@@ -52,8 +52,17 @@ public sealed class NsUserDefaultsKeyValueStore : IKeyValueStore
     public bool TryGetBool(string key, out bool value)
     {
         // NSUserDefaults.BoolForKey returns false for both "absent"
-        // and "explicitly false." Use ObjectForKey to disambiguate.
-        if (Defaults.ValueForKey(new NSString(key)) is null)
+        // and "explicitly false." Probe ObjectForKey to disambiguate.
+        // (ObjectForKey is the documented NSUserDefaults method;
+        // ValueForKey is the inherited KVC accessor which happens
+        // to dispatch here but isn't the public surface.)
+        // Use the public string-keyed indexer rather than
+        // ObjectForKey — Sharpie binds NSUserDefaults's ObjectForKey
+        // overloads as non-public, but the indexer resolves to the
+        // same `objectForKey:` method underneath. ValueForKey
+        // (inherited KVC) would also work but isn't the documented
+        // NSUserDefaults surface, just an NSObject fallback.
+        if (Defaults[key] is null)
         {
             value = false;
             return false;
@@ -66,7 +75,13 @@ public sealed class NsUserDefaultsKeyValueStore : IKeyValueStore
 
     public bool TryGetDouble(string key, out double value)
     {
-        if (Defaults.ValueForKey(new NSString(key)) is null)
+        // Use the public string-keyed indexer rather than
+        // ObjectForKey — Sharpie binds NSUserDefaults's ObjectForKey
+        // overloads as non-public, but the indexer resolves to the
+        // same `objectForKey:` method underneath. ValueForKey
+        // (inherited KVC) would also work but isn't the documented
+        // NSUserDefaults surface, just an NSObject fallback.
+        if (Defaults[key] is null)
         {
             value = 0;
             return false;

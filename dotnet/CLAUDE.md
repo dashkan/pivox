@@ -556,6 +556,82 @@ are always current. This is the standard async-router shape; the
 alternative (lock-and-mutate-sync, post-the-event) buys nothing and
 adds a lock. Document it on each service that uses the pattern.
 
+### Testing Rule-12 services — install a real UI sync context
+
+xUnit 2.x's default `AsyncTestSyncContext` is **not** a single-threaded
+message pump. Its `Post(callback, state)` delegates to the
+`ThreadPool`, so a Rule-12 service constructed inside a test captures
+the AsyncTestSyncContext as `_uiContext`, then sees its own posted
+callbacks run on whichever TP worker dequeues them — with
+`SynchronizationContext.Current == null` on that worker thread. This
+breaks two production invariants in tests:
+
+1. **The fast-path identity check.** Rule-12 services do
+   `if (SynchronizationContext.Current == _uiContext) ApplySync(); else Post(...)`.
+   In production both branches give correct behavior; in xUnit, code
+   running on the test thread takes the fast path while code after an
+   `await` (when the test continuation lands on a TP worker)
+   reference-compares `null != _uiContext` and takes the **Post**
+   path. Tests then see "eventual consistency" semantics that
+   production never exhibits.
+2. **Cross-thread ordering.** Multiple Posted callbacks can run
+   *concurrently* on different TP workers, exposing ordering races
+   between handler steps that on a real UI pump are strictly
+   serial. These manifest as flaky tests that "pass on retry" or
+   asymmetric pass/fail with diagnostic output enabled.
+
+**The fix:** wrap test bodies in `UiThread.Run` (lives at
+`Pivox.Shared.Tests/Threading/UiThread.cs`). It uses
+`Microsoft.VisualStudio.Threading.JoinableTaskFactory.Run` to
+install a single-threaded `SynchronizationContext` on the test
+thread, pump it for the duration of an `async` lambda, and tear it
+down. Inside the lambda, `SynchronizationContext.Current` is the
+JTF's main-thread context; every `await` resumes on the same
+context; identity checks against captured contexts hold; Posted
+callbacks are strictly serial.
+
+```csharp
+[Fact]
+public void Whatever() => UiThread.Run(async () =>
+{
+    var vm = BuildVm(...);
+    org.Current = "organizations/other";  // synchronous fast-path
+    Assert.Empty(vm.Messages);            // no WaitForState workaround
+});
+```
+
+**When to use it.** Tests where the system under test (or any
+collaborator constructed in the test) captures
+`SynchronizationContext.Current` at construction and throws if
+null. Today: `ActiveOrganization`, `ConversationViewModel`,
+`AppRouter`. New Rule-12 services automatically join this list when
+added.
+
+**When NOT to use it.** Pure-function tests (parsers, decoders,
+validators, value types, gRPC-client config builders, JWT
+verification). The setup cost is real, and wrapping
+non-UI-touching tests lies about their actual contract. If you're
+testing a static method that takes a string and returns a string,
+plain `[Fact]` is correct.
+
+**How to recognize the failure mode.** Symptoms that suggest you're
+missing `UiThread.Run`:
+
+- Tests pass with diagnostic prints inserted, fail without.
+- Tests fail with assertion shapes like "State == Idle but Messages
+  not empty" — i.e., a Rule-12 handler ran partially, with
+  observable bookkeeping inconsistent with the state machine.
+- Tests pass on the first run after `dotnet clean`, fail on
+  re-runs (TP warm-up timing shifted).
+- Diagnostic `Console.Error.WriteLine` shows
+  `SynchronizationContext.Current` as `null` inside a callback
+  that production callers always hit on the UI thread.
+
+If you find a test fighting test-environment threading, the fix is
+**always** to use `UiThread.Run`. Do not patch production code to
+work around test threading — production is correct by Rule 12;
+tests have to honor it.
+
 ## Rule 13: never manually `Dispose()` AppKit NS* peers
 
 AppKit owns its native objects; the managed `NSObject` subclass

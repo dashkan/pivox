@@ -22,11 +22,22 @@ internal sealed class InMemoryKeyValueStore : IKeyValueStore
     public Dictionary<string, object?> Backing { get; } = new();
 
     public string? GetString(string key)
-        => Backing.TryGetValue(key, out var v) ? v as string : null;
+    {
+        if (!Backing.TryGetValue(key, out var v)) return null;
+        var s = v as string;
+        // Mirror NsUserDefaultsKeyValueStore + the WinUI handoff
+        // skeleton: empty-string and absent are collapsed into null
+        // so callers see one canonical "no preference" representation
+        // regardless of platform. A test that exposes a divergence
+        // between this impl and the platform impls would be the kind
+        // of test-infra drift the project's CLAUDE.md test guidance
+        // explicitly warns against.
+        return string.IsNullOrEmpty(s) ? null : s;
+    }
 
     public void SetString(string key, string? value)
     {
-        if (value is null) Backing.Remove(key);
+        if (string.IsNullOrEmpty(value)) Backing.Remove(key);
         else Backing[key] = value;
     }
 

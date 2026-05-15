@@ -43,4 +43,13 @@ public enum ChatErrorKind
     /// distinguish cancellation from network-interrupted-mid-stream
     /// when transitioning state.</summary>
     Cancelled,
+
+    /// <summary>Client-side precondition failure: no organization is
+    /// currently selected, so the chat call can't be scoped. UI
+    /// should prompt the user to pick an organization (typically by
+    /// gating the composer until <c>ActiveOrganization.Current</c>
+    /// is non-null). Distinct from <see cref="Server"/> so
+    /// telemetry, future routing, and error dashboards can
+    /// distinguish "we never tried" from "the server rejected us."</summary>
+    NoOrganization,
 }

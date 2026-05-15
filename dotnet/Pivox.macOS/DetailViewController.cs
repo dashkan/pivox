@@ -144,13 +144,45 @@ public sealed class DetailViewController : NSViewController
     /// (or default to the first if no persisted value matches).
     /// Disables the picker while loading; enables on success;
     /// surfaces a status message on failure.</summary>
+    /// <summary>Upper bound on a single user's org-membership list
+    /// for picker purposes. AIP-158 caps server-side page size at
+    /// 1000; setting our request size at that ceiling means a user
+    /// belonging to up to 1000 orgs gets a complete list in one
+    /// round-trip without surfacing pagination plumbing in the
+    /// picker. Real-world membership counts are O(1–10); the
+    /// ceiling exists to defend against a future heavy-user
+    /// scenario rather than to support it. If a user ever has
+    /// &gt;1000 memberships, the truncation logging below makes the
+    /// shortfall visible at runtime — at that point the picker
+    /// itself needs a different affordance (search, virtualized
+    /// list) before pagination is even useful UX.</summary>
+    private const int OrganizationListPageSize = 1000;
+
     private async Task PopulateOrganizationsAsync()
     {
         _status.StringValue = "";
         try
         {
             var response = await _pivox.Organizations.ListOrganizationsAsync(
-                new ListOrganizationsRequest());
+                new ListOrganizationsRequest
+                {
+                    PageSize = OrganizationListPageSize,
+                });
+
+            // If the server filled the page AND signaled more, log
+            // it. Defaulting to a single page is wrong for a >1k
+            // membership user; we'd silently drop the tail of the
+            // list. The picker doesn't paginate today — this surfaces
+            // the shortfall so a future Phase D affordance has a
+            // breadcrumb to follow rather than a silent regression.
+            if (!string.IsNullOrEmpty(response.NextPageToken))
+            {
+                Console.Error.WriteLine(
+                    "[DetailViewController] ListOrganizations returned "
+                    + $"{response.Organizations.Count} orgs with a "
+                    + "NextPageToken set; the picker is showing only "
+                    + "the first page. Add pagination to surface the rest.");
+            }
 
             _organizations.Clear();
             _organizationPicker.RemoveAllItems();
@@ -174,18 +206,36 @@ public sealed class DetailViewController : NSViewController
             _organizationPicker.Enabled = true;
 
             // Restore the persisted selection if it's still in the
-            // membership list; otherwise default to the first org.
-            // Either way we WRITE through ActiveOrganization.Current so
-            // a defaulted-to-first selection persists for next launch
-            // (the user explicitly opting-into the default counts).
+            // membership list; otherwise default to first AS A
+            // VISUAL DEFAULT ONLY — don't write through to
+            // ActiveOrganization. Persisting an unsolicited default
+            // pretends the user picked when they didn't, which
+            // (a) removes the future ability to change the default
+            // without disrupting users, and (b) makes the picker's
+            // "remembered choice" semantics dishonest. On the user's
+            // first real interaction with the picker
+            // (OnOrganizationSelectionChanged), we'll persist.
             var persisted = _activeOrganization.Current;
             var matchIndex = persisted is null
                 ? -1
                 : _organizations.FindIndex(o => o.Name == persisted);
-            var selectedIndex = matchIndex >= 0 ? matchIndex : 0;
-
-            _organizationPicker.SelectItem(selectedIndex);
-            _activeOrganization.Current = _organizations[selectedIndex].Name;
+            if (matchIndex >= 0)
+            {
+                _organizationPicker.SelectItem(matchIndex);
+                // _activeOrganization.Current already matches; no
+                // re-write needed (same-value sets are suppressed
+                // anyway but skipping the round-trip is cleaner).
+            }
+            else
+            {
+                // Visual default to first; ActiveOrganization stays
+                // at whatever it was (null on first launch, or some
+                // stale value the user is no longer a member of).
+                // Downstream consumers (chat) see Current as null
+                // and gate their UI on it. The next picker
+                // interaction commits a real choice.
+                _organizationPicker.SelectItem(0);
+            }
         }
         catch (Grpc.Core.RpcException ex)
         {

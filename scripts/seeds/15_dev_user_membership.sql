@@ -58,8 +58,13 @@ DECLARE
     org_slug       TEXT;
     org_id_var     UUID;
     owner_role_id  UUID;
-    bound_count    INTEGER := 0;
-    skipped_count  INTEGER := 0;
+    inserted       INTEGER;
+    -- Count of (org_id, user_id, role_id) rows newly written. A
+    -- reseed that re-binds the same set has bound=0 because the
+    -- WHERE NOT EXISTS suppresses the INSERT — the bound number
+    -- reflects net new memberships, not iterations.
+    bound          INTEGER := 0;
+    skipped        INTEGER := 0;
 BEGIN
     -- 1) Identity. ON CONFLICT (firebase_uid) lets a real sign-in
     --    overwrite the seeded skeleton with live Firebase data
@@ -81,16 +86,16 @@ BEGIN
     LOOP
         SELECT id INTO org_id_var FROM organizations WHERE name = org_slug;
         IF org_id_var IS NULL THEN
-            RAISE NOTICE 'Skipping membership: org "%" not found (expected in 01_organizations.sql).', org_slug;
-            skipped_count := skipped_count + 1;
+            RAISE NOTICE 'Skipping membership for %: org not in organizations table.', org_slug;
+            skipped := skipped + 1;
             CONTINUE;
         END IF;
 
         SELECT id INTO owner_role_id FROM roles
             WHERE org_id = org_id_var AND name = 'owner' AND is_system = true;
         IF owner_role_id IS NULL THEN
-            RAISE NOTICE 'Skipping membership: owner role for "%" not found (expected in 12_dev_org_roles.sql).', org_slug;
-            skipped_count := skipped_count + 1;
+            RAISE NOTICE 'Skipping membership for %: owner role missing.', org_slug;
+            skipped := skipped + 1;
             CONTINUE;
         END IF;
 
@@ -103,10 +108,14 @@ BEGIN
               AND role_id = owner_role_id
         );
 
-        bound_count := bound_count + 1;
+        -- Count rows actually written, not loop iterations. A
+        -- reseed against an already-bound org skips the INSERT and
+        -- correctly contributes 0 to the bound count.
+        GET DIAGNOSTICS inserted = ROW_COUNT;
+        bound := bound + inserted;
     END LOOP;
 
     RAISE NOTICE
-        'Seeded dev user membership: ashkan (%) bound as owner of % dev org(s); % skipped.',
-        ashkan_id, bound_count, skipped_count;
+        'Seeded dev user membership: ashkan (%) — % new binding(s), % skipped.',
+        ashkan_id, bound, skipped;
 END $$;

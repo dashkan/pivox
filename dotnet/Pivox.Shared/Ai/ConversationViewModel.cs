@@ -166,7 +166,7 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
         if (string.IsNullOrEmpty(organizationName))
         {
             FailWith(
-                ChatErrorKind.Server,
+                ChatErrorKind.NoOrganization,
                 "Select an organization before sending a message.");
             return;
         }
@@ -210,9 +210,10 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
         // immediately. Prior CTS should be null on a healthy second
         // send (FinishStream / FailWith dispose it), but the
         // Interlocked.Exchange handles re-entry edges safely.
-        var oldCts = Interlocked.Exchange(ref _streamCts, new CancellationTokenSource());
+        var ownedCts = new CancellationTokenSource();
+        var oldCts = Interlocked.Exchange(ref _streamCts, ownedCts);
         oldCts?.Dispose();
-        var token = _streamCts!.Token;
+        var token = ownedCts.Token;
 
         try
         {
@@ -249,6 +250,21 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
         }
         catch (OperationCanceledException)
         {
+            // Ownership check: if another path (org-switch handler,
+            // re-entrant Send, Dispose) already swapped our CTS out
+            // and reset the VM state, our cleanup would corrupt the
+            // NEW stream's state (clear its inflight, reset its
+            // CTS). Bail out leaving the new owner in control.
+            // Without this, two interleaved sends — even when gated
+            // by the UI thread — can scramble each other's state if
+            // a runloop tick lets a Send dispatch between an
+            // org-change handler's clear and the cancelled iterator's
+            // catch block.
+            if (!ReferenceEquals(_streamCts, ownedCts)
+                && Volatile.Read(ref _streamCts) is not null)
+            {
+                return;
+            }
             // Cancel() was called or token tripped externally. Drop
             // the in-flight placeholder if it's still empty (no
             // deltas arrived), keep it if it has partial content
@@ -264,7 +280,13 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
         {
             // Server returned Cancelled status — treat as a clean
             // cancel, not as an error. Keeps the state-machine
-            // diagram honest ("* --Cancel--> Idle").
+            // diagram honest ("* --Cancel--> Idle"). Same ownership
+            // gate as above.
+            if (!ReferenceEquals(_streamCts, ownedCts)
+                && Volatile.Read(ref _streamCts) is not null)
+            {
+                return;
+            }
             DiscardEmptyInflight();
             _inflight = null;
             State = ConversationState.Idle;
@@ -273,12 +295,25 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
         }
         catch (ChatException ex)
         {
+            // Same ownership gate. If our CTS was already swapped
+            // out, the failure belongs to a stream the new owner is
+            // managing — don't double-report.
+            if (!ReferenceEquals(_streamCts, ownedCts)
+                && Volatile.Read(ref _streamCts) is not null)
+            {
+                return;
+            }
             FailWith(ex.Kind, ex.Message);
         }
         catch (Exception ex)
         {
             // Unexpected — wrap as Server. The implementation should
             // have caught and rewrapped, but defense-in-depth.
+            if (!ReferenceEquals(_streamCts, ownedCts)
+                && Volatile.Read(ref _streamCts) is not null)
+            {
+                return;
+            }
             FailWith(ChatErrorKind.Server, ex.Message);
         }
     }

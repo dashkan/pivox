@@ -195,9 +195,11 @@ consumes three new shared types:
 
 | File | Purpose |
 |---|---|
-| `Persistence/IKeyValueStore.cs` | Cross-platform abstraction for non-secret user preferences. Methods: `GetString` / `SetString` (null clears), `TryGetBool` / `SetBool`, `TryGetDouble` / `SetDouble`. Plus `TryGetEnum<T>` / `SetEnum<T>` extension methods (string-encoded, AOT-trim-safe). |
-| `Persistence/IKeyValueStore.cs` (extensions) | `KeyValueStoreExtensions.TryGetEnum<T>` / `SetEnum<T>` for storing enums as their name strings. |
-| `Organization/ActiveOrganization.cs` | Observable holder for the currently-active organization resource name (e.g. `organizations/acme`). INPC-based. Persists `Current` through the injected `IKeyValueStore` under the `pivox.active_organization` key. Null = no organization selected. |
+| `Persistence/IKeyValueStore.cs` | Cross-platform abstraction for non-secret user preferences. Methods: `GetString` / `SetString` (null clears), `TryGetBool` / `SetBool`, `TryGetDouble` / `SetDouble`. The file also defines `KeyValueStoreExtensions.TryGetEnum<T>` / `SetEnum<T>` — name-string-encoded enum storage, AOT-trim-safe (no reflection). |
+| `Organization/ActiveOrganization.cs` | Observable holder for the currently-active organization resource name (e.g. `organizations/acme`). INPC-based. Persists `Current` through the injected `IKeyValueStore` under the `pivox.active_organization` key. Null = no organization selected. Rule 12: captures `SynchronizationContext.Current` at construction, throws if null; fast-path synchronous mutation when set on the captured context, posts otherwise. |
+| `Ai/IChatService.cs` (signature change) | `StreamGenerateAsync` now takes `organizationName` as its first parameter — the service is stateless re: organization, no longer bound at construction. |
+| `Ai/ConversationViewModel.cs` (ctor change) | Takes `(IChatService chat, ActiveOrganization activeOrganization)`. Subscribes to `ActiveOrganization.PropertyChanged`; on org change cancels in-flight stream + clears `Messages` + resets state to Idle. |
+| `Ai/ChatErrorKind.cs` (new value) | `NoOrganization` — surfaced when `SendAsync` is called with `ActiveOrganization.Current == null`. UI should gate the composer until an org is selected. |
 
 ### What WinUI builds
 
@@ -206,9 +208,12 @@ Backs `IKeyValueStore` with `Windows.Storage.ApplicationData.Current.LocalSettin
 — the WinUI-canonical user-preferences store, per-app-package per-user
 container, automatic persistence. macOS reference impl is at
 `dotnet/Pivox.macOS/Persistence/NsUserDefaultsKeyValueStore.cs` and
-shows the expected method semantics (null-string normalization,
-absent-key handling, the `ObjectForKey != null` trick to
-disambiguate "set to false" from "absent" for bool/double).
+shows the expected method semantics: null-string normalization
+(empty-string → null on read and write), absent-key handling for
+`TryGet*`, and the "absent vs. zero-valued" disambiguation for
+`TryGetBool` / `TryGetDouble`. The WinUI impl uses
+`Values.TryGetValue(key, out var v)` for the disambiguation — no
+indexer trick required (that was a Sharpie binding quirk on macOS).
 
 Skeleton:
 
@@ -247,6 +252,23 @@ public sealed class ApplicationDataKeyValueStore : IKeyValueStore
     // TryGetDouble / SetDouble — mirror TryGetBool / SetBool with double.
 }
 ```
+
+**Probe semantics — defer manual verification to step 2b.** The
+macOS `NsUserDefaultsKeyValueStore` uses an indexer (`Defaults[key]`)
+to disambiguate "absent" from "stored as false/0" because Sharpie
+binds `NSUserDefaults.ObjectForKey(string)` as non-public.
+`ApplicationData.LocalSettings.Values` is an
+`IPropertySet`/`IDictionary<string, object>` — the
+`TryGetValue` overload returns the value-vs-absence distinction
+directly, no indexer trick needed. Skeleton above is correct on
+that front.
+
+Manual probe deferred to step 2b validation: round-trip a `false`
+bool through `SetBool` / `TryGetBool` against a fresh app data
+container, then a missing key, then verify the bool path
+disambiguates correctly. Code-level mirroring of the macOS
+semantics isn't enough — `ApplicationData.LocalSettings`'s actual
+behavior under "value was set but is the type's zero" can surprise.
 
 ### What WinUI wires up
 
@@ -308,7 +330,9 @@ contract.
 - [ ] `ApplicationDataKeyValueStore` implements `IKeyValueStore`,
       builds clean
 - [ ] Composition root constructs `IKeyValueStore` →
-      `ActiveOrganization` → wires through to consumers
+      `ActiveOrganization` → wires through to consumers, on the
+      dispatcher thread (so the Rule-12 ctor SyncContext capture
+      succeeds)
 - [ ] `RememberedEmail` refactored onto `IKeyValueStore` (the
       existing direct-`ApplicationData` usage replaced)
 - [ ] `WindowsChatService` constructor drops the
@@ -317,6 +341,17 @@ contract.
       `organizationName` as the first parameter and validates it
 - [ ] Org selector somewhere in the shell writes
       `ActiveOrganization.Current`
+- [ ] If `Pivox.WinUI.Tests` exists or is added, all tests that
+      construct `ActiveOrganization` / `ConversationViewModel` wrap
+      their body in `UiThread.Run` (reference shape:
+      `Pivox.Shared.Tests/Threading/UiThread.cs` and the rewritten
+      `Pivox.Shared.Tests/Ai/ConversationViewModelTests.cs`)
+- [ ] Manual probe: `TryGetBool("k", out v)` returns `(false, false)`
+      for a missing key, then `SetBool("k", false)` then
+      `TryGetBool("k", out v)` returns `(true, false)` — i.e. the
+      "stored as false" case is distinguishable from "absent" via
+      `ApplicationData.LocalSettings.Values.TryGetValue`. Same probe
+      for `TryGetDouble` with value `0`.
 - [ ] Manual probe: switch organization while a chat stream is
       mid-flight, verify the transcript clears and state returns
       to Idle without a window flicker
@@ -330,17 +365,47 @@ These apply identically on WinUI. Internalize before writing code:
 
 ### Rule 12 — UI-thread events
 
-`ConversationViewModel` captures `SynchronizationContext.Current`
-at construction and **throws** if absent. WinUI 3 installs a
-dispatcher-backed sync context on the UI thread via
-`DispatcherQueueSynchronizationContext` — the VM construction must
-happen on the dispatcher thread. The viewmodel relies on
-`ConfigureAwait(true)` (default) to keep stream-iteration
-continuations on the captured context; the caller's contract is
-"call `SendAsync` from the UI thread."
+`ConversationViewModel` and `ActiveOrganization` capture
+`SynchronizationContext.Current` at construction and **throw** if
+absent. WinUI 3 installs a dispatcher-backed sync context on the
+UI thread via `DispatcherQueueSynchronizationContext` — these
+types must be constructed on the dispatcher thread (i.e. inside
+`App.OnLaunched` or any subsequent UI callback). The viewmodel
+relies on `ConfigureAwait(true)` (default) to keep
+stream-iteration continuations on the captured context; the
+caller's contract is "call `SendAsync` from the UI thread."
 
 `WindowsChatService` itself doesn't need explicit `Post` —
 `Grpc.Net.Client`'s async iterators resume on the captured context.
+
+**Testing — install a real UI sync context.** xUnit 2's default
+`AsyncTestSyncContext` dispatches Posts to the ThreadPool, which
+breaks Rule-12 service identity checks and exposes ordering races
+that don't exist in production. The shared-tests project pulls
+`Microsoft.VisualStudio.Threading` and provides
+`Pivox.Shared.Tests/Threading/UiThread.cs`, which uses
+`JoinableTaskFactory.Run` to install a single-threaded sync
+context for the duration of an async test body. Any test that
+constructs `ActiveOrganization` or `ConversationViewModel` (or any
+future Rule-12 service) MUST wrap its body in `UiThread.Run`:
+
+```csharp
+[Fact]
+public void Whatever() => UiThread.Run(async () =>
+{
+    var (vm, org) = BuildVm(...);
+    org.Current = "organizations/other";   // synchronous fast path
+    Assert.Empty(vm.Messages);
+});
+```
+
+The same helper applies if `Pivox.WinUI.Tests` ever lands — add a
+project reference to `Pivox.Shared.Tests` (or duplicate the
+30-line helper). Pure-function tests (parsers, decoders, anything
+that doesn't capture a sync context at construction) stay plain
+`[Fact]` — wrapping non-UI code in `UiThread.Run` lies about the
+contract. Full rationale + failure-mode signatures live in
+`dotnet/CLAUDE.md` under Rule 12 → "Testing Rule-12 services."
 
 ### Rule 13–18 — AppKit-specific, not applicable
 
