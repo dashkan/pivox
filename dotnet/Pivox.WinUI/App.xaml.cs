@@ -102,17 +102,24 @@ public partial class App : Application
         window.SystemBackdrop = new Microsoft.UI.Xaml.Media.DesktopAcrylicBackdrop();
         window.ExtendsContentIntoTitleBar = true;
 
-        // Minimal title bar for drag region.
-        var grid = new Microsoft.UI.Xaml.Controls.Grid();
-        grid.RowDefinitions.Add(new Microsoft.UI.Xaml.Controls.RowDefinition { Height = new GridLength(32) });
-        grid.RowDefinitions.Add(new Microsoft.UI.Xaml.Controls.RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var grid = new Grid();
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(32) });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        var titleBar = new Microsoft.UI.Xaml.Controls.Border { Margin = new Thickness(12, 0, 0, 0) };
-        Microsoft.UI.Xaml.Controls.Grid.SetRow(titleBar, 0);
+        // Drag region for the title bar.
+        var titleBar = new Border { Margin = new Thickness(12, 0, 0, 0) };
+        Grid.SetRow(titleBar, 0);
         grid.Children.Add(titleBar);
         window.SetTitleBar(titleBar);
 
-        Microsoft.UI.Xaml.Controls.Grid.SetRow(page, 1);
+        // Radial accent backdrop behind the card — spans the full
+        // content area. Mirrors macOS RadialBackdropView.
+        var backdrop = new UI.RadialBackdropElement();
+        Grid.SetRow(backdrop, 1);
+        grid.Children.Add(backdrop);
+
+        // Auth page on top of the backdrop.
+        Grid.SetRow(page, 1);
         grid.Children.Add(page);
 
         window.Content = grid;

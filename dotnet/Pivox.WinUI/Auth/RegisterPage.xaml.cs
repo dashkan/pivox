@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Pivox.Shared.Auth;
 using Pivox.Shared.Navigation;
+using Windows.System;
 
 namespace Pivox.Auth;
 
@@ -23,6 +25,17 @@ public sealed partial class RegisterPage : Page
         _router = router;
         _vm.PropertyChanged += OnViewModelChanged;
         ApplyState();
+    }
+
+    // ── default button via PreviewKeyDown (tunneling) ──────────
+
+    private void Page_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Enter && CreateAccountButton.IsEnabled)
+        {
+            e.Handled = true;
+            CreateAccountButton_Click(CreateAccountButton, new RoutedEventArgs());
+        }
     }
 
     // ── field bindings ───────────────────────────────────────────

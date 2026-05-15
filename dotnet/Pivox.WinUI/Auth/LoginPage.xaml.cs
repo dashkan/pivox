@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Pivox.Shared.Auth;
 using Pivox.Shared.Navigation;
+using Windows.System;
 
 namespace Pivox.Auth;
 
@@ -40,6 +42,17 @@ public sealed partial class LoginPage : Page
 
         _vm.PropertyChanged += OnViewModelChanged;
         ApplyState();
+    }
+
+    // ── default button via PreviewKeyDown (tunneling) ──────────
+
+    private void Page_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Enter && PrimaryButton.IsEnabled)
+        {
+            e.Handled = true;
+            PrimaryButton_Click(PrimaryButton, new RoutedEventArgs());
+        }
     }
 
     // ── field bindings ───────────────────────────────────────────
@@ -118,9 +131,13 @@ public sealed partial class LoginPage : Page
         if (!revealed && PasswordBox.Password != _vm.Password)
             PasswordBox.Password = _vm.Password;
 
-        // Focus password field when step 2 reveals.
+        // Focus password field when step 2 reveals. Deferred so layout
+        // completes first — Focus on a Collapsed→Visible control is a
+        // no-op if the control hasn't been measured yet.
         if (revealed && !_previousDidResolveAsPassword)
-            PasswordBox.Focus(FocusState.Programmatic);
+        {
+            DispatcherQueue.TryEnqueue(() => PasswordBox.Focus(FocusState.Programmatic));
+        }
         _previousDidResolveAsPassword = revealed;
 
         EmailBox.IsEnabled = !loading;
