@@ -71,10 +71,19 @@ public enum AuthErrorCode
     OperationNotAllowed,
 
     /// <summary>The account has been disabled server-side
-    /// (<c>UserDisabled</c>). Surfaces prominently on app launch
-    /// once the AuthStateChanged listener force-refreshes the
-    /// token against Firebase's servers — without that refresh,
-    /// the locally-cached JWT looks valid and the disabled
-    /// account would silently get into the app.</summary>
+    /// (<c>UserDisabled</c>). Surfaces on app launch when the
+    /// force-refresh during construction discovers the disabled
+    /// state, and on every sign-in attempt against a disabled
+    /// account (Firebase checks the disabled flag before
+    /// validating the password).
+    ///
+    /// Security note: the user-facing string for this code is
+    /// deliberately collapsed with
+    /// <see cref="WrongPassword"/> in
+    /// <c>AuthErrorMessages.Get</c> — distinguishing them would
+    /// be an email-enumeration oracle. The discriminator stays
+    /// here for internal use (logging, telemetry, admin tooling
+    /// that needs to distinguish the cases without surfacing the
+    /// distinction to end users).</summary>
     UserDisabled,
 }

@@ -142,7 +142,16 @@ Firebase message" pattern that both platforms had:
 - `Pivox.Shared.Auth.AuthErrorMessages.Get(AuthErrorCode)` — static
   mapper returning the user-facing string for each code. Strings
   taken verbatim from SwiftUI's `firebaseErrorMessage(_:)` in
-  `native/.../Auth/AuthService.swift`.
+  `native/.../Auth/AuthService.swift`, with one deliberate exception:
+  `AuthErrorCode.UserDisabled` returns the SAME string as
+  `WrongPassword` ("Incorrect email or password."). Firebase's
+  email/password endpoint checks the disabled-account flag BEFORE
+  password validation, so a distinct "This account has been
+  disabled." message would be a clean email-enumeration oracle —
+  any password attempt against a disabled email leaks "this email
+  exists in our system." The discriminator code stays separate for
+  telemetry/admin-tooling use; only the user-facing message is
+  unified. **Don't undo this when implementing the WinUI mapping.**
 - `Pivox.Shared.Auth.AuthException` — exception with `.Code` +
   user message + inner exception. ViewModels that do
   `ErrorMessage = ex.Message` get polished copy automatically.

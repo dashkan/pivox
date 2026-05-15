@@ -8,11 +8,25 @@ namespace Pivox.Shared.Auth;
 /// <c>native/.../Auth/AuthService.swift</c> — those have been in
 /// production, vetted for UX, and the SwiftUI source explicitly
 /// states all client platforms must surface identical copy.
-/// <see cref="UserDisabled"/> is an explicit addition here (SwiftUI
-/// falls through to Firebase's default for it) because the dotnet
-/// force-refresh-on-launch behavior makes the disabled-account case
-/// prominent — a polished message beats Firebase's verbose
-/// "The user account has been disabled by an administrator."
+///
+/// Security note: <see cref="AuthErrorCode.UserDisabled"/>
+/// deliberately maps to the SAME user-facing string as
+/// <see cref="AuthErrorCode.WrongPassword"/>
+/// ("Incorrect email or password."). Firebase's email/password
+/// endpoint checks the disabled-account flag BEFORE password
+/// validation, so a distinct "This account has been disabled."
+/// response would be a clean email-enumeration oracle for an
+/// attacker with a list of emails — any password attempt against a
+/// disabled email leaks "this email exists in our system." Keeping
+/// the strings identical defeats that probe path while still
+/// preserving the <c>UserDisabled</c> code internally for
+/// telemetry, admin tooling, and any future admin-facing surface
+/// that legitimately needs to distinguish the cases.
+///
+/// (SwiftUI didn't map <c>UserDisabled</c> at all and fell through
+/// to Firebase's default "The user account has been disabled by an
+/// administrator." string — same enumeration leak, more verbose.
+/// We're now stricter than the SwiftUI side here.)
 ///
 /// <see cref="AuthErrorCode.Unknown"/> doesn't get a mapping here;
 /// the platform layer should pass through its native SDK's
@@ -47,8 +61,12 @@ public static class AuthErrorMessages
             "Too many attempts. Try again later.",
         AuthErrorCode.OperationNotAllowed =>
             "This sign-in provider is not enabled.",
+        // Collapse: identical string to WrongPassword. See class
+        // doc for the email-enumeration rationale. The discriminator
+        // code remains distinct for internal use; only the user-
+        // facing message is unified.
         AuthErrorCode.UserDisabled =>
-            "This account has been disabled.",
+            "Incorrect email or password.",
         _ =>
             "Something went wrong. Please try again.",
     };
