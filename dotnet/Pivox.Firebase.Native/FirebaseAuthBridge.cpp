@@ -89,11 +89,17 @@ namespace winrt::Pivox::Firebase::Native::implementation
     winrt::Windows::Foundation::IAsyncAction
     FirebaseAuthBridge::AwaitFuture(::firebase::Future<T> const& future)
     {
-        winrt::handle event{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
-        HANDLE raw = event.get();
+        // Shared so the handle stays alive until both the coroutine
+        // frame AND the Firebase completion callback are done. If the
+        // IAsyncAction is cancelled while suspended, the coroutine
+        // frame is destroyed — without shared ownership, SetEvent
+        // would be called on a closed handle.
+        auto event = std::make_shared<winrt::handle>(
+            CreateEvent(nullptr, TRUE, FALSE, nullptr));
+        HANDLE raw = event->get();
 
         const_cast<::firebase::Future<T>&>(future).OnCompletion(
-            [raw](const ::firebase::Future<T>&) { SetEvent(raw); });
+            [event, raw](const ::firebase::Future<T>&) { SetEvent(raw); });
 
         co_await winrt::resume_on_signal(raw);
     }

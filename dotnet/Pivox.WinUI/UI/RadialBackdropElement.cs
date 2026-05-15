@@ -29,12 +29,12 @@ public sealed partial class RadialBackdropElement : Grid
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         SizeChanged += OnSizeChanged;
-        _uiSettings.ColorValuesChanged += OnSystemColorsChanged;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         _dispatcher = DispatcherQueue.GetForCurrentThread();
+        _uiSettings.ColorValuesChanged += OnSystemColorsChanged;
         BuildVisuals();
         UpdateVisualLayout();
     }

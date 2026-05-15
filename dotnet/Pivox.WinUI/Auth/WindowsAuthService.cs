@@ -63,13 +63,23 @@ public sealed class WindowsAuthService : IAuthService
                 }
                 try
                 {
-                    var jwt = await _bridge.GetIdTokenAsync(false);
+                    // Force refresh on state restore so Firebase
+                    // validates the session against the server.
+                    // A cached token looks valid locally even if
+                    // the account was disabled/deleted — only a
+                    // server round-trip catches that.
+                    var jwt = await _bridge.GetIdTokenAsync(true);
                     SetCurrent(BuildSession(jwt));
                 }
                 catch (Exception ex)
                 {
+                    // Token fetch failed — account deleted, token
+                    // revoked, or network error during refresh.
+                    // Treat as signed out so the router shows Login
+                    // rather than leaving the app in limbo.
                     Console.Error.WriteLine(
                         $"[Auth] token fetch on state change failed: {ex.Message}");
+                    SetCurrent(null);
                 }
             });
         };
@@ -160,8 +170,10 @@ public sealed class WindowsAuthService : IAuthService
 
     public Task SignOutAsync(CancellationToken ct = default)
     {
+        // SignOut triggers AuthStateChanged → listener dispatches
+        // SetCurrent(null) to UI thread. No explicit SetCurrent
+        // here — Rule 14: pick one path.
         _bridge.SignOut();
-        SetCurrent(null);
         return Task.CompletedTask;
     }
 
@@ -372,11 +384,11 @@ public sealed class WindowsAuthService : IAuthService
         var tcs = new TaskCompletionSource<string>();
         var window = new Window { Title = "Sign In — Pivox" };
         var webView = new WebView2();
-        var callbackFired = false;
+        var callbackFired = 0; // interlocked — ct callback is threadpool
 
         ct.Register(() =>
         {
-            if (!callbackFired)
+            if (Interlocked.CompareExchange(ref callbackFired, 0, 0) == 0)
                 window.DispatcherQueue.TryEnqueue(() => window.Close());
         });
 
@@ -388,8 +400,7 @@ public sealed class WindowsAuthService : IAuthService
                 return;
 
             args.Cancel = true;
-            if (callbackFired) return;
-            callbackFired = true;
+            if (Interlocked.Exchange(ref callbackFired, 1) != 0) return;
 
             var query = HttpUtility.ParseQueryString(new Uri(uri).Query);
             var returnedState = query["state"];
@@ -419,7 +430,8 @@ public sealed class WindowsAuthService : IAuthService
 
         window.Closed += (_, _) =>
         {
-            if (!callbackFired) { callbackFired = true; tcs.TrySetCanceled(); }
+            if (Interlocked.Exchange(ref callbackFired, 1) == 0)
+                tcs.TrySetCanceled();
         };
 
         window.Content = webView;
@@ -442,11 +454,11 @@ public sealed class WindowsAuthService : IAuthService
         var tcs = new TaskCompletionSource<string>();
         var window = new Window { Title = "Sign In — Pivox" };
         var webView = new WebView2();
-        var callbackFired = false;
+        var callbackFired = 0;
 
         ct.Register(() =>
         {
-            if (!callbackFired)
+            if (Interlocked.CompareExchange(ref callbackFired, 0, 0) == 0)
                 window.DispatcherQueue.TryEnqueue(() => window.Close());
         });
 
@@ -458,8 +470,7 @@ public sealed class WindowsAuthService : IAuthService
                 return;
 
             args.Cancel = true;
-            if (callbackFired) return;
-            callbackFired = true;
+            if (Interlocked.Exchange(ref callbackFired, 1) != 0) return;
 
             tcs.TrySetResult(uri);
             window.Close();
@@ -467,7 +478,8 @@ public sealed class WindowsAuthService : IAuthService
 
         window.Closed += (_, _) =>
         {
-            if (!callbackFired) { callbackFired = true; tcs.TrySetCanceled(); }
+            if (Interlocked.Exchange(ref callbackFired, 1) == 0)
+                tcs.TrySetCanceled();
         };
 
         window.Content = webView;

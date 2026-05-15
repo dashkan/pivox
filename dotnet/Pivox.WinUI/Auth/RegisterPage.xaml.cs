@@ -55,13 +55,22 @@ public sealed partial class RegisterPage : Page
     // ── button handlers ──────────────────────────────────────────
 
     private async void CreateAccountButton_Click(object sender, RoutedEventArgs e)
-        => await _vm.CreateAccountAsync();
+    {
+        try { await _vm.CreateAccountAsync(); }
+        catch (Exception ex) { Console.Error.WriteLine($"[Register] {ex.Message}"); }
+    }
 
     private async void GoogleButton_Click(object sender, RoutedEventArgs e)
-        => await _vm.SignInWithGoogleAsync();
+    {
+        try { await _vm.SignInWithGoogleAsync(); }
+        catch (Exception ex) { Console.Error.WriteLine($"[Register] {ex.Message}"); }
+    }
 
     private async void GitHubButton_Click(object sender, RoutedEventArgs e)
-        => await _vm.SignInWithGitHubAsync();
+    {
+        try { await _vm.SignInWithGitHubAsync(); }
+        catch (Exception ex) { Console.Error.WriteLine($"[Register] {ex.Message}"); }
+    }
 
     private void SignInButton_Click(object sender, RoutedEventArgs e)
         => _router.Pop();

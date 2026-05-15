@@ -37,15 +37,27 @@ public partial class App : Application
         _pivox = new PivoxClient(_auth);
         _rememberedEmail = new RememberedEmail();
 
-        // Router starts at Login; auth state listener swaps to Shell
-        // if a persisted session is restored.
         _router = new AppRouter(new AppRoute.Login());
 
         _auth.CurrentChanged += OnAuthChanged;
         _router.CurrentChanged += OnRouteChanged;
 
-        // Render the initial route (Login).
-        RenderRoute(_router.Current);
+        // Defer the initial render by one dispatcher tick. The
+        // WindowsAuthService constructor dispatches the Firebase
+        // auth-state-restore event via TryEnqueue; if we rendered
+        // immediately we'd show Login for one frame before the
+        // handler swaps to Shell. Deferring lets the auth state
+        // resolve first — if there's a persisted session, the
+        // handler fires OnAuthChanged → ReplaceRoot(Shell) before
+        // the deferred render runs, and _currentWindow is already
+        // set. If there's no session, the handler is a no-op and
+        // the deferred render shows Login with no flicker.
+        Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()
+            .TryEnqueue(() =>
+            {
+                if (_currentWindow is null)
+                    RenderRoute(_router!.Current);
+            });
     }
 
     private void OnAuthChanged(object? sender, AuthSession? session)

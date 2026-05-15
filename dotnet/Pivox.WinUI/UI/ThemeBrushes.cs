@@ -24,7 +24,7 @@ public static class ThemeBrushes
         ThemeColor.Foreground          => ResourceBrush("TextFillColorPrimaryBrush"),
         ThemeColor.SecondaryForeground => ResourceBrush("TextFillColorSecondaryBrush"),
         ThemeColor.Border              => ResourceBrush("ControlStrokeColorDefaultBrush"),
-        ThemeColor.Destructive         => new SolidColorBrush(ColorFrom(0xFFE8, 0x3B, 0x3B)),
+        ThemeColor.Destructive         => new SolidColorBrush(ColorFrom(0xE8, 0x3B, 0x3B)),
         ThemeColor.Background          => ResourceBrush("SolidBackgroundFillColorBaseBrush"),
         ThemeColor.Surface             => ResourceBrush("LayerFillColorDefaultBrush"),
         _ => throw new ArgumentOutOfRangeException(nameof(token), token, null),
