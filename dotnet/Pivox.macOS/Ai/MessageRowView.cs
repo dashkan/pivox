@@ -78,10 +78,6 @@ internal sealed class MessageRowView : NSView
         _body.TranslatesAutoresizingMaskIntoConstraints = false;
         _body.LineBreakMode = NSLineBreakMode.ByWordWrapping;
         _body.UsesSingleLineMode = false;
-        // We DON'T set PreferredMaxLayoutWidth — that's a racy
-        // pre-Auto-Layout hack. We give the body an explicit width
-        // constraint below; NSTextField's intrinsicContentSize then
-        // returns the height needed for that exact width.
 
         if (message.Role == MessageRole.User)
         {
@@ -107,13 +103,11 @@ internal sealed class MessageRowView : NSView
     {
         var bubble = new NSView { TranslatesAutoresizingMaskIntoConstraints = false };
         bubble.WantsLayer = true;
-        // Secondary-tinted fill at ~18% opacity — matches SwiftUI's
-        // `Color.secondary.opacity(0.18)`. NSColor.SecondaryLabel is
-        // appearance-aware (auto-flips light↔dark);
-        // ColorWithAlphaComponent preserves that.
-        bubble.Layer!.BackgroundColor = NSColor.SecondaryLabel
-            .ColorWithAlphaComponent(0.18f)
-            .CGColor;
+        // Accent-tinted fill at 12% — matches the SwiftUI theme's
+        // `userBubble` token (Color.accentColor.opacity(0.12)).
+        // The previous secondary-label tint was wrong; user turns
+        // should read with the accent flavor.
+        bubble.Layer!.BackgroundColor = ThemeColors.NS(ThemeColor.UserBubble).CGColor;
         bubble.Layer.CornerRadius = ThemeMetrics.ChatBubbleCornerRadius;
         bubble.AddSubview(_body);
 
@@ -182,6 +176,58 @@ internal sealed class MessageRowView : NSView
             _body.TopAnchor.ConstraintEqualTo(TopAnchor),
             _body.BottomAnchor.ConstraintEqualTo(BottomAnchor),
         });
+    }
+
+    /// <summary>NSTextField wrapping requires
+    /// <c>PreferredMaxLayoutWidth</c> to compute the intrinsic height
+    /// for wrapped content. The width-constraint alone is necessary
+    /// but not sufficient — AppKit caches the single-line intrinsic
+    /// content size until <c>PreferredMaxLayoutWidth</c> is set
+    /// (then re-measures against that). Recompute on every layout
+    /// pass so width changes (split-view drag, window resize)
+    /// re-wrap correctly.
+    ///
+    /// <para><b>Order matters.</b> Read the row's settled
+    /// <see cref="NSView.Bounds"/> BEFORE invalidating intrinsic
+    /// size — the row's width is set by Auto Layout from the
+    /// transcript stack's width constraint, independent of the
+    /// body's intrinsic. The body's <see cref="NSView.Frame"/> may
+    /// still reflect the previous pass's value (especially the
+    /// stale single-line intrinsic) at the time
+    /// <see cref="Layout"/> is invoked. Use the row's Bounds (the
+    /// authoritative width) and compute the body's available area
+    /// from it, accounting for the bubble's padding for the user
+    /// case.</para></summary>
+    public override void Layout()
+    {
+        var rowWidth = (float)Bounds.Width;
+        if (rowWidth > 0)
+        {
+            float available;
+            if (_message.Role == MessageRole.User)
+            {
+                // User bubble caps at UserBubbleMaxWidth, then the
+                // body inside accounts for horizontal padding.
+                available = Math.Min(rowWidth, UserBubbleMaxWidth)
+                    - 2 * BubbleHorizontalPadding;
+            }
+            else
+            {
+                // Assistant fills the row.
+                available = rowWidth;
+            }
+
+            if (available > 0
+                && Math.Abs((float)_body.PreferredMaxLayoutWidth - available) > 0.5)
+            {
+                _body.PreferredMaxLayoutWidth = available;
+                // Setting PreferredMaxLayoutWidth invalidates the
+                // cached intrinsic size; AppKit re-lays-out on the
+                // next pass with the wrapped height.
+                _body.InvalidateIntrinsicContentSize();
+            }
+        }
+        base.Layout();
     }
 
     private void OnMessagePropertyChanged(object? sender, PropertyChangedEventArgs e)

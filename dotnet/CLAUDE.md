@@ -89,6 +89,91 @@ gets you re-corrected. Internalize all of them before touching code.
   official packages (Google.Api.CommonProtos, Google.LongRunning),
   reference rather than regenerate.
 
+### SwiftUI native is the visual + UX source of truth
+
+The dotnet stack is the *parallel port* of the SwiftUI native app,
+not a parallel design. When the question is "what should this look
+like, what should the spacing be, what icon, what label, what
+behavior on hover/focus/error" — the answer lives in
+`native/platform/macos/swift/` first. Translate; don't invent.
+
+Concretely:
+
+- **Visual values come from `native/.../Core/Foundation/Theme/Theme.swift`.**
+  The `PivoxTheme.default` static there is the canonical
+  token → value map. Every color, font, spacing, radius, icon size
+  in the SwiftUI app reads from those tokens. When porting a
+  component, find the SwiftUI source first, read its token usage,
+  add the equivalent token to the dotnet theme if it doesn't exist,
+  and route through it. Don't reinvent values inline.
+- **Component shape comes from the SwiftUI implementation.** A
+  `ShimmerPromptField`, an `IconButton`, a `ConversationView` —
+  each has a SwiftUI source. Read it. Translate the body
+  structure, the modifier chain, the keyboard semantics. AppKit's
+  primitives differ, but the *shape* (rounded rect, divider, tool
+  row, hint, primary button) maps over.
+- **Behavior comes from SwiftUI too.** Hover-reveal action icons,
+  empty-state placeholder, focus-driven shimmer intensity,
+  Esc-cancels-stream IME-safety — all decisions already made in
+  the Swift source. Translate the decisions; don't re-litigate
+  them in C#.
+
+The rule extends "ground with MS docs + Apple docs" — the SwiftUI
+codebase is a third grounding source for *what the Pivox app
+should look and feel like*. Compose the three: Apple docs +
+SwiftUI ref + MS docs → C# implementation.
+
+### Theme is the source for all visual values
+
+**Never hardcode a color, font, size, spacing, corner radius, or
+any other theme-shaped value at the call site.** Always go
+through:
+
+- `ThemeColors.NS(ThemeColor.X)` — appearance-aware NSColor
+- `ThemeFonts.NS(ThemeFont.X)` — cached NSFont
+- `ThemeMetrics.X` — float constants for spacing/radii/widths
+
+If the value you need doesn't have a token yet, **add the token
+first** (to `Pivox.Shared/UI/Theme.cs` for the enum, to the macOS
+realizer for the concrete value), then route the call site through
+it. The shared `ThemeColor` / `ThemeFont` enums are intentionally
+closed sets — adding a case is a compile-error prompt that surfaces
+every realizer that needs updating.
+
+**Why this rule exists.** The user has corrected this multiple
+times. Hardcoded inline values:
+
+- Don't follow appearance changes (a literal `NSColor.FromRgba(0.07,...)`
+  doesn't auto-flip light/dark; the system semantic color does).
+- Don't compose with the cross-stack design (SwiftUI uses
+  `windowBackgroundColor`; a hand-picked hex diverges immediately).
+- Drift silently. The user reads two screenshots side-by-side and
+  the dotnet panel doesn't match the SwiftUI panel because someone
+  picked `secondaryLabel @ 18%` when SwiftUI uses `accent @ 12%`.
+- Generate rewrite cycles. Every "make it look like the screenshot"
+  pass touches more code than it should because the values were
+  scattered, not centralized.
+
+**Common violations to avoid** (caught in audits):
+
+| Anti-pattern | Fix |
+|---|---|
+| `NSColor.SecondaryLabel.ColorWithAlphaComponent(0.18f)` inline | Add `ThemeColor.X` token, realize once. |
+| `NSFont.SystemFontOfSize(17, NSFontWeight.Semibold)!` inline | Add `ThemeFont.X` token, realize once. |
+| Inline `14f` corner radius, `8f` spacing | Use `ThemeMetrics.SpaceSm`, `ThemeMetrics.ChatBubbleCornerRadius`, etc. — or add a new `ThemeMetrics.X` constant. |
+| `.ColorWithAlphaComponent(0.55f)` "to soften" | If the SwiftUI ref uses `.tertiary`, add a `TertiaryForeground` token and route through it. The alpha-tweak is a design decision; the design has already made it. |
+
+**Exceptions** — narrow, document inline:
+
+- The `AIShimmerLayer` palette: pastel rainbow stops are the
+  shimmer's identity, not a theme color. Inline is correct here.
+- Pre-existing platform-system constants that aren't theme-shaped
+  (e.g. `NSEventModifierMask.CommandKeyMask`, `NSImageSymbolScale.Medium`).
+
+When in doubt, **add the token**. The cost of a token is one enum
+case + one realizer line. The cost of NOT adding it is a future
+rewrite when the value diverges from the SwiftUI source.
+
 ### No time estimates
 
 The user has explicitly banned them. "Tasks in AI take minutes vs

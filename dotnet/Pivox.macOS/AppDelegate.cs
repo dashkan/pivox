@@ -55,6 +55,12 @@ public sealed class AppDelegate : NSApplicationDelegate
     private NSSplitViewItem? _chatPanelSplitItem;
     private NSToolbarItem? _chatToggleToolbarItem;
 
+    // KVO context for ChatPanelSplitItem.collapsed. The non-null
+    // sentinel lets ObserveValue dispatch to the right handler when
+    // multiple KVO observers exist (Apple's documented pattern —
+    // see "Registering as an Observer of a Property").
+    private static readonly IntPtr ChatPanelCollapsedKvoContext = (IntPtr)0xC0117A;
+
     public override void DidFinishLaunching(NSNotification notification)
     {
         NSApplication.SharedApplication.MainMenu = BuildMainMenu();
@@ -208,6 +214,24 @@ public sealed class AppDelegate : NSApplicationDelegate
         // (future surface that flips it) update the split item.
         _chatPanelState.PropertyChanged += OnChatPanelStateChanged;
 
+        // Observe drag-collapse from the user so ChatPanelState
+        // stays in sync. Without this, dragging the divider to
+        // collapse the chat pane sets `_chatPanelSplitItem.Collapsed
+        // = true` but doesn't write back to IsVisible — the next
+        // toolbar-toggle click then needs two presses to re-open
+        // (first press flips IsVisible:true→false, which produces
+        // no visual change because Collapsed is already true;
+        // second press flips back to true and expands).
+        //
+        // KVO on NSSplitViewItem.collapsed is the documented hook
+        // for this — Apple updates the property on user-driven
+        // collapse and AppKit fires the observer notification.
+        _chatPanelSplitItem.AddObserver(
+            this,
+            new NSString("collapsed"),
+            NSKeyValueObservingOptions.New,
+            ChatPanelCollapsedKvoContext);
+
         var style = NSWindowStyle.Titled
                   | NSWindowStyle.Closable
                   | NSWindowStyle.Miniaturizable
@@ -274,14 +298,15 @@ public sealed class AppDelegate : NSApplicationDelegate
                 Label = "Chat",
                 PaletteLabel = "Chat",
                 ToolTip = "Toggle AI chat panel (⇧⌘A)",
-                // SF Symbol: `sidebar.trailing` is the canonical
-                // "right inspector toggle" symbol on macOS 11+. We
-                // target macOS 26+ so it's guaranteed available.
-                // GetSystemSymbol's nullable return is for SDK-version
-                // safety; if it ever returns null on this OS, the
-                // toolbar item just shows no image — survivable, not
-                // worth a fallback that pulls in deprecated icons.
-                Image = NSImage.GetSystemSymbol("sidebar.trailing", "Toggle chat panel"),
+                // SF Symbol: `sparkles` — the Pivox AI-surface glyph
+                // (matches the SwiftUI native toolbar item). Hierarchical
+                // rendering picks up the system tint subtly; in Phase C
+                // this will swap to a rainbow-gradient fill via
+                // AIShimmerLayer-style tinting on hover. Falls back
+                // gracefully on absence (GetSystemSymbol returns null
+                // → toolbar shows no image; tooltip + label still
+                // identify the action).
+                Image = NSImage.GetSystemSymbol("sparkles", "Toggle AI chat panel"),
                 Bordered = true,
                 Action = new Selector("toggleChatPanel:"),
                 Target = _app,
@@ -304,6 +329,35 @@ public sealed class AppDelegate : NSApplicationDelegate
     {
         if (e.PropertyName != nameof(ChatPanelState.IsVisible)) return;
         ApplyChatPanelVisibility(_chatPanelState!.IsVisible, animated: true);
+    }
+
+    public override void ObserveValue(
+        NSString keyPath, NSObject ofObject, NSDictionary change, IntPtr context)
+    {
+        if (context == ChatPanelCollapsedKvoContext
+            && _chatPanelSplitItem is not null
+            && _chatPanelState is not null
+            && keyPath?.ToString() == "collapsed")
+        {
+            // User-driven divider drag → flip ChatPanelState so the
+            // toolbar toggle stays consistent with the visual state.
+            // Skip the write if already in sync (avoids a feedback
+            // loop: setter → PropertyChanged → ApplyChatPanelVisibility
+            // → Animator.Collapsed → KVO → setter again).
+            var collapsed = _chatPanelSplitItem.Collapsed;
+            var desiredVisible = !collapsed;
+            if (_chatPanelState.IsVisible != desiredVisible)
+            {
+                _chatPanelState.IsVisible = desiredVisible;
+            }
+            return;
+        }
+        // Defensive null-forgiving: ObserveValue's keyPath parameter
+        // is declared non-null in the binding, but the analyzer trips
+        // on the post-null-check flow above. By this point keyPath is
+        // either our matched path (handled and returned) or whatever
+        // the base class needs — pass through.
+        base.ObserveValue(keyPath!, ofObject, change, context);
     }
 
     private void ApplyChatPanelVisibility(bool visible, bool animated)

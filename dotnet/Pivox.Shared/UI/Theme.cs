@@ -33,28 +33,45 @@ namespace Pivox.Shared.UI;
 /// </summary>
 public enum ThemeFont
 {
-    /// <summary>App-name-level heading. "Pivox" on the login card.</summary>
+    /// <summary>App-name-level heading. "Pivox" on the login card.
+    /// SwiftUI: <c>brandTitleFont = .largeTitle.weight(.bold)</c>.</summary>
     BrandTitle,
 
-    /// <summary>Section heading. One step above body weight + size.</summary>
+    /// <summary>Section heading. One step above body weight + size.
+    /// SwiftUI: <c>pageTitleFont = .title2.weight(.semibold)</c>.</summary>
     Title,
 
-    /// <summary>Default body text. Buttons, fields, paragraph copy.</summary>
+    /// <summary>Empty-state and section heading (one step below
+    /// <see cref="Title"/>). SwiftUI:
+    /// <c>sectionHeadingFont = .title3.weight(.semibold)</c>.</summary>
+    SectionHeading,
+
+    /// <summary>Default body text. Buttons, fields, paragraph copy.
+    /// SwiftUI: <c>bodyFont = .body</c>.</summary>
     Body,
 
-    /// <summary>Captions, dividers, secondary affordances. One step below
-    /// <see cref="Body"/>.</summary>
+    /// <summary>Row-title weight: body size at semibold. Chat title
+    /// strip, table-row primary labels. SwiftUI:
+    /// <c>rowTitleFont = .body.weight(.semibold)</c>.</summary>
+    RowTitle,
+
+    /// <summary>Captions, dividers, secondary affordances. One step
+    /// below <see cref="Body"/>. SwiftUI:
+    /// <c>bodySmallFont = .callout</c>.</summary>
     BodySmall,
 }
 
 public enum ThemeColor
 {
-    /// <summary>Window/canvas background. Behind everything.</summary>
+    /// <summary>Window/canvas background. Behind everything.
+    /// SwiftUI realization: <c>NSColor.windowBackgroundColor</c>.</summary>
     Background,
 
-    /// <summary>Card/surface background — one level up from
-    /// <see cref="Background"/>.</summary>
-    Surface,
+    /// <summary>One level up from <see cref="Background"/> — control
+    /// containers, composer chrome, chat-bubble fills. SwiftUI:
+    /// <c>NSColor.controlBackgroundColor</c> (the SwiftUI theme's
+    /// <c>backgroundRaised</c> role).</summary>
+    BackgroundRaised,
 
     /// <summary>Primary tint (the "Pivox blue"). Accent buttons, links,
     /// focused control rings.</summary>
@@ -64,19 +81,36 @@ public enum ThemeColor
     /// surfaces (prominent button text, accent-on-accent labels).</summary>
     ProminentButtonText,
 
-    /// <summary>Primary text/foreground. Pairs with <see cref="Background"/>
-    /// and <see cref="Surface"/>.</summary>
+    /// <summary>Primary text/foreground. SwiftUI: <c>labelColor</c>.</summary>
     Foreground,
 
-    /// <summary>De-emphasized text — captions, helper copy.</summary>
+    /// <summary>De-emphasized text — captions, helper copy.
+    /// SwiftUI: <c>secondaryLabelColor</c>.</summary>
     SecondaryForeground,
 
-    /// <summary>Subtle separators, control outlines, low-emphasis dividers.</summary>
+    /// <summary>Tertiary text — placeholders, empty-state hints, very
+    /// low-emphasis labels. SwiftUI: <c>tertiaryLabelColor</c>.</summary>
+    TertiaryForeground,
+
+    /// <summary>Subtle separators, control outlines, low-emphasis
+    /// dividers. SwiftUI: <c>separatorColor</c>.</summary>
     Border,
 
-    /// <summary>Error / destructive states — invalid-credential messaging,
-    /// delete affordances.</summary>
+    /// <summary>Error / destructive states — invalid-credential
+    /// messaging, delete affordances, stop-streaming glyph.
+    /// SwiftUI: <c>systemRed</c>.</summary>
     Destructive,
+
+    /// <summary>Subtle hover background — icon-button hover state,
+    /// click-to-edit hint backgrounds. SwiftUI:
+    /// <c>secondaryLabelColor.opacity(0.12)</c>.</summary>
+    HoverFill,
+
+    /// <summary>User-message bubble fill. SwiftUI:
+    /// <c>accent.opacity(0.12)</c>. Distinct from secondary-label
+    /// tint: user turns are accent-flavored to read as the user's
+    /// own contribution.</summary>
+    UserBubble,
 }
 
 /// <summary>
@@ -138,6 +172,15 @@ public static class ThemeMetrics
     /// than a card, but enough to read as a discrete pill rather than
     /// a rectangular text block.</summary>
     public const float ChatBubbleCornerRadius = 14;
+
+    /// <summary>Square hit-target size for icon buttons. Matches
+    /// SwiftUI's IconButton metric (32pt = 17pt glyph + 15pt padding,
+    /// the standard macOS toolbar-button hit area).</summary>
+    public const float IconButtonHitTarget = 32;
+
+    /// <summary>Toolbar-icon glyph size. SwiftUI:
+    /// <c>iconToolbar: .system(size: 17, weight: .medium)</c>.</summary>
+    public const float IconToolbarSize = 17;
 
     /// <summary>Corner radius for inline chat controls that aren't
     /// the user bubble — composer text-area outline, future

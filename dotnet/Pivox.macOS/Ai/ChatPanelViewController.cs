@@ -13,58 +13,48 @@ namespace Pivox.Ai;
 /// <summary>
 /// macOS chat panel — the trailing inspector pane of the shell
 /// window. Visual reference: SwiftUI native
-/// <c>AIChat/Transcript/ConversationView.swift</c>. Stacked top-to-bottom:
+/// <c>AIChat/Window/AIChatContainerView.swift</c> +
+/// <c>AIChat/Transcript/ConversationView.swift</c>. Stacked
+/// top-to-bottom:
 ///
 /// <list type="number">
-/// <item><b>Title header</b> — "New Conversation" (static; editable
-///   title lands in Phase D with the <c>UpdateConversation</c> RPC).</item>
+/// <item><b>Header strip</b> — history button (left, opens
+///   conversation list popover in Phase D), title label (center,
+///   currently static "New Conversation"), new-conversation button
+///   + detach button (right, Phase D wires them).</item>
+/// <item><b>Hairline divider</b>.</item>
 /// <item><b>Transcript</b> — NSStackView of <see cref="MessageRowView"/>
-///   in NSScrollView. Empty-state hint when no messages.</item>
+///   in NSScrollView. Empty-state icon + heading when no messages.</item>
 /// <item><b>Status line</b> — sending / streaming / error.</item>
-/// <item><b>Divider</b> — hairline rule.</item>
-/// <item><b>Composer</b> — multi-line NSTextView with placeholder.
-///   Send button to the right.</item>
+/// <item><b>Composer</b> — <see cref="ChatComposerView"/> with the
+///   animated shimmer border, attachment button, hint, and circular
+///   send button.</item>
 /// </list>
 ///
-/// <para><b>What's intentionally NOT here (Phase C/D scope):</b>
-/// markdown rendering, hover-reveal action icons (thumbs/copy/redo),
-/// thinking-indicator placeholder during the first-token gap,
-/// jump-to-latest pill, title editing, attachment menu, conversation
-/// history list.</para>
+/// <para><b>Phase B step 2b scope</b>: chrome only. Markdown
+/// rendering / code blocks / hover-reveal action icons / history
+/// popover / title editing / attachment menu are Phase C/D.</para>
 ///
-/// <para><b>State model.</b> A single
-/// <see cref="ConversationViewModel"/> drives the surface. The VM
-/// subscribes to <see cref="ActiveOrganization.PropertyChanged"/>
-/// internally; switching organization wipes the transcript
-/// automatically. This VC subscribes to
-/// <see cref="ConversationViewModel.Messages"/> (add-only — TextDelta
-/// mutations come via each row's own
-/// <see cref="Message.PropertyChanged"/> subscription) and to
-/// <see cref="ConversationViewModel.PropertyChanged"/> for state /
-/// CanSend transitions.</para>
-///
-/// <para><b>No-org gating.</b> The chat surface itself doesn't gate
-/// on org — the toolbar item and ⇧⌘A menu binding do (validation in
-/// <c>AppDelegate</c>). When the panel is visible with no org
-/// selected, <see cref="ConversationViewModel.SendAsync"/>'s
-/// precondition check fails with
-/// <see cref="ChatErrorKind.NoOrganization"/> and the composer
-/// surfaces the error inline. In practice the toolbar gating
-/// prevents this path.</para>
+/// <para><b>No-org gating</b>: the toolbar item and ⇧⌘A menu
+/// binding validate against <c>ActiveOrganization.Current</c>; this
+/// VC itself doesn't gate. If a stale state lets SendAsync run
+/// without an org, the VM's precondition surfaces
+/// <see cref="ChatErrorKind.NoOrganization"/> in the status line.</para>
 /// </summary>
 public sealed class ChatPanelViewController : NSViewController
 {
     private readonly ConversationViewModel _vm;
 
+    private IconButton _historyButton = null!;
     private NSTextField _titleLabel = null!;
-    private NSStackView _transcriptStack = null!;
+    private IconButton _newConversationButton = null!;
+    private IconButton _detachButton = null!;
+    private NSBox _headerDivider = null!;
+    private FlippedStackView _transcriptStack = null!;
     private NSScrollView _transcriptScroll = null!;
-    private NSTextField _emptyStateLabel = null!;
+    private NSView _emptyStateView = null!;
     private NSTextField _statusLabel = null!;
-    private NSBox _divider = null!;
-    private NSTextView _composer = null!;
-    private NSScrollView _composerScroll = null!;
-    private NSButton _sendButton = null!;
+    private ChatComposerView _composer = null!;
 
     public ChatPanelViewController(ConversationViewModel vm)
         : base((string?)null, null)
@@ -78,19 +68,27 @@ public sealed class ChatPanelViewController : NSViewController
         // inspector. NSSplitViewController honors its constraints
         // once attached, but a non-zero LoadView frame avoids a
         // zero-size first layout.
-        View = new NSView(new CGRect(0, 0, 320, 600));
-        View.WantsLayer = true;
-        View.Layer!.BackgroundColor = ThemeColors.NS(ThemeColor.Background).CGColor;
+        //
+        // Don't set an explicit Layer.BackgroundColor here. The
+        // detail pane's NSViewController doesn't set one either, so
+        // it inherits NSWindow.backgroundColor (= NSColor.WindowBackground
+        // by default). Explicit layer-background on the chat panel
+        // produced a different rendered tone than the layer-less
+        // detail pane (compositor vs. CG draw path) — the SwiftUI
+        // ref has both panes at the same color because both flow
+        // through theme.background = windowBackgroundColor. Match
+        // the SwiftUI shape by letting AppKit fill via the window's
+        // background.
+        View = new NSView(new CGRect(0, 0, 360, 600));
     }
 
     public override void ViewDidLoad()
     {
         base.ViewDidLoad();
-        BuildTitleHeader();
+        BuildHeader();
         BuildTranscript();
         BuildEmptyState();
         BuildStatus();
-        BuildDivider();
         BuildComposer();
         ArrangeLayout();
         SubscribeToVm();
@@ -102,35 +100,88 @@ public sealed class ChatPanelViewController : NSViewController
             AppendRow(m);
         }
         UpdateEmptyStateVisibility();
-        UpdateComposerEnabled();
+        UpdateComposerState();
         UpdateStatusLine();
     }
 
     // ───── construction ────────────────────────────────────────
 
-    private void BuildTitleHeader()
+    private void BuildHeader()
     {
-        // Static title — Phase D adds in-place editing via the
-        // UpdateConversation RPC (mirroring
-        // ConversationTitleHeader.swift). For now, a centered,
-        // appearance-aware label sits in the header strip.
+        // History button — Phase D wires this to a ConversationListPopover
+        // (mirrors AIChatPanel.swift line 105-128). For now it's a no-op
+        // visually present so the layout matches.
+        _historyButton = new IconButton(
+            systemSymbolName: "clock.arrow.circlepath",
+            accessibilityLabel: "Show conversation history",
+            toolTip: "Conversation history");
+        _historyButton.Activated += (_, _) =>
+        {
+            // Phase D: present the conversation-list popover.
+        };
+
         _titleLabel = NSTextField.CreateLabel("New Conversation");
-        _titleLabel.Font = ThemeFonts.NS(ThemeFont.Title);
+        // RowTitle = body.semibold — matches SwiftUI's
+        // `Text("New Conversation").font(.headline)` in
+        // AIChatContainerView.swift.
+        _titleLabel.Font = ThemeFonts.NS(ThemeFont.RowTitle);
         _titleLabel.TextColor = ThemeColors.NS(ThemeColor.Foreground);
         _titleLabel.Alignment = NSTextAlignment.Center;
         _titleLabel.LineBreakMode = NSLineBreakMode.TruncatingTail;
         _titleLabel.UsesSingleLineMode = true;
         _titleLabel.TranslatesAutoresizingMaskIntoConstraints = false;
+
+        // New-conversation button — Phase D wires to "reset to
+        // NewChat view." For now it just clears the transcript
+        // (which is a reasonable Phase B placeholder; the VM
+        // doesn't yet have a "reset conversation" method, so we
+        // can't formally start a new one without losing the in-
+        // memory turn context).
+        _newConversationButton = new IconButton(
+            systemSymbolName: "plus.bubble",
+            accessibilityLabel: "New conversation",
+            toolTip: "New conversation");
+        _newConversationButton.Activated += (_, _) =>
+        {
+            // Phase D wires the proper reset; this is a placeholder.
+        };
+
+        // Detach button — Phase D wires to "open chat in a floating
+        // NSPanel." Placeholder for layout parity.
+        _detachButton = new IconButton(
+            systemSymbolName: "arrow.up.right.square",
+            accessibilityLabel: "Open in floating window",
+            toolTip: "Open in window");
+        _detachButton.Activated += (_, _) =>
+        {
+            // Phase D wires the float-detach.
+        };
+
+        _headerDivider = new NSBox
+        {
+            BoxType = NSBoxType.NSBoxSeparator,
+            TranslatesAutoresizingMaskIntoConstraints = false,
+        };
     }
 
     private void BuildTranscript()
     {
-        _transcriptStack = new NSStackView
+        // FlippedStackView overrides IsFlipped to true so subviews
+        // stack from the TOP DOWN (first added at top, latest at
+        // bottom) — the natural reading order for a transcript.
+        //
+        // Distribution = GravityAreas lets us anchor rows to the
+        // BOTTOM of the stack via `AddView(view, NSStackViewGravity.Bottom)`.
+        // When the transcript is sparse (fewer messages than fill
+        // the stack), the center gravity area absorbs the slack and
+        // pushes messages down against the composer — matching
+        // SwiftUI's chat shape where empty space sits ABOVE the
+        // messages, not below. Once the messages overflow the
+        // stack height, scrolling kicks in normally.
+        _transcriptStack = new FlippedStackView
         {
             Orientation = NSUserInterfaceLayoutOrientation.Vertical,
-            // .Leading keeps both user (right-aligned via internal
-            // spacer) and assistant (full-width left-aligned) rows
-            // working — each row owns its own internal alignment.
+            Distribution = NSStackViewDistribution.GravityAreas,
             Alignment = NSLayoutAttribute.Leading,
             Spacing = ThemeMetrics.SpaceSm,
             TranslatesAutoresizingMaskIntoConstraints = false,
@@ -149,8 +200,6 @@ public sealed class ChatPanelViewController : NSViewController
             DocumentView = _transcriptStack,
         };
 
-        // The stack must fill the document container's width so its
-        // rows can grow to the available width.
         var content = _transcriptScroll.ContentView;
         content.TranslatesAutoresizingMaskIntoConstraints = false;
         NSLayoutConstraint.ActivateConstraints(new[]
@@ -158,25 +207,62 @@ public sealed class ChatPanelViewController : NSViewController
             _transcriptStack.LeadingAnchor.ConstraintEqualTo(content.LeadingAnchor),
             _transcriptStack.TrailingAnchor.ConstraintEqualTo(content.TrailingAnchor),
             _transcriptStack.TopAnchor.ConstraintEqualTo(content.TopAnchor),
-            // Width drives intrinsic-height layout in MessageRowView.
             _transcriptStack.WidthAnchor.ConstraintEqualTo(content.WidthAnchor),
+            // Stack must be AT LEAST as tall as the clip view so the
+            // GravityAreas distribution has slack to absorb above
+            // the Bottom-gravity rows. Without this, the stack
+            // hugs its content (sum of message heights), the center
+            // gravity area collapses to 0, and the bottom-anchoring
+            // visually disappears.
+            _transcriptStack.HeightAnchor.ConstraintGreaterThanOrEqualTo(content.HeightAnchor),
         });
     }
 
+    /// <summary>Empty-state view: centered chat-bubble glyph + heading.
+    /// Mirrors SwiftUI's NewChatView shape — Image(systemName:
+    /// "bubble.left.and.text.bubble.right") + "Start a conversation"
+    /// in title3.</summary>
     private void BuildEmptyState()
     {
-        // Empty-state hint shown when Messages.Count == 0. Mirrors
-        // the SwiftUI ref's "Message..." composer placeholder + the
-        // implicit "ask anything" affordance. Keep it short — the
-        // composer's own placeholder text reinforces the call to
-        // action, so this label sets the tone, not the instruction.
-        _emptyStateLabel = NSTextField.CreateLabel("Ask Pivox anything");
-        _emptyStateLabel.Font = ThemeFonts.NS(ThemeFont.Title);
-        _emptyStateLabel.TextColor = ThemeColors.NS(ThemeColor.SecondaryForeground);
-        _emptyStateLabel.Alignment = NSTextAlignment.Center;
-        _emptyStateLabel.LineBreakMode = NSLineBreakMode.ByWordWrapping;
-        _emptyStateLabel.UsesSingleLineMode = false;
-        _emptyStateLabel.TranslatesAutoresizingMaskIntoConstraints = false;
+        var icon = new NSImageView
+        {
+            Image = NSImage.GetSystemSymbol(
+                "bubble.left.and.text.bubble.right",
+                "Empty conversation"),
+            TranslatesAutoresizingMaskIntoConstraints = false,
+            // Tertiary tint reads as ambient hint, not active UI.
+            // Matches the SwiftUI ref's `.foregroundStyle(.tertiary)`
+            // on the empty-state glyph.
+            ContentTintColor = ThemeColors.NS(ThemeColor.TertiaryForeground),
+        };
+        icon.SymbolConfiguration = NSImageSymbolConfiguration.Create(
+            36, (double)NSFontWeight.Regular, NSImageSymbolScale.Large);
+
+        var heading = NSTextField.CreateLabel("Start a conversation");
+        // SectionHeading = title3.semibold — matches SwiftUI's
+        // `Text("Start a conversation").font(.title3)` on NewChatView.
+        heading.Font = ThemeFonts.NS(ThemeFont.SectionHeading);
+        heading.TextColor = ThemeColors.NS(ThemeColor.SecondaryForeground);
+        heading.Alignment = NSTextAlignment.Center;
+        heading.TranslatesAutoresizingMaskIntoConstraints = false;
+
+        _emptyStateView = new NSView
+        {
+            TranslatesAutoresizingMaskIntoConstraints = false,
+        };
+        _emptyStateView.AddSubview(icon);
+        _emptyStateView.AddSubview(heading);
+
+        NSLayoutConstraint.ActivateConstraints(new[]
+        {
+            icon.CenterXAnchor.ConstraintEqualTo(_emptyStateView.CenterXAnchor),
+            icon.TopAnchor.ConstraintEqualTo(_emptyStateView.TopAnchor),
+            heading.CenterXAnchor.ConstraintEqualTo(_emptyStateView.CenterXAnchor),
+            heading.TopAnchor.ConstraintEqualTo(icon.BottomAnchor, ThemeMetrics.SpaceSm),
+            heading.BottomAnchor.ConstraintEqualTo(_emptyStateView.BottomAnchor),
+            heading.LeadingAnchor.ConstraintGreaterThanOrEqualTo(_emptyStateView.LeadingAnchor),
+            heading.TrailingAnchor.ConstraintLessThanOrEqualTo(_emptyStateView.TrailingAnchor),
+        });
     }
 
     private void BuildStatus()
@@ -189,166 +275,80 @@ public sealed class ChatPanelViewController : NSViewController
         _statusLabel.TranslatesAutoresizingMaskIntoConstraints = false;
     }
 
-    private void BuildDivider()
-    {
-        _divider = new NSBox
-        {
-            BoxType = NSBoxType.NSBoxSeparator,
-            TranslatesAutoresizingMaskIntoConstraints = false,
-        };
-    }
-
     private void BuildComposer()
     {
-        // NSTextView lives inside NSScrollView so multi-line input
-        // can grow with content (capped via height constraints on
-        // the scroll view, not the text view itself). NSTextView
-        // doesn't have a native placeholder property — we draw one
-        // via a private override below.
-        _composer = new NSTextView
+        _composer = new ChatComposerView();
+        _composer.OnSubmit += async text => await SendAsync(text);
+        _composer.OnCancel += () => _vm.Cancel();
+        _composer.OnAttachmentRequested += () =>
         {
-            Font = ThemeFonts.NS(ThemeFont.Body),
-            TextContainerInset = new CGSize(ThemeMetrics.SpaceSm, ThemeMetrics.SpaceSm),
-            Editable = true,
-            Selectable = true,
-            RichText = false,
-            ImportsGraphics = false,
-            AllowsUndo = true,
-            UsesFontPanel = false,
-            UsesRuler = false,
-            DrawsBackground = false,
-            // NSTextView's autoresize defaults are designed for use
-            // inside NSScrollView — leave them.
-            HorizontallyResizable = false,
-            VerticallyResizable = true,
-        };
-        _composer.TextContainer!.WidthTracksTextView = true;
-        _composer.TextContainer.LineFragmentPadding = 0;
-
-        _composerScroll = new NSScrollView
-        {
-            HasVerticalScroller = true,
-            HasHorizontalScroller = false,
-            AutohidesScrollers = true,
-            TranslatesAutoresizingMaskIntoConstraints = false,
-            DocumentView = _composer,
-            DrawsBackground = true,
-        };
-        _composerScroll.WantsLayer = true;
-        _composerScroll.Layer!.BorderColor = ThemeColors.NS(ThemeColor.Border).CGColor;
-        _composerScroll.Layer.BorderWidth = ThemeMetrics.HairlineThickness;
-        _composerScroll.Layer.CornerRadius = ThemeMetrics.ChatMessageCornerRadius;
-        _composerScroll.Layer.MasksToBounds = true;
-        _composerScroll.BackgroundColor = ThemeColors.NS(ThemeColor.Surface);
-
-        // Placeholder via NSTextView's documented overlay pattern —
-        // a non-editable NSTextField pinned over the text view that
-        // hides when content is non-empty.
-        _composerPlaceholder = NSTextField.CreateLabel("Message…");
-        _composerPlaceholder.Font = ThemeFonts.NS(ThemeFont.Body);
-        _composerPlaceholder.TextColor = ThemeColors.NS(ThemeColor.SecondaryForeground);
-        _composerPlaceholder.TranslatesAutoresizingMaskIntoConstraints = false;
-        _composerPlaceholder.WantsLayer = true;
-        // Don't intercept clicks — let them fall through to the
-        // text view underneath. Labels are non-editable but still
-        // hit-testable; disable hit testing entirely.
-        _composerPlaceholder.Hidden = false;
-
-        _sendButton = new NSButton
-        {
-            Title = "Send",
-            BezelStyle = NSBezelStyle.Push,
-            ControlSize = NSControlSize.Regular,
-            TranslatesAutoresizingMaskIntoConstraints = false,
-            // No KeyEquivalent (\r): the composer is multi-line and
-            // Enter must insert a newline. Send fires on click. ⌘↩-
-            // as-send is a future affordance (NSTextView delegate's
-            // DoCommandBySelector) — Phase C scope.
-        };
-        _sendButton.Activated += async (_, _) => await SendCurrentAsync();
-
-        // Composer text changes → flip placeholder visibility +
-        // re-evaluate Send enabled state.
-        _composer.TextDidChange += (_, _) =>
-        {
-            UpdateComposerPlaceholder();
-            UpdateComposerEnabled();
+            // Phase D: attachment menu (file picker, slash commands).
         };
     }
-
-    private NSTextField _composerPlaceholder = null!;
 
     private void ArrangeLayout()
     {
+        View.AddSubview(_historyButton);
         View.AddSubview(_titleLabel);
+        View.AddSubview(_newConversationButton);
+        View.AddSubview(_detachButton);
+        View.AddSubview(_headerDivider);
         View.AddSubview(_transcriptScroll);
-        View.AddSubview(_emptyStateLabel);
+        View.AddSubview(_emptyStateView);
         View.AddSubview(_statusLabel);
-        View.AddSubview(_divider);
-        View.AddSubview(_composerScroll);
-        View.AddSubview(_composerPlaceholder);
-        View.AddSubview(_sendButton);
+        View.AddSubview(_composer);
 
         const float pad = ThemeMetrics.SpaceMd;
-        const float composerMinHeight = 64;
-        const float composerMaxHeight = 160;
-        const float headerHeight = 44;
+        const float headerPadH = 12;
+        const float headerPadV = 8;
 
         NSLayoutConstraint.ActivateConstraints(new[]
         {
             // ───── header ─────
-            _titleLabel.TopAnchor.ConstraintEqualTo(View.TopAnchor),
-            _titleLabel.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor, pad),
-            _titleLabel.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor, -pad),
-            _titleLabel.HeightAnchor.ConstraintEqualTo(headerHeight),
+            _historyButton.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor, headerPadH - 6),
+            _historyButton.TopAnchor.ConstraintEqualTo(View.TopAnchor, headerPadV - 6),
+
+            _detachButton.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor, -(headerPadH - 6)),
+            _detachButton.CenterYAnchor.ConstraintEqualTo(_historyButton.CenterYAnchor),
+
+            _newConversationButton.TrailingAnchor.ConstraintEqualTo(_detachButton.LeadingAnchor),
+            _newConversationButton.CenterYAnchor.ConstraintEqualTo(_historyButton.CenterYAnchor),
+
+            _titleLabel.CenterXAnchor.ConstraintEqualTo(View.CenterXAnchor),
+            _titleLabel.CenterYAnchor.ConstraintEqualTo(_historyButton.CenterYAnchor),
+            _titleLabel.LeadingAnchor.ConstraintGreaterThanOrEqualTo(
+                _historyButton.TrailingAnchor, ThemeMetrics.SpaceSm),
+            _titleLabel.TrailingAnchor.ConstraintLessThanOrEqualTo(
+                _newConversationButton.LeadingAnchor, -ThemeMetrics.SpaceSm),
+
+            _headerDivider.TopAnchor.ConstraintEqualTo(_historyButton.BottomAnchor, headerPadV - 6),
+            _headerDivider.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor),
+            _headerDivider.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor),
+            _headerDivider.HeightAnchor.ConstraintEqualTo(ThemeMetrics.HairlineThickness),
 
             // ───── transcript ─────
-            _transcriptScroll.TopAnchor.ConstraintEqualTo(_titleLabel.BottomAnchor),
+            _transcriptScroll.TopAnchor.ConstraintEqualTo(_headerDivider.BottomAnchor),
             _transcriptScroll.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor),
             _transcriptScroll.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor),
             _transcriptScroll.BottomAnchor.ConstraintEqualTo(_statusLabel.TopAnchor, -ThemeMetrics.SpaceSm),
 
-            // Empty-state hint centered inside the transcript area.
-            _emptyStateLabel.CenterXAnchor.ConstraintEqualTo(_transcriptScroll.CenterXAnchor),
-            _emptyStateLabel.CenterYAnchor.ConstraintEqualTo(_transcriptScroll.CenterYAnchor),
-            _emptyStateLabel.LeadingAnchor.ConstraintGreaterThanOrEqualTo(
+            // Empty-state vertically centered in the transcript area.
+            _emptyStateView.CenterXAnchor.ConstraintEqualTo(_transcriptScroll.CenterXAnchor),
+            _emptyStateView.CenterYAnchor.ConstraintEqualTo(_transcriptScroll.CenterYAnchor),
+            _emptyStateView.LeadingAnchor.ConstraintGreaterThanOrEqualTo(
                 _transcriptScroll.LeadingAnchor, pad),
-            _emptyStateLabel.TrailingAnchor.ConstraintLessThanOrEqualTo(
+            _emptyStateView.TrailingAnchor.ConstraintLessThanOrEqualTo(
                 _transcriptScroll.TrailingAnchor, -pad),
 
             // ───── status ─────
             _statusLabel.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor, pad),
             _statusLabel.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor, -pad),
-            _statusLabel.BottomAnchor.ConstraintEqualTo(_divider.TopAnchor, -ThemeMetrics.SpaceXs),
-
-            // ───── divider ─────
-            _divider.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor),
-            _divider.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor),
-            _divider.HeightAnchor.ConstraintEqualTo(ThemeMetrics.HairlineThickness),
-            _divider.BottomAnchor.ConstraintEqualTo(_composerScroll.TopAnchor, -ThemeMetrics.SpaceSm),
+            _statusLabel.BottomAnchor.ConstraintEqualTo(_composer.TopAnchor, -ThemeMetrics.SpaceXs),
 
             // ───── composer ─────
-            _composerScroll.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor, pad),
-            _composerScroll.TrailingAnchor.ConstraintEqualTo(_sendButton.LeadingAnchor, -ThemeMetrics.SpaceSm),
-            _composerScroll.HeightAnchor.ConstraintGreaterThanOrEqualTo(composerMinHeight),
-            _composerScroll.HeightAnchor.ConstraintLessThanOrEqualTo(composerMaxHeight),
-            _composerScroll.BottomAnchor.ConstraintEqualTo(View.BottomAnchor, -pad),
-
-            // Placeholder pinned to the composer's text origin.
-            // TextContainerInset is (SpaceSm, SpaceSm); the
-            // placeholder's leading aligns to that inset inside the
-            // scroll view's content frame.
-            _composerPlaceholder.LeadingAnchor.ConstraintEqualTo(
-                _composerScroll.LeadingAnchor, ThemeMetrics.SpaceSm),
-            _composerPlaceholder.TopAnchor.ConstraintEqualTo(
-                _composerScroll.TopAnchor, ThemeMetrics.SpaceSm),
-            _composerPlaceholder.TrailingAnchor.ConstraintLessThanOrEqualTo(
-                _composerScroll.TrailingAnchor, -ThemeMetrics.SpaceSm),
-
-            // ───── send button ─────
-            _sendButton.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor, -pad),
-            _sendButton.BottomAnchor.ConstraintEqualTo(_composerScroll.BottomAnchor),
-            _sendButton.WidthAnchor.ConstraintGreaterThanOrEqualTo(72),
+            _composer.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor, pad),
+            _composer.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor, -pad),
+            _composer.BottomAnchor.ConstraintEqualTo(View.BottomAnchor, -pad),
         });
     }
 
@@ -375,15 +375,14 @@ public sealed class ChatPanelViewController : NSViewController
                 break;
 
             case NotifyCollectionChangedAction.Reset:
-                // Org switch / re-send-after-error clears Messages.
                 ClearTranscript();
                 break;
 
             case NotifyCollectionChangedAction.Remove:
                 // DiscardEmptyInflight removes the last row. Detach
-                // the managed Message.PropertyChanged handler BEFORE
-                // RemoveFromSuperview (Rule 13 — don't Dispose the
-                // NSView peer).
+                // managed Message.PropertyChanged BEFORE removing
+                // from the view hierarchy (Rule 13 — never
+                // Dispose() the NSView peer).
                 if (e.OldStartingIndex >= 0
                     && e.OldStartingIndex < _transcriptStack.ArrangedSubviews.Length)
                 {
@@ -402,9 +401,8 @@ public sealed class ChatPanelViewController : NSViewController
         switch (e.PropertyName)
         {
             case nameof(ConversationViewModel.CanSend):
-                UpdateComposerEnabled();
-                break;
             case nameof(ConversationViewModel.State):
+                UpdateComposerState();
                 UpdateStatusLine();
                 break;
             case nameof(ConversationViewModel.LastErrorMessage):
@@ -416,19 +414,15 @@ public sealed class ChatPanelViewController : NSViewController
     private void AppendRow(Message m)
     {
         var row = new MessageRowView(m);
-        _transcriptStack.AddArrangedSubview(row);
-        // Rule 15 (dotnet/CLAUDE.md): NSStackView has no built-in
-        // "fill cross-axis" alignment. To make each row fill the
-        // stack's content width, pin row.width to stack.width minus
-        // the stack's horizontal EdgeInsets on both sides. Derive
-        // the inset from the stack's actual EdgeInsets so the two
-        // numbers can't drift.
-        //
-        // Don't add a leading+trailing pair here — the stack's
-        // Alignment=Leading already pins leading; a redundant
-        // explicit pair creates a constraint conflict that
-        // resolves unpredictably (the symptom on the prior cut: row
-        // collapsed to ~80pt wide).
+        // GravityAreas distribution + Bottom gravity: messages anchor
+        // to the bottom of the stack so a sparse transcript hugs the
+        // composer (matching SwiftUI's chat shape). AddView is the
+        // gravity-aware insertion API; AddArrangedSubview ignores
+        // gravity and falls back to Top.
+        _transcriptStack.AddView(row, NSStackViewGravity.Bottom);
+        // Rule 15 (dotnet/CLAUDE.md): pin row width to stack content
+        // width via single WidthAnchor constraint. Pair of
+        // leading+trailing conflicts with NSStackView.Alignment.
         var horizontalInset = -2f * (float)_transcriptStack.EdgeInsets.Left;
         row.WidthAnchor
             .ConstraintEqualTo(_transcriptStack.WidthAnchor, 1, horizontalInset)
@@ -447,34 +441,47 @@ public sealed class ChatPanelViewController : NSViewController
 
     private void ScrollTranscriptToBottom()
     {
-        // Defer to next runloop tick so the freshly-added row's
-        // intrinsic height is settled before we measure.
         BeginInvokeOnMainThread(ScrollToBottomImpl);
     }
 
     private void ScrollToBottomImpl()
     {
         if (_transcriptScroll.DocumentView is not NSView doc) return;
-        var bottom = new CGPoint(0, doc.Bounds.Height - _transcriptScroll.ContentView.Bounds.Height);
-        if (bottom.Y < 0) bottom = new CGPoint(0, 0);
-        _transcriptScroll.ContentView.ScrollToPoint(bottom);
-        _transcriptScroll.ReflectScrolledClipView(_transcriptScroll.ContentView);
+        var clip = _transcriptScroll.ContentView;
+        var docHeight = (float)doc.Bounds.Height;
+        var clipHeight = (float)clip.Bounds.Height;
+        // FlippedStackView's IsFlipped = true puts the bottom of the
+        // document at y = docHeight - clipHeight in clip-bounds
+        // coordinates. Negative target means the doc is shorter than
+        // the clip; clamp to 0 to avoid over-scrolling.
+        var targetY = (float)Math.Max(0, docHeight - clipHeight);
+        clip.ScrollToPoint(new CGPoint(0, targetY));
+        _transcriptScroll.ReflectScrolledClipView(clip);
+    }
+
+    /// <summary>NSStackView in a vertical orientation inside an
+    /// <see cref="NSScrollView"/> needs <see cref="NSView.IsFlipped"/>
+    /// = true for "top down" stacking to match user expectation. The
+    /// AppKit default (non-flipped) stacks subviews from the
+    /// bottom up, which inverts the apparent order and breaks
+    /// scroll-to-bottom math.</summary>
+    private sealed class FlippedStackView : NSStackView
+    {
+        public override bool IsFlipped => true;
     }
 
     private void UpdateEmptyStateVisibility()
     {
-        _emptyStateLabel.Hidden = _vm.Messages.Count > 0;
+        _emptyStateView.Hidden = _vm.Messages.Count > 0;
     }
 
-    private void UpdateComposerEnabled()
+    private void UpdateComposerState()
     {
-        _sendButton.Enabled = _vm.CanSend && !string.IsNullOrWhiteSpace(_composer.Value);
-        _composer.Editable = _vm.CanSend;
-    }
-
-    private void UpdateComposerPlaceholder()
-    {
-        _composerPlaceholder.Hidden = !string.IsNullOrEmpty(_composer.Value);
+        _composer.IsStreaming = _vm.State is ConversationState.Loading
+            or ConversationState.Streaming;
+        _composer.IsEnabled = _vm.CanSend
+            || _vm.State is ConversationState.Loading
+                or ConversationState.Streaming;
     }
 
     private void UpdateStatusLine()
@@ -491,19 +498,16 @@ public sealed class ChatPanelViewController : NSViewController
             : ThemeColors.NS(ThemeColor.SecondaryForeground);
     }
 
-    private async Task SendCurrentAsync()
+    private async Task SendAsync(string text)
     {
-        var text = _composer.Value?.Trim();
-        if (string.IsNullOrEmpty(text)) return;
+        if (string.IsNullOrWhiteSpace(text)) return;
         if (!_vm.CanSend) return;
 
         // Clear composer immediately so the user can start typing
-        // the next turn while the response streams. The VM's
-        // CanSend flips false during Loading/Streaming, so Send is
-        // gated.
-        _composer.Value = "";
-        UpdateComposerPlaceholder();
-        UpdateComposerEnabled();
+        // the next turn while the response streams. CanSend flips
+        // false during Loading/Streaming, so the field disables
+        // until the response completes.
+        _composer.Text = "";
 
         try
         {
@@ -511,10 +515,15 @@ public sealed class ChatPanelViewController : NSViewController
         }
         catch (Exception ex)
         {
-            // The VM is supposed to surface errors via state — but
-            // defense-in-depth: a leak past the VM still gets shown.
+            // Defense-in-depth: the VM surfaces errors via State,
+            // but a leak past it still shows up in the status line.
             _statusLabel.StringValue = $"Send failed: {ex.Message}";
             _statusLabel.TextColor = ThemeColors.NS(ThemeColor.Destructive);
         }
     }
+
+    /// <summary>Move keyboard focus to the composer. Called from
+    /// the ⇧⌘A path when the panel opens — matches the SwiftUI
+    /// .aiChatFocusRequested behavior.</summary>
+    public void FocusComposer() => _composer.FocusTextInput();
 }

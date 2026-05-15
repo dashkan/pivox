@@ -24,54 +24,38 @@ public static class ThemeColors
 {
     /// <summary>Resolve a token to its <see cref="NSColor"/> realization.
     /// Backing fields are cached so repeated calls return the same
-    /// instance.</summary>
+    /// instance.
+    ///
+    /// <para><b>Source of truth: SwiftUI.</b> Token-to-NSColor
+    /// mappings mirror <c>PivoxTheme.default</c> in
+    /// <c>native/.../Core/Foundation/Theme/Theme.swift</c>:
+    /// <c>background = Color(nsColor: .windowBackgroundColor)</c>,
+    /// <c>backgroundRaised = .controlBackgroundColor</c>, etc. The
+    /// system semantic colors are appearance-aware (auto-flip
+    /// light/dark + accessibility variants) without us inventing a
+    /// dynamic provider, and they keep the dotnet shell visually
+    /// identical to the SwiftUI shell on the same OS version.</para></summary>
     public static NSColor NS(ThemeColor token) => token switch
     {
-        ThemeColor.Background          => s_background,
-        ThemeColor.Surface             => s_surface,
+        ThemeColor.Background          => NSColor.WindowBackground,
+        ThemeColor.BackgroundRaised    => NSColor.ControlBackground,
         ThemeColor.Accent              => NSColor.ControlAccent,
         ThemeColor.ProminentButtonText => NSColor.White,
         ThemeColor.Foreground          => NSColor.Label,
         ThemeColor.SecondaryForeground => NSColor.SecondaryLabel,
+        ThemeColor.TertiaryForeground  => NSColor.TertiaryLabel,
         ThemeColor.Border              => NSColor.Separator,
         ThemeColor.Destructive         => NSColor.SystemRed,
+        // HoverFill: secondaryLabel.opacity(0.12) — matches the
+        // SwiftUI theme's `hoverFill` exactly. NSColor's
+        // ColorWithAlphaComponent preserves the appearance-aware
+        // dynamic-color behavior; the alpha clamp is constant.
+        ThemeColor.HoverFill           => NSColor.SecondaryLabel.ColorWithAlphaComponent(0.12f),
+        // UserBubble: accent.opacity(0.12) — matches SwiftUI's
+        // `userBubble`. Accent tint at 12% reads as "the user's
+        // turn" without competing with the markdown-rendered
+        // assistant content next to it.
+        ThemeColor.UserBubble          => NSColor.ControlAccent.ColorWithAlphaComponent(0.12f),
         _ => throw new ArgumentOutOfRangeException(nameof(token), token, null),
     };
-
-    // ───── private appearance-aware backings ──────────────────────────
-
-    // Background: window canvas. The solid window-background surface
-    // that the auth card's NSGlassEffectView refracts from. Per WWDC
-    // 2025 session 310, the new design uses a solid window background
-    // (not NSVisualEffectView) so the floating Liquid Glass card has
-    // a definite surface to sample; see Rule 16 in dotnet/CLAUDE.md.
-    private static readonly NSColor s_background
-        = NSColor.GetColor("PivoxBackground", appearance =>
-            IsDark(appearance)
-                ? NSColor.FromRgba(0.07f, 0.07f, 0.09f, 1f)
-                : NSColor.FromRgba(0.97f, 0.97f, 0.99f, 1f));
-
-    // Surface: card / panel background. One step up from Background.
-    // Used as the solid fill behind the auth card's inner glass material.
-    private static readonly NSColor s_surface
-        = NSColor.GetColor("PivoxSurface", appearance =>
-            IsDark(appearance)
-                ? NSColor.FromRgba(0.12f, 0.12f, 0.15f, 1f)
-                : NSColor.FromRgba(1.00f, 1.00f, 1.00f, 1f));
-
-    private static bool IsDark(NSAppearance appearance)
-    {
-        // FindBestMatch returns the canonical name even when the
-        // appearance is an accessibility variant
-        // (DarkAquaIncreaseContrast etc.) — it walks the same lookup
-        // path AppKit uses internally to resolve dynamic colors.
-        // NSAppearance.NameAqua / NameDarkAqua are NSString; cast to
-        // string for the string[] overload.
-        var match = appearance.FindBestMatch(new[]
-        {
-            (string)NSAppearance.NameAqua,
-            (string)NSAppearance.NameDarkAqua,
-        });
-        return match == (string)NSAppearance.NameDarkAqua;
-    }
 }
