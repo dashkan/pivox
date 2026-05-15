@@ -3,6 +3,8 @@
 #include "FirebaseAuthBridge.g.cpp"
 #include "firebase_config.h"
 
+#include "firebase/auth/user.h"
+
 #include <windows.h>
 
 namespace winrt::Pivox::Firebase::Native::implementation
@@ -38,7 +40,7 @@ namespace winrt::Pivox::Firebase::Native::implementation
 
     bool FirebaseAuthBridge::Initialize()
     {
-        if (m_app) return true; // Already initialized.
+        if (m_app) return true;
 
         ::firebase::AppOptions options;
         options.set_api_key(pivox::firebase_config::kApiKey);
@@ -62,13 +64,9 @@ namespace winrt::Pivox::Firebase::Native::implementation
             return false;
         }
 
-        // Wire the state listener — Firebase fires it once on
-        // registration with the current state (restores persisted
-        // session from Windows credential storage).
         m_listener = std::make_unique<StateListener>(this);
         m_auth->AddAuthStateListener(m_listener.get());
 
-        // Connect to emulator if env var is set.
         wchar_t buf[8]{};
         if (GetEnvironmentVariableW(L"USE_AUTH_EMULATOR", buf, 8) > 0)
         {
@@ -80,11 +78,8 @@ namespace winrt::Pivox::Firebase::Native::implementation
         return true;
     }
 
-    // ── Helpers ──────────────────────────────────────────────────
+    // ── Internal helpers ─────────────────────────────────────────
 
-    // Bridges firebase::Future<T> to a coroutine-awaitable pattern.
-    // Signals a Win32 event from OnCompletion, then co_awaits the
-    // signal so the coroutine resumes on completion without polling.
     template <typename T>
     winrt::Windows::Foundation::IAsyncAction
     FirebaseAuthBridge::AwaitFuture(::firebase::Future<T> const& future)
@@ -92,7 +87,6 @@ namespace winrt::Pivox::Firebase::Native::implementation
         winrt::handle event{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
         HANDLE raw = event.get();
 
-        // OnCompletion fires on Firebase's internal thread.
         const_cast<::firebase::Future<T>&>(future).OnCompletion(
             [raw](const ::firebase::Future<T>&) { SetEvent(raw); });
 
@@ -119,7 +113,26 @@ namespace winrt::Pivox::Firebase::Native::implementation
         co_return winrt::to_hstring(*future.result());
     }
 
-    // ── IAuthService-shaped operations ───────────────────────────
+    winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
+    FirebaseAuthBridge::SignInWithCredentialInternalAsync(
+        ::firebase::auth::Credential const& credential)
+    {
+        if (!m_auth)
+            throw winrt::hresult_error(E_FAIL, L"Firebase not initialized.");
+
+        auto future = m_auth->SignInWithCredential(credential);
+        co_await AwaitFuture(future);
+
+        if (future.error() != ::firebase::auth::kAuthErrorNone)
+        {
+            throw winrt::hresult_error(E_FAIL,
+                winrt::to_hstring(future.error_message()));
+        }
+
+        co_return co_await GetCurrentUserTokenAsync(false);
+    }
+
+    // ── Sign-in paths ────────────────────────────────────────────
 
     winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
     FirebaseAuthBridge::SignInWithEmailAsync(
@@ -140,40 +153,109 @@ namespace winrt::Pivox::Firebase::Native::implementation
                 winrt::to_hstring(future.error_message()));
         }
 
-        // Sign-in succeeded — fetch the ID token.
         co_return co_await GetCurrentUserTokenAsync(false);
     }
 
     winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
-    FirebaseAuthBridge::SignInWithCredentialAsync(
+    FirebaseAuthBridge::SignInWithGoogleCredentialAsync(
+        winrt::hstring idToken, winrt::hstring accessToken)
+    {
+        auto credential = ::firebase::auth::GoogleAuthProvider::GetCredential(
+            winrt::to_string(idToken).c_str(),
+            winrt::to_string(accessToken).c_str());
+
+        co_return co_await SignInWithCredentialInternalAsync(credential);
+    }
+
+    winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
+    FirebaseAuthBridge::SignInWithGitHubCredentialAsync(
+        winrt::hstring accessToken)
+    {
+        auto credential = ::firebase::auth::GitHubAuthProvider::GetCredential(
+            winrt::to_string(accessToken).c_str());
+
+        co_return co_await SignInWithCredentialInternalAsync(credential);
+    }
+
+    winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
+    FirebaseAuthBridge::SignInWithOidcCredentialAsync(
         winrt::hstring providerId,
         winrt::hstring idToken,
-        winrt::hstring accessToken)
+        winrt::hstring rawNonce)
+    {
+        // 4-arg overload: (provider, id_token, raw_nonce, access_token).
+        // access_token is nullptr for OIDC — the broker doesn't issue one.
+        auto credential = ::firebase::auth::OAuthProvider::GetCredential(
+            winrt::to_string(providerId).c_str(),
+            winrt::to_string(idToken).c_str(),
+            winrt::to_string(rawNonce).c_str(),
+            nullptr);
+
+        co_return co_await SignInWithCredentialInternalAsync(credential);
+    }
+
+    // ── Account lifecycle ────────────────────────────────────────
+
+    winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
+    FirebaseAuthBridge::CreateAccountAsync(
+        winrt::hstring email, winrt::hstring password, winrt::hstring displayName)
     {
         if (!m_auth)
             throw winrt::hresult_error(E_FAIL, L"Firebase not initialized.");
 
-        // Build the credential from provider ID + tokens.
-        // Currently only Google is wired; extend for other providers.
-        ::firebase::auth::Credential credential;
+        // Step 1: create the Firebase user.
+        auto createFuture = m_auth->CreateUserWithEmailAndPassword(
+            winrt::to_string(email).c_str(),
+            winrt::to_string(password).c_str());
 
-        auto provider = winrt::to_string(providerId);
-        if (provider == "google.com")
+        co_await AwaitFuture(createFuture);
+
+        if (createFuture.error() != ::firebase::auth::kAuthErrorNone)
         {
-            credential = ::firebase::auth::GoogleAuthProvider::GetCredential(
-                winrt::to_string(idToken).c_str(),
-                winrt::to_string(accessToken).c_str());
-        }
-        else
-        {
-            // OAuthProvider::GetCredential for generic OIDC providers.
-            credential = ::firebase::auth::OAuthProvider::GetCredential(
-                provider.c_str(),
-                winrt::to_string(idToken).c_str(),
-                winrt::to_string(accessToken).c_str());
+            throw winrt::hresult_error(E_FAIL,
+                winrt::to_hstring(createFuture.error_message()));
         }
 
-        auto future = m_auth->SignInWithCredential(credential);
+        // Step 2: set displayName on the new user.
+        auto user = m_auth->current_user();
+        if (user.is_valid())
+        {
+            ::firebase::auth::User::UserProfile profile;
+            auto nameStr = winrt::to_string(displayName);
+            profile.display_name = nameStr.c_str();
+
+            auto updateFuture = user.UpdateUserProfile(profile);
+            co_await AwaitFuture(updateFuture);
+
+            if (updateFuture.error() != ::firebase::auth::kAuthErrorNone)
+            {
+                // Non-fatal — account exists, display name just didn't
+                // stick. Log it; don't throw.
+                OutputDebugStringA("[FirebaseAuthBridge] UpdateUserProfile failed\n");
+            }
+            else
+            {
+                // Step 3: reload to pick up the updated JWT with the
+                // name claim.
+                auto reloadFuture = user.Reload();
+                co_await AwaitFuture(reloadFuture);
+            }
+        }
+
+        // Return a fresh token (post-profile-update, carries the
+        // name claim if the update succeeded).
+        co_return co_await GetCurrentUserTokenAsync(/* forceRefresh */ true);
+    }
+
+    winrt::Windows::Foundation::IAsyncAction
+    FirebaseAuthBridge::SendPasswordResetAsync(winrt::hstring email)
+    {
+        if (!m_auth)
+            throw winrt::hresult_error(E_FAIL, L"Firebase not initialized.");
+
+        auto future = m_auth->SendPasswordResetEmail(
+            winrt::to_string(email).c_str());
+
         co_await AwaitFuture(future);
 
         if (future.error() != ::firebase::auth::kAuthErrorNone)
@@ -181,9 +263,9 @@ namespace winrt::Pivox::Firebase::Native::implementation
             throw winrt::hresult_error(E_FAIL,
                 winrt::to_hstring(future.error_message()));
         }
-
-        co_return co_await GetCurrentUserTokenAsync(false);
     }
+
+    // ── Token + state ────────────────────────────────────────────
 
     winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
     FirebaseAuthBridge::GetIdTokenAsync(bool forceRefresh)

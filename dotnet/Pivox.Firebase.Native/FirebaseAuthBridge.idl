@@ -3,6 +3,11 @@
 // Thin bridge: wraps firebase::auth::Auth calls and projects them as
 // IAsyncOperation<String> (JWT strings) + a state-change event.
 // No UI, no OAuth, no business logic — that lives in the C# adapter.
+//
+// Each credential method is a 1:1 transliteration of the Firebase
+// C++ SDK's GetCredential shape for that provider family.  No
+// string-keyed provider dispatch in C++ — the C# side knows which
+// flow it ran and picks the right method.
 
 namespace Pivox.Firebase.Native
 {
@@ -15,16 +20,38 @@ namespace Pivox.Firebase.Native
         // once before any other method.  Returns false if init fails.
         Boolean Initialize();
 
+        // ── sign-in paths ───────────────────────────────────────────
+
         // Email/password sign-in.  Returns the user's ID token JWT on
         // success; throws winrt::hresult_error on failure.
         Windows.Foundation.IAsyncOperation<String> SignInWithEmailAsync(
             String email, String password);
 
-        // Sign in with an OAuth credential (e.g. Google id_token +
-        // access_token exchanged on the C# side).  Returns the ID
-        // token JWT.
-        Windows.Foundation.IAsyncOperation<String> SignInWithCredentialAsync(
-            String providerId, String idToken, String accessToken);
+        // Google: GoogleAuthProvider::GetCredential(idToken, accessToken).
+        Windows.Foundation.IAsyncOperation<String> SignInWithGoogleCredentialAsync(
+            String idToken, String accessToken);
+
+        // GitHub: GitHubAuthProvider::GetCredential(accessToken).
+        Windows.Foundation.IAsyncOperation<String> SignInWithGitHubCredentialAsync(
+            String accessToken);
+
+        // OIDC/SSO: OAuthProvider::GetCredential(providerId, idToken,
+        //           rawNonce, /*accessToken*/ nullptr).
+        Windows.Foundation.IAsyncOperation<String> SignInWithOidcCredentialAsync(
+            String providerId, String idToken, String rawNonce);
+
+        // ── account lifecycle ───────────────────────────────────────
+
+        // Create email/password account + set displayName + reload.
+        // Returns the post-update ID token JWT carrying the name claim.
+        Windows.Foundation.IAsyncOperation<String> CreateAccountAsync(
+            String email, String password, String displayName);
+
+        // Send password-reset email.  Fire-and-forget from the caller's
+        // perspective — throws on failure, returns on acceptance.
+        Windows.Foundation.IAsyncAction SendPasswordResetAsync(String email);
+
+        // ── token + state ───────────────────────────────────────────
 
         // Get the current user's ID token.  Firebase auto-refreshes
         // when the token is close to expiry (~5 min).

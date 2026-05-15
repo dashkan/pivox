@@ -16,14 +16,36 @@ namespace winrt::Pivox::Firebase::Native::implementation
 
         bool Initialize();
 
+        // ── sign-in paths ───────────────────────────────────────
+
         winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
             SignInWithEmailAsync(winrt::hstring email, winrt::hstring password);
 
         winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
-            SignInWithCredentialAsync(
+            SignInWithGoogleCredentialAsync(
+                winrt::hstring idToken, winrt::hstring accessToken);
+
+        winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
+            SignInWithGitHubCredentialAsync(winrt::hstring accessToken);
+
+        winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
+            SignInWithOidcCredentialAsync(
                 winrt::hstring providerId,
                 winrt::hstring idToken,
-                winrt::hstring accessToken);
+                winrt::hstring rawNonce);
+
+        // ── account lifecycle ───────────────────────────────────
+
+        winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
+            CreateAccountAsync(
+                winrt::hstring email,
+                winrt::hstring password,
+                winrt::hstring displayName);
+
+        winrt::Windows::Foundation::IAsyncAction
+            SendPasswordResetAsync(winrt::hstring email);
+
+        // ── token + state ───────────────────────────────────────
 
         winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
             GetIdTokenAsync(bool forceRefresh);
@@ -37,20 +59,21 @@ namespace winrt::Pivox::Firebase::Native::implementation
         void AuthStateChanged(winrt::event_token const& token) noexcept;
 
     private:
-        // Waits for a firebase::Future to complete, then returns.
-        // Throws winrt::hresult_error if the future has an error.
         template <typename T>
         winrt::Windows::Foundation::IAsyncAction AwaitFuture(
             ::firebase::Future<T> const& future);
 
-        // Gets the ID token from the current Firebase user.
         winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
             GetCurrentUserTokenAsync(bool forceRefresh);
+
+        // Signs in with a pre-built credential and returns the JWT.
+        winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
+            SignInWithCredentialInternalAsync(
+                ::firebase::auth::Credential const& credential);
 
         ::firebase::App* m_app{ nullptr };
         ::firebase::auth::Auth* m_auth{ nullptr };
 
-        // Auth state listener forwarding to the WinRT event.
         struct StateListener;
         std::unique_ptr<StateListener> m_listener;
 
