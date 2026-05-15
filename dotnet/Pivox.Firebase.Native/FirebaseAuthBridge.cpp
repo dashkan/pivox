@@ -85,6 +85,25 @@ namespace winrt::Pivox::Firebase::Native::implementation
 
     // ── Internal helpers ─────────────────────────────────────────
 
+    // Encodes the Firebase AuthError enum into a FACILITY_ITF HRESULT
+    // so the C# side can extract the numeric code from Exception.HResult.
+    // Layout: 0x80040000 | (authError & 0xFFFF).
+    static HRESULT AuthErrorToHresult(int authError)
+    {
+        return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF,
+            static_cast<WORD>(authError & 0xFFFF));
+    }
+
+    // Throws a winrt::hresult_error carrying the Firebase error code
+    // in the HRESULT and the SDK's English message as the description.
+    [[noreturn]]
+    static void ThrowAuthError(int authError, const char* message)
+    {
+        throw winrt::hresult_error(
+            AuthErrorToHresult(authError),
+            winrt::to_hstring(message));
+    }
+
     template <typename T>
     winrt::Windows::Foundation::IAsyncAction
     FirebaseAuthBridge::AwaitFuture(::firebase::Future<T> const& future)
@@ -117,8 +136,7 @@ namespace winrt::Pivox::Firebase::Native::implementation
 
         if (future.error() != ::firebase::auth::kAuthErrorNone)
         {
-            throw winrt::hresult_error(E_FAIL,
-                winrt::to_hstring(future.error_message()));
+            ThrowAuthError(future.error(), future.error_message());
         }
 
         co_return winrt::to_hstring(*future.result());
@@ -136,11 +154,14 @@ namespace winrt::Pivox::Firebase::Native::implementation
 
         if (future.error() != ::firebase::auth::kAuthErrorNone)
         {
-            throw winrt::hresult_error(E_FAIL,
-                winrt::to_hstring(future.error_message()));
+            ThrowAuthError(future.error(), future.error_message());
         }
 
-        co_return co_await GetCurrentUserTokenAsync(false);
+        // Force refresh so Firebase validates the session server-side.
+        // Without this, a disabled account gets a valid-looking cached
+        // JWT, the router swaps to Shell, then the listener's forced
+        // refresh fails and routes back — causing a flicker.
+        co_return co_await GetCurrentUserTokenAsync(true);
     }
 
     // ── Sign-in paths ────────────────────────────────────────────
@@ -160,11 +181,10 @@ namespace winrt::Pivox::Firebase::Native::implementation
 
         if (future.error() != ::firebase::auth::kAuthErrorNone)
         {
-            throw winrt::hresult_error(E_FAIL,
-                winrt::to_hstring(future.error_message()));
+            ThrowAuthError(future.error(), future.error_message());
         }
 
-        co_return co_await GetCurrentUserTokenAsync(false);
+        co_return co_await GetCurrentUserTokenAsync(true);
     }
 
     winrt::Windows::Foundation::IAsyncOperation<winrt::hstring>
@@ -223,8 +243,7 @@ namespace winrt::Pivox::Firebase::Native::implementation
 
         if (createFuture.error() != ::firebase::auth::kAuthErrorNone)
         {
-            throw winrt::hresult_error(E_FAIL,
-                winrt::to_hstring(createFuture.error_message()));
+            ThrowAuthError(createFuture.error(), createFuture.error_message());
         }
 
         // Step 2: set displayName on the new user.
@@ -271,8 +290,7 @@ namespace winrt::Pivox::Firebase::Native::implementation
 
         if (future.error() != ::firebase::auth::kAuthErrorNone)
         {
-            throw winrt::hresult_error(E_FAIL,
-                winrt::to_hstring(future.error_message()));
+            ThrowAuthError(future.error(), future.error_message());
         }
     }
 
