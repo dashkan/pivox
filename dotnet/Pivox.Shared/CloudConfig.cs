@@ -47,6 +47,22 @@ public static class CloudConfig
     }
 
     /// <summary>
+    /// Base URL for pivox-cloud's REST surface: SSO provider resolution,
+    /// the OAuth/OIDC broker, etc. Derived from <see cref="GrpcEndpoint"/>'s
+    /// host so a single <c>PIVOX_GRPC_HOST</c> override flips both gRPC
+    /// and REST. Always HTTPS in production — broker callbacks carry id
+    /// tokens; never plaintext.
+    /// </summary>
+    public static string BrokerBaseUrl
+    {
+        get
+        {
+            var (host, _) = ParsedEndpoint();
+            return $"https://{host}";
+        }
+    }
+
+    /// <summary>
     /// Parses <see cref="GrpcEndpoint"/> into (host, port). Throws on
     /// malformed values rather than silently picking a default — a
     /// typo here would otherwise misroute every RPC.

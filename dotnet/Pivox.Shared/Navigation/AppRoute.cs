@@ -22,9 +22,13 @@ public abstract record AppRoute
 {
     private AppRoute() { }
 
-    /// <summary>Pre-auth route. Login form. No back history (signing out
+    /// <summary>Pre-auth: sign-in form. No back history (signing out
     /// wipes history; you can't navigate back into a signed-in shell).</summary>
     public sealed record Login : AppRoute;
+
+    /// <summary>Pre-auth: sign-up form. Pushed from <see cref="Login"/>
+    /// via "Create one"; Pop returns to Login.</summary>
+    public sealed record Register : AppRoute;
 
     /// <summary>Post-auth app shell — the sidebar+detail split. Currently
     /// the only post-auth route. As in-shell screens land, this becomes the

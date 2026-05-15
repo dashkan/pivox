@@ -1017,95 +1017,68 @@ namespace FirebaseAuth {
 	[DisableDefaultCtor]
 	interface FIRMultiFactorSession {
 	}
-// // 
-// // 	// @interface FIROAuthCredential : FIRAuthCredential <NSSecureCoding>
-// // 	[TV (13, 0), MacCatalyst (13, 0), Mac (10, 15), iOS (13, 0)]
-// // 	[BaseType (typeof (FIRAuthCredential))]
-// // 	interface FIROAuthCredential : INSSecureCoding {
-// // 		// @property (readonly, copy, nonatomic) NSString * _Nullable IDToken;
-// // 		[NullAllowed, Export ("IDToken")]
-// // 		string IDToken { get; }
-// // 
-// // 		// @property (readonly, copy, nonatomic) NSString * _Nullable accessToken;
-// // 		[NullAllowed, Export ("accessToken")]
-// // 		string AccessToken { get; }
-// // 
-// // 		// @property (readonly, copy, nonatomic) NSString * _Nullable secret;
-// // 		[NullAllowed, Export ("secret")]
-// // 		string Secret { get; }
-// // 
-// // 		// @property (readonly, nonatomic, class) BOOL supportsSecureCoding;
-// // 		[Static]
-// // 		[Export ("supportsSecureCoding")]
-// // 		bool SupportsSecureCoding { get; }
-// // 
-// // 		// -(void)encodeWithCoder:(NSCoder * _Nonnull)coder;
-// // 		[Export ("encodeWithCoder:")]
-// // 		void EncodeWithCoder (NSCoder coder);
-// // 
-// // 		// -(instancetype _Nullable)initWithCoder:(NSCoder * _Nonnull)coder __attribute__((objc_designated_initializer));
-// // 		[Export ("initWithCoder:")]
-// // 		[DesignatedInitializer]
-// // 		NativeHandle Constructor (NSCoder coder);
-// // 	}
-// 
-// 	// @interface FIROAuthProvider : NSObject <FIRFederatedAuthProvider>
-// 	[TV (13, 0), MacCatalyst (13, 0), Mac (10, 15), iOS (13, 0)]
-// 	[BaseType (typeof (NSObject))]
-// 	[DisableDefaultCtor]
-// 	interface FIROAuthProvider {
-// 		// @property (readonly, copy, nonatomic, class) NSString * _Nonnull id;
-// 		[Static]
-// 		[Export ("id")]
-// 		string Id { get; }
-// 
-// 		// @property (copy, nonatomic) NSArray<NSString *> * _Nullable scopes;
-// 		[NullAllowed, Export ("scopes", ArgumentSemantic.Copy)]
-// 		string [] Scopes { get; set; }
-// 
-// 		// @property (copy, nonatomic) NSDictionary<NSString *,NSString *> * _Nullable customParameters;
-// 		[NullAllowed, Export ("customParameters", ArgumentSemantic.Copy)]
-// 		NSDictionary<NSString, NSString> CustomParameters { get; set; }
-// 
-// 		// @property (readonly, copy, nonatomic) NSString * _Nonnull providerID;
-// 		[Export ("providerID")]
-// 		string ProviderID { get; }
-// 
-// 		// +(FIROAuthProvider * _Nonnull)providerWithProviderID:(NSString * _Nonnull)providerID __attribute__((warn_unused_result("")));
-// 		[Static]
-// 		[Export ("providerWithProviderID:")]
-// 		FIROAuthProvider ProviderWithProviderID (string providerID);
-// 
-// 		// +(FIROAuthProvider * _Nonnull)providerWithProviderID:(NSString * _Nonnull)providerID auth:(FIRAuth * _Nonnull)auth __attribute__((warn_unused_result("")));
-// 		[Static]
-// 		[Export ("providerWithProviderID:auth:")]
-// 		FIROAuthProvider ProviderWithProviderID (string providerID, FIRAuth auth);
-// 
-// 		// +(FIROAuthCredential * _Nonnull)credentialWithProviderID:(NSString * _Nonnull)providerID IDToken:(NSString * _Nonnull)idToken accessToken:(NSString * _Nullable)accessToken __attribute__((warn_unused_result("")));
-// 		[Static]
-// 		[Export ("credentialWithProviderID:IDToken:accessToken:")]
-// 		FIROAuthCredential CredentialWithProviderID (string providerID, string idToken, [NullAllowed] string accessToken);
-// 
-// 		// +(FIROAuthCredential * _Nonnull)credentialWithProviderID:(NSString * _Nonnull)providerID accessToken:(NSString * _Nonnull)accessToken __attribute__((warn_unused_result("")));
-// 		[Static]
-// 		[Export ("credentialWithProviderID:accessToken:")]
-// 		FIROAuthCredential CredentialWithProviderID (string providerID, string accessToken);
-// 
-// 		// +(FIROAuthCredential * _Nonnull)credentialWithProviderID:(NSString * _Nonnull)providerID IDToken:(NSString * _Nonnull)idToken rawNonce:(NSString * _Nonnull)rawNonce accessToken:(NSString * _Nonnull)accessToken __attribute__((warn_unused_result("")));
-// 		[Static]
-// 		[Export ("credentialWithProviderID:IDToken:rawNonce:accessToken:")]
-// 		FIROAuthCredential CredentialWithProviderID (string providerID, string idToken, string rawNonce, string accessToken);
-// 
-// 		// +(FIROAuthCredential * _Nonnull)credentialWithProviderID:(NSString * _Nonnull)providerID IDToken:(NSString * _Nonnull)idToken rawNonce:(NSString * _Nonnull)rawNonce __attribute__((warn_unused_result("")));
-// 		[Static]
-// 		[Export ("credentialWithProviderID:IDToken:rawNonce:")]
-// 		FIROAuthCredential CredentialWithProviderID (string providerID, string idToken, string rawNonce);
-// 
-// 		// +(FIROAuthCredential * _Nonnull)appleCredentialWithIDToken:(NSString * _Nonnull)idToken rawNonce:(NSString * _Nullable)rawNonce fullName:(NSPersonNameComponents * _Nullable)fullName __attribute__((warn_unused_result("")));
-// 		[Static]
-// 		[Export ("appleCredentialWithIDToken:rawNonce:fullName:")]
-// 		FIROAuthCredential AppleCredentialWithIDToken (string idToken, [NullAllowed] string rawNonce, [NullAllowed] NSPersonNameComponents fullName);
-// 	}
+	// @interface FIROAuthCredential : FIRAuthCredential <NSSecureCoding>
+	// INSSecureCoding interface dropped per dotnet/CLAUDE.md
+	// post-sharpie fix catalogue ("duplicate constructors from
+	// INSSecureCoding + base") — the encoding APIs aren't called
+	// from our auth flow, and we only need the credential value.
+	[TV (13, 0), MacCatalyst (13, 0), Mac (10, 15), iOS (13, 0)]
+	[BaseType (typeof (FIRAuthCredential))]
+	interface FIROAuthCredential {
+		// @property (readonly, copy, nonatomic) NSString * _Nullable IDToken;
+		[NullAllowed, Export ("IDToken")]
+		string IDToken { get; }
+
+		// @property (readonly, copy, nonatomic) NSString * _Nullable accessToken;
+		[NullAllowed, Export ("accessToken")]
+		string AccessToken { get; }
+
+		// @property (readonly, copy, nonatomic) NSString * _Nullable secret;
+		[NullAllowed, Export ("secret")]
+		string Secret { get; }
+	}
+
+	// @interface FIROAuthProvider : NSObject <FIRFederatedAuthProvider>
+	// FIRFederatedAuthProvider interface dropped — same rationale as
+	// FIROAuthCredential. We only use the static credential-factory
+	// methods, never the instance protocol methods.
+	[TV (13, 0), MacCatalyst (13, 0), Mac (10, 15), iOS (13, 0)]
+	[BaseType (typeof (NSObject))]
+	[DisableDefaultCtor]
+	interface FIROAuthProvider {
+		// @property (readonly, copy, nonatomic) NSString * _Nonnull providerID;
+		[Export ("providerID")]
+		string ProviderID { get; }
+
+		// +(FIROAuthProvider * _Nonnull)providerWithProviderID:(NSString * _Nonnull)providerID __attribute__((warn_unused_result("")));
+		[Static]
+		[Export ("providerWithProviderID:")]
+		FIROAuthProvider ProviderWithProviderID (string providerID);
+
+		// Note: the Swift / ObjC API distinguishes 5 overloads via
+		// argument labels (IDToken: vs accessToken: vs rawNonce:). C#
+		// has no argument-label disambiguation, so the 3-arg
+		// (string, string, string) overloads collide. We only bind the
+		// shapes we actually use:
+		//   - (providerID, accessToken) — generic access-token providers.
+		//   - (providerID, idToken, rawNonce, accessToken) — full OIDC.
+		//   - (providerID, idToken, rawNonce) — Pivox's SSO broker shape.
+
+		// +(FIROAuthCredential * _Nonnull)credentialWithProviderID:(NSString * _Nonnull)providerID accessToken:(NSString * _Nonnull)accessToken __attribute__((warn_unused_result("")));
+		[Static]
+		[Export ("credentialWithProviderID:accessToken:")]
+		FIROAuthCredential CredentialWithProviderID (string providerID, string accessToken);
+
+		// +(FIROAuthCredential * _Nonnull)credentialWithProviderID:(NSString * _Nonnull)providerID IDToken:(NSString * _Nonnull)idToken rawNonce:(NSString * _Nonnull)rawNonce accessToken:(NSString * _Nonnull)accessToken __attribute__((warn_unused_result("")));
+		[Static]
+		[Export ("credentialWithProviderID:IDToken:rawNonce:accessToken:")]
+		FIROAuthCredential CredentialWithProviderID (string providerID, string idToken, string rawNonce, string accessToken);
+
+		// +(FIROAuthCredential * _Nonnull)credentialWithProviderID:(NSString * _Nonnull)providerID IDToken:(NSString * _Nonnull)idToken rawNonce:(NSString * _Nonnull)rawNonce __attribute__((warn_unused_result("")));
+		[Static]
+		[Export ("credentialWithProviderID:IDToken:rawNonce:")]
+		FIROAuthCredential CredentialWithProviderID (string providerID, string idToken, string rawNonce);
+	}
 // 
 // 	// @interface FIRPhoneAuthCredential : FIRAuthCredential <NSSecureCoding>
 // 	[TV (13, 0), MacCatalyst (13, 0), Mac (10, 15), iOS (13, 0)]

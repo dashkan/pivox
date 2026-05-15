@@ -36,6 +36,7 @@ public sealed class AppDelegate : NSApplicationDelegate
     private IAuthService? _auth;
     private PivoxClient? _pivox;
     private AppRouter? _router;
+    private RememberedEmail? _rememberedEmail;
     private NSWindowController? _activeWindowController;
 
     public override void DidFinishLaunching(NSNotification notification)
@@ -43,9 +44,12 @@ public sealed class AppDelegate : NSApplicationDelegate
         NSApplication.SharedApplication.MainMenu = BuildMainMenu();
 
         // Long-lived services. Auth wraps FIRAuth + Google OAuth;
-        // PivoxClient holds the gRPC channel with Bearer auto-attached.
+        // PivoxClient holds the gRPC channel with Bearer auto-attached;
+        // RememberedEmail persists the email across launches via
+        // NSUserDefaults.
         _auth = new MacOsAuthService();
         _pivox = new PivoxClient(_auth);
+        _rememberedEmail = new RememberedEmail();
 
         // Router seeded with the route corresponding to current auth
         // state — covers the "Firebase restored a persisted session
@@ -112,7 +116,11 @@ public sealed class AppDelegate : NSApplicationDelegate
         return route switch
         {
             AppRoute.Login => new LoginWindowController(
-                new LoginViewController(new LoginViewModel(_auth!))),
+                new LoginViewController(
+                    new LoginViewModel(_auth!), _router!, _rememberedEmail!)),
+            AppRoute.Register => new RegisterWindowController(
+                new RegisterViewController(
+                    new RegisterViewModel(_auth!), _router!)),
             AppRoute.Shell => BuildShellWindowController(),
             _ => throw new InvalidOperationException($"No window for route: {route}"),
         };

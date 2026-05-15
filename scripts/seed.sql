@@ -5,6 +5,7 @@
 BEGIN;
 
 \i scripts/seeds/01_organizations.sql
+\i scripts/seeds/02_acme_sso.sql
 \i scripts/seeds/03_invitation_policies.sql
 \i scripts/seeds/04_spaces.sql
 \i scripts/seeds/05_api_keys.sql
