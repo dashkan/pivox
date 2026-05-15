@@ -35,14 +35,19 @@ public sealed class AuthPrimaryButton : NSButton
         // Configure the button shape.
         BezelStyle = NSBezelStyle.Push;
         ControlSize = NSControlSize.Large;
-        // Primary prominence = the AppKit equivalent of SwiftUI's
-        // .borderedProminent — accent-tinted fill with system-chosen
-        // bright label. We deliberately do NOT set ContentTintColor:
-        // letting AppKit pick the label color gives correct contrast
-        // in both enabled (crisp white) and disabled (properly dimmed)
-        // states. Setting it to a fixed color makes disabled-state
-        // text vanish into the fill.
+        // Primary prominence + explicit BezelColor: TintProminence
+        // alone lets macOS Tahoe desaturate both the fill AND the
+        // label in disabled state, which in light mode collapses
+        // contrast to barely-legible (pale text on pale blue). Forcing
+        // BezelColor keeps the fill saturated regardless of state; the
+        // explicit white ContentTintColor then has enough contrast in
+        // both enabled (full accent + white) and disabled (slightly
+        // dimmed accent + slightly dimmed white) renderings.
         TintProminence = NSTintProminence.Primary;
+        BezelColor = ThemeColors.NS(Shared.UI.ThemeColor.Accent);
+        // ContentTintColor doesn't survive the disabled-state
+        // desaturation in Tahoe; the attributed-title path in
+        // ApplyTitle is what we actually use for the label color.
         Title = "";
         TranslatesAutoresizingMaskIntoConstraints = false;
 
@@ -82,8 +87,36 @@ public sealed class AuthPrimaryButton : NSButton
         set
         {
             _persistentTitle = value;
-            if (!_isLoading) Title = value;
+            if (!_isLoading) ApplyTitle(value);
         }
+    }
+
+    /// <summary>
+    /// Renders the title as an <see cref="NSAttributedString"/> with
+    /// explicit white foreground + system font, instead of a plain
+    /// <c>Title</c>. macOS Tahoe's prominent-button disabled state
+    /// desaturates both fill and label when AppKit picks the label
+    /// color from <see cref="NSButton.ContentTintColor"/>; an
+    /// attributed title with a baked-in color survives the desaturation
+    /// veil with much better contrast. Mirrors SwiftUI
+    /// <c>AuthPrimaryButton</c>'s explicit
+    /// <c>.foregroundStyle(theme.prominentButtonText)</c> on the
+    /// label.
+    /// </summary>
+    private void ApplyTitle(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            AttributedTitle = new Foundation.NSAttributedString(string.Empty);
+            return;
+        }
+
+        var attrs = new AppKit.NSStringAttributes
+        {
+            ForegroundColor = ThemeColors.NS(Shared.UI.ThemeColor.ProminentButtonText),
+            Font = NSFont.SystemFontOfSize(NSFont.SystemFontSize, NSFontWeight.Semibold)!,
+        };
+        AttributedTitle = new Foundation.NSAttributedString(text, attrs);
     }
 
     /// <summary>True while a request is in flight. Disables the button
@@ -98,14 +131,14 @@ public sealed class AuthPrimaryButton : NSButton
             _isLoading = value;
             if (value)
             {
-                Title = "";
+                AttributedTitle = new Foundation.NSAttributedString(string.Empty);
                 _spinner.StartAnimation(null);
                 Enabled = false;
             }
             else
             {
                 _spinner.StopAnimation(null);
-                Title = _persistentTitle;
+                ApplyTitle(_persistentTitle);
                 // IsLoading turning off does NOT re-enable the button —
                 // the caller's CanSubmit gate may still want it disabled
                 // (e.g., field validation failed). Caller assigns Enabled

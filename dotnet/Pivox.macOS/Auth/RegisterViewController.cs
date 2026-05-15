@@ -43,10 +43,23 @@ public sealed class RegisterViewController : NSViewController
     public override void LoadView()
     {
         var container = new NSView();
+
+        var backdrop = new RadialBackdropView
+        {
+            TranslatesAutoresizingMaskIntoConstraints = false,
+        };
+        container.AddSubview(backdrop);
+
         var card = BuildCard();
         container.AddSubview(card);
+
         NSLayoutConstraint.ActivateConstraints(new[]
         {
+            backdrop.TopAnchor.ConstraintEqualTo(container.TopAnchor),
+            backdrop.BottomAnchor.ConstraintEqualTo(container.BottomAnchor),
+            backdrop.LeadingAnchor.ConstraintEqualTo(container.LeadingAnchor),
+            backdrop.TrailingAnchor.ConstraintEqualTo(container.TrailingAnchor),
+
             card.CenterXAnchor.ConstraintEqualTo(container.CenterXAnchor),
             card.CenterYAnchor.ConstraintEqualTo(container.CenterYAnchor),
             card.WidthAnchor.ConstraintEqualTo(ThemeMetrics.AuthCardWidth),

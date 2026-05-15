@@ -1,11 +1,21 @@
 # WinUI — Auth build brief
 
-The macOS side of the auth flow is built and validated. This is the
-build brief for matching it on WinUI.
+The dotnet macOS side of the auth flow is built and validated. This
+is the build brief for matching it on WinUI.
 
-Read alongside `dotnet/CLAUDE.md` (Rules 12–17 cover threading,
-lifecycle, layout, glass, and controller-ownership patterns that
-apply identically here).
+**Canonical reference: the new dotnet macOS implementation in
+`dotnet/Pivox.macOS/`.** Use it as the source of truth for layout,
+behavior, state machines, theming, and lifecycle. The
+`native/platform/macos/swift/Auth/` SwiftUI sources are NOT the
+reference for design or wiring — they're outdated relative to the
+post-audit dotnet build. The exception: `native/platform/macos/Assets.xcassets/`
+remains the source of visual assets (Google logo, GitHub logo, etc.).
+Copy from there; don't re-source them elsewhere.
+
+Read alongside `dotnet/CLAUDE.md` (Rules 12–18 cover threading,
+lifecycle, layout, glass, controller-ownership, and accent-color
+patterns from the macOS side — translate the spirit; some have
+WinUI-specific equivalents called out below).
 
 ## Shared contract
 
@@ -199,16 +209,116 @@ diverge from the macOS architecture. The Firebase C++ SDK 13.x does
 expose `OAuthProvider::GetCredential` per the public headers; verify
 the bridge can pass it through cleanly.
 
+## Theming on WinUI
+
+The shared theme tokens live in `Pivox.Shared/UI/Theme.cs`:
+`ThemeColor` (semantic palette), `ThemeFont` (typography roles),
+`ThemeMetrics` (spacing scale + numeric design tokens). They're
+platform-agnostic. Each platform realizes them.
+
+macOS has `Pivox.macOS/UI/ThemeColors.cs` (returns `NSColor`) and
+`Pivox.macOS/UI/ThemeFonts.cs` (returns `NSFont`). WinUI needs the
+parallel:
+
+```
+Pivox.WinUI/UI/ThemeBrushes.cs   // ThemeColor → Brush (or Color)
+Pivox.WinUI/UI/ThemeFonts.cs     // ThemeFont  → FontFamily + size
+```
+
+XAML pages bind via `{x:Bind}` to static members on those realizers,
+OR reference `{ThemeResource SystemAccentColorBrush}` etc. directly
+for system-level tokens.
+
+### System accent
+
+Windows has a single system-wide accent color — no Multicolor
+fallback, no `AccentColor.colorset` asset, no `NSAccentColorName`
+declaration. Bind directly to `{ThemeResource SystemAccentColor}`
+(or `SystemAccentColorBrush`) and you're done. `ThemeColor.Accent`
+on the WinUI realizer should map to that.
+
+### Light / dark
+
+WinUI handles light/dark from the system preference automatically
+when you use `{ThemeResource ...}` brushes throughout. Don't bake C#
+`Color` constants — let the theme dictionary resolve them.
+
+For the root `Window`, leave `RequestedTheme = ElementTheme.Default`
+(follows system). Don't hardcode `Light` or `Dark` at the window
+level — that wins over the system pref and looks wrong when the user
+flips appearance.
+
+### System fonts
+
+WinUI uses Segoe UI Variable on Win 11+ by default. The
+`ThemeFont` realizer should return `FontFamily` + size pairs that
+mirror the macOS sizing:
+
+| Token | macOS (`NSFont`) | WinUI guidance |
+|---|---|---|
+| `BrandTitle` | 28pt, Semibold | 28pt or `{ThemeResource CaptionTextBlockFontSize}`-adjacent large title |
+| `Title` | system + 2, Semibold | 17pt Semibold (`ThemeResource SubtitleTextBlockFontSize`) |
+| `Body` | `SystemFontSize` | `{ThemeResource ControlContentThemeFontSize}` (14pt) |
+| `BodySmall` | `SmallSystemFontSize` | 12pt (`{ThemeResource CaptionTextBlockFontSize}`) |
+
+Don't hardcode — use the WinUI font theme resources where they map
+cleanly so the realizer scales with the system text-size preference.
+
+### Backdrop: Acrylic vs Mica
+
+The existing `Pivox.WinUI` setup uses `DesktopAcrylicBackdrop` on
+the window. Stick with that — acrylic gives desktop bleed-through
+similar in spirit to the macOS glass treatment.
+`MicaBackdrop` / `MicaAltBackdrop` are newer alternatives worth
+trying after the basic flow lands; visual call.
+
+### Radial accent backdrop (mirror of macOS `RadialBackdropView`)
+
+The macOS side has `Pivox.macOS/UI/RadialBackdropView.cs` — an
+`NSView` that paints two accent-tinted radial gradients (top-leading
+at 0.28 alpha radius 520, bottom-trailing at 0.18 alpha radius 620)
+to give the floating glass card something to refract. The visual
+gain in light mode is large — without it the card reads as a faint
+outline.
+
+XAML doesn't have a `RadialGradientBrush` until WinUI 1.2+, but the
+Composition API does:
+`Microsoft.UI.Composition.CompositionRadialGradientBrush`. Wire it
+up via a `Border` with a `CompositionBrush` set via
+`ElementCompositionPreview.SetElementChildVisual`, painting two
+radials (one at each anchor corner) using the system accent color
+at the alpha values above. Reference shape:
+
+```csharp
+var compositor = ElementCompositionPreview.GetElementVisual(backdrop)
+    .Compositor;
+var brush = compositor.CreateRadialGradientBrush();
+brush.EllipseCenter = new Vector2(0, 0);  // top-leading
+brush.EllipseRadius = new Vector2(520, 520);
+brush.ColorStops.Add(compositor.CreateColorGradientStop(
+    0.0f, accentAt28Alpha));
+brush.ColorStops.Add(compositor.CreateColorGradientStop(
+    1.0f, accentAtZeroAlpha));
+// Repeat for second radial at bottom-trailing, alpha 0.18, radius 620.
+```
+
+If `CompositionRadialGradientBrush` proves fiddly, fall back to a
+single linear gradient + Mica/Acrylic for depth — but the radial
+mirrors macOS closely, worth attempting first.
+
 ## Build the XAML pages
 
 ### `Pivox.WinUI/Auth/RegisterPage.xaml`
 
 Mirror `Pivox.macOS/Auth/RegisterViewController.cs`:
 
-- Card on solid window background (Mica/acrylic equivalent).
-- Header: "Pivox" (large semibold) + "Create your account"
-  (secondary).
-- Fields: Email, Password, optional Display name.
+- Floating card on the window's acrylic/mica backdrop, with the
+  accent-tinted radial gradient backdrop (see Theming section).
+- Card shape: acrylic-brushed `Border` with `CornerRadius` matching
+  `ThemeMetrics.CardCornerRadius`, `Width = ThemeMetrics.AuthCardWidth`.
+- Header: "Pivox" (`ThemeFont.BrandTitle`) + "Create your account"
+  (`ThemeFont.Body` in `SystemColors.SecondaryText`).
+- Fields: Email, Display name, Password, Confirm password.
 - Primary button: "Create Account" (uses
   `RegisterViewModel.CreateAccountAsync`).
 - Error label (pre-allocated height so layout doesn't shift).
@@ -313,12 +423,32 @@ The auth flow is the first place `router.Push` and `router.Pop` get
 exercised — verify Login → Push Register → Pop returns to Login
 without crashing or stacking windows.
 
-## Asset to copy
+## Assets to copy
 
-`GitHubLogo` from
-`native/platform/macos/Assets.xcassets/GitHubLogo.imageset/` into the
-WinUI asset folder. SVG works in WinAppSDK 1.7+ via `Image` source;
-older SDKs need PNG at multiple scales.
+Glyphs and visual assets come from the native/ asset catalog —
+that's the canonical source for both stacks (the dotnet macOS app
+already reuses these). For WinUI:
+
+- `GitHubLogo` from
+  `native/platform/macos/Assets.xcassets/GitHubLogo.imageset/`
+- `GoogleLogo` from
+  `native/platform/macos/Assets.xcassets/GoogleLogo.imageset/`
+  (already in `Pivox.macOS/Assets.xcassets/` — same source)
+
+Both ship as SVG with preserves-vector-representation. WinAppSDK
+1.7+ accepts SVG via `Image` source. Older SDKs need PNG at multiple
+scales — run the SVG through a converter.
+
+Sizing in the XAML: explicit `Width="16" Height="16"` on the
+`Image`. The macOS side learned the hard way that
+preserves-vector-representation SVGs render at their viewBox
+(GitHub's is 1024×1024) unless clamped — same caveat applies in
+WinUI even though the bug surface looks different.
+
+If the WinUI side later needs additional glyphs / accent assets,
+prefer copying from `native/platform/macos/Assets.xcassets/`
+(or `native/platform/windows/...` if Windows-side native art exists)
+over sourcing them fresh.
 
 ## Smoke checklist
 
@@ -335,6 +465,17 @@ older SDKs need PNG at multiple scales.
 - [ ] Remember-me persists email across sign-out + restart.
 - [ ] Editing email after step 2 collapses back to step 1.
 - [ ] Push Register → Pop back to Login (router back-nav works).
+- [ ] Continue/Sign In disabled state is legible in BOTH light and
+      dark mode. (On macOS Tahoe `TintProminence.Primary` desaturated
+      the disabled fill/label too aggressively; macOS workaround was
+      `AttributedTitle` with explicit foreground — may not be needed
+      on WinUI's `AccentButtonStyle` but verify.)
+- [ ] Light mode + dark mode visual sweep — system theme flip lands
+      sane in all auth views (radial backdrop reads, card edges
+      visible, text contrast holds).
+- [ ] System accent flip — change the Windows accent color from blue
+      to something else; the radial backdrop, primary button, and
+      link text should re-tint live.
 
 ## Reference files
 
@@ -342,14 +483,29 @@ older SDKs need PNG at multiple scales.
   `IAuthService` method implementations against Firebase Cocoa.
   Same shape applies to Firebase C++ on Windows.
 - `dotnet/Pivox.macOS/Auth/LoginViewController.cs` — two-step flow
-  reference, including the SSO branch.
+  reference, including the SSO branch + the email-edit-resets-step
+  invalidation, default-button wiring, and post-submit
+  remember-me persistence shape.
 - `dotnet/Pivox.macOS/Auth/RegisterViewController.cs` — Register
-  form reference.
-- `dotnet/Pivox.macOS/Auth/RememberedEmail.cs` — NSUserDefaults
-  variant.
+  form layout + bindings reference.
+- `dotnet/Pivox.macOS/Auth/RememberedEmail.cs` — `NSUserDefaults`
+  variant; WinUI swaps to `ApplicationData.LocalSettings`.
+- `dotnet/Pivox.macOS/UI/ThemeColors.cs` + `ThemeFonts.cs` —
+  per-platform realizers; the WinUI versions return `Brush` /
+  `FontFamily+size` instead.
+- `dotnet/Pivox.macOS/UI/RadialBackdropView.cs` — radial-gradient
+  backdrop reference; WinUI uses `CompositionRadialGradientBrush`.
+- `dotnet/Pivox.macOS/UI/AuthPrimaryButton.cs` — primary button
+  shape + `AttributedTitle` workaround for macOS Tahoe
+  disabled-state legibility (may or may not be needed on WinUI's
+  `AccentButtonStyle` — verify, see smoke checklist).
 - `dotnet/Pivox.Shared/Auth/LoginViewModel.cs` — two-step state
   machine + OAuth orchestration (`DidResolveAsPassword`,
   `IsOAuthInProgress`).
 - `dotnet/Pivox.Shared/Auth/RegisterViewModel.cs` — Register state.
-- `dotnet/CLAUDE.md` — Rules 12-17 (threading, lifecycle, layout,
-  glass, controller-ownership) apply identically to WinUI.
+- `dotnet/Pivox.Shared/UI/Theme.cs` — `ThemeColor`, `ThemeFont`,
+  `ThemeMetrics` enums + constants shared across platforms.
+- `dotnet/CLAUDE.md` — Rules 12–18 (threading, lifecycle, layout,
+  glass, controller-ownership, accent-color). Most apply identically
+  to WinUI; Rule 16 (NSGlassEffectView) translates to Mica/Acrylic
+  + composition; Rule 18 (NSAccentColorName) is macOS-only.

@@ -725,6 +725,54 @@ Same principle applies to anything available on `NSWindowController`
 to the window from `BuildWindow`). The controller is the
 construction-time owner; don't bypass it.
 
+## Rule 18: custom accent color needs BOTH the asset AND `NSAccentColorName`
+
+In an Xcode-built app, an `AccentColor.colorset` in `Assets.xcassets`
+auto-discovers — Xcode injects the linking metadata at build time so
+macOS uses the asset's color when the user's system accent is set to
+Multicolor. **`.NET-for-macOS does not do that injection.**` The asset
+compiles into `Assets.car` correctly (verifiable via `assetutil
+--info`), but macOS's `NSColor.controlAccentColor` returns the system
+default (blue) without an explicit declaration.
+
+Required setup on .NET-for-macOS:
+
+1. `Pivox.macOS/Assets.xcassets/AccentColor.colorset/` — defines the
+   color (light + dark appearance pairs).
+2. `Pivox.macOS/Info.plist`:
+
+   ```xml
+   <key>NSAccentColorName</key>
+   <string>AccentColor</string>
+   ```
+
+Both are load-bearing. Drop either one and accent falls back to
+system blue. Verified by removing each in turn and observing the
+fallback.
+
+### Info.plist incremental-build staleness
+
+Edits to `Info.plist` source aren't always picked up by `dotnet
+build`'s incremental cache — the build can reuse a stale bundled
+`Info.plist` and silently miss new keys. If a key you added to the
+source isn't showing up at runtime:
+
+```sh
+dotnet clean Pivox.macOS/Pivox.macOS.csproj
+rm -rf Pivox.macOS/bin/Debug Pivox.macOS/obj
+dotnet build Pivox.macOS.slnx
+```
+
+Verify with:
+
+```sh
+plutil -convert xml1 -o - \
+  Pivox.macOS/bin/Debug/net10.0-macos/osx-arm64/Pivox.app/Contents/Info.plist \
+  | grep -A 1 <YourKey>
+```
+
+Don't trust incremental builds to mirror your `Info.plist` source.
+
 ## Tooling reference
 
 | Tool | Install | Use for |

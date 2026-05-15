@@ -28,5 +28,16 @@
 	<string>NSApplication</string>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/AppIcon.appiconset</string>
+	<!-- Tells macOS to use Assets.xcassets/AccentColor.colorset as the
+	     app's accent color (resolves to its violet under the
+	     "Multicolor" system accent pref; system accent takes
+	     precedence otherwise).
+	     Required on .NET-for-macOS: unlike Xcode-built apps, the
+	     build doesn't auto-inject this key from the asset name, so
+	     macOS doesn't auto-discover the AccentColor.colorset without
+	     this declaration. Verified by removing it — accent falls back
+	     to system blue. -->
+	<key>NSAccentColorName</key>
+	<string>AccentColor</string>
 </dict>
 </plist>

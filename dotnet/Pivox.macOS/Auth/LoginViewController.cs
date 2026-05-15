@@ -73,10 +73,26 @@ public sealed class LoginViewController : NSViewController
     public override void LoadView()
     {
         var container = new NSView();
+
+        // Accent-tinted radial backdrop — matches SwiftUI's
+        // authBackdrop. Fills the container; gives the glass card
+        // something to refract.
+        var backdrop = new RadialBackdropView
+        {
+            TranslatesAutoresizingMaskIntoConstraints = false,
+        };
+        container.AddSubview(backdrop);
+
         var card = BuildCard();
         container.AddSubview(card);
+
         NSLayoutConstraint.ActivateConstraints(new[]
         {
+            backdrop.TopAnchor.ConstraintEqualTo(container.TopAnchor),
+            backdrop.BottomAnchor.ConstraintEqualTo(container.BottomAnchor),
+            backdrop.LeadingAnchor.ConstraintEqualTo(container.LeadingAnchor),
+            backdrop.TrailingAnchor.ConstraintEqualTo(container.TrailingAnchor),
+
             card.CenterXAnchor.ConstraintEqualTo(container.CenterXAnchor),
             card.CenterYAnchor.ConstraintEqualTo(container.CenterYAnchor),
             card.WidthAnchor.ConstraintEqualTo(ThemeMetrics.AuthCardWidth),
