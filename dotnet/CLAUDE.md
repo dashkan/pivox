@@ -773,6 +773,60 @@ plutil -convert xml1 -o - \
 
 Don't trust incremental builds to mirror your `Info.plist` source.
 
+## Rule 19: `NativeReference` Include paths must be absolute via `$(MSBuildThisFileDirectory)`
+
+The .NET-for-macOS SDK's `InstallNameTool` MSBuild task chokes on
+relative paths in `<NativeReference Include="...\Pivox.Native\...\libfoo.dylib">`.
+Symptom is a non-obvious crash:
+
+```
+error : install_name_tool: can't open file: obj/.../libfoo.dylib.tmp (No such file or directory)
+error MSB4018: System.IO.FileNotFoundException
+    at System.IO.File.Move
+    at Xamarin.MacDev.Tasks.InstallNameTool.<...>b__0
+```
+
+The task does `Path.GetFullPath(input.ItemSpec)` and then `File.Copy` to
+a `.tmp` shadow before invoking `install_name_tool`. When `ItemSpec` is
+a `..\..\` relative path, MSBuild's working-directory-at-task-time and
+`Path.GetFullPath`'s normalization don't always agree about where the
+source actually lives — the `File.Copy` lands at a path that
+`install_name_tool` doesn't see, install_name_tool exits with code 1,
+the ContinueWith then tries `File.Move` on the (never-created) `.tmp`
+and the build fails.
+
+Use:
+
+```xml
+<NativeReference Include="$(MSBuildThisFileDirectory)../Pivox.Native/runtimes/osx-arm64/native/libpivox_markdown.dylib">
+  <Kind>Dynamic</Kind>
+</NativeReference>
+```
+
+`$(MSBuildThisFileDirectory)` is the project file's directory with a
+trailing slash, resolved at evaluation time. The forward slashes after
+it survive the round trip cleanly on macOS. Don't use `..\` Windows
+separators (the macios examples on GitHub use them, but those tests
+build via a different path that masks the issue).
+
+Once that's right, the SDK lands the dylib at
+`Pivox.app/Contents/MonoBundle/` next to the .NET runtime dylibs AND
+adds the dylib to the main binary's load commands with
+`@executable_path/../../Contents/MonoBundle/libfoo.dylib` — meaning the
+dylib loads at process start via dyld, before any P/Invoke. Verify
+with:
+
+```sh
+otool -L Pivox.macOS/bin/Debug/net10.0-macos/osx-arm64/Pivox.app/Contents/MacOS/Pivox \
+  | grep libpivox_
+```
+
+Expected output (per dylib):
+
+```
+@executable_path/../../Contents/MonoBundle/libpivox_markdown.dylib (compatibility version 0.0.0, current version 0.0.0)
+```
+
 ## Tooling reference
 
 | Tool | Install | Use for |

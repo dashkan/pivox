@@ -1,0 +1,93 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!-- Per dotnet/CLAUDE.md Rule 11: shared class libs flag AOT
+         compatibility so reflection / non-trim-safe patterns warn
+         at build time. P/Invoke is trim-friendly by design. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <RootNamespace>Pivox.Native</RootNamespace>
+    <!-- LibraryImport source generator emits pointer-based marshaling
+         shims; CodeHighlighter also uses unsafe blocks for direct
+         span-array iteration. Scope: P/Invoke layer only — managed
+         consumers see no unsafe surface. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- Native libraries shipped alongside the managed assembly.
+       Co-locating the .dylib/.dll with Pivox.Native.dll means the
+       runtime's DllImport resolver finds them via its standard
+       assembly-directory search.
+
+       The runtimes/<rid>/native/ folder is populated by
+       dotnet/scripts/build-ai-native.sh — run `make ai-native`
+       (or the script directly) before building this project for
+       the first time after a checkout. The build does NOT invoke
+       the native build automatically: native sources change rarely
+       and managed iteration shouldn't pay the cost.
+
+       Host-RID matching: dev `dotnet build` (no RID) picks the host
+       platform's runtimes folder via the IsOSPlatform check. Publish
+       with an explicit RID uses that RID's folder.
+
+       Visible="false" hides these from IDE solution explorers — they're
+       build artifacts, not source. -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) and '$(RuntimeIdentifier)' == ''">
+    <Content Include="runtimes/osx-arm64/native/*.dylib"
+             CopyToOutputDirectory="PreserveNewest"
+             Link="%(Filename)%(Extension)"
+             Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(RuntimeIdentifier)' == ''">
+    <Content Include="runtimes/win-x64/native/*.dll"
+             CopyToOutputDirectory="PreserveNewest"
+             Link="%(Filename)%(Extension)"
+             Visible="false" />
+  </ItemGroup>
+
+  <!-- Explicit-RID build (publish): pick the matching runtimes folder.
+       Enumerate extensions explicitly — a *.* glob would match
+       libpivox_markdown.dylib.dSYM directory bundles on macOS
+       (the bundle name contains dots) and trigger undefined MSBuild
+       Content behavior. We only want the loadable artifacts. -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <Content Include="runtimes/$(RuntimeIdentifier)/native/*.dylib;runtimes/$(RuntimeIdentifier)/native/*.so;runtimes/$(RuntimeIdentifier)/native/*.dll;runtimes/$(RuntimeIdentifier)/native/*.pdb"
+             CopyToOutputDirectory="PreserveNewest"
+             Link="%(Filename)%(Extension)"
+             Visible="false" />
+  </ItemGroup>
+
+  <!-- Fail-fast guard. The csproj does not invoke the native build —
+       sources change rarely and managed iteration shouldn't pay the
+       cost. But that means a fresh checkout that runs `dotnet build`
+       without `make ai-native` first will succeed and then fail at
+       runtime with a confusing DllNotFoundException out of P/Invoke.
+       Surface the missing-libs case at build time with an actionable
+       error message.
+
+       Logic: if we're on the host platform and the host-RID native
+       directory is empty (no .dylib / .dll), bail. This deliberately
+       does NOT run when an explicit RuntimeIdentifier is set — the
+       publish workflow targets a specific RID that may not match the
+       host (cross-publish), and the per-RID staging is enforced by
+       the publish output itself failing if files are missing. -->
+  <Target Name="EnsureAiNativeStaged"
+          BeforeTargets="Build"
+          Condition="'$(RuntimeIdentifier)' == ''">
+    <ItemGroup>
+      <_StagedNativeLibs Include="runtimes/osx-arm64/native/*.dylib"
+                         Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
+      <_StagedNativeLibs Include="runtimes/win-x64/native/*.dll"
+                         Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+      <_StagedNativeLibs Include="runtimes/linux-x64/native/*.so"
+                         Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
+    </ItemGroup>
+    <Error Text="Pivox.Native: no staged native libraries found for the host platform. Run 'make ai-native' (or 'dotnet/scripts/build-ai-native.sh') before building Pivox.Native."
+           Condition="'@(_StagedNativeLibs)' == ''" />
+  </Target>
+
+</Project>

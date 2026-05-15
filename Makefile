@@ -6,6 +6,7 @@
 	lint-icons \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down firebase-deploy clean-fn-revisions \
+	ai-native \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
 	test-native-ui
 
@@ -243,6 +244,14 @@ run-app-macos:
 	test -d "$$APP_DIR/Pivox.app" \
 		|| (echo "Pivox.app not found at $$APP_DIR — build it first (Xcode IDE or xcodebuild)"; exit 1); \
 	open "$$APP_DIR/Pivox.app"
+
+# ai-native builds the Pivox.Native native dependencies (markdown
+# C++ via CMake, highlight Rust via Cargo) for the host RID and
+# stages them into dotnet/Pivox.Native/runtimes/<rid>/native/.
+# Run this before `dotnet build` after first checkout or after
+# native sources change. Idempotent.
+ai-native:
+	@dotnet/scripts/build-ai-native.sh
 
 # Native UI Tests (macOS) — image editor only. The auth UI tests
 # previously depended on the Firebase Auth emulator; they are
