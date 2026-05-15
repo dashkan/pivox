@@ -29,25 +29,11 @@ namespace Pivox.Ai;
 public sealed class MacOsChatService : IChatService
 {
     private readonly PivoxClient _client;
-    private readonly string _organizationName;
 
-    /// <param name="organizationName">Resource name of the org that
-    /// scopes the request — format <c>organizations/{org}</c>. The
-    /// proto requires it. Phase B callers (the chat window) supply
-    /// the user's active org; Phase C+ may scope per conversation.</param>
-    public MacOsChatService(PivoxClient client, string organizationName)
+    public MacOsChatService(PivoxClient client)
     {
         ArgumentNullException.ThrowIfNull(client);
-        ArgumentException.ThrowIfNullOrEmpty(organizationName);
-        if (!organizationName.StartsWith("organizations/", StringComparison.Ordinal))
-        {
-            throw new ArgumentException(
-                "organizationName must be a full resource name of the " +
-                "form 'organizations/{org}'.",
-                nameof(organizationName));
-        }
         _client = client;
-        _organizationName = organizationName;
         AssertRoleAlignment();
     }
 
@@ -71,9 +57,18 @@ public sealed class MacOsChatService : IChatService
     }
 
     public async IAsyncEnumerable<ChatStreamEvent> StreamGenerateAsync(
+        string organizationName,
         IReadOnlyList<ChatTurn> turns,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrEmpty(organizationName);
+        if (!organizationName.StartsWith("organizations/", StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "organizationName must be a full resource name of the " +
+                "form 'organizations/{organization}'.",
+                nameof(organizationName));
+        }
         ArgumentNullException.ThrowIfNull(turns);
         if (turns.Count == 0)
         {
@@ -82,7 +77,7 @@ public sealed class MacOsChatService : IChatService
                 "StreamGenerateAsync requires at least one turn.");
         }
 
-        var request = BuildRequest(turns);
+        var request = BuildRequest(organizationName, turns);
 
         // AsyncServerStreamingCall is IDisposable — wrap its consumption
         // in a try/finally to ensure the gRPC call resources release
@@ -146,12 +141,12 @@ public sealed class MacOsChatService : IChatService
     /// single <c>TextPart</c> per message. Phase B is text-only;
     /// multi-part messages (file attachments, tool results) are a
     /// later phase.</summary>
-    private global::Pivox.Ai.V1.GenerateContentRequest BuildRequest(
-        IReadOnlyList<ChatTurn> turns)
+    private static global::Pivox.Ai.V1.GenerateContentRequest BuildRequest(
+        string organizationName, IReadOnlyList<ChatTurn> turns)
     {
         var request = new global::Pivox.Ai.V1.GenerateContentRequest
         {
-            Parent = _organizationName,
+            Parent = organizationName,
         };
 
         foreach (var turn in turns)

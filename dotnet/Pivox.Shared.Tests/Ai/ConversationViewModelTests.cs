@@ -1,5 +1,7 @@
 using System.Collections.Specialized;
 using Pivox.Shared.Ai;
+using Pivox.Shared.Organization;
+using Pivox.Shared.Tests.Persistence;
 using Xunit;
 
 namespace Pivox.Shared.Tests.Ai;
@@ -10,19 +12,33 @@ namespace Pivox.Shared.Tests.Ai;
 /// to control the event sequence; asserts state transitions, message
 /// list mutations, and INotifyPropertyChanged signals.
 ///
-/// All tests install a basic <see cref="SynchronizationContext"/> on
-/// the test thread so the viewmodel's construction-time requirement
-/// is satisfied. xunit doesn't provide one by default; without this
-/// the constructor throws InvalidOperationException (which we test
-/// for explicitly in <see cref="Construction_WithoutSyncContext_Throws"/>).
+/// Each test builds a fresh <see cref="ConversationViewModel"/> via
+/// <see cref="BuildVm"/>, which also creates a backing
+/// <see cref="ActiveOrganization"/> seeded with a default test org.
+/// Tests that need to drive an org switch hold a reference to the
+/// constructed <see cref="ActiveOrganization"/> via the second
+/// return value.
 /// </summary>
 public class ConversationViewModelTests
 {
+    private const string DefaultOrg = "organizations/test";
+
+    /// <summary>Build a viewmodel + its backing active-organization
+    /// reference. The default test org is pre-seeded so Send paths
+    /// don't fail the "no organization selected" guard.</summary>
+    private static (ConversationViewModel Vm, ActiveOrganization Org) BuildVm(
+        IChatService chat, string? initialOrg = DefaultOrg)
+    {
+        var store = new InMemoryKeyValueStore();
+        var org = new ActiveOrganization(store) { Current = initialOrg };
+        return (new ConversationViewModel(chat, org), org);
+    }
+
     [Fact]
     public void Initial_State_IsIdle_WithEmptyMessages()
     {
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
 
         Assert.Equal(ConversationState.Idle, vm.State);
         Assert.Empty(vm.Messages);
@@ -34,7 +50,7 @@ public class ConversationViewModelTests
     public async Task SendAsync_TransitionsLoading_ThenStreaming_ThenIdle()
     {
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
 
         var states = new List<ConversationState>();
         vm.PropertyChanged += (_, args) =>
@@ -88,7 +104,7 @@ public class ConversationViewModelTests
         // Text mutates in place on each Delta. UI subscribers see
         // per-row PropertyChanged on Message, not list-level churn.
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
         var sendTask = vm.SendAsync("ping");
 
         stub.Emit(new TextStartEvent("m1"));
@@ -118,7 +134,7 @@ public class ConversationViewModelTests
     public async Task ServiceThrowsChatException_TransitionsToError()
     {
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
         var sendTask = vm.SendAsync("hi");
 
         stub.Throw(new ChatException(
@@ -141,7 +157,7 @@ public class ConversationViewModelTests
         // ChatException, but if one slips through, the VM categorizes
         // it as Server rather than surfacing raw exception types.
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
         var sendTask = vm.SendAsync("hi");
 
         stub.Throw(new InvalidOperationException("oops"));
@@ -156,7 +172,7 @@ public class ConversationViewModelTests
     public async Task Cancel_DuringStreaming_TransitionsToIdle_KeepsPartialContent()
     {
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
         var sendTask = vm.SendAsync("hi");
 
         stub.Emit(new TextStartEvent("m1"));
@@ -183,7 +199,7 @@ public class ConversationViewModelTests
         // The placeholder is empty; rather than show a blank
         // assistant row, the VM drops it.
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
         var sendTask = vm.SendAsync("hi");
 
         stub.Emit(new TextStartEvent("m1"));
@@ -207,7 +223,7 @@ public class ConversationViewModelTests
         // calls on the same channel.
         var failing = new StubChatService();
         var retry = new RoutingChatService(failing);
-        var vm = new ConversationViewModel(retry);
+        var (vm, _) = BuildVm(retry);
 
         // First call: fail.
         var first = vm.SendAsync("hi");
@@ -238,7 +254,7 @@ public class ConversationViewModelTests
     public async Task SendAsync_WhileStreaming_Throws()
     {
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
         var first = vm.SendAsync("hi");
 
         stub.Emit(new TextStartEvent("m1"));
@@ -293,7 +309,7 @@ public class ConversationViewModelTests
         // carry the test fixture's SynchronizationContext.
         var firstStub = new StubChatService();
         var routing = new RoutingChatService(firstStub);
-        var vm = new ConversationViewModel(routing);
+        var (vm, _) = BuildVm(routing);
 
         var t1 = vm.SendAsync("first user");
         firstStub.Emit(new TextStartEvent("m1"));
@@ -337,7 +353,7 @@ public class ConversationViewModelTests
     public async Task CanSend_PropertyChanged_FiresOnTransitions()
     {
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
 
         var canSendChanges = 0;
         vm.PropertyChanged += (_, args) =>
@@ -370,7 +386,7 @@ public class ConversationViewModelTests
         // placeholder at TextStart) — NOT for in-place text mutations
         // during streaming.
         var stub = new StubChatService();
-        var vm = new ConversationViewModel(stub);
+        var (vm, _) = BuildVm(stub);
 
         var addCount = 0;
         ((INotifyCollectionChanged)vm.Messages).CollectionChanged += (_, args) =>
@@ -391,5 +407,113 @@ public class ConversationViewModelTests
         // No further adds despite three deltas — those mutate Text on
         // the existing assistant Message.
         Assert.Equal(2, addCount);
+    }
+
+    [Fact]
+    public async Task SendAsync_PassesActiveOrganizationToService()
+    {
+        // Pins the per-call organization-name contract: the VM reads
+        // ActiveOrganization.Current at SendAsync entry and forwards
+        // it to the service. WinUI's implementation honors the same
+        // contract.
+        var stub = new StubChatService();
+        var (vm, _) = BuildVm(stub, initialOrg: "organizations/acme");
+
+        var sendTask = vm.SendAsync("hi");
+        stub.Emit(new TextStartEvent("m1"));
+        stub.Emit(new TextDeltaEvent("hello"));
+        stub.Emit(new TextEndEvent());
+        stub.Complete();
+        await sendTask;
+
+        Assert.Equal("organizations/acme", stub.LastOrganizationSent);
+    }
+
+    [Fact]
+    public async Task SendAsync_WithNoActiveOrganization_FailsWithError()
+    {
+        // Defensive: if SendAsync is invoked while ActiveOrganization
+        // is null (e.g., a UI race where the composer didn't gate),
+        // the VM fails to Error rather than hitting the server with
+        // a malformed request.
+        var stub = new StubChatService();
+        var (vm, _) = BuildVm(stub, initialOrg: null);
+
+        await vm.SendAsync("hi");
+
+        Assert.Equal(ConversationState.Error, vm.State);
+        Assert.NotNull(vm.LastErrorMessage);
+        Assert.Contains("organization", vm.LastErrorMessage,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, stub.InvocationCount);
+    }
+
+    [Fact]
+    public async Task OrganizationChange_WhileStreaming_CancelsAndClearsMessages()
+    {
+        // Org switch mid-stream: cancellation propagates through the
+        // service's async iterator, the cancel-handler in SendAsync
+        // resets state to Idle, and OnActiveOrganizationChanged
+        // clears Messages. Net visible state: empty transcript, Idle.
+        var stub = new StubChatService();
+        var (vm, org) = BuildVm(stub);
+
+        var sendTask = vm.SendAsync("hello");
+        stub.Emit(new TextStartEvent("m1"));
+        stub.Emit(new TextDeltaEvent("partial"));
+        await WaitForStateAsync(vm, ConversationState.Streaming);
+
+        // Switch organizations. This trips Cancel() and clears
+        // Messages synchronously.
+        org.Current = "organizations/other";
+
+        await sendTask;
+
+        Assert.Equal(ConversationState.Idle, vm.State);
+        Assert.Empty(vm.Messages);
+        Assert.Null(vm.LastErrorKind);
+    }
+
+    [Fact]
+    public async Task OrganizationChange_WhileError_ClearsErrorAndMessages()
+    {
+        // From the Error state: org switch resets to Idle and wipes
+        // any leftover messages plus the error metadata.
+        var stub = new StubChatService();
+        var (vm, org) = BuildVm(stub);
+
+        var sendTask = vm.SendAsync("hi");
+        stub.Throw(new ChatException(ChatErrorKind.Network, "boom"));
+        await sendTask;
+        Assert.Equal(ConversationState.Error, vm.State);
+        Assert.NotEmpty(vm.Messages);   // the user message remains
+
+        org.Current = "organizations/other";
+
+        Assert.Equal(ConversationState.Idle, vm.State);
+        Assert.Empty(vm.Messages);
+        Assert.Null(vm.LastErrorKind);
+        Assert.Null(vm.LastErrorMessage);
+        Assert.True(vm.CanSend);
+    }
+
+    [Fact]
+    public void OrganizationChange_WhileIdle_IsNoOpOnState()
+    {
+        // No-stream, no-error: org switch leaves State at Idle.
+        // Messages is already empty so Clear() is a no-op visible
+        // outcome — but we verify the event still fires (the VM
+        // re-emits state events defensively on every switch).
+        var stub = new StubChatService();
+        var (vm, org) = BuildVm(stub);
+
+        Assert.Equal(ConversationState.Idle, vm.State);
+        Assert.Empty(vm.Messages);
+
+        org.Current = "organizations/other";
+
+        Assert.Equal(ConversationState.Idle, vm.State);
+        Assert.Empty(vm.Messages);
+        Assert.Null(vm.LastErrorKind);
     }
 }

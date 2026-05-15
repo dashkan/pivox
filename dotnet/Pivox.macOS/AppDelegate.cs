@@ -4,8 +4,11 @@ using Foundation;
 using ObjCRuntime;
 using Pivox.Auth;
 using Pivox.Client;
+using Pivox.MacOs.Persistence;
 using Pivox.Shared.Auth;
 using Pivox.Shared.Navigation;
+using Pivox.Shared.Organization;
+using Pivox.Shared.Persistence;
 
 namespace Pivox;
 
@@ -37,6 +40,8 @@ public sealed class AppDelegate : NSApplicationDelegate
     private PivoxClient? _pivox;
     private AppRouter? _router;
     private RememberedEmail? _rememberedEmail;
+    private IKeyValueStore? _keyValueStore;
+    private ActiveOrganization? _activeOrganization;
     private NSWindowController? _activeWindowController;
 
     public override void DidFinishLaunching(NSNotification notification)
@@ -45,11 +50,16 @@ public sealed class AppDelegate : NSApplicationDelegate
 
         // Long-lived services. Auth wraps FIRAuth + Google OAuth;
         // PivoxClient holds the gRPC channel with Bearer auto-attached;
-        // RememberedEmail persists the email across launches via
-        // NSUserDefaults.
+        // RememberedEmail persists the email across launches via the
+        // shared key-value store abstraction (NSUserDefaults-backed
+        // on macOS). ActiveOrganization holds the currently-active
+        // org resource name and persists it across launches via the
+        // same store.
+        _keyValueStore = new NsUserDefaultsKeyValueStore();
+        _activeOrganization = new ActiveOrganization(_keyValueStore);
         _auth = new MacOsAuthService();
         _pivox = new PivoxClient(_auth);
-        _rememberedEmail = new RememberedEmail();
+        _rememberedEmail = new RememberedEmail(_keyValueStore);
 
         // Router seeded with the route corresponding to current auth
         // state — covers the "Firebase restored a persisted session
@@ -147,7 +157,7 @@ public sealed class AppDelegate : NSApplicationDelegate
     private NSWindowController BuildShellWindowController()
     {
         var sidebar = new SidebarViewController();
-        var detail = new DetailViewController(_auth!, _pivox!);
+        var detail = new DetailViewController(_auth!, _pivox!, _activeOrganization!);
 
         var split = new NSSplitViewController();
         split.AddSplitViewItem(NSSplitViewItem.CreateSidebar(sidebar));

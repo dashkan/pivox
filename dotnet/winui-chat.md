@@ -116,34 +116,38 @@ as-is.
 | `ChatStreamEvent.cs` | Discriminated union — abstract record + sealed `TextStartEvent` / `TextDeltaEvent` / `TextEndEvent`. |
 | `ChatErrorKind.cs` | enum (NotSignedIn/AuthenticationRequired/PermissionDenied/Network/Server/Cancelled). |
 | `ChatException.cs` | Exception subclass with `Kind` + inner exception. |
-| `IChatService.cs` | The cross-platform contract. `IAsyncEnumerable<ChatStreamEvent> StreamGenerateAsync(IReadOnlyList<ChatTurn>, CancellationToken)`. |
-| `ConversationViewModel.cs` | State machine. Owns Messages, drives the service, handles streaming + cancellation + errors. |
+| `IChatService.cs` | The cross-platform contract. **Updated in Phase B step 2a**: now `IAsyncEnumerable<ChatStreamEvent> StreamGenerateAsync(string organizationName, IReadOnlyList<ChatTurn>, CancellationToken)`. Organization name is now passed per-call, not bound at construction. |
+| `ConversationViewModel.cs` | State machine. Owns Messages, drives the service, handles streaming + cancellation + errors. **Updated in Phase B step 2a**: constructor now takes `ActiveOrganization` alongside `IChatService`. Subscribes to `ActiveOrganization.PropertyChanged` and clears all chat state when `Current` changes (org switch wipes per-org history). Reads `ActiveOrganization.Current` on each `SendAsync` and fails with `ChatErrorKind.Server` if no org is selected. |
 
 ### What WinUI builds
 
 One file: `dotnet/Pivox.WinUI/Ai/WindowsChatService.cs` —
 implements `IChatService` against `PivoxClient.Ai` (the generated
 `AiChat.AiChatClient`). Mirror the shape of
-`dotnet/Pivox.macOS/Ai/MacOsChatService.cs` exactly:
+`dotnet/Pivox.macOS/Ai/MacOsChatService.cs` exactly. **Note the
+signature change in Phase B step 2a** — `organizationName` is now
+a per-call parameter, not bound at construction:
 
 ```csharp
 public sealed class WindowsChatService : IChatService
 {
     private readonly PivoxClient _client;
-    private readonly string _organizationName;
 
-    public WindowsChatService(PivoxClient client, string organizationName)
+    public WindowsChatService(PivoxClient client)
     {
-        // Validate organizationName starts with "organizations/".
+        ArgumentNullException.ThrowIfNull(client);
+        _client = client;
         // Call AssertRoleAlignment() once to catch proto enum drift.
     }
 
     public async IAsyncEnumerable<ChatStreamEvent> StreamGenerateAsync(
+        string organizationName,
         IReadOnlyList<ChatTurn> turns,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        // Validate organizationName non-empty and starts with "organizations/".
         // Build Pivox.Ai.V1.GenerateContentRequest:
-        //   - Parent = _organizationName
+        //   - Parent = organizationName
         //   - Each ChatTurn → InputMessage with TextPart
         // Open AsyncServerStreamingCall via _client.Ai.StreamGenerateContent.
         // Iterate response stream, mapping ServerEvent.EventOneofCase to
@@ -181,6 +185,144 @@ instance (constructed with `WindowsAuthService`) gets this for free.
       7 (PERMISSION_DENIED) → PermissionDenied,
       16 (UNAUTHENTICATED) → AuthenticationRequired,
       4 (CANCELLED) → ChatException(Cancelled) → VM → Idle
+
+## Phase B step 2a — shared state foundation
+
+This step landed alongside the IChatService signature change. WinUI
+consumes three new shared types:
+
+### What's new in `Pivox.Shared/`
+
+| File | Purpose |
+|---|---|
+| `Persistence/IKeyValueStore.cs` | Cross-platform abstraction for non-secret user preferences. Methods: `GetString` / `SetString` (null clears), `TryGetBool` / `SetBool`, `TryGetDouble` / `SetDouble`. Plus `TryGetEnum<T>` / `SetEnum<T>` extension methods (string-encoded, AOT-trim-safe). |
+| `Persistence/IKeyValueStore.cs` (extensions) | `KeyValueStoreExtensions.TryGetEnum<T>` / `SetEnum<T>` for storing enums as their name strings. |
+| `Organization/ActiveOrganization.cs` | Observable holder for the currently-active organization resource name (e.g. `organizations/acme`). INPC-based. Persists `Current` through the injected `IKeyValueStore` under the `pivox.active_organization` key. Null = no organization selected. |
+
+### What WinUI builds
+
+One file: `dotnet/Pivox.WinUI/Persistence/ApplicationDataKeyValueStore.cs`.
+Backs `IKeyValueStore` with `Windows.Storage.ApplicationData.Current.LocalSettings`
+— the WinUI-canonical user-preferences store, per-app-package per-user
+container, automatic persistence. macOS reference impl is at
+`dotnet/Pivox.macOS/Persistence/NsUserDefaultsKeyValueStore.cs` and
+shows the expected method semantics (null-string normalization,
+absent-key handling, the `ObjectForKey != null` trick to
+disambiguate "set to false" from "absent" for bool/double).
+
+Skeleton:
+
+```csharp
+public sealed class ApplicationDataKeyValueStore : IKeyValueStore
+{
+    private static ApplicationDataContainer Settings
+        => ApplicationData.Current.LocalSettings;
+
+    public string? GetString(string key)
+    {
+        if (!Settings.Values.TryGetValue(key, out var v)) return null;
+        var s = v as string;
+        return string.IsNullOrEmpty(s) ? null : s;
+    }
+
+    public void SetString(string key, string? value)
+    {
+        if (string.IsNullOrEmpty(value)) Settings.Values.Remove(key);
+        else Settings.Values[key] = value;
+    }
+
+    public bool TryGetBool(string key, out bool value)
+    {
+        if (Settings.Values.TryGetValue(key, out var v) && v is bool b)
+        {
+            value = b;
+            return true;
+        }
+        value = false;
+        return false;
+    }
+
+    public void SetBool(string key, bool value) => Settings.Values[key] = value;
+
+    // TryGetDouble / SetDouble — mirror TryGetBool / SetBool with double.
+}
+```
+
+### What WinUI wires up
+
+In `App.OnLaunched` (composition root), construct and pass through:
+
+```csharp
+_keyValueStore = new ApplicationDataKeyValueStore();
+_activeOrganization = new ActiveOrganization(_keyValueStore);
+_auth = new WindowsAuthService();
+_pivox = new PivoxClient(_auth);
+_chat = new WindowsChatService(_pivox);    // no organizationName!
+// ...
+_rememberedEmail = new RememberedEmail(_keyValueStore);  // refactored too
+```
+
+The chat panel page (when it lands in Phase B step 2b) will
+construct `new ConversationViewModel(_chat, _activeOrganization)`.
+
+`RememberedEmail` on the macOS side has been refactored onto
+`IKeyValueStore`. The WinUI side's `RememberedEmail` (currently
+backed directly by `ApplicationData.LocalSettings`) should be
+similarly refactored to consume `IKeyValueStore` for consistency.
+
+### Org switch behavior
+
+When `ActiveOrganization.Current` changes:
+
+- `ConversationViewModel.OnActiveOrganizationChanged` fires.
+- Any in-flight stream is cancelled via the CTS.
+- `Messages` is cleared.
+- `LastErrorKind` / `LastErrorMessage` are reset.
+- `State` returns to `ConversationState.Idle`.
+
+The viewmodel is per-org by behavior, not by lifetime — a single
+viewmodel instance handles every org the user switches between.
+The platform UI doesn't need to recreate the VM on org switch;
+binding to `ActiveOrganization` from the UI layer is enough to
+trigger the reset automatically.
+
+### Where the org dropdown lives (macOS reference)
+
+`dotnet/Pivox.macOS/DetailViewController.cs` hosts an
+`NSPopUpButton` populated from
+`Organizations.ListOrganizationsAsync`. Selection writes through
+`ActiveOrganization.Current`, which:
+
+1. Persists the new value via `IKeyValueStore`.
+2. Fires `PropertyChanged` → any subscribed `ConversationViewModel`
+   wipes its per-org state.
+
+WinUI's equivalent is a `ComboBox` somewhere in the shell chrome
+(the natural home is wherever WinUI's "you're signed in as X"
+header lives). Same data source, same write target. The UI choice
+is up to the WinUI side; the state binding is fixed by the shared
+contract.
+
+### Phase B step 2a validation checklist (WinUI)
+
+- [ ] `ApplicationDataKeyValueStore` implements `IKeyValueStore`,
+      builds clean
+- [ ] Composition root constructs `IKeyValueStore` →
+      `ActiveOrganization` → wires through to consumers
+- [ ] `RememberedEmail` refactored onto `IKeyValueStore` (the
+      existing direct-`ApplicationData` usage replaced)
+- [ ] `WindowsChatService` constructor drops the
+      `organizationName` parameter
+- [ ] `WindowsChatService.StreamGenerateAsync` accepts
+      `organizationName` as the first parameter and validates it
+- [ ] Org selector somewhere in the shell writes
+      `ActiveOrganization.Current`
+- [ ] Manual probe: switch organization while a chat stream is
+      mid-flight, verify the transcript clears and state returns
+      to Idle without a window flicker
+- [ ] Manual probe: select an organization, quit, relaunch, verify
+      the same organization is preselected from
+      `ApplicationDataKeyValueStore`
 
 ## Cross-cutting rules (from `dotnet/CLAUDE.md`)
 

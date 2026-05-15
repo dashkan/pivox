@@ -25,7 +25,8 @@ internal sealed class RoutingChatService : IChatService
     public void SetInner(StubChatService next) => _inner = next;
 
     public IAsyncEnumerable<ChatStreamEvent> StreamGenerateAsync(
+        string organizationName,
         IReadOnlyList<ChatTurn> turns,
         CancellationToken cancellationToken = default)
-        => _inner.StreamGenerateAsync(turns, cancellationToken);
+        => _inner.StreamGenerateAsync(organizationName, turns, cancellationToken);
 }

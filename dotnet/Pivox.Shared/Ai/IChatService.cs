@@ -3,17 +3,21 @@ namespace Pivox.Shared.Ai;
 /// <summary>
 /// Cross-platform chat surface. Each platform implements this against
 /// its native gRPC stack — macOS via <c>Grpc.Net.Client</c> through
-/// <c>PivoxClient.Ai</c>, Windows likewise once WinUI wires its own
-/// <c>PivoxClient</c> instance — and produces
-/// <see cref="ChatStreamEvent"/> values that the cross-platform
-/// <see cref="ConversationViewModel"/> consumes without knowing about
-/// proto types.
+/// <c>PivoxClient.Ai</c>, Windows likewise via the same
+/// <c>PivoxClient</c> — and produces <see cref="ChatStreamEvent"/>
+/// values that the cross-platform <see cref="ConversationViewModel"/>
+/// consumes without knowing about proto types.
 ///
 /// The interface is intentionally narrow: one method that issues a
-/// streaming generation. Stateless (no conversation id) for Phase B;
-/// the server's <c>StreamGenerateContent</c> RPC handles stateless
-/// calls natively, so this surface doesn't need a per-conversation
-/// abstraction yet.
+/// streaming generation. Stateless re: organization — the active
+/// organization is passed per-call, not bound at construction —
+/// so a single service instance handles every organization the
+/// user belongs to. Switching organizations doesn't require
+/// recreating the service. The viewmodel layer
+/// (<see cref="ConversationViewModel"/>) is responsible for
+/// providing the active organization on each
+/// <c>SendAsync</c>; the service simply forwards it to the proto
+/// request.
 ///
 /// Threading: implementations choose their dispatch surface. The
 /// viewmodel subscribes to the returned stream from its construction
@@ -28,9 +32,13 @@ public interface IChatService
 {
     /// <summary>
     /// Stream-generate an assistant response for
-    /// <paramref name="turns"/>. The implementation:
+    /// <paramref name="turns"/>, scoped to
+    /// <paramref name="organizationName"/>. The implementation:
     ///
     /// <list type="number">
+    /// <item>Builds a <c>GenerateContentRequest</c> with
+    ///   <c>Parent = organizationName</c>, maps each
+    ///   <see cref="ChatTurn"/> to a proto <c>InputMessage</c>.</item>
     /// <item>Fetches an auth token (via the platform's
     ///   <c>IAuthService</c>) and attaches it as the Bearer token
     ///   on the outbound RPC.</item>
@@ -48,7 +56,11 @@ public interface IChatService
     /// <paramref name="cancellationToken"/>; the returned async
     /// sequence terminates cleanly when triggered.
     /// </summary>
+    /// <param name="organizationName">Full resource name of the
+    /// organization scoping this call, e.g. <c>organizations/acme</c>.
+    /// Must be non-empty and start with <c>organizations/</c>.</param>
     IAsyncEnumerable<ChatStreamEvent> StreamGenerateAsync(
+        string organizationName,
         IReadOnlyList<ChatTurn> turns,
         CancellationToken cancellationToken = default);
 }

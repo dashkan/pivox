@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Pivox.Shared.Organization;
 
 namespace Pivox.Shared.Ai;
 
@@ -52,6 +53,7 @@ namespace Pivox.Shared.Ai;
 public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly IChatService _chat;
+    private readonly ActiveOrganization _activeOrganization;
     // Captured at construction to validate UI-thread placement. Not
     // used for explicit Post — see class doc. Kept as a field rather
     // than discarded so future explicit marshaling (e.g., a `Refresh`
@@ -65,16 +67,26 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
     private Message? _inflight;
     private bool _disposed;
 
-    public ConversationViewModel(IChatService chat)
+    public ConversationViewModel(
+        IChatService chat, ActiveOrganization activeOrganization)
     {
         ArgumentNullException.ThrowIfNull(chat);
+        ArgumentNullException.ThrowIfNull(activeOrganization);
         _chat = chat;
+        _activeOrganization = activeOrganization;
         _uiContext = SynchronizationContext.Current
             ?? throw new InvalidOperationException(
                 "ConversationViewModel must be constructed on a thread " +
                 "with a SynchronizationContext. macOS and Windows apps " +
                 "install one via their event-loop runtimes; tests install " +
                 "one via the test class fixture.");
+
+        // Subscribe to organization switches. The UI is single-org —
+        // when the user picks a different organization, any in-flight
+        // chat is invalidated (the assistant context is org-scoped on
+        // the server) and the transcript is wiped. The state-reset
+        // logic lives in OnActiveOrganizationChanged.
+        _activeOrganization.PropertyChanged += OnActiveOrganizationChanged;
     }
 
     /// <summary>Ordered transcript of completed and in-flight messages.
@@ -145,6 +157,20 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
                 $"SendAsync called while State={State}; gate via CanSend.");
         }
 
+        // Resolve the active organization once at the top of Send.
+        // The UI ensures CanSend is only true when an organization is
+        // selected (composer disabled with a hint otherwise), but
+        // re-check here so an off-UI caller still gets a clean error
+        // instead of a server-side INVALID_ARGUMENT rejection.
+        var organizationName = _activeOrganization.Current;
+        if (string.IsNullOrEmpty(organizationName))
+        {
+            FailWith(
+                ChatErrorKind.Server,
+                "Select an organization before sending a message.");
+            return;
+        }
+
         // Append the user message immediately so the UI shows the turn
         // before the network round-trip starts. The user-message Text
         // is final at construction; no streaming mutation needed.
@@ -195,7 +221,7 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
             // the UI thread because the caller is on the UI thread
             // (precondition; see class doc).
             await foreach (var evt in _chat
-                .StreamGenerateAsync(turns, token)
+                .StreamGenerateAsync(organizationName, turns, token)
                 .WithCancellation(token)
                 .ConfigureAwait(true))
             {
@@ -324,6 +350,41 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
         cts?.Dispose();
     }
 
+    /// <summary>Handles <see cref="ActiveOrganization.Current"/>
+    /// changes: cancels any in-flight stream, wipes the transcript,
+    /// and resets the error/state slots. The UI operates on one
+    /// organization at a time, so the chat history from a previous
+    /// organization is invalidated the moment a switch occurs.
+    ///
+    /// Race-safety: <see cref="Cancel"/> trips the CTS synchronously,
+    /// but the async <c>await foreach</c> in <see cref="SendAsync"/>
+    /// observes the cancellation on its next iteration. Clearing
+    /// <see cref="Messages"/> here happens BEFORE the cancellation
+    /// handler runs; that handler's
+    /// <see cref="DiscardEmptyInflight"/> path is a safe no-op
+    /// against an empty list (the
+    /// <c>Messages.Count &gt; 0</c> guard skips cleanly). The
+    /// in-flight <see cref="Message"/> instance, if any, becomes
+    /// orphaned from the collection — any late
+    /// <c>_inflight.Text += delta</c> from a yielded-but-not-yet-
+    /// processed event just mutates the orphaned object, which the
+    /// UI is no longer subscribed to. No exception, no torn UI.</summary>
+    private void OnActiveOrganizationChanged(
+        object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ActiveOrganization.Current)) return;
+        if (_disposed) return;
+
+        Cancel();
+        Messages.Clear();
+        _inflight = null;
+        LastErrorKind = null;
+        LastErrorMessage = null;
+        State = ConversationState.Idle;
+        RaisePropertyChanged(nameof(CanSend));
+        DisposeCts();
+    }
+
     private void DiscardEmptyInflight()
     {
         if (_inflight is not null
@@ -351,6 +412,7 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _activeOrganization.PropertyChanged -= OnActiveOrganizationChanged;
         var cts = Interlocked.Exchange(ref _streamCts, null);
         if (cts is not null)
         {

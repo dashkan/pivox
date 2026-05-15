@@ -34,12 +34,15 @@ internal sealed class StubChatService : IChatService
             });
 
     public IReadOnlyList<ChatTurn>? LastTurnsSent { get; private set; }
+    public string? LastOrganizationSent { get; private set; }
     public int InvocationCount { get; private set; }
 
     public async IAsyncEnumerable<ChatStreamEvent> StreamGenerateAsync(
+        string organizationName,
         IReadOnlyList<ChatTurn> turns,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        LastOrganizationSent = organizationName;
         LastTurnsSent = turns;
         InvocationCount++;
 
