@@ -183,6 +183,25 @@ public sealed class MacOsAuthService : IAuthService
 
     private void SetCurrent(AuthSession? session)
     {
+        // Dedupe: FIRAuth's AddAuthStateDidChangeListener fires for
+        // every sign-in / sign-out / token rotation, AND we also call
+        // SetCurrent explicitly from FinalizeAsync / SignOutAsync. The
+        // listener path arrives slightly after the explicit path,
+        // carrying an effectively-equal session (same JWT). Without
+        // dedup, every sign-in/out fires CurrentChanged twice, which
+        // makes the router rebuild windows twice.
+        //
+        // Equality: both null, or both non-null with identical IdToken
+        // (FirebaseIdentity is derived from IdToken so JWT identity
+        // implies semantic identity).
+        if (_current is null && session is null) return;
+        if (_current is not null && session is not null
+            && _current.IdToken == session.IdToken)
+        {
+            // Same JWT → no semantic change. Suppress the duplicate.
+            return;
+        }
+
         _current = session;
         CurrentChanged?.Invoke(this, session);
     }

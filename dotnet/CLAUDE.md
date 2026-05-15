@@ -484,6 +484,247 @@ Class libraries do **not** set `<PublishAot>` — that's executable-only.
 `Pivox.macOS.csproj` sets `<PublishAot>true</PublishAot>` (unconditional;
 AOT only triggers at publish time, not build).
 
+## Rule 12: shared services raise events on the UI thread
+
+Any state holder in `Pivox.Shared` that fires events the UI subscribes
+to (`IAuthService.CurrentChanged`, `AppRouter.CurrentChanged`,
+view-model `INotifyPropertyChanged`, future feature services) MUST
+ensure those events deliver on the platform's UI thread, regardless of
+which thread mutated the state. Subscribers should never have to
+marshal in their handler — the boundary is the service's
+responsibility.
+
+**Two enforcement points, both should hold long-term:**
+
+1. **Platform-specific `IAuthService` impls** marshal at their own
+   boundary. `MacOsAuthService` gets this nearly free (FIRAuth
+   callbacks fire on the main queue); `WindowsAuthService` must
+   explicitly dispatch via the WinUI 3 `DispatcherQueue` before
+   raising `CurrentChanged` — the C++/WinRT bridge's
+   `AuthStateChanged` event arrives on Firebase's internal thread.
+2. **Shared state services** (router, view-models) capture a
+   `SynchronizationContext` at construction (the UI thread's
+   context, present on both platforms by default) and `Post` events
+   through it. `AppRouter` is the reference shape.
+
+**Why both:** defense-in-depth. Platform impls own their own
+threading, but the shared layer protects against forgotten
+marshaling at any layer above. Latent bugs surface as "callbacks
+fire on background thread on platform X only" — exactly the kind of
+heisenbug TDD won't catch.
+
+**Implementation pattern (shared layer):**
+
+```csharp
+public sealed class FooService
+{
+    private readonly SynchronizationContext _uiContext;
+
+    public FooService()
+    {
+        _uiContext = SynchronizationContext.Current
+            ?? throw new InvalidOperationException(
+                "FooService must be constructed on the UI thread.");
+    }
+
+    public event EventHandler<TArgs>? SomethingChanged;
+
+    public void MutateFromAnywhere(...)
+    {
+        if (SynchronizationContext.Current == _uiContext)
+        {
+            // Fast path: already on UI thread → synchronous mutation
+            DoMutate();
+            SomethingChanged?.Invoke(this, args);
+        }
+        else
+        {
+            _uiContext.Post(_ =>
+            {
+                DoMutate();
+                SomethingChanged?.Invoke(this, args);
+            }, null);
+        }
+    }
+}
+```
+
+**Consequence — eventual consistency on background calls.** Mutations
+posted from a background thread are not visible to that thread
+immediately after the call returns. State reads from the UI thread
+are always current. This is the standard async-router shape; the
+alternative (lock-and-mutate-sync, post-the-event) buys nothing and
+adds a lock. Document it on each service that uses the pattern.
+
+## Rule 13: never manually `Dispose()` AppKit NS* peers
+
+AppKit owns its native objects; the managed `NSObject` subclass
+(`NSWindowController`, `NSWindow`, `NSViewController`, etc.) is a
+peer pointing at the native side. Calling `.Dispose()` on the peer
+disposes its handle — but AppKit may still hold the native object
+(deferred close animations, autorelease pools, `ReleasedWhenClosed`
+nuances). The next time AppKit messages the peer, it dereferences a
+dead handle. Use-after-free shaped bug, often invisible until a
+later release pass.
+
+**Pattern for window teardown:**
+
+```csharp
+// CORRECT — let AppKit run its release path; managed peer GC's later.
+previous?.Close();
+
+// WRONG — disposes the managed peer while AppKit may still hold ref.
+previous?.Close();
+previous?.Dispose();
+```
+
+If you need deterministic cleanup of *managed-side* state
+(unhook events, dispose injected services), do that explicitly on
+the controller's content (e.g. before `Close()`, walk to the
+`ContentViewController` and unsubscribe its bindings). Don't
+`Dispose()` the AppKit peer itself.
+
+This rule applies to every type derived from `NSObject` that AppKit
+constructs lifetimes for: `NSWindow`, `NSWindowController`,
+`NSViewController`, `NSView`, `NSMenuItem`, `NSTextField`, etc.
+Manual `Dispose()` is only correct for managed wrappers we own end
+to end (e.g. our own classes implementing `IDisposable` with no
+AppKit handle).
+
+## Rule 14: pick one path between Firebase listener and explicit `SetCurrent`
+
+`FIRAuth.AddAuthStateDidChangeListener` fires for every sign-in,
+sign-out, and token rotation. If your `IAuthService` impl also
+calls `SetCurrent(session)` explicitly inside `SignInAsync` /
+`SignOutAsync`, **`CurrentChanged` fires twice** — once from the
+explicit path, once from the listener. Every subscriber runs its
+handler twice. For `AppRouter.ReplaceRoot`, that means windows
+build twice.
+
+Pick one:
+
+- **Listener-only** (recommended): explicit auth methods *just*
+  call FIRAuth; the listener observes the resulting state change
+  and calls `SetCurrent` exactly once.
+- **Explicit-only**: don't install the listener, do everything via
+  the explicit paths. Loses the "restore persisted session on
+  launch" signal — usually not what you want on macOS.
+
+If you do keep both (because the listener also catches passive
+token refreshes), **dedupe in `SetCurrent`**: compare incoming
+session to current by identity-relevant field (Firebase JWT
+`IdToken` is canonical — same JWT means same session). Suppress
+the duplicate.
+
+This applies to the WinUI side too: `FirebaseAuthBridge`'s
+`AuthStateChanged` event fires for the same triggers; the C#
+adapter's `WindowsAuthService` should dedupe in `SetCurrent` the
+same way.
+
+## Rule 15: `NSStackView` has no built-in "Fill" cross-axis alignment
+
+NSStackView's `Alignment` property controls cross-axis positioning
+(Leading/Trailing/CenterX/CenterY etc.) — none of them stretch
+children to fill the cross axis the way SwiftUI's
+`HStackAlignment.center` + `frame(maxWidth: .infinity)` does, or
+the way UIStackView's `.fill` distribution does.
+
+To make children fill cross-axis in NSStackView:
+
+```csharp
+// Pin each child's width to the stack's content width (stack width
+// minus EdgeInsets on both sides). EdgeInsets is the single source
+// of truth for padding — derive the constant from it, don't hardcode
+// the same magic number twice.
+var inset = -2 * (float)stack.EdgeInsets.Left;
+NSLayoutConstraint.ActivateConstraints(new[]
+{
+    child1.WidthAnchor.ConstraintEqualTo(stack.WidthAnchor, 1, inset),
+    child2.WidthAnchor.ConstraintEqualTo(stack.WidthAnchor, 1, inset),
+});
+```
+
+**Anti-pattern:** combining `EdgeInsets = N` AND hardcoded
+`WidthAnchor.ConstraintEqualTo(stack.WidthAnchor, 1, -2N)` — both
+do the same math; if `N` changes, only one updates. Pick: derive
+the constraint constant from `EdgeInsets`, OR drop EdgeInsets and
+let the constraints carry the inset. See
+`LoginViewController.BuildCard()` for the canonical shape.
+
+## Rule 16: Liquid Glass scope on macOS 26
+
+`NSGlassEffectView` is the proper macOS 26 Liquid Glass primitive.
+Per WWDC 2025 session 310 ("Build an AppKit app with the new
+design"): **limit Liquid Glass to top-level UI elements that float
+above content** — auth cards, inline editing controls, toolbar
+glass. Not for general window backgrounds.
+
+Practical layering:
+
+| Layer | Use |
+|---|---|
+| Window content | Plain `NSView` with `NSColor.WindowBackground` (appearance-aware, solid). Don't put `NSVisualEffectView` here — it competes with the glass card for the same "translucent surface" role and the glass sampling gets confused ("glass can't sample other glass"). |
+| Floating cards / panels | `NSGlassEffectView` with `ContentView = yourLayout` and `CornerRadius = ThemeMetrics.CardCornerRadius` |
+| Sidebar / toolbar | `NSSplitViewController.CreateSidebar` and `NSToolbar` auto-glass per the new design system. Don't apply additional `NSVisualEffectView` to a sidebar — the WWDC session calls this out as a removal-required pattern. |
+
+`NSGlassEffectView` properties: `ContentView` (required — sets the
+view to appear on glass; AppKit ties geometry via Auto Layout
+automatically), `CornerRadius`, `TintColor`. See `LoginViewController.BuildCard()`.
+
+For grouping multiple glass elements in close proximity, use
+`NSGlassEffectContainerView` so they share sampling regions and
+join/separate fluidly (the WWDC session calls this out for visual
+correctness — light refraction breaks when two `NSGlassEffectView`
+instances sample independently).
+
+## Rule 17: set window/VC ownership via the `NSWindowController`, not the window
+
+The AppKit ownership chain is three-way:
+`WindowController ↔ Window ↔ ContentViewController`. Both
+`NSWindow.ContentViewController` and
+`NSWindowController.ContentViewController` exist; they do different
+things.
+
+| Setter | What it does |
+|---|---|
+| `window.ContentViewController = vc` | Sets `contentView = vc.View`. Window-side only. |
+| `windowController.ContentViewController = vc` | Same as above, PLUS wires the controller into the responder chain (controller becomes the next responder above the VC) and ties the VC's lifetime to the controller. |
+
+If you reach through and set `window.ContentViewController` directly
+— especially **before** the window is bound to a window controller
+(i.e. inside the `static NSWindow Build...()` helper called from
+`base(BuildWindow())`) — you get a contentView with broken
+responder-chain integration: no controller in the chain, no proper
+key-view loop. Empirically on macOS 26, the window may not surface
+at all.
+
+**Pattern:**
+
+```csharp
+public sealed class MyWindowController : NSWindowController
+{
+    public MyWindowController(MyContentVC content)
+        : base(BuildWindow())                  // window only — no content yet
+    {
+        ContentViewController = content;       // controller-side setter
+    }
+
+    private static NSWindow BuildWindow()
+    {
+        var window = new NSWindow(/*...*/) { /* chrome */ };
+        window.Center();
+        // Don't set ContentViewController here — the window has no
+        // associated controller yet.
+        return window;
+    }
+}
+```
+
+Same principle applies to anything available on `NSWindowController`
+(e.g. `Window` — read it via the controller, not by capturing a ref
+to the window from `BuildWindow`). The controller is the
+construction-time owner; don't bypass it.
+
 ## Tooling reference
 
 | Tool | Install | Use for |

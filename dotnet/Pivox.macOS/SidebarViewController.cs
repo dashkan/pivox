@@ -2,6 +2,8 @@ using AppKit;
 using CoreGraphics;
 using Foundation;
 using ObjCRuntime;
+using Pivox.Shared.UI;
+using Pivox.UI;
 
 namespace Pivox;
 
@@ -36,9 +38,7 @@ public sealed class SidebarViewController : NSViewController
 			DrawsBackground = false,
 			Selectable = false,
 			Alignment = NSTextAlignment.Center,
-			// NSFont.SystemFontOfSize is bound as nullable but Apple's
-			// contract guarantees non-null. Forgive at the boundary.
-			Font = NSFont.SystemFontOfSize(NSFont.SystemFontSize)!,
+			Font = ThemeFonts.NS(ThemeFont.Body),
 			TranslatesAutoresizingMaskIntoConstraints = false,
 		};
 
