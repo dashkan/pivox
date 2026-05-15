@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -39,31 +40,38 @@ public sealed class WindowsAuthService : IAuthService
     private static readonly HttpClient s_http = new();
 
     private readonly Firebase.Native.FirebaseAuthBridge _bridge;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcher;
     private AuthSession? _current;
 
     public WindowsAuthService()
     {
+        _dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         _bridge = new Firebase.Native.FirebaseAuthBridge();
 
         // Subscribe BEFORE Initialize — Firebase's AddAuthStateListener
         // fires synchronously with the current state on registration.
-        _bridge.AuthStateChanged += async (_, signedIn) =>
+        // The event fires on Firebase's internal thread (CLAUDE.md
+        // Rule 12) — marshal to UI thread before calling SetCurrent.
+        _bridge.AuthStateChanged += (_, signedIn) =>
         {
-            if (!signedIn)
+            _dispatcher.TryEnqueue(async () =>
             {
-                SetCurrent(null);
-                return;
-            }
-            try
-            {
-                var jwt = await _bridge.GetIdTokenAsync(false);
-                SetCurrent(BuildSession(jwt));
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine(
-                    $"[Auth] token fetch on state change failed: {ex.Message}");
-            }
+                if (!signedIn)
+                {
+                    SetCurrent(null);
+                    return;
+                }
+                try
+                {
+                    var jwt = await _bridge.GetIdTokenAsync(false);
+                    SetCurrent(BuildSession(jwt));
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(
+                        $"[Auth] token fetch on state change failed: {ex.Message}");
+                }
+            });
         };
 
         if (!_bridge.Initialize())
@@ -203,10 +211,10 @@ public sealed class WindowsAuthService : IAuthService
         if (!_bridge.IsSignedIn)
             throw new InvalidOperationException("Not signed in.");
 
-        var jwt = await _bridge.GetIdTokenAsync(false).AsTask(ct);
-        var session = BuildSession(jwt);
-        SetCurrent(session);
-        return session.IdToken;
+        // Pure getter — no SetCurrent. Token refresh is handled by
+        // the AuthStateChanged listener. This runs on every gRPC
+        // call via AuthCallCredentials.
+        return await _bridge.GetIdTokenAsync(false).AsTask(ct);
     }
 
     // ── helpers ──────────────────────────────────────────────────
@@ -417,6 +425,7 @@ public sealed class WindowsAuthService : IAuthService
         window.Content = webView;
         window.AppWindow.Resize(new Windows.Graphics.SizeInt32 { Width = 500, Height = 700 });
         window.Activate();
+        SetPopupOwner(window);
         webView.Source = new Uri(authUrl);
 
         return tcs.Task;
@@ -464,6 +473,7 @@ public sealed class WindowsAuthService : IAuthService
         window.Content = webView;
         window.AppWindow.Resize(new Windows.Graphics.SizeInt32 { Width = 500, Height = 700 });
         window.Activate();
+        SetPopupOwner(window);
         webView.Source = new Uri(startUrl);
 
         return tcs.Task;
@@ -483,6 +493,31 @@ public sealed class WindowsAuthService : IAuthService
             if (val is not null) dict[key] = val;
         }
         return dict;
+    }
+
+    // ── popup window ownership ─────────────────────────────────
+
+    private const int GWLP_HWNDPARENT = -8;
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    /// <summary>
+    /// Sets <paramref name="popup"/> as owned by the current foreground
+    /// window so it minimizes together, shares the taskbar group, and
+    /// doesn't appear as a separate alt-tab entry.
+    /// </summary>
+    private static void SetPopupOwner(Window popup)
+    {
+        var popupHwnd = WinRT.Interop.WindowNative.GetWindowHandle(popup);
+        var ownerHwnd = GetForegroundWindow();
+        if (ownerHwnd != IntPtr.Zero && ownerHwnd != popupHwnd)
+        {
+            SetWindowLongPtr(popupHwnd, GWLP_HWNDPARENT, ownerHwnd);
+        }
     }
 
     // ── PKCE ─────────────────────────────────────────────────────

@@ -27,9 +27,8 @@ public sealed partial class RadialBackdropElement : Grid
     public RadialBackdropElement()
     {
         Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
         SizeChanged += OnSizeChanged;
-        // UISettings.ColorValuesChanged fires on accent color AND
-        // light/dark changes — on a background thread.
         _uiSettings.ColorValuesChanged += OnSystemColorsChanged;
     }
 
@@ -38,6 +37,11 @@ public sealed partial class RadialBackdropElement : Grid
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         BuildVisuals();
         UpdateVisualLayout();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _uiSettings.ColorValuesChanged -= OnSystemColorsChanged;
     }
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs e)

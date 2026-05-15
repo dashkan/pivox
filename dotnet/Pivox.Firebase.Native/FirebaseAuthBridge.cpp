@@ -15,10 +15,14 @@ namespace winrt::Pivox::Firebase::Native::implementation
         : public ::firebase::auth::AuthStateListener
     {
         FirebaseAuthBridge* owner;
+        std::atomic<bool> active{ true };
         explicit StateListener(FirebaseAuthBridge* o) : owner(o) {}
 
         void OnAuthStateChanged(::firebase::auth::Auth*) override
         {
+            // Guard against teardown race: RemoveAuthStateListener
+            // returns before in-progress callbacks complete.
+            if (!active.load()) return;
             bool signedIn = owner->IsSignedIn();
             owner->m_authStateChanged(*owner, signedIn);
         }
@@ -30,6 +34,7 @@ namespace winrt::Pivox::Firebase::Native::implementation
     {
         if (m_auth && m_listener)
         {
+            m_listener->active.store(false);
             m_auth->RemoveAuthStateListener(m_listener.get());
         }
         // Auth::GetAuth() returns a cached pointer owned by the App.
