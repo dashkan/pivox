@@ -93,47 +93,51 @@ public sealed class MacOsAuthService : IAuthService
         }
 
         // Synchronous bootstrap: if Firebase restored a user from
-        // Keychain during Configure, hydrate _current now — BEFORE
-        // we add the auth-state listener and BEFORE we return to
-        // AppDelegate. AppDelegate reads _auth.Current synchronously
-        // when picking the initial route; without this, Current is
-        // null at that moment (the listener fires async) and the
-        // app routes to Login first, then flickers to Shell ~500ms
-        // later when the listener catches up.
+        // Keychain during Configure, validate the session against
+        // Firebase's servers NOW — BEFORE we add the auth-state
+        // listener and BEFORE we return to AppDelegate. AppDelegate
+        // reads _auth.Current synchronously when picking the initial
+        // route; we need that read to reflect a server-validated
+        // truth, not just the locally cached JWT.
         //
-        // We fetch the cached JWT via a brief run-loop pump because
-        // FIRUser.GetIDTokenWithCompletion has no synchronous variant.
-        // The token is already in Keychain — no network round-trip —
-        // so this typically completes in <100 ms. The 2-second
-        // timeout is a hard cap on the rare slow-Keychain case;
-        // exceeding it leaves _current null and the app falls back
-        // to the listener-driven flicker path rather than hanging.
+        // Why force-refresh instead of cached: Firebase's locally
+        // cached JWTs are cryptographically valid for ~1 hour after
+        // issue, so the SDK considers them fine even when the
+        // account has been disabled or deleted server-side. The
+        // only signal is a server round-trip. If we sync-hydrated
+        // with the cached token and let the listener's force-refresh
+        // catch the disabled state asynchronously, AppDelegate would
+        // render Shell first and the app would flash Shell → Login
+        // ~500ms later when the refresh failed. Doing the refresh
+        // synchronously here pays a ~500ms launch latency cost to
+        // get a single, correct route from the first render.
         //
-        // The listener's subsequent force-refresh still validates
-        // the session against Firebase's servers — that's how
-        // disabled accounts surface. If force-refresh produces the
-        // SAME JWT (cached token still valid), the dedup at
-        // SetCurrent suppresses the duplicate event; if it produces
-        // a different JWT (rotated) the event fires once but the
-        // AppRouter route is unchanged.
+        // Mirrors the WinUI side's deferred-render pattern (see
+        // App.OnLaunched in Pivox.WinUI) — same goal, different
+        // implementation because macOS DidFinishLaunching is sync
+        // and has no dispatcher-deferred initial-render hook.
         //
-        // Disabled-account flow at launch: hydrate Shell → listener
-        // force-refresh fails → SetCurrent(null) → CurrentChanged →
-        // OnAuthChanged routes Login. One launch-time flicker for
-        // the rare disabled case; accepted.
+        // We pump the main run loop because FIRUser's token APIs
+        // are async-only. The 2-second timeout caps the worst case
+        // — if the user is offline or Firebase is slow, we fall
+        // back to "no validated session" → Login, matching the
+        // network-failure-during-refresh behavior on the listener
+        // path. Not ideal for offline-launch UX, but consistent
+        // with WinUI's `await GetIdTokenAsync(true)` failure path
+        // (`catch { SetCurrent(null); }`).
         //
-        // Ordering invariant: this sync hydration MUST run before
+        // Ordering invariant: this sync validation MUST run before
         // AddAuthStateDidChangeListener below. The run-loop pump in
-        // TryFetchCachedSessionSync is re-entrant — if a listener
+        // TryFetchValidatedSessionSync is re-entrant — if a listener
         // were already registered, FIRAuth could fire it during the
         // pump and we'd observe `_current == null` while we're
         // mid-hydration. Don't reorder these two blocks.
         var restoredUser = FIRAuth.Auth.CurrentUser;
         if (restoredUser is not null)
         {
-            var cached = TryFetchCachedSessionSync(
+            var validated = TryFetchValidatedSessionSync(
                 restoredUser, TimeSpan.FromSeconds(2));
-            if (cached is not null)
+            if (validated is not null)
             {
                 // Set _current directly, NOT via SetCurrent — no
                 // subscribers can be attached at construction time,
@@ -144,8 +148,11 @@ public sealed class MacOsAuthService : IAuthService
                 // both run on main). Cross-thread readers (e.g., a
                 // future gRPC interceptor reading Current from a
                 // worker) must marshal via _uiContext per Rule 12.
-                _current = cached;
+                _current = validated;
             }
+            // If validated is null (disabled, deleted, network
+            // failure, or timeout), _current stays null and
+            // AppDelegate routes to Login on first render.
         }
 
         // FIRAuth restores the persisted user from Keychain synchronously
@@ -405,19 +412,21 @@ public sealed class MacOsAuthService : IAuthService
 
     // ───── helpers ───────────────────────────────────────────────
 
-    /// <summary>Synchronously fetch the cached ID token from a
-    /// restored <see cref="FIRUser"/> and build an
+    /// <summary>Synchronously fetch a server-validated ID token from
+    /// a restored <see cref="FIRUser"/> and build an
     /// <see cref="AuthSession"/>. Returns null on token-fetch error
-    /// or timeout — callers fall back to the listener-driven async
-    /// path. Used only at service construction time to eliminate
-    /// the launch-time Login → Shell flicker when Firebase restored
-    /// a session from Keychain.
+    /// (disabled / deleted account, revoked refresh token, network
+    /// failure) or timeout. Used only at service construction time
+    /// to determine the launch-time route from a validated truth
+    /// rather than a locally cached JWT.
     ///
-    /// Implementation: FIRAuth's <c>GetIDTokenWithCompletion</c> is
-    /// async-only, so we pump the main run loop (in tight 10 ms
-    /// slices) until the completion fires or the deadline hits. The
-    /// cached token is already in Keychain; no network is involved;
-    /// the call typically returns in &lt;100 ms.
+    /// Implementation: FIRUser's force-refresh API is async-only,
+    /// so we pump the main run loop (in tight 10 ms slices) until
+    /// the completion fires or the deadline hits. This is a server
+    /// round-trip; typical latency ~300–800 ms. Slower than the
+    /// equivalent cached-token fetch, but the cached token can't
+    /// distinguish a still-valid session from one that was disabled
+    /// server-side within the JWT's ~1 hour validity window.
     ///
     /// Pumping the run loop is a known re-entrancy hazard — it
     /// dispatches arbitrary user-input and timer events during the
@@ -426,14 +435,17 @@ public sealed class MacOsAuthService : IAuthService
     /// exists, (b) no FIRAuth listener has been registered yet
     /// (ordering invariant in the constructor), (c) the 2-second
     /// timeout caps the worst case if the pump never quiesces.</summary>
-    private static AuthSession? TryFetchCachedSessionSync(
+    private static AuthSession? TryFetchValidatedSessionSync(
         FIRUser user, TimeSpan timeout)
     {
         NSString? token = null;
         NSError? error = null;
         var done = false;
 
-        user.GetIDTokenWithCompletion((t, e) =>
+        // Force-refresh = server round-trip = "validate this session."
+        // Firebase rejects disabled / deleted accounts here even when
+        // the locally cached JWT still has time on its clock.
+        user.GetIDTokenForcingRefresh(true, (t, e) =>
         {
             // Defensive: if we've already returned (timeout fired
             // before this completion landed), don't overwrite the

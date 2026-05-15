@@ -46,11 +46,23 @@ public sealed class LoginViewController : NSViewController
 
     private NSTextField _emailField = null!;
     private NSSecureTextField _passwordField = null!;
-    // Tracks the previous DidResolveAsPassword value across ApplyState
-    // calls so we can detect the false→true transition and focus the
-    // password field exactly once — without stealing focus on every
-    // refresh while in step 2.
-    private bool _previousDidResolveAsPassword;
+    // Tracks the previous "password is interactable" state across
+    // ApplyState calls so we can detect the false→true transition
+    // and focus the password field exactly once — without stealing
+    // focus on every refresh while in step 2.
+    //
+    // The condition is `revealed && !loading`, not just `revealed`,
+    // because AppKit refuses MakeFirstResponder on a disabled
+    // control (the call silently returns false). During step 1's
+    // submit, IsLoading flips true → DidResolveAsPassword flips
+    // true → IsLoading flips false. If we tracked just `revealed`,
+    // the focus call would fire on the middle transition while the
+    // password field is still disabled (Enabled = !loading), the
+    // call would no-op, and the final IsLoading=false transition
+    // wouldn't re-fire focus because `revealed` hadn't flipped a
+    // second time. Tracking the composite "interactable" predicate
+    // catches the right moment.
+    private bool _previousPasswordInteractable;
     private NSButton _rememberMeCheckbox = null!;
     private NSButton _forgotPasswordButton = null!;
     private NSView _optionsRow = null!;
@@ -483,20 +495,26 @@ public sealed class LoginViewController : NSViewController
         {
             _passwordField.StringValue = _vm.Password;
         }
-        // Focus the password field exactly once when step 1 resolves
-        // as password (false→true transition). Don't refocus on every
-        // ApplyState while in step 2 — that would steal focus from
-        // the user mid-edit.
-        if (revealed && !_previousDidResolveAsPassword)
-        {
-            View.Window?.MakeFirstResponder(_passwordField);
-        }
-        _previousDidResolveAsPassword = revealed;
-
         _googleButton.Enabled = !loading;
         _githubButton.Enabled = !loading;
         _emailField.Enabled = !loading;
         _passwordField.Enabled = !loading;
+
+        // Focus the password field exactly once on the
+        // false→true transition of "revealed AND not loading."
+        // Sequenced AFTER the enabled-state assignments above so
+        // _passwordField is interactable when MakeFirstResponder
+        // runs — otherwise AppKit refuses the focus on the still-
+        // disabled control. The transition fires on the IsLoading=false
+        // PropertyChanged that follows SubmitEmailStepAsync's
+        // DidResolveAsPassword=true; by then the spinner is gone
+        // and the field is enabled.
+        var interactable = revealed && !loading;
+        if (interactable && !_previousPasswordInteractable)
+        {
+            View.Window?.MakeFirstResponder(_passwordField);
+        }
+        _previousPasswordInteractable = interactable;
         _rememberMeCheckbox.Enabled = !loading;
         _forgotPasswordButton.Enabled = !loading;
         _createOneLinkButton.Enabled = !loading;
