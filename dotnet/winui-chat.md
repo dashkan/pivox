@@ -114,7 +114,7 @@ as-is.
 | `Message.cs` | Mutable-Text class with INPC. Used for the placeholder-streaming pattern. |
 | `ConversationState.cs` | enum (Idle/Loading/Streaming/Error). |
 | `ChatStreamEvent.cs` | Discriminated union — abstract record + sealed `TextStartEvent` / `TextDeltaEvent` / `TextEndEvent`. |
-| `ChatErrorKind.cs` | enum (NotSignedIn/AuthenticationRequired/PermissionDenied/Network/Server/Cancelled). |
+| `ChatErrorKind.cs` | enum (NotSignedIn/AuthenticationRequired/PermissionDenied/Network/Timeout/Server/Cancelled/NoOrganization). |
 | `ChatException.cs` | Exception subclass with `Kind` + inner exception. |
 | `IChatService.cs` | The cross-platform contract. **Updated in Phase B step 2a**: now `IAsyncEnumerable<ChatStreamEvent> StreamGenerateAsync(string organizationName, IReadOnlyList<ChatTurn>, CancellationToken)`. Organization name is now passed per-call, not bound at construction. |
 | `ConversationViewModel.cs` | State machine. Owns Messages, drives the service, handles streaming + cancellation + errors. **Updated in Phase B step 2a**: constructor now takes `ActiveOrganization` alongside `IChatService`. Subscribes to `ActiveOrganization.PropertyChanged` and clears all chat state when `Current` changes (org switch wipes per-org history). Reads `ActiveOrganization.Current` on each `SendAsync` and fails with `ChatErrorKind.Server` if no org is selected. |
@@ -181,10 +181,11 @@ instance (constructed with `WindowsAuthService`) gets this for free.
       `PivoxClient`, call `StreamGenerateAsync` with a single user
       turn, observe text events arriving (log to console for now;
       UI in Phase B step 2)
-- [ ] RpcException paths exercised: 16 (UNAVAILABLE) → Network,
+- [ ] RpcException paths exercised: 14 (UNAVAILABLE) → Network,
+      4 (DEADLINE_EXCEEDED) → Timeout,
       7 (PERMISSION_DENIED) → PermissionDenied,
       16 (UNAUTHENTICATED) → AuthenticationRequired,
-      4 (CANCELLED) → ChatException(Cancelled) → VM → Idle
+      1 (CANCELLED) → ChatException(Cancelled) → VM → Idle
 
 ## Phase B step 2a — shared state foundation
 
@@ -199,7 +200,7 @@ consumes three new shared types:
 | `Organization/ActiveOrganization.cs` | Observable holder for the currently-active organization resource name (e.g. `organizations/acme`). INPC-based. Persists `Current` through the injected `IKeyValueStore` under the `pivox.active_organization` key. Null = no organization selected. Rule 12: captures `SynchronizationContext.Current` at construction, throws if null; fast-path synchronous mutation when set on the captured context, posts otherwise. |
 | `Ai/IChatService.cs` (signature change) | `StreamGenerateAsync` now takes `organizationName` as its first parameter — the service is stateless re: organization, no longer bound at construction. |
 | `Ai/ConversationViewModel.cs` (ctor change) | Takes `(IChatService chat, ActiveOrganization activeOrganization)`. Subscribes to `ActiveOrganization.PropertyChanged`; on org change cancels in-flight stream + clears `Messages` + resets state to Idle. |
-| `Ai/ChatErrorKind.cs` (new value) | `NoOrganization` — surfaced when `SendAsync` is called with `ActiveOrganization.Current == null`. UI should gate the composer until an org is selected. |
+| `Ai/ChatErrorKind.cs` (new values) | `NoOrganization` — surfaced when `SendAsync` is called with `ActiveOrganization.Current == null`. UI should gate the composer until an org is selected. `Timeout` — gRPC `DEADLINE_EXCEEDED` is now distinct from `Network`; same UI affordance today (retry), kept separate for telemetry + future "still waiting…" UX. |
 
 ### What WinUI builds
 
