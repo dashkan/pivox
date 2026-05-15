@@ -1,4 +1,3 @@
-using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -8,6 +7,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Pivox.Shared;
 using Pivox.Shared.Auth;
+using Pivox.Shared.Http;
 
 namespace Pivox.Auth;
 
@@ -36,8 +36,6 @@ public sealed class WindowsAuthService : IAuthService
     // ── Broker flows (GitHub, SSO) ───────────────────────────────
     private const string BrokerCallbackScheme = "pivox";
     private const string BrokerReturnUrl = "pivox://auth-complete";
-
-    private static readonly HttpClient s_http = new();
 
     private readonly Firebase.Native.FirebaseAuthBridge _bridge;
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcher;
@@ -99,23 +97,37 @@ public sealed class WindowsAuthService : IAuthService
     public async Task<AuthSession> SignInWithEmailAsync(
         string email, string password, CancellationToken ct = default)
     {
-        var jwt = await _bridge.SignInWithEmailAsync(email, password)
-            .AsTask(ct);
-        var session = BuildSession(jwt);
-        SetCurrent(session);
-        return session;
+        try
+        {
+            var jwt = await _bridge.SignInWithEmailAsync(email, password)
+                .AsTask(ct);
+            var session = BuildSession(jwt);
+            SetCurrent(session);
+            return session;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ToAuthException(ex, "email-sign-in");
+        }
     }
 
     public async Task<AuthSession> SignInWithGoogleAsync(
         CancellationToken ct = default)
     {
         var (idToken, accessToken) = await PerformGoogleOAuthAsync(ct);
-        var jwt = await _bridge.SignInWithGoogleCredentialAsync(
-                idToken, accessToken)
-            .AsTask(ct);
-        var session = BuildSession(jwt);
-        SetCurrent(session);
-        return session;
+        try
+        {
+            var jwt = await _bridge.SignInWithGoogleCredentialAsync(
+                    idToken, accessToken)
+                .AsTask(ct);
+            var session = BuildSession(jwt);
+            SetCurrent(session);
+            return session;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ToAuthException(ex, "google-credential");
+        }
     }
 
     public async Task<AuthSession> SignInWithGitHubAsync(
@@ -129,11 +141,18 @@ public sealed class WindowsAuthService : IAuthService
             loginHint: null,
             ct: ct);
 
-        var jwt = await _bridge.SignInWithGitHubCredentialAsync(accessToken)
-            .AsTask(ct);
-        var session = BuildSession(jwt);
-        SetCurrent(session);
-        return session;
+        try
+        {
+            var jwt = await _bridge.SignInWithGitHubCredentialAsync(accessToken)
+                .AsTask(ct);
+            var session = BuildSession(jwt);
+            SetCurrent(session);
+            return session;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ToAuthException(ex, "github-credential");
+        }
     }
 
     public async Task<AuthSession> SignInWithSsoAsync(
@@ -142,12 +161,19 @@ public sealed class WindowsAuthService : IAuthService
         var (idToken, nonce) = await PerformSsoBrokerOAuthAsync(
             providerId, loginHint, ct);
 
-        var jwt = await _bridge.SignInWithOidcCredentialAsync(
-                providerId, idToken, nonce)
-            .AsTask(ct);
-        var session = BuildSession(jwt);
-        SetCurrent(session);
-        return session;
+        try
+        {
+            var jwt = await _bridge.SignInWithOidcCredentialAsync(
+                    providerId, idToken, nonce)
+                .AsTask(ct);
+            var session = BuildSession(jwt);
+            SetCurrent(session);
+            return session;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ToAuthException(ex, "oidc-credential");
+        }
     }
 
     // ── account lifecycle ────────────────────────────────────────
@@ -156,17 +182,33 @@ public sealed class WindowsAuthService : IAuthService
         string email, string password, string displayName,
         CancellationToken ct = default)
     {
-        var jwt = await _bridge.CreateAccountAsync(
-                email, password, displayName)
-            .AsTask(ct);
-        var session = BuildSession(jwt);
-        SetCurrent(session);
-        return session;
+        try
+        {
+            var jwt = await _bridge.CreateAccountAsync(
+                    email, password, displayName)
+                .AsTask(ct);
+            var session = BuildSession(jwt);
+            SetCurrent(session);
+            return session;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ToAuthException(ex, "create-account");
+        }
     }
 
-    public Task SendPasswordResetAsync(
+    public async Task SendPasswordResetAsync(
         string email, CancellationToken ct = default)
-        => _bridge.SendPasswordResetAsync(email).AsTask(ct);
+    {
+        try
+        {
+            await _bridge.SendPasswordResetAsync(email).AsTask(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ToAuthException(ex, "password-reset");
+        }
+    }
 
     public Task SignOutAsync(CancellationToken ct = default)
     {
@@ -179,53 +221,17 @@ public sealed class WindowsAuthService : IAuthService
 
     // ── SSO discovery ────────────────────────────────────────────
 
-    public async Task<string?> ResolveSsoProviderAsync(
+    public Task<string?> ResolveSsoProviderAsync(
         string email, CancellationToken ct = default)
-    {
-        var trimmed = email.Trim();
-        if (string.IsNullOrEmpty(trimmed)) return null;
-
-        // pivox-cloud's resolveProvider is a REST endpoint — no auth
-        // header (pre-auth surface). AOT-clean: hand-built JSON body
-        // to avoid IL2026/IL3050 from JsonSerializer on anonymous types.
-        var url = $"{CloudConfig.BrokerBaseUrl}/internal/v1/auth:resolveProvider";
-        var encoded = System.Text.Encodings.Web.JavaScriptEncoder.Default
-            .Encode(trimmed);
-        var body = $"{{\"email\":\"{encoded}\"}}";
-        using var req = new HttpRequestMessage(HttpMethod.Post, url)
-        {
-            Content = new StringContent(body, Encoding.UTF8, "application/json"),
-        };
-
-        using var resp = await s_http.SendAsync(req, ct);
-        switch ((int)resp.StatusCode)
-        {
-            case 200:
-                var payload = await resp.Content.ReadAsStringAsync(ct);
-                using (var doc = JsonDocument.Parse(payload))
-                {
-                    return doc.RootElement.TryGetProperty("provider_id", out var p)
-                        ? p.GetString()
-                        : null;
-                }
-            case 404:
-                return null;
-            default:
-                throw new InvalidOperationException(
-                    $"resolveProvider failed: HTTP {(int)resp.StatusCode}");
-        }
-    }
+        => SsoProviderResolver.ResolveAsync(email, ct);
 
     // ── token access ─────────────────────────────────────────────
 
     public async Task<string> GetIdTokenAsync(CancellationToken ct = default)
     {
         if (!_bridge.IsSignedIn)
-            throw new InvalidOperationException("Not signed in.");
+            throw InternalAuthError("GetIdTokenAsync called while not signed in");
 
-        // Pure getter — no SetCurrent. Token refresh is handled by
-        // the AuthStateChanged listener. This runs on every gRPC
-        // call via AuthCallCredentials.
         return await _bridge.GetIdTokenAsync(false).AsTask(ct);
     }
 
@@ -268,7 +274,7 @@ public sealed class WindowsAuthService : IAuthService
         var authCode = await LaunchOAuthPopupAsync(
             authUrl, GoogleCallbackScheme, state, ct);
 
-        var tokenResponse = await s_http.PostAsync(
+        var tokenResponse = await SharedHttp.Instance.PostAsync(
             "https://oauth2.googleapis.com/token",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -553,4 +559,63 @@ public sealed class WindowsAuthService : IAuthService
             .TrimEnd('=')
             .Replace('+', '-')
             .Replace('/', '_');
+
+    // ── auth error translation ───────────────────────────────────
+    // Two-tier: Firebase C++ AuthError (encoded in HRESULT by the
+    // bridge) → canonical AuthErrorCode → user-facing string via
+    // AuthErrorMessages.Get. Mirrors MacOsAuthService.ToAuthException.
+
+    // FACILITY_ITF HRESULT range: 0x80040000–0x8004FFFF.
+    private const int FacilityItfBase = unchecked((int)0x80040000);
+
+    private static AuthException ToAuthException(Exception ex, string contextLabel)
+    {
+        var firebaseCode = ExtractFirebaseCode(ex);
+        var code = MapToAuthCode(firebaseCode);
+
+        var message = code == AuthErrorCode.Unknown
+            ? (ex.Message ?? AuthErrorMessages.Get(AuthErrorCode.Unknown))
+            : AuthErrorMessages.Get(code);
+
+        Console.Error.WriteLine(
+            $"[Auth] {contextLabel} failed: firebase={firebaseCode} → {code}, "
+            + $"raw='{ex.Message}'");
+
+        return new AuthException(code, message, ex);
+    }
+
+    private static AuthException InternalAuthError(string context)
+    {
+        Console.Error.WriteLine($"[Auth] internal: {context}");
+        return new AuthException(
+            AuthErrorCode.Unknown,
+            AuthErrorMessages.Get(AuthErrorCode.Unknown));
+    }
+
+    private static int ExtractFirebaseCode(Exception ex)
+    {
+        var hr = ex.HResult;
+        // Bridge encodes Firebase AuthError as FACILITY_ITF HRESULT:
+        // 0x80040000 | (authError & 0xFFFF).
+        if ((hr & unchecked((int)0xFFFF0000)) == FacilityItfBase)
+            return hr & 0xFFFF;
+        return -1; // unknown
+    }
+
+    // Firebase C++ SDK enum values from firebase/auth/types.h.
+    private static AuthErrorCode MapToAuthCode(int firebaseCode) => firebaseCode switch
+    {
+        11 => AuthErrorCode.InvalidEmail,         // kAuthErrorInvalidEmail
+        12 or 14 or 4                             // kAuthErrorWrongPassword, UserNotFound, InvalidCredential
+            => AuthErrorCode.WrongPassword,
+        8 => AuthErrorCode.EmailAlreadyInUse,     // kAuthErrorEmailAlreadyInUse
+        6 or 10                                   // kAuthErrorAccountExistsWithDifferentCredentials, CredentialAlreadyInUse
+            => AuthErrorCode.AccountExistsWithDifferentCredential,
+        23 => AuthErrorCode.WeakPassword,         // kAuthErrorWeakPassword
+        19 => AuthErrorCode.NetworkError,         // kAuthErrorNetworkRequestFailed
+        13 => AuthErrorCode.TooManyRequests,      // kAuthErrorTooManyRequests
+        7 => AuthErrorCode.OperationNotAllowed,   // kAuthErrorOperationNotAllowed
+        5 => AuthErrorCode.UserDisabled,          // kAuthErrorUserDisabled
+        _ => AuthErrorCode.Unknown,
+    };
 }
