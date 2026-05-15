@@ -80,9 +80,27 @@ public sealed class AppDelegate : NSApplicationDelegate
         // ReplaceRoot wipes history at the auth boundary. Sign-in
         // (Login → Shell) and sign-out (Shell → Login) both drop the
         // previous root entirely; you can't back-navigate across.
-        _router?.ReplaceRoot(session is null
-            ? new AppRoute.Login()
-            : new AppRoute.Shell());
+        //
+        // Defensive: the handler can only fire after _router is wired
+        // in DidFinishLaunching, so _router is non-null in practice —
+        // but checking up-front skips the (otherwise-wasted) AppRoute
+        // allocation and locks the precondition in close to the
+        // returning branch.
+        if (_router is null) return;
+
+        // Guard against same-route swap: CurrentChanged fires not only
+        // on real auth transitions but also on every token rotation
+        // (the dedup at SetCurrent compares IdTokens, and force-refresh
+        // always produces a new JWT even when the user is unchanged).
+        // Calling ReplaceRoot(Shell) when we're already on Shell would
+        // rebuild the window and tear down the old one — a second
+        // launch-time flicker on every rotation. Compare routes via
+        // record equality before invoking the swap.
+        var desired = session is null
+            ? (AppRoute)new AppRoute.Login()
+            : new AppRoute.Shell();
+        if (_router.Current.Equals(desired)) return;
+        _router.ReplaceRoot(desired);
     }
 
     private void OnRouteChanged(object? sender, AppRoute route) => RenderRoute(route);

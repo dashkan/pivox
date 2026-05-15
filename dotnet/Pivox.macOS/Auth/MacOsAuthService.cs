@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -91,11 +92,67 @@ public sealed class MacOsAuthService : IAuthService
             FIRApp.Configure();
         }
 
+        // Synchronous bootstrap: if Firebase restored a user from
+        // Keychain during Configure, hydrate _current now — BEFORE
+        // we add the auth-state listener and BEFORE we return to
+        // AppDelegate. AppDelegate reads _auth.Current synchronously
+        // when picking the initial route; without this, Current is
+        // null at that moment (the listener fires async) and the
+        // app routes to Login first, then flickers to Shell ~500ms
+        // later when the listener catches up.
+        //
+        // We fetch the cached JWT via a brief run-loop pump because
+        // FIRUser.GetIDTokenWithCompletion has no synchronous variant.
+        // The token is already in Keychain — no network round-trip —
+        // so this typically completes in <100 ms. The 2-second
+        // timeout is a hard cap on the rare slow-Keychain case;
+        // exceeding it leaves _current null and the app falls back
+        // to the listener-driven flicker path rather than hanging.
+        //
+        // The listener's subsequent force-refresh still validates
+        // the session against Firebase's servers — that's how
+        // disabled accounts surface. If force-refresh produces the
+        // SAME JWT (cached token still valid), the dedup at
+        // SetCurrent suppresses the duplicate event; if it produces
+        // a different JWT (rotated) the event fires once but the
+        // AppRouter route is unchanged.
+        //
+        // Disabled-account flow at launch: hydrate Shell → listener
+        // force-refresh fails → SetCurrent(null) → CurrentChanged →
+        // OnAuthChanged routes Login. One launch-time flicker for
+        // the rare disabled case; accepted.
+        //
+        // Ordering invariant: this sync hydration MUST run before
+        // AddAuthStateDidChangeListener below. The run-loop pump in
+        // TryFetchCachedSessionSync is re-entrant — if a listener
+        // were already registered, FIRAuth could fire it during the
+        // pump and we'd observe `_current == null` while we're
+        // mid-hydration. Don't reorder these two blocks.
+        var restoredUser = FIRAuth.Auth.CurrentUser;
+        if (restoredUser is not null)
+        {
+            var cached = TryFetchCachedSessionSync(
+                restoredUser, TimeSpan.FromSeconds(2));
+            if (cached is not null)
+            {
+                // Set _current directly, NOT via SetCurrent — no
+                // subscribers can be attached at construction time,
+                // and we don't want to fire CurrentChanged before
+                // AppDelegate has had a chance to wire its handler.
+                // Visible to main-thread readers (constructor caller
+                // and the FIRAuth-listener marshaled-to-main path
+                // both run on main). Cross-thread readers (e.g., a
+                // future gRPC interceptor reading Current from a
+                // worker) must marshal via _uiContext per Rule 12.
+                _current = cached;
+            }
+        }
+
         // FIRAuth restores the persisted user from Keychain synchronously
         // during Configure. The listener below fires once on registration
-        // with the current state (Firebase's documented behavior) so it
-        // catches both the launch-time restored session AND subsequent
-        // changes — no separate restore-on-launch code needed.
+        // with the current state (Firebase's documented behavior) and on
+        // every subsequent state change (sign-in, sign-out, token
+        // rotation, profile mutation).
         FIRAuth.Auth.AddAuthStateDidChangeListener((_, user) =>
         {
             // Explicit flows that fetch a fresh JWT after a profile
@@ -348,6 +405,84 @@ public sealed class MacOsAuthService : IAuthService
 
     // ───── helpers ───────────────────────────────────────────────
 
+    /// <summary>Synchronously fetch the cached ID token from a
+    /// restored <see cref="FIRUser"/> and build an
+    /// <see cref="AuthSession"/>. Returns null on token-fetch error
+    /// or timeout — callers fall back to the listener-driven async
+    /// path. Used only at service construction time to eliminate
+    /// the launch-time Login → Shell flicker when Firebase restored
+    /// a session from Keychain.
+    ///
+    /// Implementation: FIRAuth's <c>GetIDTokenWithCompletion</c> is
+    /// async-only, so we pump the main run loop (in tight 10 ms
+    /// slices) until the completion fires or the deadline hits. The
+    /// cached token is already in Keychain; no network is involved;
+    /// the call typically returns in &lt;100 ms.
+    ///
+    /// Pumping the run loop is a known re-entrancy hazard — it
+    /// dispatches arbitrary user-input and timer events during the
+    /// wait. We accept the risk here because (a) the call runs
+    /// inside DidFinishLaunching before any window or user input
+    /// exists, (b) no FIRAuth listener has been registered yet
+    /// (ordering invariant in the constructor), (c) the 2-second
+    /// timeout caps the worst case if the pump never quiesces.</summary>
+    private static AuthSession? TryFetchCachedSessionSync(
+        FIRUser user, TimeSpan timeout)
+    {
+        NSString? token = null;
+        NSError? error = null;
+        var done = false;
+
+        user.GetIDTokenWithCompletion((t, e) =>
+        {
+            // Defensive: if we've already returned (timeout fired
+            // before this completion landed), don't overwrite the
+            // observed state. Writes to dead locals are functionally
+            // harmless (closure keeps them alive, nothing reads them)
+            // but skipping the work avoids racing with a hypothetical
+            // future reader.
+            if (done) return;
+            token = t;
+            error = e;
+            done = true;
+        });
+
+        // Monotonic deadline via Stopwatch — DateTime.UtcNow is
+        // wall-clock-sensitive (NTP adjusts during launch could
+        // perturb the comparison). Stopwatch ticks at hardware
+        // resolution; the conversion via TimeSpan.FromSeconds keeps
+        // the timeout expressed in human-readable form.
+        var deadlineTicks = Stopwatch.GetTimestamp()
+            + (long)(timeout.TotalSeconds * Stopwatch.Frequency);
+        while (!done && Stopwatch.GetTimestamp() < deadlineTicks)
+        {
+            NSRunLoop.Main.RunUntil(NSDate.FromTimeIntervalSinceNow(0.01));
+        }
+
+        if (!done)
+        {
+            Console.Error.WriteLine(
+                "[Auth] cached token fetch timed out; falling back to "
+                + "async listener path (initial launch may flicker through Login).");
+            return null;
+        }
+        if (error is not null)
+        {
+            Console.Error.WriteLine(
+                $"[Auth] cached token fetch failed: {error.LocalizedDescription} "
+                + "→ falling back to async listener path.");
+            return null;
+        }
+        if (token is null)
+        {
+            Console.Error.WriteLine(
+                "[Auth] cached token fetch returned null with no error; "
+                + "falling back to async listener path.");
+            return null;
+        }
+        return BuildSession(token);
+    }
+
     /// <summary>Translate a Firebase Cocoa SDK <see cref="NSError"/>
     /// into a Pivox <see cref="AuthException"/> with a user-friendly
     /// message. Mirrors the SwiftUI <c>firebaseErrorMessage(_:)</c>
@@ -433,8 +568,27 @@ public sealed class MacOsAuthService : IAuthService
             throw InternalAuthError("signIn returned no user");
         }
 
+        // Force-refresh on the post-sign-in token, NOT the cached
+        // variant. Firebase's email/password endpoint returns a
+        // valid-looking JWT even for accounts that have been
+        // disabled server-side — the disabled status is only
+        // discovered on the next server round-trip. Without the
+        // forced refresh here, FinalizeAsync would SetCurrent(session)
+        // → AppRouter swaps to Shell → ~500 ms later the
+        // AuthStateDidChange listener's own force-refresh fails and
+        // SetCurrent(null) routes back to Login: the user sees a
+        // Login → Shell flash → Login flicker on every disabled-
+        // account sign-in attempt.
+        //
+        // With the force-refresh inline, a disabled account throws
+        // before we ever SetCurrent: AuthException(UserDisabled)
+        // bubbles into the view-model's catch → ErrorMessage shows
+        // "This account has been disabled." → user stays on Login,
+        // no flicker. Cost: one extra ~500 ms network round-trip on
+        // every sign-in, which is hidden by the in-flight loading
+        // spinner.
         var tcs = new TaskCompletionSource<(NSString?, NSError?)>();
-        result.User.GetIDTokenWithCompletion((tok, err) => tcs.SetResult((tok, err)));
+        result.User.GetIDTokenForcingRefresh(true, (tok, err) => tcs.SetResult((tok, err)));
         var (token, tokErr) = await tcs.Task.WaitAsync(ct);
         if (tokErr is not null)
         {
