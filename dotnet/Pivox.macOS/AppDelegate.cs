@@ -1,10 +1,13 @@
+using System.ComponentModel;
 using AppKit;
 using CoreGraphics;
 using Foundation;
 using ObjCRuntime;
+using Pivox.Ai;
 using Pivox.Auth;
 using Pivox.Client;
 using Pivox.MacOs.Persistence;
+using Pivox.Shared.Ai;
 using Pivox.Shared.Auth;
 using Pivox.Shared.Navigation;
 using Pivox.Shared.Organization;
@@ -42,7 +45,15 @@ public sealed class AppDelegate : NSApplicationDelegate
     private RememberedEmail? _rememberedEmail;
     private IKeyValueStore? _keyValueStore;
     private ActiveOrganization? _activeOrganization;
+    private ChatPanelState? _chatPanelState;
+    private IChatService? _chatService;
     private NSWindowController? _activeWindowController;
+
+    // Live shell wiring — refreshed by BuildShellWindowController.
+    // Used by the toolbar/menu action handlers to flip the chat
+    // panel and observe the active organization.
+    private NSSplitViewItem? _chatPanelSplitItem;
+    private NSToolbarItem? _chatToggleToolbarItem;
 
     public override void DidFinishLaunching(NSNotification notification)
     {
@@ -57,9 +68,16 @@ public sealed class AppDelegate : NSApplicationDelegate
         // same store.
         _keyValueStore = new NsUserDefaultsKeyValueStore();
         _activeOrganization = new ActiveOrganization(_keyValueStore);
+        _chatPanelState = new ChatPanelState(_keyValueStore);
         _auth = new MacOsAuthService();
         _pivox = new PivoxClient(_auth);
+        _chatService = new MacOsChatService(_pivox);
         _rememberedEmail = new RememberedEmail(_keyValueStore);
+
+        // Chat panel toggle gating: the toolbar item + ⌘⇧A menu
+        // binding both validate against ActiveOrganization.Current,
+        // so observe changes to enable/disable in real time.
+        _activeOrganization.PropertyChanged += OnActiveOrganizationChanged;
 
         // Router seeded with the route corresponding to current auth
         // state — covers the "Firebase restored a persisted session
@@ -159,33 +177,237 @@ public sealed class AppDelegate : NSApplicationDelegate
         var sidebar = new SidebarViewController();
         var detail = new DetailViewController(_auth!, _pivox!, _activeOrganization!);
 
+        // Build the chat panel up front. ConversationViewModel
+        // captures SynchronizationContext.Current at construction
+        // (Rule 12) — DidFinishLaunching runs on the main thread,
+        // so this is correct.
+        var conversation = new ConversationViewModel(_chatService!, _activeOrganization!);
+        var chatPanel = new ChatPanelViewController(conversation);
+
         var split = new NSSplitViewController();
         split.AddSplitViewItem(NSSplitViewItem.CreateSidebar(sidebar));
         split.AddSplitViewItem(new NSSplitViewItem { ViewController = detail });
+
+        // Trailing inspector for chat. CanCollapse=true so the
+        // toolbar toggle can hide it. Initial Collapsed reflects the
+        // persisted ChatPanelState.IsVisible.
+        _chatPanelSplitItem = new NSSplitViewItem
+        {
+            ViewController = chatPanel,
+            CanCollapse = true,
+            Collapsed = !_chatPanelState!.IsVisible,
+            // Sensible inspector widths. AppKit autosaves the user's
+            // resize across launches via NSSplitViewItem's persisted
+            // state once the split view has an autosaveName.
+            MinimumThickness = 280,
+            MaximumThickness = 520,
+        };
+        split.AddSplitViewItem(_chatPanelSplitItem);
+
+        // Subscribe to ChatPanelState changes so external writes
+        // (future surface that flips it) update the split item.
+        _chatPanelState.PropertyChanged += OnChatPanelStateChanged;
 
         var style = NSWindowStyle.Titled
                   | NSWindowStyle.Closable
                   | NSWindowStyle.Miniaturizable
                   | NSWindowStyle.Resizable;
         var window = new NSWindow(
-            new CGRect(0, 0, 900, 600), style, NSBackingStore.Buffered, false)
+            new CGRect(0, 0, 1100, 680), style, NSBackingStore.Buffered, false)
         {
             Title = "Pivox",
             ContentViewController = split,
+            Toolbar = BuildShellToolbar(),
         };
+        // ToolbarStyle.Unified keeps the toolbar visually integrated
+        // with the title bar on macOS 11+ — matches the macOS 26
+        // design system for split-view-rooted windows.
+        window.ToolbarStyle = NSWindowToolbarStyle.Unified;
         window.Center();
         return new NSWindowController(window);
     }
 
+    private NSToolbar BuildShellToolbar()
+    {
+        // Single-item toolbar for now (chat panel toggle). NSToolbar
+        // takes a delegate that vends items by identifier; we
+        // implement it inline via a small delegate subclass below.
+        var toolbar = new NSToolbar("pivox.shell.toolbar")
+        {
+            // Icon-only is the binding name for `NSToolbarDisplayModeIconOnly`
+            // — the binding generator strips the redundant "Only" suffix.
+            DisplayMode = NSToolbarDisplayMode.Icon,
+            // ShowsBaselineSeparator is obsoleted on macOS 15+ (the new
+            // toolbar style handles the separator implicitly via
+            // NSWindowToolbarStyle); don't set it on macOS 26 target.
+            AllowsUserCustomization = false,
+            AutosavesConfiguration = false,
+        };
+        toolbar.Delegate = new ShellToolbarDelegate(this);
+        return toolbar;
+    }
+
+    // Inline NSToolbarDelegate subclass — small enough that hoisting
+    // it to a separate file would add noise. Owns no state of its
+    // own; defers back to the AppDelegate for action wiring.
+    private sealed class ShellToolbarDelegate : NSToolbarDelegate
+    {
+        internal const string ChatToggleId = "pivox.toolbar.chat-toggle";
+
+        private readonly AppDelegate _app;
+
+        public ShellToolbarDelegate(AppDelegate app) => _app = app;
+
+        public override string[] AllowedItemIdentifiers(NSToolbar toolbar)
+            => new[] { ChatToggleId, NSToolbar.NSToolbarFlexibleSpaceItemIdentifier };
+
+        public override string[] DefaultItemIdentifiers(NSToolbar toolbar)
+            => new[] { NSToolbar.NSToolbarFlexibleSpaceItemIdentifier, ChatToggleId };
+
+        public override NSToolbarItem? WillInsertItem(
+            NSToolbar toolbar, string itemIdentifier, bool willBeInserted)
+        {
+            if (itemIdentifier != ChatToggleId) return null;
+
+            var item = new NSToolbarItem(ChatToggleId)
+            {
+                Label = "Chat",
+                PaletteLabel = "Chat",
+                ToolTip = "Toggle AI chat panel (⇧⌘A)",
+                // SF Symbol: `sidebar.trailing` is the canonical
+                // "right inspector toggle" symbol on macOS 11+. We
+                // target macOS 26+ so it's guaranteed available.
+                // GetSystemSymbol's nullable return is for SDK-version
+                // safety; if it ever returns null on this OS, the
+                // toolbar item just shows no image — survivable, not
+                // worth a fallback that pulls in deprecated icons.
+                Image = NSImage.GetSystemSymbol("sidebar.trailing", "Toggle chat panel"),
+                Bordered = true,
+                Action = new Selector("toggleChatPanel:"),
+                Target = _app,
+            };
+            _app._chatToggleToolbarItem = item;
+            _app.RefreshChatToggleEnabled();
+            return item;
+        }
+    }
+
+    // ───── chat panel toggle wiring ─────────────────────────────
+
+    private void OnActiveOrganizationChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ActiveOrganization.Current)) return;
+        RefreshChatToggleEnabled();
+    }
+
+    private void OnChatPanelStateChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ChatPanelState.IsVisible)) return;
+        ApplyChatPanelVisibility(_chatPanelState!.IsVisible, animated: true);
+    }
+
+    private void ApplyChatPanelVisibility(bool visible, bool animated)
+    {
+        if (_chatPanelSplitItem is null) return;
+        var collapsed = !visible;
+        if (_chatPanelSplitItem.Collapsed == collapsed) return;
+
+        if (animated)
+        {
+            NSAnimationContext.RunAnimation(
+                ctx =>
+                {
+                    ctx.Duration = 0.2;
+                    ((NSSplitViewItem)_chatPanelSplitItem.Animator).Collapsed = collapsed;
+                },
+                null);
+        }
+        else
+        {
+            _chatPanelSplitItem.Collapsed = collapsed;
+        }
+    }
+
+    private void RefreshChatToggleEnabled()
+    {
+        if (_chatToggleToolbarItem is null) return;
+        var hasOrg = !string.IsNullOrEmpty(_activeOrganization?.Current);
+        _chatToggleToolbarItem.Enabled = hasOrg;
+        // If org goes away while panel is open, collapse it. Avoids
+        // the user staring at a panel that can't do anything.
+        if (!hasOrg && _chatPanelState is not null && _chatPanelState.IsVisible)
+        {
+            _chatPanelState.IsVisible = false;
+        }
+    }
+
+    [Export("toggleChatPanel:")]
+    public void ToggleChatPanel(NSObject sender)
+    {
+        // Defense: if the user somehow triggers via menu while no
+        // org is selected (validateMenuItem misses, the validation
+        // path on NSMenuItem with a target=AppDelegate ought to
+        // route to validateMenuItem: here, but be safe).
+        if (string.IsNullOrEmpty(_activeOrganization?.Current)) return;
+        _chatPanelState?.Toggle();
+    }
+
+    [Export("validateMenuItem:")]
+    public bool ValidateMenuItem(NSMenuItem item)
+    {
+        if (item.Action?.Name == "toggleChatPanel:")
+        {
+            return !string.IsNullOrEmpty(_activeOrganization?.Current);
+        }
+        // Unknown selectors — defer to default behavior. AppKit's
+        // responder chain will fall through to other validators.
+        return true;
+    }
+
+    [Export("validateToolbarItem:")]
+    public bool ValidateToolbarItem(NSToolbarItem item)
+    {
+        if (item.Action?.Name == "toggleChatPanel:")
+        {
+            return !string.IsNullOrEmpty(_activeOrganization?.Current);
+        }
+        return true;
+    }
+
     // ───── menu ──────────────────────────────────────────────────
 
-    private static NSMenu BuildMainMenu()
+    private NSMenu BuildMainMenu()
     {
         var main = new NSMenu();
         main.AddItem(BuildAppMenuItem());
         main.AddItem(BuildEditMenuItem());
+        main.AddItem(BuildViewMenuItem());
         main.AddItem(BuildWindowMenuItem());
         return main;
+    }
+
+    private NSMenuItem BuildViewMenuItem()
+    {
+        var viewMenu = new NSMenu("View");
+        var toggleChat = new NSMenuItem(
+            "Show Chat Panel",
+            new Selector("toggleChatPanel:"),
+            "a")
+        {
+            // ⇧⌘A: distinct from ⌘A (Select All in Edit) and ⌘⇧F
+            // (future find). Maps the SwiftUI parity keybinding for
+            // "toggle AI assistant."
+            KeyEquivalentModifierMask = NSEventModifierMask.CommandKeyMask
+                                       | NSEventModifierMask.ShiftKeyMask,
+            // No Target set — AppKit's responder chain walks until
+            // it finds a responder implementing the action; the
+            // AppDelegate (us) handles it via the [Export] above.
+            // validateMenuItem: below disables the item when no org
+            // is selected.
+        };
+        viewMenu.AddItem(toggleChat);
+
+        return new NSMenuItem("View") { Submenu = viewMenu };
     }
 
     private static NSMenuItem BuildAppMenuItem()

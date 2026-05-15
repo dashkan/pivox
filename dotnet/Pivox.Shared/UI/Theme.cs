@@ -130,4 +130,18 @@ public static class ThemeMetrics
     /// the form feel too horizontal at desktop sizes; narrower
     /// cramps the fields and primary button.</summary>
     public const float AuthCardWidth = 360;
+
+    /// <summary>Corner radius for the user-turn chat bubble. Matches
+    /// the SwiftUI reference (<c>RoundedRectangle(cornerRadius: 14)</c>
+    /// in <c>AIElements/Components/Message/Message.swift</c>). Bubbles
+    /// are the visible "user said this" affordance — softer curvature
+    /// than a card, but enough to read as a discrete pill rather than
+    /// a rectangular text block.</summary>
+    public const float ChatBubbleCornerRadius = 14;
+
+    /// <summary>Corner radius for inline chat controls that aren't
+    /// the user bubble — composer text-area outline, future
+    /// inspector chips. Smaller curvature than
+    /// <see cref="ChatBubbleCornerRadius"/> for visual hierarchy.</summary>
+    public const float ChatMessageCornerRadius = 8;
 }

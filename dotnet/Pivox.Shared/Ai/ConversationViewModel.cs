@@ -226,7 +226,7 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
                 .WithCancellation(token)
                 .ConfigureAwait(true))
             {
-                Apply(evt);
+                Apply(evt, ownedCts);
             }
 
             // Stream closed cleanly. If we're still mid-stream (an
@@ -327,8 +327,29 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
         cts?.Cancel();
     }
 
-    private void Apply(ChatStreamEvent evt)
+    private void Apply(ChatStreamEvent evt, CancellationTokenSource ownedCts)
     {
+        // Stale-stream gate (audit H3). The iterator that produced this
+        // event was launched against `ownedCts`. If something else
+        // (org-switch handler, re-entrant Send, Dispose) already swapped
+        // `_streamCts` out from under us, applying this event would
+        // corrupt the new stream's state — most visibly, a TextDelta
+        // arriving here AFTER OnActiveOrganizationChanged nulled
+        // `_inflight` would hit the "TextDelta before TextStart"
+        // protocol-violation branch and surface a spurious
+        // Server-kind error, attributed to the freshly-switched org.
+        //
+        // On a real UI sync context (AppKit main thread / WinUI
+        // dispatcher), the handler and the iterator continuation are
+        // serial, so this can't race. But we run on multi-threaded
+        // test sync contexts (UiThread.Run installs a real one for
+        // ours, but defense-in-depth here costs nothing) and a future
+        // Cancel() caller from a background thread could trigger the
+        // race in production too. Bail silently when stale; the
+        // owner of the new `_streamCts` is responsible for the new
+        // stream's state.
+        if (!ReferenceEquals(_streamCts, ownedCts)) return;
+
         switch (evt)
         {
             case TextStartEvent start:
