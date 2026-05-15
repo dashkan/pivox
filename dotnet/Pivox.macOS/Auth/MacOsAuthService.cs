@@ -227,12 +227,11 @@ public sealed class MacOsAuthService : IAuthService
 
         if (createError is not null)
         {
-            throw new InvalidOperationException(
-                $"Firebase createUser failed: {createError.LocalizedDescription} (code {createError.Code})");
+            throw ToAuthException(createError, "createUser");
         }
         if (result?.User is null)
         {
-            throw new InvalidOperationException("Firebase createUser returned no user.");
+            throw InternalAuthError("createUser returned no user");
         }
 
         // Step 2: set the display name on the freshly-created user.
@@ -276,8 +275,7 @@ public sealed class MacOsAuthService : IAuthService
         var error = await tcs.Task.WaitAsync(ct);
         if (error is not null)
         {
-            throw new InvalidOperationException(
-                $"Firebase sendPasswordReset failed: {error.LocalizedDescription} (code {error.Code})");
+            throw ToAuthException(error, "sendPasswordReset");
         }
     }
 
@@ -290,8 +288,7 @@ public sealed class MacOsAuthService : IAuthService
         FIRAuth.Auth.SignOut(out var error);
         if (error is not null)
         {
-            throw new InvalidOperationException(
-                $"FIRAuth.signOut failed: {error.LocalizedDescription} (code {error.Code})");
+            throw ToAuthException(error, "signOut");
         }
         SetCurrent(null);
         return Task.CompletedTask;
@@ -300,7 +297,7 @@ public sealed class MacOsAuthService : IAuthService
     public async Task<string> GetIdTokenAsync(CancellationToken ct = default)
     {
         var user = FIRAuth.Auth.CurrentUser
-            ?? throw new InvalidOperationException("Not signed in.");
+            ?? throw InternalAuthError("GetIdTokenAsync: no current user");
 
         // FIRAuth's getIDToken: auto-refreshes if the token is close to
         // expiry (default ~5 min). No need to second-guess it.
@@ -310,12 +307,11 @@ public sealed class MacOsAuthService : IAuthService
 
         if (error is not null)
         {
-            throw new InvalidOperationException(
-                $"Token fetch failed: {error.LocalizedDescription} (code {error.Code})");
+            throw ToAuthException(error, "getIDToken");
         }
         if (token is null)
         {
-            throw new InvalidOperationException("Token fetch returned no token.");
+            throw InternalAuthError("getIDToken returned no token");
         }
 
         // Update the cached snapshot — Firebase may have rotated the
@@ -327,17 +323,89 @@ public sealed class MacOsAuthService : IAuthService
 
     // ───── helpers ───────────────────────────────────────────────
 
+    /// <summary>Translate a Firebase Cocoa SDK <see cref="NSError"/>
+    /// into a Pivox <see cref="AuthException"/> with a user-friendly
+    /// message. Mirrors the SwiftUI <c>firebaseErrorMessage(_:)</c>
+    /// flow: domain-check, code-switch into the canonical
+    /// <see cref="AuthErrorCode"/>, and either map to the polished
+    /// string or fall through to Firebase's localized description
+    /// (which is at least actionable — the generic
+    /// "something went wrong" is useless for diagnosis of MFA /
+    /// verification / etc. paths we haven't mapped yet).
+    ///
+    /// Also logs the raw error to Console.Error so devs can see
+    /// the underlying Firebase code even when the user message is
+    /// the generic one. Future replacement once
+    /// Microsoft.Extensions.Logging is wired (per CLAUDE.md).</summary>
+    private static AuthException ToAuthException(NSError nsError, string contextLabel)
+    {
+        var code = MapToAuthCode(nsError);
+        var message = code == AuthErrorCode.Unknown
+            ? (nsError.LocalizedDescription
+                ?? AuthErrorMessages.Get(AuthErrorCode.Unknown))
+            : AuthErrorMessages.Get(code);
+
+        Console.Error.WriteLine(
+            $"[Auth] {contextLabel} failed: code={nsError.Code} → {code}, "
+            + $"raw='{nsError.LocalizedDescription}'");
+
+        return new AuthException(code, message);
+    }
+
+    /// <summary>Map a Firebase Cocoa SDK error to the canonical
+    /// <see cref="AuthErrorCode"/>. The numeric domain check guards
+    /// against non-FIRAuthError NSErrors (e.g. network-layer
+    /// errors that bubble through as a different domain).</summary>
+    private static AuthErrorCode MapToAuthCode(NSError nsError)
+    {
+        if (nsError.Domain != "FIRAuthErrorDomain") return AuthErrorCode.Unknown;
+        return (FIRAuthErrorCode)(long)nsError.Code switch
+        {
+            FIRAuthErrorCode.InvalidEmail => AuthErrorCode.InvalidEmail,
+            // Collapse three "credential rejected" codes into one
+            // user-facing message — preserves the anti-existence-probing
+            // contract documented on AuthErrorCode.WrongPassword.
+            FIRAuthErrorCode.WrongPassword
+                or FIRAuthErrorCode.UserNotFound
+                or FIRAuthErrorCode.InvalidCredential
+                => AuthErrorCode.WrongPassword,
+            FIRAuthErrorCode.EmailAlreadyInUse
+                => AuthErrorCode.EmailAlreadyInUse,
+            FIRAuthErrorCode.AccountExistsWithDifferentCredential
+                or FIRAuthErrorCode.CredentialAlreadyInUse
+                => AuthErrorCode.AccountExistsWithDifferentCredential,
+            FIRAuthErrorCode.WeakPassword => AuthErrorCode.WeakPassword,
+            FIRAuthErrorCode.NetworkError => AuthErrorCode.NetworkError,
+            FIRAuthErrorCode.TooManyRequests => AuthErrorCode.TooManyRequests,
+            FIRAuthErrorCode.OperationNotAllowed => AuthErrorCode.OperationNotAllowed,
+            FIRAuthErrorCode.UserDisabled => AuthErrorCode.UserDisabled,
+            _ => AuthErrorCode.Unknown,
+        };
+    }
+
+    /// <summary>Throw a generic-message <see cref="AuthException"/>
+    /// for defensive "shouldn't happen" cases where there's no
+    /// NSError to translate (Firebase returned a null user, a null
+    /// token, etc.). Logs the specific context so devs can locate
+    /// the path even when the user message is generic.</summary>
+    private static AuthException InternalAuthError(string context)
+    {
+        Console.Error.WriteLine($"[Auth] internal: {context}");
+        return new AuthException(
+            AuthErrorCode.Unknown,
+            AuthErrorMessages.Get(AuthErrorCode.Unknown));
+    }
+
     private async Task<AuthSession> FinalizeAsync(
         FIRAuthDataResult? result, NSError? error, CancellationToken ct)
     {
         if (error is not null)
         {
-            throw new InvalidOperationException(
-                $"Firebase sign-in failed: {error.LocalizedDescription} (code {error.Code})");
+            throw ToAuthException(error, "signIn");
         }
         if (result?.User is null)
         {
-            throw new InvalidOperationException("Firebase returned no user.");
+            throw InternalAuthError("signIn returned no user");
         }
 
         var tcs = new TaskCompletionSource<(NSString?, NSError?)>();
@@ -345,12 +413,11 @@ public sealed class MacOsAuthService : IAuthService
         var (token, tokErr) = await tcs.Task.WaitAsync(ct);
         if (tokErr is not null)
         {
-            throw new InvalidOperationException(
-                $"Got user but ID token fetch failed: {tokErr.LocalizedDescription}");
+            throw ToAuthException(tokErr, "post-signIn getIDToken");
         }
         if (token is null)
         {
-            throw new InvalidOperationException("Got user but no ID token.");
+            throw InternalAuthError("post-signIn getIDToken returned no token");
         }
 
         var session = BuildSession(token);
