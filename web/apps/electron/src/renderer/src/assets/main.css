@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+@import '@pivox/primitives/theme.css';
+
+@source "../../../../../../packages/primitives/src/**/*.tsx";
+@source "../../../../../../packages/ui/src/**/*.tsx";
+@source "../../../../../../packages/features/src/**/*.tsx";
