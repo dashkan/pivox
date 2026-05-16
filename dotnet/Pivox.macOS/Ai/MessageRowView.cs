@@ -7,6 +7,19 @@ using Pivox.UI;
 
 namespace Pivox.Ai;
 
+// NOTE: This class is intentionally retained in the codebase despite
+// having no consumers in the current build. The transcript renderer
+// was rolled back to a placeholder state at the end of the last
+// session (two porting attempts — NSStackView and NSScrollView+NSTableView
+// — both produced broken output). The visual shape captured here
+// (role-distinct rows, user-bubble at accent-tint with 380pt cap,
+// assistant full-width plain text) is correct against the SwiftUI
+// source at native/.../AIElements/Components/Message/Message.swift
+// and is the right cell-content shape for whatever transcript
+// primitive the next session picks. Keeping the file saves the
+// next port from re-deriving the bubble layout. See the project
+// memory note for the broader rationale.
+
 /// <summary>
 /// One row in the chat transcript. Two visual shapes by role, mirroring
 /// the SwiftUI native chat (<c>native/.../AIElements/Components/Message/Message.swift</c>):

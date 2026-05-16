@@ -1,10 +1,8 @@
-using System.Collections.Specialized;
 using System.ComponentModel;
 using AppKit;
 using CoreGraphics;
 using Foundation;
 using Pivox.Shared.Ai;
-using Pivox.Shared.Organization;
 using Pivox.Shared.UI;
 using Pivox.UI;
 
@@ -14,8 +12,22 @@ namespace Pivox.Ai;
 /// macOS chat panel — the trailing inspector pane of the shell
 /// window. Visual reference: SwiftUI native
 /// <c>AIChat/Window/AIChatContainerView.swift</c> +
-/// <c>AIChat/Transcript/ConversationView.swift</c>. Stacked
-/// top-to-bottom:
+/// <c>AIChat/Transcript/ConversationView.swift</c>.
+///
+/// <para><b>Current state — transcript renderer intentionally
+/// absent.</b> Two prior porting attempts (NSStackView, then
+/// NSScrollView + NSTableView) both produced broken output and
+/// were rolled back. The panel here ships in a "chrome-only"
+/// state: header + composer + status line + always-visible empty-
+/// state hint, with no message-rendering surface between them.
+/// The composer's Send still calls <c>_vm.SendAsync</c> (so the
+/// gRPC stream still flows), but the streamed deltas have no
+/// visible target. The next session needs to port the SwiftUI
+/// <c>ConversationTranscriptView.swift</c> AppKit bridge
+/// end-to-end before writing any C# — see the project memory
+/// note <c>project_transcript_port_redo.md</c>.</para>
+///
+/// <para>Stacked top-to-bottom:</para>
 ///
 /// <list type="number">
 /// <item><b>Header strip</b> — history button (left, opens
@@ -23,17 +35,14 @@ namespace Pivox.Ai;
 ///   currently static "New Conversation"), new-conversation button
 ///   + detach button (right, Phase D wires them).</item>
 /// <item><b>Hairline divider</b>.</item>
-/// <item><b>Transcript</b> — NSStackView of <see cref="MessageRowView"/>
-///   in NSScrollView. Empty-state icon + heading when no messages.</item>
+/// <item><b>Transcript placeholder</b> — empty <see cref="NSView"/>
+///   filling the area between the header divider and status line.
+///   Hosts the empty-state hint centered.</item>
 /// <item><b>Status line</b> — sending / streaming / error.</item>
 /// <item><b>Composer</b> — <see cref="ChatComposerView"/> with the
 ///   animated shimmer border, attachment button, hint, and circular
 ///   send button.</item>
 /// </list>
-///
-/// <para><b>Phase B step 2b scope</b>: chrome only. Markdown
-/// rendering / code blocks / hover-reveal action icons / history
-/// popover / title editing / attachment menu are Phase C/D.</para>
 ///
 /// <para><b>No-org gating</b>: the toolbar item and ⇧⌘A menu
 /// binding validate against <c>ActiveOrganization.Current</c>; this
@@ -50,8 +59,16 @@ public sealed class ChatPanelViewController : NSViewController
     private IconButton _newConversationButton = null!;
     private IconButton _detachButton = null!;
     private NSBox _headerDivider = null!;
-    private FlippedStackView _transcriptStack = null!;
-    private NSScrollView _transcriptScroll = null!;
+    // Transcript-rendering surface intentionally absent. The
+    // NSStackView and NSTableView ports both failed (see the
+    // session-end memory note for what went wrong). The chat panel
+    // boots cleanly without a transcript; composer Send still
+    // triggers the VM's stream, but the streamed content has no
+    // visible target in this build. A real transcript renderer
+    // is the first task for the next session — port end-to-end
+    // from native/.../AIChat/Transcript/ConversationTranscriptView.swift
+    // BEFORE writing C#.
+    private NSView _transcriptPlaceholder = null!;
     private NSView _emptyStateView = null!;
     private NSTextField _statusLabel = null!;
     private ChatComposerView _composer = null!;
@@ -86,19 +103,12 @@ public sealed class ChatPanelViewController : NSViewController
     {
         base.ViewDidLoad();
         BuildHeader();
-        BuildTranscript();
+        BuildTranscriptPlaceholder();
         BuildEmptyState();
         BuildStatus();
         BuildComposer();
         ArrangeLayout();
         SubscribeToVm();
-        // Seed the transcript with any messages already on the VM.
-        // At Phase B step 2b this is usually empty; sets up the
-        // path for re-entry once history persistence lands (Phase D).
-        foreach (var m in _vm.Messages)
-        {
-            AppendRow(m);
-        }
         UpdateEmptyStateVisibility();
         UpdateComposerState();
         UpdateStatusLine();
@@ -164,58 +174,17 @@ public sealed class ChatPanelViewController : NSViewController
         };
     }
 
-    private void BuildTranscript()
+    /// <summary>Empty NSView placeholder where the transcript will
+    /// live once a real renderer lands (see the file-level note on
+    /// why this is intentionally absent in this build). The view
+    /// fills the area between the header divider and the status
+    /// line, with the empty-state hint centered inside.</summary>
+    private void BuildTranscriptPlaceholder()
     {
-        // FlippedStackView overrides IsFlipped to true so subviews
-        // stack from the TOP DOWN (first added at top, latest at
-        // bottom) — the natural reading order for a transcript.
-        //
-        // Distribution = GravityAreas lets us anchor rows to the
-        // BOTTOM of the stack via `AddView(view, NSStackViewGravity.Bottom)`.
-        // When the transcript is sparse (fewer messages than fill
-        // the stack), the center gravity area absorbs the slack and
-        // pushes messages down against the composer — matching
-        // SwiftUI's chat shape where empty space sits ABOVE the
-        // messages, not below. Once the messages overflow the
-        // stack height, scrolling kicks in normally.
-        _transcriptStack = new FlippedStackView
+        _transcriptPlaceholder = new NSView
         {
-            Orientation = NSUserInterfaceLayoutOrientation.Vertical,
-            Distribution = NSStackViewDistribution.GravityAreas,
-            Alignment = NSLayoutAttribute.Leading,
-            Spacing = ThemeMetrics.SpaceSm,
             TranslatesAutoresizingMaskIntoConstraints = false,
-            EdgeInsets = new NSEdgeInsets(
-                ThemeMetrics.SpaceMd, ThemeMetrics.SpaceMd,
-                ThemeMetrics.SpaceMd, ThemeMetrics.SpaceMd),
         };
-
-        _transcriptScroll = new NSScrollView
-        {
-            HasVerticalScroller = true,
-            HasHorizontalScroller = false,
-            AutohidesScrollers = true,
-            TranslatesAutoresizingMaskIntoConstraints = false,
-            DrawsBackground = false,
-            DocumentView = _transcriptStack,
-        };
-
-        var content = _transcriptScroll.ContentView;
-        content.TranslatesAutoresizingMaskIntoConstraints = false;
-        NSLayoutConstraint.ActivateConstraints(new[]
-        {
-            _transcriptStack.LeadingAnchor.ConstraintEqualTo(content.LeadingAnchor),
-            _transcriptStack.TrailingAnchor.ConstraintEqualTo(content.TrailingAnchor),
-            _transcriptStack.TopAnchor.ConstraintEqualTo(content.TopAnchor),
-            _transcriptStack.WidthAnchor.ConstraintEqualTo(content.WidthAnchor),
-            // Stack must be AT LEAST as tall as the clip view so the
-            // GravityAreas distribution has slack to absorb above
-            // the Bottom-gravity rows. Without this, the stack
-            // hugs its content (sum of message heights), the center
-            // gravity area collapses to 0, and the bottom-anchoring
-            // visually disappears.
-            _transcriptStack.HeightAnchor.ConstraintGreaterThanOrEqualTo(content.HeightAnchor),
-        });
     }
 
     /// <summary>Empty-state view: centered chat-bubble glyph + heading.
@@ -293,7 +262,7 @@ public sealed class ChatPanelViewController : NSViewController
         View.AddSubview(_newConversationButton);
         View.AddSubview(_detachButton);
         View.AddSubview(_headerDivider);
-        View.AddSubview(_transcriptScroll);
+        View.AddSubview(_transcriptPlaceholder);
         View.AddSubview(_emptyStateView);
         View.AddSubview(_statusLabel);
         View.AddSubview(_composer);
@@ -327,18 +296,18 @@ public sealed class ChatPanelViewController : NSViewController
             _headerDivider.HeightAnchor.ConstraintEqualTo(ThemeMetrics.HairlineThickness),
 
             // ───── transcript ─────
-            _transcriptScroll.TopAnchor.ConstraintEqualTo(_headerDivider.BottomAnchor),
-            _transcriptScroll.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor),
-            _transcriptScroll.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor),
-            _transcriptScroll.BottomAnchor.ConstraintEqualTo(_statusLabel.TopAnchor, -ThemeMetrics.SpaceSm),
+            _transcriptPlaceholder.TopAnchor.ConstraintEqualTo(_headerDivider.BottomAnchor),
+            _transcriptPlaceholder.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor),
+            _transcriptPlaceholder.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor),
+            _transcriptPlaceholder.BottomAnchor.ConstraintEqualTo(_statusLabel.TopAnchor, -ThemeMetrics.SpaceSm),
 
             // Empty-state vertically centered in the transcript area.
-            _emptyStateView.CenterXAnchor.ConstraintEqualTo(_transcriptScroll.CenterXAnchor),
-            _emptyStateView.CenterYAnchor.ConstraintEqualTo(_transcriptScroll.CenterYAnchor),
+            _emptyStateView.CenterXAnchor.ConstraintEqualTo(_transcriptPlaceholder.CenterXAnchor),
+            _emptyStateView.CenterYAnchor.ConstraintEqualTo(_transcriptPlaceholder.CenterYAnchor),
             _emptyStateView.LeadingAnchor.ConstraintGreaterThanOrEqualTo(
-                _transcriptScroll.LeadingAnchor, pad),
+                _transcriptPlaceholder.LeadingAnchor, pad),
             _emptyStateView.TrailingAnchor.ConstraintLessThanOrEqualTo(
-                _transcriptScroll.TrailingAnchor, -pad),
+                _transcriptPlaceholder.TrailingAnchor, -pad),
 
             // ───── status ─────
             _statusLabel.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor, pad),
@@ -356,44 +325,13 @@ public sealed class ChatPanelViewController : NSViewController
 
     private void SubscribeToVm()
     {
-        ((INotifyCollectionChanged)_vm.Messages).CollectionChanged += OnMessagesChanged;
+        // No CollectionChanged subscription: there's no transcript
+        // renderer in this build, so message-add/remove events have
+        // nowhere to land. The composer's Send still triggers
+        // _vm.SendAsync; the streamed deltas mutate Messages but
+        // we don't paint them. State/CanSend/LastErrorMessage on
+        // the VM still drive composer + status updates.
         _vm.PropertyChanged += OnVmPropertyChanged;
-    }
-
-    private void OnMessagesChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        // Rule 12: VM events fire on the UI thread; no marshaling.
-        switch (e.Action)
-        {
-            case NotifyCollectionChangedAction.Add:
-                if (e.NewItems is null) break;
-                foreach (Message m in e.NewItems)
-                {
-                    AppendRow(m);
-                }
-                ScrollTranscriptToBottom();
-                break;
-
-            case NotifyCollectionChangedAction.Reset:
-                ClearTranscript();
-                break;
-
-            case NotifyCollectionChangedAction.Remove:
-                // DiscardEmptyInflight removes the last row. Detach
-                // managed Message.PropertyChanged BEFORE removing
-                // from the view hierarchy (Rule 13 — never
-                // Dispose() the NSView peer).
-                if (e.OldStartingIndex >= 0
-                    && e.OldStartingIndex < _transcriptStack.ArrangedSubviews.Length)
-                {
-                    var view = _transcriptStack.ArrangedSubviews[e.OldStartingIndex];
-                    (view as MessageRowView)?.Unsubscribe();
-                    _transcriptStack.RemoveArrangedSubview(view);
-                    view.RemoveFromSuperview();
-                }
-                break;
-        }
-        UpdateEmptyStateVisibility();
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -411,68 +349,13 @@ public sealed class ChatPanelViewController : NSViewController
         }
     }
 
-    private void AppendRow(Message m)
-    {
-        var row = new MessageRowView(m);
-        // GravityAreas distribution + Bottom gravity: messages anchor
-        // to the bottom of the stack so a sparse transcript hugs the
-        // composer (matching SwiftUI's chat shape). AddView is the
-        // gravity-aware insertion API; AddArrangedSubview ignores
-        // gravity and falls back to Top.
-        _transcriptStack.AddView(row, NSStackViewGravity.Bottom);
-        // Rule 15 (dotnet/CLAUDE.md): pin row width to stack content
-        // width via single WidthAnchor constraint. Pair of
-        // leading+trailing conflicts with NSStackView.Alignment.
-        var horizontalInset = -2f * (float)_transcriptStack.EdgeInsets.Left;
-        row.WidthAnchor
-            .ConstraintEqualTo(_transcriptStack.WidthAnchor, 1, horizontalInset)
-            .Active = true;
-    }
-
-    private void ClearTranscript()
-    {
-        foreach (var view in _transcriptStack.ArrangedSubviews.ToArray())
-        {
-            (view as MessageRowView)?.Unsubscribe();
-            _transcriptStack.RemoveArrangedSubview(view);
-            view.RemoveFromSuperview();
-        }
-    }
-
-    private void ScrollTranscriptToBottom()
-    {
-        BeginInvokeOnMainThread(ScrollToBottomImpl);
-    }
-
-    private void ScrollToBottomImpl()
-    {
-        if (_transcriptScroll.DocumentView is not NSView doc) return;
-        var clip = _transcriptScroll.ContentView;
-        var docHeight = (float)doc.Bounds.Height;
-        var clipHeight = (float)clip.Bounds.Height;
-        // FlippedStackView's IsFlipped = true puts the bottom of the
-        // document at y = docHeight - clipHeight in clip-bounds
-        // coordinates. Negative target means the doc is shorter than
-        // the clip; clamp to 0 to avoid over-scrolling.
-        var targetY = (float)Math.Max(0, docHeight - clipHeight);
-        clip.ScrollToPoint(new CGPoint(0, targetY));
-        _transcriptScroll.ReflectScrolledClipView(clip);
-    }
-
-    /// <summary>NSStackView in a vertical orientation inside an
-    /// <see cref="NSScrollView"/> needs <see cref="NSView.IsFlipped"/>
-    /// = true for "top down" stacking to match user expectation. The
-    /// AppKit default (non-flipped) stacks subviews from the
-    /// bottom up, which inverts the apparent order and breaks
-    /// scroll-to-bottom math.</summary>
-    private sealed class FlippedStackView : NSStackView
-    {
-        public override bool IsFlipped => true;
-    }
-
     private void UpdateEmptyStateVisibility()
     {
-        _emptyStateView.Hidden = _vm.Messages.Count > 0;
+        // No transcript renderer in this build, so the empty-state
+        // hint always shows (regardless of message count). Once a
+        // real transcript renderer lands, this should flip back to
+        // `_vm.Messages.Count > 0`.
+        _emptyStateView.Hidden = false;
     }
 
     private void UpdateComposerState()
