@@ -32,6 +32,16 @@ public enum ChatErrorKind
     /// stream interrupted mid-flight). UI should offer retry.</summary>
     Network,
 
+    /// <summary>Client-side deadline exceeded before the server
+    /// produced a response. Distinct from <see cref="Network"/>: the
+    /// network might be reachable but the request budget was too
+    /// small (or the server was slow). Both surface as "retry" in
+    /// the UI today, but the kind is split so telemetry can
+    /// distinguish budget overruns from connectivity failures and so
+    /// a future UX (e.g., "this is taking longer than usual — keep
+    /// waiting / give up") can route off the kind.</summary>
+    Timeout,
+
     /// <summary>The server returned a non-success gRPC status that
     /// isn't auth-related (INVALID_ARGUMENT, RESOURCE_EXHAUSTED,
     /// INTERNAL, etc.). UI should show a generic "something went

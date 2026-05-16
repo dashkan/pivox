@@ -6,31 +6,33 @@ using Pivox.Shared.Ai;
 namespace Pivox.Ai;
 
 /// <summary>
-/// macOS implementation of <see cref="IChatService"/>. Thin adapter
+/// Windows implementation of <see cref="IChatService"/>. Thin adapter
 /// over <see cref="PivoxClient.Ai"/>'s generated
 /// <c>AiChat.AiChatClient</c>: builds the proto request, calls
-/// <c>StreamGenerateContent</c>, maps each
-/// <c>ServerEvent</c> oneof case to a domain
-/// <see cref="ChatStreamEvent"/>, and translates RpcException +
-/// cancellation into <see cref="ChatException"/>.
+/// <c>StreamGenerateContent</c>, maps each <c>ServerEvent</c> oneof
+/// case to a domain <see cref="ChatStreamEvent"/>, and translates
+/// <see cref="RpcException"/> + cancellation into
+/// <see cref="ChatException"/>.
+///
+/// Mirror of <c>Pivox.macOS</c>'s <c>MacOsChatService</c> — same
+/// proto types (both projects reference <c>Pivox.Client</c>), same
+/// state-machine assumptions on the <see cref="ConversationViewModel"/>
+/// side, same error mapping. The only platform-specific concern is
+/// the layering boundary: lives in <c>Pivox.WinUI</c>, not
+/// <c>Pivox.Shared</c>, because the proto types
+/// (<c>Pivox.Ai.V1.*</c>) live in <c>Pivox.Client</c> which the
+/// shared layer doesn't depend on.
 ///
 /// Phase B scope: text-track events only. Reasoning, tool-call,
-/// tool-output, and artifact events are consumed and dropped — the
-/// stream isn't surfaced to the UI yet, and dropping events keeps the
-/// stream advancing without producing spurious UI state. Phase C/D add
-/// the corresponding event surfaces as those features get UI.
-///
-/// Layering: lives in <c>Pivox.macOS</c> (not <c>Pivox.Shared</c>)
-/// because the proto types (<c>Pivox.Ai.V1.*</c>) are generated into
-/// <c>Pivox.Client</c>, which <c>Pivox.Shared</c> doesn't depend on.
-/// Conversion at this seam keeps the cross-platform layer free of
-/// gRPC concepts.
+/// tool-output, and artifact events are consumed and dropped with a
+/// <see cref="System.Diagnostics.Debug.WriteLine"/> breadcrumb. Phase
+/// C/D adds those surfaces.
 /// </summary>
-public sealed class MacOsChatService : IChatService
+public sealed class WindowsChatService : IChatService
 {
     private readonly PivoxClient _client;
 
-    public MacOsChatService(PivoxClient client)
+    public WindowsChatService(PivoxClient client)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
@@ -40,9 +42,9 @@ public sealed class MacOsChatService : IChatService
     /// <summary>One-time runtime check that the proto
     /// <c>pivox.ai.v1.Role</c> enum values match
     /// <see cref="MessageRole"/> — we rely on numeric alignment for
-    /// the <c>(Role)(int)</c> cast in <see cref="BuildRequest"/>.
-    /// If proto regenerates with a different numbering, this throws
-    /// on first use rather than silently miscategorizing every turn.
+    /// the <c>(Role)(int)</c> cast in <see cref="BuildRequest"/>. If
+    /// proto regenerates with a different numbering, this throws on
+    /// first use rather than silently miscategorizing every turn.
     /// Cheap (runs once per service instance, ~3 enum comparisons).</summary>
     private static void AssertRoleAlignment()
     {
@@ -52,7 +54,7 @@ public sealed class MacOsChatService : IChatService
         {
             throw new InvalidOperationException(
                 "Proto Role enum numbering drifted from MessageRole; " +
-                "update the cast in MacOsChatService.BuildRequest.");
+                "update the cast in WindowsChatService.BuildRequest.");
         }
     }
 
@@ -80,8 +82,8 @@ public sealed class MacOsChatService : IChatService
         var request = BuildRequest(organizationName, turns);
 
         // AsyncServerStreamingCall is IDisposable — wrap its consumption
-        // in a try/finally to ensure the gRPC call resources release
-        // even if the consumer breaks out of the iteration early.
+        // in a using so the gRPC call resources release even if the
+        // consumer breaks out of the iteration early.
         using var call = _client.Ai.StreamGenerateContent(
             request,
             cancellationToken: cancellationToken);
@@ -103,9 +105,8 @@ public sealed class MacOsChatService : IChatService
 
     /// <summary>Iterate the gRPC response stream, translating
     /// <see cref="RpcException"/> and cancellation into
-    /// <see cref="ChatException"/>. Returns raw
-    /// <c>ServerEvent</c>s so the caller can decide which oneof cases
-    /// to surface.</summary>
+    /// <see cref="ChatException"/>. Returns raw <c>ServerEvent</c>s so
+    /// the caller can decide which oneof cases to surface.</summary>
     private static async IAsyncEnumerable<global::Pivox.Ai.V1.ServerEvent>
         EnumerateWithMapping(
             AsyncServerStreamingCall<global::Pivox.Ai.V1.ServerEvent> call,
@@ -154,10 +155,10 @@ public sealed class MacOsChatService : IChatService
             var input = new global::Pivox.Ai.V1.InputMessage
             {
                 // Numeric values align with the proto Role enum by
-                // construction (see MessageRole's doc-comment). Cast
-                // through int rather than via name-based mapping —
-                // catches any future drift at compile time when the
-                // numeric ranges diverge.
+                // construction (see MessageRole's doc-comment + the
+                // AssertRoleAlignment ctor check). Cast through int
+                // rather than via name-based mapping — catches drift
+                // at the call site rather than at runtime.
                 Role = (global::Pivox.Ai.V1.Role)(int)turn.Role,
             };
             input.Parts.Add(new global::Pivox.Ai.V1.MessagePart
@@ -186,18 +187,18 @@ public sealed class MacOsChatService : IChatService
                 return new TextEndEvent();
             default:
                 // Phase B drops non-text tracks. Log so observability
-                // tells us what's on the wire when Phase C/D ramps
-                // up the reasoning / tool / artifact surfaces.
+                // tells us what's on the wire when Phase C/D ramps up
+                // the reasoning / tool / artifact surfaces.
                 System.Diagnostics.Debug.WriteLine(
-                    $"[MacOsChatService] dropping ServerEvent: {evt.EventCase}");
+                    $"[WindowsChatService] dropping ServerEvent: {evt.EventCase}");
                 return null;
         }
     }
 
     /// <summary>Categorize a gRPC failure for the UI layer. The raw
-    /// RpcException is preserved as the inner exception for log
-    /// inspection; the surfaced message is generic per the auth-leak
-    /// rationale documented on <see cref="ChatErrorKind"/>.</summary>
+    /// <see cref="RpcException"/> is preserved as the inner exception
+    /// for log inspection; the surfaced message is generic per the
+    /// auth-leak rationale documented on <see cref="ChatErrorKind"/>.</summary>
     private static ChatException MapRpcException(RpcException rpc)
     {
         var kind = rpc.StatusCode switch
@@ -205,8 +206,8 @@ public sealed class MacOsChatService : IChatService
             StatusCode.Unauthenticated => ChatErrorKind.AuthenticationRequired,
             // PermissionDenied is distinct from AuthenticationRequired:
             // the caller IS authenticated but lacks org/role access.
-            // Re-signing in won't fix it — the UI should route to
-            // "no access" rather than the sign-in screen.
+            // Re-signing in won't fix it — the UI should route to "no
+            // access" rather than the sign-in screen.
             StatusCode.PermissionDenied => ChatErrorKind.PermissionDenied,
             StatusCode.Unavailable => ChatErrorKind.Network,
             // DeadlineExceeded is a client-side budget event, not a

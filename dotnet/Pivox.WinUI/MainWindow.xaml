@@ -29,7 +29,7 @@
         </Border>
 
         <!-- Post-auth detail pane. Mirrors macOS DetailViewController:
-             top-aligned, leading-aligned, padded. -->
+             welcome banner, organization picker, sign-out, status. -->
         <StackPanel Grid.Row="1"
                     Spacing="16"
                     Padding="24"
@@ -39,9 +39,15 @@
             <TextBlock x:Name="WelcomeText"
                        FontSize="17" FontWeight="SemiBold" />
 
-            <Button x:Name="ListOrgsButton"
-                    Content="List organizations"
-                    Click="ListOrgsButton_Click" />
+            <TextBlock Text="Organization"
+                       FontSize="12"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+            <ComboBox x:Name="OrganizationPicker"
+                      HorizontalAlignment="Stretch"
+                      IsEnabled="False"
+                      PlaceholderText="Loading organizations…"
+                      SelectionChanged="OrganizationPicker_SelectionChanged" />
 
             <Button x:Name="SignOutButton"
                     Content="Sign out"
