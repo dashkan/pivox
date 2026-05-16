@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 using AppKit;
 using CoreGraphics;
@@ -59,16 +60,13 @@ public sealed class ChatPanelViewController : NSViewController
     private IconButton _newConversationButton = null!;
     private IconButton _detachButton = null!;
     private NSBox _headerDivider = null!;
-    // Transcript-rendering surface intentionally absent. The
-    // NSStackView and NSTableView ports both failed (see the
-    // session-end memory note for what went wrong). The chat panel
-    // boots cleanly without a transcript; composer Send still
-    // triggers the VM's stream, but the streamed content has no
-    // visible target in this build. A real transcript renderer
-    // is the first task for the next session — port end-to-end
-    // from native/.../AIChat/Transcript/ConversationTranscriptView.swift
-    // BEFORE writing C#.
-    private NSView _transcriptPlaceholder = null!;
+    // Transcript renderer — port of the SwiftUI native AppKit bridge
+    // at native/.../AIChat/Transcript/ConversationTranscriptView.swift.
+    // Step 2: skeleton only (NSScrollView+NSTableView+BottomPinClipView,
+    // 0 rows). Subsequent steps layer in data binding, active bottom-
+    // pin, streaming, and width-change height invalidation per the
+    // step-gated procedure in memory/project_transcript_port_redo.md.
+    private TranscriptView _transcript = null!;
     private NSView _emptyStateView = null!;
     private NSTextField _statusLabel = null!;
     private ChatComposerView _composer = null!;
@@ -103,7 +101,7 @@ public sealed class ChatPanelViewController : NSViewController
     {
         base.ViewDidLoad();
         BuildHeader();
-        BuildTranscriptPlaceholder();
+        BuildTranscript();
         BuildEmptyState();
         BuildStatus();
         BuildComposer();
@@ -174,17 +172,14 @@ public sealed class ChatPanelViewController : NSViewController
         };
     }
 
-    /// <summary>Empty NSView placeholder where the transcript will
-    /// live once a real renderer lands (see the file-level note on
-    /// why this is intentionally absent in this build). The view
-    /// fills the area between the header divider and the status
-    /// line, with the empty-state hint centered inside.</summary>
-    private void BuildTranscriptPlaceholder()
+    /// <summary>Transcript renderer. Fills the area between the
+    /// header divider and the status line. The empty-state view
+    /// (built separately) is placed as a sibling at the same
+    /// rectangle and toggled on/off based on message count — Step 2
+    /// keeps the empty state always visible (no rows yet).</summary>
+    private void BuildTranscript()
     {
-        _transcriptPlaceholder = new NSView
-        {
-            TranslatesAutoresizingMaskIntoConstraints = false,
-        };
+        _transcript = new TranscriptView(_vm);
     }
 
     /// <summary>Empty-state view: centered chat-bubble glyph + heading.
@@ -262,7 +257,15 @@ public sealed class ChatPanelViewController : NSViewController
         View.AddSubview(_newConversationButton);
         View.AddSubview(_detachButton);
         View.AddSubview(_headerDivider);
-        View.AddSubview(_transcriptPlaceholder);
+        View.AddSubview(_transcript);
+        // Empty-state added AFTER the transcript so it sits ABOVE the
+        // transcript in z-order. With the transcript currently
+        // returning 0 rows and drawing transparently
+        // (`drawsBackground = false` on every layer), this is purely
+        // defensive against a future opaque-background change; the
+        // transcript itself is invisible at 0 rows. Step 3 toggles
+        // empty-state visibility off when messages arrive so they
+        // don't overlap the rendered rows.
         View.AddSubview(_emptyStateView);
         View.AddSubview(_statusLabel);
         View.AddSubview(_composer);
@@ -296,18 +299,18 @@ public sealed class ChatPanelViewController : NSViewController
             _headerDivider.HeightAnchor.ConstraintEqualTo(ThemeMetrics.HairlineThickness),
 
             // ───── transcript ─────
-            _transcriptPlaceholder.TopAnchor.ConstraintEqualTo(_headerDivider.BottomAnchor),
-            _transcriptPlaceholder.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor),
-            _transcriptPlaceholder.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor),
-            _transcriptPlaceholder.BottomAnchor.ConstraintEqualTo(_statusLabel.TopAnchor, -ThemeMetrics.SpaceSm),
+            _transcript.TopAnchor.ConstraintEqualTo(_headerDivider.BottomAnchor),
+            _transcript.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor),
+            _transcript.TrailingAnchor.ConstraintEqualTo(View.TrailingAnchor),
+            _transcript.BottomAnchor.ConstraintEqualTo(_statusLabel.TopAnchor, -ThemeMetrics.SpaceSm),
 
             // Empty-state vertically centered in the transcript area.
-            _emptyStateView.CenterXAnchor.ConstraintEqualTo(_transcriptPlaceholder.CenterXAnchor),
-            _emptyStateView.CenterYAnchor.ConstraintEqualTo(_transcriptPlaceholder.CenterYAnchor),
+            _emptyStateView.CenterXAnchor.ConstraintEqualTo(_transcript.CenterXAnchor),
+            _emptyStateView.CenterYAnchor.ConstraintEqualTo(_transcript.CenterYAnchor),
             _emptyStateView.LeadingAnchor.ConstraintGreaterThanOrEqualTo(
-                _transcriptPlaceholder.LeadingAnchor, pad),
+                _transcript.LeadingAnchor, pad),
             _emptyStateView.TrailingAnchor.ConstraintLessThanOrEqualTo(
-                _transcriptPlaceholder.TrailingAnchor, -pad),
+                _transcript.TrailingAnchor, -pad),
 
             // ───── status ─────
             _statusLabel.LeadingAnchor.ConstraintEqualTo(View.LeadingAnchor, pad),
@@ -325,13 +328,21 @@ public sealed class ChatPanelViewController : NSViewController
 
     private void SubscribeToVm()
     {
-        // No CollectionChanged subscription: there's no transcript
-        // renderer in this build, so message-add/remove events have
-        // nowhere to land. The composer's Send still triggers
-        // _vm.SendAsync; the streamed deltas mutate Messages but
-        // we don't paint them. State/CanSend/LastErrorMessage on
-        // the VM still drive composer + status updates.
         _vm.PropertyChanged += OnVmPropertyChanged;
+        // Empty-state visibility tracks message count. The transcript
+        // itself subscribes to Messages directly via its coordinator
+        // (see TranscriptView.ctor / TranscriptCoordinator); this
+        // VC-side subscription is just for toggling the empty-state
+        // overlay. Both subscriptions on the same collection is fine
+        // — ObservableCollection<T> fans out CollectionChanged to
+        // every subscriber.
+        _vm.Messages.CollectionChanged += OnMessagesCollectionChanged;
+    }
+
+    private void OnMessagesCollectionChanged(
+        object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        UpdateEmptyStateVisibility();
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -351,11 +362,13 @@ public sealed class ChatPanelViewController : NSViewController
 
     private void UpdateEmptyStateVisibility()
     {
-        // No transcript renderer in this build, so the empty-state
-        // hint always shows (regardless of message count). Once a
-        // real transcript renderer lands, this should flip back to
-        // `_vm.Messages.Count > 0`.
-        _emptyStateView.Hidden = false;
+        // Empty state shows only when the transcript has nothing to
+        // render. The transcript itself draws transparently at zero
+        // rows (NSTableView + NSScrollView with all DrawsBackground /
+        // BackgroundColor knobs at clear), so toggling visibility on
+        // the empty-state view alone gives us the "Start a
+        // conversation" hint when empty and clean rows when not.
+        _emptyStateView.Hidden = _vm.Messages.Count > 0;
     }
 
     private void UpdateComposerState()

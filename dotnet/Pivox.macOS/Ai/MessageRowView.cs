@@ -65,20 +65,45 @@ internal sealed class MessageRowView : NSView
     /// which sits at 280–520pt overall. A bubble that fills the
     /// inspector edge-to-edge reads as "system message" rather than
     /// "user turn"; capping below the panel width preserves the
-    /// right-rail visual.</summary>
-    private const float UserBubbleMaxWidth = 380;
+    /// right-rail visual.
+    ///
+    /// <para><b>Internal visibility</b>: the transcript coordinator
+    /// reads this for measurement so render and measure use the same
+    /// cap. Adding a second source of truth (a parallel constant in
+    /// the coordinator) would let the two values drift — exactly the
+    /// drift class Swift's <c>messageBody()</c> helper exists to
+    /// prevent. Keeping the constant here makes MessageRowView the
+    /// single source for user-bubble geometry.</para></summary>
+    internal const float UserBubbleMaxWidth = 380;
 
     /// <summary>Horizontal padding inside the user bubble (matches
-    /// SwiftUI's <c>.padding(.horizontal, 14)</c>).</summary>
-    private const float BubbleHorizontalPadding = 14;
+    /// SwiftUI's <c>.padding(.horizontal, 14)</c>). Internal so the
+    /// transcript coordinator's measurement helper reads the same
+    /// value the render path uses.</summary>
+    internal const float BubbleHorizontalPadding = 14;
 
     /// <summary>Vertical padding inside the user bubble (matches
-    /// SwiftUI's <c>.padding(.vertical, 10)</c>).</summary>
-    private const float BubbleVerticalPadding = 10;
+    /// SwiftUI's <c>.padding(.vertical, 10)</c>). Internal so the
+    /// transcript coordinator's measurement helper reads the same
+    /// value the render path uses.</summary>
+    internal const float BubbleVerticalPadding = 10;
 
     private readonly Message _message;
     private readonly NSTextField _body;
     private bool _subscribed;
+
+    /// <summary>Coalesces streaming-text PropertyChanged events to
+    /// at most one <see cref="NSTextField"/> update per runloop
+    /// tick. Without this, fast deltas (50–100/sec) each trigger a
+    /// synchronous NSTextField intrinsic recompute against the
+    /// growing text, which is O(text length) per delta — cumulative
+    /// O(N²) over the stream. With coalesce, the body picks up the
+    /// latest text once per runloop tick (≤60Hz), bounding UI cost
+    /// regardless of delta rate. SwiftUI's <c>Text</c> view has the
+    /// same bounding via the render-pass batching SwiftUI does
+    /// implicitly per frame; AppKit needs the throttle to be
+    /// explicit.</summary>
+    private bool _textUpdateScheduled;
 
     public MessageRowView(Message message)
     {
@@ -243,19 +268,52 @@ internal sealed class MessageRowView : NSView
         base.Layout();
     }
 
+    /// <summary>AppKit's natural detach hook. Called when the cell
+    /// is about to be removed from its parent view (which NSTableView
+    /// does both when scrolling rows out of the visible window and
+    /// when a structural change like <c>ReloadData</c> rebuilds the
+    /// cell pool). Unsubscribing here prevents
+    /// <see cref="Message.PropertyChanged"/> from rooting orphaned
+    /// cells past their visible lifetime — the SwiftUI reference
+    /// uses <c>NSHostingView&lt;Message&gt;</c> whose SwiftUI render
+    /// tree is torn down by SwiftUI itself on removal, so the issue
+    /// doesn't surface there. Our plain AppKit cell needs the
+    /// explicit hook. Newly-visible cells are constructed fresh by
+    /// <c>tableView(_:viewForTableColumn:row:)</c> with a current
+    /// <c>Message.Text</c> snapshot, so no missed-update window:
+    /// scroll-back picks up the latest text in the new cell's ctor.</summary>
+    public override void ViewWillMoveToSuperview(NSView? newSuperview)
+    {
+        base.ViewWillMoveToSuperview(newSuperview);
+        if (newSuperview is null) Unsubscribe();
+    }
+
     private void OnMessagePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (!_subscribed) return;
-        if (e.PropertyName == nameof(Message.Text))
+        if (e.PropertyName != nameof(Message.Text)) return;
+
+        // Coalesce per-runloop-tick — multiple deltas within one
+        // tick share a single body update. The block reads
+        // `_message.Text` at flush time, so it always picks up the
+        // latest streamed value regardless of how many deltas
+        // landed between schedule and flush. See _textUpdateScheduled
+        // doc for the cost model that motivates the throttle.
+        if (_textUpdateScheduled) return;
+        _textUpdateScheduled = true;
+        BeginInvokeOnMainThread(() =>
         {
+            _textUpdateScheduled = false;
+            if (!_subscribed) return;
             // Same-thread by Rule 12 (the VM raises events on the UI
+            // thread; BeginInvokeOnMainThread also runs on the UI
             // thread). Safe to mutate AppKit directly.
             _body.StringValue = _message.Text;
             // NSTextField re-computes intrinsic content size on
             // StringValue change; Auto Layout picks up new height
             // automatically as long as the width constraint is set
             // (it is, in both bubble and assistant builds).
-        }
+        });
     }
 
     /// <summary>Detach this row's <see cref="Message.PropertyChanged"/>
@@ -274,5 +332,137 @@ internal sealed class MessageRowView : NSView
         if (!_subscribed) return;
         _message.PropertyChanged -= OnMessagePropertyChanged;
         _subscribed = false;
+    }
+
+    /// <summary>Computes the rendered height of a message row at the
+    /// given row width. Co-located with the render path so the
+    /// per-role text width, font, and padding constants have a
+    /// single source of truth — the structural equivalent of Swift's
+    /// <c>messageBody()</c> single-source helper shared by
+    /// <c>makeMessageCell</c> and <c>measureMessageHeight</c>.
+    ///
+    /// <para><b>Why this and not detached-MessageRowView
+    /// measurement.</b> The first cut of the C# port instantiated a
+    /// fresh <see cref="MessageRowView"/> per measurement, set a
+    /// width anchor, called <c>LayoutSubtreeIfNeeded</c>, and read
+    /// <c>FittingSize.Height</c>. That works for SwiftUI's
+    /// <c>NSHostingController.sizeThatFits</c> (the Swift bridge's
+    /// equivalent) because the hosting controller auto-provides
+    /// window context for its SwiftUI tree; <c>NSView</c>'s
+    /// constraint solver requires a window to fully drive Auto
+    /// Layout, and a detached row never gets the multi-pass
+    /// resolution that <see cref="Layout"/>'s
+    /// <c>PreferredMaxLayoutWidth</c> set + intrinsic invalidation
+    /// depend on. Result: measured height equals one line, rows
+    /// clip everything past the first line.</para>
+    ///
+    /// <para><b>Why <see cref="NSAttributedString"/> bounding-rect
+    /// preserves identity-with-render.</b> Apple's text layout
+    /// engine sits below <see cref="NSTextField"/>'s intrinsic
+    /// sizing — the same machinery that <c>NSTextField</c> uses to
+    /// compute its <c>IntrinsicContentSize</c> with PMW set is what
+    /// <see cref="NSAttributedString.GetBoundingRect(CGSize, NSStringDrawingOptions)"/>
+    /// returns directly. Same font, same wrap mode, same target
+    /// width → same wrapped height, pixel-for-pixel. The
+    /// measurement reads the same <see cref="ThemeFonts.NS"/>
+    /// font role and the same role-aware width math the live
+    /// <see cref="Layout"/> override uses, so changes to either
+    /// land in one place.</para>
+    ///
+    /// <para><b>Phase C revisit point.</b> When markdown rendering
+    /// lands, the live cell stops being a plain <see cref="NSTextField"/>
+    /// and bounding-rect measurement no longer corresponds to the
+    /// rendered height (code blocks, lists, blockquotes have their
+    /// own geometry). At that point this helper takes a new path
+    /// — either a renderer-specific measurement primitive, or
+    /// off-screen rendering into a backed view. The
+    /// single-source-of-truth shape (one method, both paths route
+    /// through it) stays the same.</para></summary>
+    public static nfloat MeasureRowHeight(Message message, nfloat rowWidth)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+
+        // Per-role text-width and vertical-padding math — kept in
+        // lockstep with Layout()'s available-width calc above.
+        nfloat textWidth;
+        nfloat verticalPadding;
+        if (message.Role == MessageRole.User)
+        {
+            // Mirror Layout()'s user-case:
+            //   available = min(rowWidth, UserBubbleMaxWidth) - 2*BubbleHorizontalPadding
+            // Plus the bubble's vertical padding (top + bottom).
+            textWidth = (nfloat)Math.Min(
+                (double)rowWidth, UserBubbleMaxWidth) - 2 * BubbleHorizontalPadding;
+            verticalPadding = 2 * BubbleVerticalPadding;
+        }
+        else
+        {
+            // Assistant fills the row width; no bubble padding.
+            textWidth = rowWidth;
+            verticalPadding = 0;
+        }
+
+        // Guard against zero-or-negative widths (pre-layout, very
+        // narrow panel). 1pt floor matches the live cell's fallback
+        // behavior — NSTextField won't render at width=0 either.
+        if (textWidth < 1) textWidth = 1;
+
+        var label = GetSizingLabel();
+        label.StringValue = message.Text ?? "";
+        // Setting PMW invalidates the cached intrinsic, then
+        // reading IntrinsicContentSize forces recomputation against
+        // the new PMW. The NSTextField returns (PMW, wrapped_height).
+        label.PreferredMaxLayoutWidth = textWidth;
+        var intrinsic = label.IntrinsicContentSize;
+
+        var measured = intrinsic.Height + verticalPadding;
+        return (nfloat)Math.Max((double)measured, 1.0);
+    }
+
+    /// <summary>Shared, reused sizing label — one NSTextField for
+    /// every <see cref="MeasureRowHeight"/> call instead of a fresh
+    /// allocation per measurement.
+    ///
+    /// <para><b>Why reuse.</b> Per-delta streaming triggers
+    /// per-delta height re-measurement (cache invalidation +
+    /// NSTableView re-asking heightOfRow). Live resize fires the
+    /// frame-change observer at 60Hz, each tick re-measuring all
+    /// visible rows. With fresh-per-call allocation, each
+    /// measurement costs an NSTextField init + cell-tree setup —
+    /// individually small (~0.5–1ms) but cumulatively high at high
+    /// invocation rates, especially when markdown rendering lands
+    /// in Phase C (per-cell measurement could grow to several ms).
+    /// Reusing one NSTextField for all measurements — same font,
+    /// same wrap mode, same PMW-driven intrinsic protocol — cuts
+    /// per-measurement cost to just the text-layout work that
+    /// can't be amortized.</para>
+    ///
+    /// <para><b>Why this is the structural analog of Swift's
+    /// <c>sizingHost</c>.</b> The Swift bridge keeps a single
+    /// reused <c>NSHostingController</c> (<c>sizingHost</c>) and
+    /// swaps its <c>rootView</c> per measurement; the host's
+    /// SwiftUI render-tree state is reused across calls. Our static
+    /// NSTextField achieves the same per-call amortization at the
+    /// NSTextField layer — the renderer that backs both the live
+    /// cell and the measurement.</para>
+    ///
+    /// <para><b>Threading.</b> AppKit objects are main-thread-only.
+    /// <see cref="MeasureRowHeight"/> is always called from
+    /// NSTableView's <c>heightOfRow</c> delegate path, which runs
+    /// on the main thread (Rule 12). Lazy init on first call is
+    /// thus also main-thread; no cross-thread race.</para></summary>
+    private static NSTextField? _sizingLabel;
+
+    private static NSTextField GetSizingLabel()
+    {
+        if (_sizingLabel is null)
+        {
+            var label = NSTextField.CreateWrappingLabel("");
+            label.Font = ThemeFonts.NS(ThemeFont.Body);
+            label.LineBreakMode = NSLineBreakMode.ByWordWrapping;
+            label.UsesSingleLineMode = false;
+            _sizingLabel = label;
+        }
+        return _sizingLabel;
     }
 }

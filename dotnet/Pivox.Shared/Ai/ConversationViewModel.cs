@@ -65,6 +65,7 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
     private string? _lastErrorMessage;
     private CancellationTokenSource? _streamCts;
     private Message? _inflight;
+    private bool _stickToBottom = true;
     private bool _disposed;
 
     public ConversationViewModel(
@@ -138,6 +139,34 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
     /// False during Loading / Streaming.</summary>
     public bool CanSend => State is ConversationState.Idle or ConversationState.Error;
 
+    /// <summary>User-intent flag for streaming auto-scroll. Set true
+    /// at <see cref="SendAsync"/> start (the user just sent → take
+    /// them to the new message even if they were scrolled up
+    /// reading history). The transcript view flips this false when
+    /// the user scrolls past a one-viewport-up threshold, and back
+    /// true when they scroll back into the bottom region.
+    ///
+    /// <para>Gates the streaming-delta auto-scroll. The Swift VM has
+    /// the same field with the same semantics (<c>viewModel.stickToBottom</c>);
+    /// the Swift bridge's streaming-delta branch comment at lines
+    /// 528–547 of <c>ConversationTranscriptView.swift</c> is
+    /// explicit that this MUST be an intent flag, not a position
+    /// check, because per-delta layout invalidation causes
+    /// position-based gates to flicker (visible.maxY reads
+    /// pre-delta-N values while docHeight reflects pending growth,
+    /// so a position check aborts the scroll on every delta after
+    /// the first).</para></summary>
+    public bool StickToBottom
+    {
+        get => _stickToBottom;
+        set
+        {
+            if (_stickToBottom == value) return;
+            _stickToBottom = value;
+            RaisePropertyChanged();
+        }
+    }
+
     /// <summary>Issue a new user turn. Appends a user
     /// <see cref="Message"/> to <see cref="Messages"/>, transitions to
     /// <see cref="ConversationState.Loading"/>, and consumes the
@@ -170,6 +199,14 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
                 "Select an organization before sending a message.");
             return;
         }
+
+        // Force sticky-bottom on send — even if the user had
+        // scrolled up reading history, hitting Send expresses
+        // intent to see the new turn at the bottom. This matches
+        // SwiftUI's viewModel.send() which sets stickToBottom = true.
+        // The transcript's scroll-position observer flips this
+        // false when the user scrolls away during streaming.
+        StickToBottom = true;
 
         // Append the user message immediately so the UI shows the turn
         // before the network round-trip starts. The user-message Text
@@ -221,12 +258,40 @@ public sealed class ConversationViewModel : INotifyPropertyChanged, IDisposable
             // UI sync context across each iteration — Apply runs on
             // the UI thread because the caller is on the UI thread
             // (precondition; see class doc).
+            //
+            // `await Task.Yield()` between iterations is load-bearing
+            // for UI responsiveness during fast streams. gRPC's async
+            // iterator can deliver buffered events synchronously
+            // (`MoveNextAsync` returns a completed ValueTask when the
+            // next event is already in the channel); on a
+            // single-threaded SyncContext like AppKit's main runloop
+            // or WinUI's DispatcherQueue, that synchronous return
+            // means the iteration loop holds the UI thread end-to-end
+            // for the entire stream, blocking input and redraw until
+            // the stream completes.
+            //
+            // Task.Yield posts the continuation back through the
+            // SyncContext (`Post(...)`), which the UI runloop drains
+            // alongside its other queued work (paint, hit-test, click
+            // events). The net effect is the loop processes one
+            // event, yields one tick to the runloop, processes the
+            // next event, yields again. Same observable behavior as
+            // SwiftUI's async iterator under the Swift Concurrency
+            // runtime, which cooperates with the main actor by
+            // default.
+            //
+            // Without this yield, the dotnet UI freezes through the
+            // entire stream (observed: "UI completely unusable
+            // during streaming, stable after stream finishes" — the
+            // post-stream "pause" was the accumulated UI work
+            // draining after the loop finally released the thread).
             await foreach (var evt in _chat
                 .StreamGenerateAsync(organizationName, turns, token)
                 .WithCancellation(token)
                 .ConfigureAwait(true))
             {
                 Apply(evt, ownedCts);
+                await Task.Yield();
             }
 
             // Stream closed cleanly. If we're still mid-stream (an

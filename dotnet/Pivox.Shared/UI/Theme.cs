@@ -187,4 +187,15 @@ public static class ThemeMetrics
     /// inspector chips. Smaller curvature than
     /// <see cref="ChatBubbleCornerRadius"/> for visual hierarchy.</summary>
     public const float ChatMessageCornerRadius = 8;
+
+    /// <summary>Vertical spacing between rows in the chat transcript
+    /// — fed into <c>NSTableView.IntercellSpacing</c>. Matches the
+    /// SwiftUI reference (<c>intercellSpacing = NSSize(width: 0,
+    /// height: 8)</c> in
+    /// <c>native/.../AIChat/Transcript/ConversationTranscriptView.swift</c>).
+    /// Same magnitude as <see cref="SpaceSm"/> today but feature-
+    /// scoped so the two can diverge if the transcript layout ever
+    /// wants tighter or looser breathing room than generic 8pt
+    /// spacing.</summary>
+    public const float TranscriptIntercellSpacingY = 8;
 }
