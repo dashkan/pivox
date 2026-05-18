@@ -77,19 +77,19 @@
     "tailwindcss": "^4.0.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.2.4",
+    "@tailwindcss/vite": "^4.3.0",
     "@tanstack/vite-config": "^0.5.2",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "tailwindcss": "^4.2.4",
-    "vite": "^8.0.9"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tailwindcss": "^4.3.0",
+    "vite": "^8.0.13"
   },
   "dependencies": {
     "@pivox/image-editor": "workspace:*",
     "@pivox/primitives": "workspace:*",
-    "lucide-react": "^1.8.0",
+    "lucide-react": "^1.16.0",
     "qrcode.react": "^4.2.0"
   }
 }

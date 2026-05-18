@@ -8,7 +8,8 @@
 	docker-up docker-down firebase-deploy clean-fn-revisions \
 	ai-native \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
-	test-native-ui
+	test-native-ui \
+	web-primitives web-image-editor web-features web-ui web-start electron-start
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
@@ -302,20 +303,45 @@ log-pivox-app-macos:
 ollama-serve:
 	ollama serve
 
+# Web watchers + dev server. Each is a thin wrapper around the
+# corresponding pnpm script in web/package.json so callers can run
+# them standalone (e.g. `make web-primitives`) or composed via `make dev`.
+web-primitives:
+	pnpm run --dir web web:build:primitives --watch
+
+web-image-editor:
+	pnpm run --dir web web:build:image-editor --watch
+
+web-features:
+	pnpm run --dir web web:build:features --watch
+
+web-ui:
+	pnpm run --dir web web:build:ui --watch
+
+web-start:
+	pnpm run --dir web web:start
+
+electron-start:
+	pnpm run --dir web electron:start
+
 # dev runs every component of the local loop in one terminal: the
 # pivox-cloud + pivox-worker air watchers, the nginx + ngrok ingress
-# proxies, and the native-app log stream. `concurrently` color-codes
-# each prefix and `--kill-others` tears the rest down the moment any
-# one process exits — so a crashed binary or Ctrl-C cleans up cleanly
-# instead of leaving zombies.
+# proxies, the native-app log stream, and the web watchers + dev
+# server. `concurrently` color-codes each prefix and `--kill-others`
+# tears the rest down the moment any one process exits — so a crashed
+# binary or Ctrl-C cleans up cleanly instead of leaving zombies.
 dev:
 	pnpx concurrently \
 		--kill-others \
-		--names "air,worker,ollama,nginx,ngrok,log" \
-		--prefix-colors "yellow,green,red,cyan,magenta,blue" \
+		--names "cloud,worker,ollama,nginx,ngrok,web-primitives,web-image-editor,web-features,web-ui,start" \
+		--prefix-colors "yellow,green,red,cyan,magenta,blue,gray,gray,gray,gray,white" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
 		"$(MAKE) ollama-serve" \
 		"$(MAKE) proxy-nginx" \
 		"$(MAKE) proxy-ngrok" \
-		"$(MAKE) log-pivox-app-macos"
+		"$(MAKE) web-primitives" \
+		"$(MAKE) web-image-editor" \
+		"$(MAKE) web-features" \
+		"$(MAKE) web-ui" \
+		"$(MAKE) web-start"

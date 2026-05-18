@@ -14,10 +14,6 @@
     "prettier:write": "prettier --write .",
     "test:eslint": "pnpm -r --filter \"./packages/**\" --filter \"./apps/**\" run test:eslint",
     "test:types": "pnpm -r --filter \"./packages/**\" --filter \"./apps/**\" run test:types",
-    "server:cloud": "go -C ../ run ./cmd/pivox-cloud",
-    "server:storage": "go -C ../ run ./cmd/pivox-agent storage --token dev-token-local",
-    "dev": "concurrently -n prims,image-editor,ui,feat,web,cloud,storage -c gray,gray,gray,gray,blue,red,green \"pnpm web:build:primitives --watch\" \"pnpm web:build:image-editor --watch\" \"pnpm web:build:ui --watch\" \"pnpm web:build:features --watch\" \"pnpm web:start\" \"pnpm server:cloud\" \"pnpm server:storage\"",
-    "dev:ngrok": "concurrently -n prims,image-editor,ui,feat,web,cloud,storage,nginx,ngrok -c gray,gray,gray,gray,blue,red,green,yellow,magenta \"pnpm web:build:primitives --watch\" \"pnpm web:build:image-editor --watch\" \"pnpm web:build:ui --watch\" \"pnpm web:build:features --watch\" \"pnpm web:start\" \"pnpm server:cloud\" \"pnpm server:storage\" \"pnpm proxy:nginx\" \"pnpm proxy:ngrok\"",
     "web:build": "pnpm run build",
     "web:build:primitives": "pnpm --filter @pivox/primitives run build",
     "web:build:image-editor": "pnpm --filter @pivox/image-editor run build",
@@ -25,26 +21,27 @@
     "web:build:ui": "pnpm --filter @pivox/ui build",
     "web:clean": "pnpm clean",
     "web:start": "pnpm --filter @pivox/start dev",
-    "proxy:nginx": "nginx -c $PWD/../configs/nginx.conf -e stderr",
-    "proxy:nginx:stop": "nginx -c $PWD/../configs/nginx.conf -s stop",
-    "proxy:ngrok": "ngrok start --config $PWD/../configs/ngrok.yml --all"
+    "electron:start": "pnpm --filter @pivox/electron dev"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.4.0",
     "concurrently": "^9.2.1",
-    "eslint": "^10.2.1",
+    "eslint": "^10.4.0",
     "eslint-plugin-unused-imports": "^4.4.1",
     "premove": "^4.0.0",
     "prettier": "^3.8.3",
-    "publint": "^0.3.18",
+    "publint": "^0.3.21",
     "typescript": "^5.9.3",
-    "vite": "^8.0.9",
-    "vitest": "^4.1.5"
+    "vite": "^8.0.13",
+    "vitest": "^4.1.6"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@firebase/util",
+      "electron",
+      "electron-winstaller",
       "esbuild",
-      "msw",
+      "protobufjs",
       "sharp",
       "unrs-resolver"
     ]

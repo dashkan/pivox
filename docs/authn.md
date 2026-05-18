@@ -525,7 +525,7 @@ This launches (via `concurrently`):
 
 | Process | Port | Purpose |
 |---------|------|---------|
-| Vite (start app) | 3001 | TanStack Start dev server |
+| Vite (start app) | 3000 | TanStack Start dev server |
 | Go server (REST) | 8080 | REST gateway + internal hooks |
 | Go server (gRPC) | 50051 | gRPC services |
 | Go server (debug) | 9090 | Health/readiness probes |
@@ -542,8 +542,8 @@ This launches (via `concurrently`):
 | `/internal/*` | REST → `:8080` |
 | `/v1/*` | REST → `:8080` |
 | `/healthz`, `/readyz` | Debug → `:9090` |
-| `/__tsd/*` | Vite → `:3001` (SSE, no buffering, 24h timeout) |
-| `/*` | Vite → `:3001` (WebSocket upgrade for HMR) |
+| `/__tsd/*` | Vite → `:3000` (SSE, no buffering, 24h timeout) |
+| `/*` | Vite → `:3000` (WebSocket upgrade for HMR) |
 
 **Auth behavior:**
 - Start app uses **real Firebase Auth** (`VITE_FIREBASE_AUTH_DOMAIN=pivox.ngrok.app`, emulator URL commented out)
@@ -644,13 +644,13 @@ The default dev mode. No ngrok, no external network dependencies, no real Fireba
 │                                                                  │
 │  ┌─────────────┐   ┌───────────────┐   ┌────────────────────┐  │
 │  │ Electron    │   │ Start app     │   │ Firebase Emulator  │  │
-│  │ (dev or     │   │ Vite :3001    │   │ Auth :9099         │  │
+│  │ (dev or     │   │ Vite :3000    │   │ Auth :9099         │  │
 │  │ built .app) │   │               │   │ Functions :5001    │  │
 │  └──────┬──────┘   └───────┬───────┘   └────────┬───────────┘  │
 │         │                  │                     │              │
 │         │   ┌──────────────┴──────────────┐      │              │
 │         │   │ nginx :8081 (optional)      │      │              │
-│         │   │ or direct access to :3001   │      │              │
+│         │   │ or direct access to :3000   │      │              │
 │         │   └──────────────┬──────────────┘      │              │
 │         │                  │                     │              │
 │         │   ┌──────────────┴──────────────┐      │              │
@@ -691,7 +691,7 @@ Would launch (without ngrok or nginx):
 
 | Process | Port | Purpose |
 |---------|------|---------|
-| Vite (start app) | 3001 | TanStack Start dev server |
+| Vite (start app) | 3000 | TanStack Start dev server |
 | Go server | 8080 / 50051 / 9090 | REST + gRPC + debug |
 | Firebase emulators | 9099, 5001 | Auth + Functions |
 | PostgreSQL (docker) | 5432 | Database |
@@ -818,7 +818,7 @@ This produces a `.app` that:
 - Uses the Firebase emulator (renderer connects to `:9099`)
 - Does NOT use `import.meta.env.DEV` branches (production code paths)
 - Uses deep links, `pivox://` protocol, `signInWithCustomToken`
-- Sets `PIVOX_WEB_URL=http://localhost:8081` (or `:3001`) at runtime
+- Sets `PIVOX_WEB_URL=http://localhost:8081` (or `:3000`) at runtime
 
 **Limitation:** Real OAuth still doesn't work (emulator). The deep link flow can be tested with email/password by adjusting the bridge pages, or by using a custom test flow that bypasses OAuth redirect and directly mints tokens.
 
@@ -839,7 +839,7 @@ Accept that testing the deep link flow requires ngrok for real OAuth. This is al
 | Service | Port | Mode 1 | Mode 3 |
 |---------|------|--------|--------|
 | PostgreSQL | 5432 | ✅ | ✅ |
-| Vite (start app) | 3001 | ✅ | ✅ |
+| Vite (start app) | 3000 | ✅ | ✅ |
 | Electron dev renderer | 5173 | ✅ | ✅ |
 | Go REST gateway | 8080 | ✅ | ✅ |
 | nginx | 8081 | ✅ | Optional |
