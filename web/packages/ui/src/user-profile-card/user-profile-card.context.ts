@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, use } from 'react';
+
 import type { UserProfileContextValue } from './user-profile-card.types';
 
 export const UserProfileContext = createContext<UserProfileContextValue | null>(

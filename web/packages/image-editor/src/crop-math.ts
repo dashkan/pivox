@@ -1,4 +1,5 @@
 import { MIN_CROP_SIZE } from './constants';
+
 import type { CropRect, DragHandle } from './types';
 
 /**
@@ -63,13 +64,17 @@ export function computeTranslationBounds(
   // Solve for maxTx (assuming ty = 0, worst-case corner)
   // Constraint: |tx*cos| + |hCW*cos + hCH*sin| <= hIW
   //             |tx*sin| + |hCW*sin + hCH*cos| <= hIH
-  const txLimit1 = absCos > 1e-10 ? (hIW - (hCW * absCos + hCH * absSin)) / absCos : Infinity;
-  const txLimit2 = absSin > 1e-10 ? (hIH - (hCW * absSin + hCH * absCos)) / absSin : Infinity;
+  const txLimit1 =
+    absCos > 1e-10 ? (hIW - (hCW * absCos + hCH * absSin)) / absCos : Infinity;
+  const txLimit2 =
+    absSin > 1e-10 ? (hIH - (hCW * absSin + hCH * absCos)) / absSin : Infinity;
   const maxTx = Math.max(0, Math.min(txLimit1, txLimit2));
 
   // Solve for maxTy (assuming tx = 0, worst-case corner)
-  const tyLimit1 = absSin > 1e-10 ? (hIW - (hCW * absCos + hCH * absSin)) / absSin : Infinity;
-  const tyLimit2 = absCos > 1e-10 ? (hIH - (hCW * absSin + hCH * absCos)) / absCos : Infinity;
+  const tyLimit1 =
+    absSin > 1e-10 ? (hIW - (hCW * absCos + hCH * absSin)) / absSin : Infinity;
+  const tyLimit2 =
+    absCos > 1e-10 ? (hIH - (hCW * absSin + hCH * absCos)) / absCos : Infinity;
   const maxTy = Math.max(0, Math.min(tyLimit1, tyLimit2));
 
   return { maxTx, maxTy };

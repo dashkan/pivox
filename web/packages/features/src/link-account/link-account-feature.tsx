@@ -1,7 +1,9 @@
 'use client';
 
 import { LinkAccountCard } from '@pivox/ui/link-account-card';
+
 import { useLinkAccount } from './use-link-account';
+
 import type { User } from 'firebase/auth';
 
 export function LinkAccountFeature({

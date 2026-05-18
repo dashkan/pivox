@@ -1,6 +1,5 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
 import {
   GoogleAuthProvider,
   OAuthProvider,
@@ -8,14 +7,17 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
 } from 'firebase/auth';
+import { useActionState, useRef, useState } from 'react';
+
 import type {
   LoginActions,
   LoginContextValue,
   LoginMeta,
   LoginState,
 } from '@pivox/ui/login-card';
-import type { User, UserCredential } from 'firebase/auth';
 import type { FirebaseError } from 'firebase/app';
+import type { User, UserCredential } from 'firebase/auth';
+
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 import { signInWithGitHubPopup } from '@/shared/github-oauth';
 import { setPendingLink } from '@/shared/pending-link';
@@ -81,7 +83,7 @@ export function useLogin(
           result = await signInWithGitHubPopup();
         } else if (provider in socialProviders) {
           const auth = getAuth();
-          const factory = socialProviders[provider as keyof typeof socialProviders];
+          const factory = socialProviders[provider];
           result = await signInWithPopup(auth, factory());
         } else {
           throw new Error(`Unsupported provider: ${provider}`);

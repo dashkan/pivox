@@ -1,6 +1,6 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { ResetPasswordFeature } from '@pivox/features/reset-password';
 import { ResetPasswordCard } from '@pivox/ui/reset-password-card';
+import { createFileRoute, useRouter } from '@tanstack/react-router';
 
 type ResetPasswordSearch = {
   oobCode: string;

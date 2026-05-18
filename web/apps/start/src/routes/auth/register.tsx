@@ -1,6 +1,7 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { RegistrationFeature } from '@pivox/features/registration';
 import { RegistrationCard } from '@pivox/ui/registration-card';
+import { createFileRoute, useRouter } from '@tanstack/react-router';
+
 import { authProviders } from '@/lib/auth-providers';
 
 export const Route = createFileRoute('/auth/register')({

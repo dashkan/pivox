@@ -1,7 +1,7 @@
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, mergeConfig } from "vitest/config";
-import { tanstackViteConfig } from "@tanstack/vite-config";
+import { pivoxViteConfig } from "../../vite.config.shared.js";
 import packageJson from "./package.json";
 
 const config = defineConfig({
@@ -45,7 +45,7 @@ const config = defineConfig({
 
 export default mergeConfig(
   config,
-  tanstackViteConfig({
+  pivoxViteConfig({
     entry: [
       "./src/index.ts",
       // hooks
@@ -159,6 +159,5 @@ export default mergeConfig(
       "./src/shadcn/components/ui/tooltip.tsx",
     ],
     srcDir: "./src",
-    cjs: false,
   }),
 );

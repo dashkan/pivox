@@ -1,7 +1,5 @@
 'use client';
 
-import { useFormStatus } from 'react-dom';
-import { cn } from '@pivox/primitives/utils';
 import { Button } from '@pivox/primitives/button';
 import {
   Card,
@@ -10,14 +8,19 @@ import {
   CardHeader,
   CardTitle,
 } from '@pivox/primitives/card';
-import { Input } from '@pivox/primitives/input';
-import { Field, FieldError, FieldLabel } from '@pivox/primitives/field';
 import { Checkbox } from '@pivox/primitives/checkbox';
+import { Field, FieldError, FieldLabel } from '@pivox/primitives/field';
+import { Input } from '@pivox/primitives/input';
 import { Label } from '@pivox/primitives/label';
 import { Separator } from '@pivox/primitives/separator';
+import { cn } from '@pivox/primitives/utils';
+import { useFormStatus } from 'react-dom';
+
 import { LoginContext, useLoginContext } from './login-card.context';
-import type { PivoxAuthProvider } from '../shared/auth-provider';
+
 import type { LoginContextValue } from './login-card.types';
+import type { PivoxAuthProvider } from '../shared/auth-provider';
+
 import { AppleIcon, GitHubIcon, GoogleIcon } from '@/shared/social-icons';
 
 /* ------------------------------------------------------------------ */
@@ -86,6 +89,7 @@ function LoginCardEmailField({ className }: { className?: string }) {
     <Field className={cn('px-4', className)}>
       <FieldLabel>Email</FieldLabel>
       <Input
+        // eslint-disable-next-line react-hooks/refs -- forwarding the ref object to a JSX `ref={}` prop, not reading `.current` during render
         ref={meta.emailRef}
         name="email"
         type="email"

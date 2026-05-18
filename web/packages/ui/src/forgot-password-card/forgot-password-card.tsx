@@ -1,7 +1,5 @@
 'use client';
 
-import { useFormStatus } from 'react-dom';
-import { cn } from '@pivox/primitives/utils';
 import { Button } from '@pivox/primitives/button';
 import {
   Card,
@@ -10,12 +8,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@pivox/primitives/card';
-import { Input } from '@pivox/primitives/input';
 import { Field, FieldError, FieldLabel } from '@pivox/primitives/field';
+import { Input } from '@pivox/primitives/input';
+import { cn } from '@pivox/primitives/utils';
+import { useFormStatus } from 'react-dom';
+
 import {
   ForgotPasswordContext,
   useForgotPasswordContext,
 } from './forgot-password-card.context';
+
 import type { ForgotPasswordContextValue } from './forgot-password-card.types';
 
 /* ------------------------------------------------------------------ */
@@ -88,6 +90,7 @@ function ForgotPasswordCardEmailField({ className }: { className?: string }) {
     <Field className={cn('px-4', className)}>
       <FieldLabel>Email</FieldLabel>
       <Input
+        // eslint-disable-next-line react-hooks/refs -- forwarding the ref object to a JSX `ref={}` prop, not reading `.current` during render
         ref={meta.emailRef}
         name="email"
         type="email"

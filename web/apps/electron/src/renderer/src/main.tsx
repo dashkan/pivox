@@ -1,14 +1,14 @@
 import './assets/main.css';
 
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
 import {
   RouterProvider,
   createHashHistory,
   createRouter,
 } from '@tanstack/react-router';
-import { ensureFirebase } from './lib/firebase';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 
+import { ensureFirebase } from './lib/firebase';
 import { routeTree } from './routeTree.gen';
 
 ensureFirebase();

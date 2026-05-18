@@ -26,11 +26,21 @@ export class CropOverlayRenderer {
     // Top
     ctx.fillRect(0, 0, containerWidth, cropScreenY);
     // Bottom
-    ctx.fillRect(0, cropScreenY + cropScreenH, containerWidth, containerHeight - cropScreenY - cropScreenH);
+    ctx.fillRect(
+      0,
+      cropScreenY + cropScreenH,
+      containerWidth,
+      containerHeight - cropScreenY - cropScreenH,
+    );
     // Left
     ctx.fillRect(0, cropScreenY, cropScreenX, cropScreenH);
     // Right
-    ctx.fillRect(cropScreenX + cropScreenW, cropScreenY, containerWidth - cropScreenX - cropScreenW, cropScreenH);
+    ctx.fillRect(
+      cropScreenX + cropScreenW,
+      cropScreenY,
+      containerWidth - cropScreenX - cropScreenW,
+      cropScreenH,
+    );
   }
 
   /**
@@ -51,14 +61,36 @@ export class CropOverlayRenderer {
 
     this.drawBorder(ctx, rx, ry, rw, rh, scale, colors.border);
     this.drawGrid(ctx, rx, ry, rw, rh, scale, colors.grid);
-    this.drawCornerHandles(ctx, rx, ry, rw, rh, scale, colors.handle, colors.border);
-    this.drawEdgeHandles(ctx, rx, ry, rw, rh, scale, colors.handle, colors.border);
+    this.drawCornerHandles(
+      ctx,
+      rx,
+      ry,
+      rw,
+      rh,
+      scale,
+      colors.handle,
+      colors.border,
+    );
+    this.drawEdgeHandles(
+      ctx,
+      rx,
+      ry,
+      rw,
+      rh,
+      scale,
+      colors.handle,
+      colors.border,
+    );
   }
 
   private drawBorder(
     ctx: CanvasRenderingContext2D,
-    rx: number, ry: number, rw: number, rh: number,
-    scale: number, color: string,
+    rx: number,
+    ry: number,
+    rw: number,
+    rh: number,
+    scale: number,
+    color: string,
   ): void {
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.5 / scale;
@@ -67,8 +99,12 @@ export class CropOverlayRenderer {
 
   private drawGrid(
     ctx: CanvasRenderingContext2D,
-    rx: number, ry: number, rw: number, rh: number,
-    scale: number, color: string,
+    rx: number,
+    ry: number,
+    rw: number,
+    rh: number,
+    scale: number,
+    color: string,
   ): void {
     ctx.strokeStyle = color;
     ctx.lineWidth = 1 / scale;
@@ -93,8 +129,13 @@ export class CropOverlayRenderer {
    */
   private drawCornerHandles(
     ctx: CanvasRenderingContext2D,
-    rx: number, ry: number, rw: number, rh: number,
-    scale: number, _fillColor: string, strokeColor: string,
+    rx: number,
+    ry: number,
+    rw: number,
+    rh: number,
+    scale: number,
+    _fillColor: string,
+    strokeColor: string,
   ): void {
     const len = Math.min(18 / scale, rw / 5, rh / 5);
     const t = 5 / scale;
@@ -125,13 +166,13 @@ export class CropOverlayRenderer {
 
       // Start at vertical arm tip (outer side), round the tip
       ctx.moveTo(innerX, vTip);
-      ctx.arcTo(outerX, vTip, outerX, outerY, r);     // round vertical arm tip
+      ctx.arcTo(outerX, vTip, outerX, outerY, r); // round vertical arm tip
 
       // Up/down to the main outer corner, round it
-      ctx.arcTo(outerX, outerY, hTip, outerY, r);     // round outer L corner
+      ctx.arcTo(outerX, outerY, hTip, outerY, r); // round outer L corner
 
       // Across to horizontal arm tip, round it
-      ctx.arcTo(hTip, outerY, hTip, innerY, r);       // round horizontal arm tip
+      ctx.arcTo(hTip, outerY, hTip, innerY, r); // round horizontal arm tip
 
       // Back to inner edge of horizontal arm
       ctx.lineTo(hTip, innerY);
@@ -156,8 +197,13 @@ export class CropOverlayRenderer {
    */
   private drawEdgeHandles(
     ctx: CanvasRenderingContext2D,
-    rx: number, ry: number, rw: number, rh: number,
-    scale: number, _fillColor: string, strokeColor: string,
+    rx: number,
+    ry: number,
+    rw: number,
+    rh: number,
+    scale: number,
+    _fillColor: string,
+    strokeColor: string,
   ): void {
     const barLen = Math.min(22 / scale, rw / 5, rh / 5);
     const thickness = 4 / scale;
@@ -165,11 +211,31 @@ export class CropOverlayRenderer {
 
     const edges = [
       // Horizontal edges (top, bottom)
-      { x: rx + rw / 2 - barLen / 2, y: ry - thickness / 2, w: barLen, h: thickness },
-      { x: rx + rw / 2 - barLen / 2, y: ry + rh - thickness / 2, w: barLen, h: thickness },
+      {
+        x: rx + rw / 2 - barLen / 2,
+        y: ry - thickness / 2,
+        w: barLen,
+        h: thickness,
+      },
+      {
+        x: rx + rw / 2 - barLen / 2,
+        y: ry + rh - thickness / 2,
+        w: barLen,
+        h: thickness,
+      },
       // Vertical edges (left, right)
-      { x: rx - thickness / 2, y: ry + rh / 2 - barLen / 2, w: thickness, h: barLen },
-      { x: rx + rw - thickness / 2, y: ry + rh / 2 - barLen / 2, w: thickness, h: barLen },
+      {
+        x: rx - thickness / 2,
+        y: ry + rh / 2 - barLen / 2,
+        w: thickness,
+        h: barLen,
+      },
+      {
+        x: rx + rw - thickness / 2,
+        y: ry + rh / 2 - barLen / 2,
+        w: thickness,
+        h: barLen,
+      },
     ];
 
     for (const { x, y, w, h } of edges) {
@@ -185,7 +251,10 @@ export class CropOverlayRenderer {
 
   private drawRoundedRect(
     ctx: CanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
     r: number,
   ): void {
     r = Math.min(r, w / 2, h / 2);

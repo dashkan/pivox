@@ -1,4 +1,10 @@
-import { FREE_TEMPLATE, MAX_HISTORY, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from './constants';
+import {
+  FREE_TEMPLATE,
+  MAX_HISTORY,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  ZOOM_STEP,
+} from './constants';
 import {
   applyCropTemplate,
   clampTranslation,
@@ -8,6 +14,7 @@ import {
   stateToImageCropRect,
 } from './crop-math';
 import { CropOverlayRenderer } from './renderer';
+
 import type {
   CropColors,
   CropTemplate,
@@ -76,8 +83,11 @@ function isEditStateDirty(
   );
 }
 
-function totalAngleRad(state: { rotation: number; straighten: number }): number {
-  return (state.rotation + state.straighten) * Math.PI / 180;
+function totalAngleRad(state: {
+  rotation: number;
+  straighten: number;
+}): number {
+  return ((state.rotation + state.straighten) * Math.PI) / 180;
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,10 +95,14 @@ function totalAngleRad(state: { rotation: number; straighten: number }): number 
 /* ------------------------------------------------------------------ */
 
 const CURSOR_MAP: Record<DragHandle, string> = {
-  nw: 'nwse-resize', se: 'nwse-resize',
-  ne: 'nesw-resize', sw: 'nesw-resize',
-  n: 'ns-resize', s: 'ns-resize',
-  e: 'ew-resize', w: 'ew-resize',
+  nw: 'nwse-resize',
+  se: 'nwse-resize',
+  ne: 'nesw-resize',
+  sw: 'nesw-resize',
+  n: 'ns-resize',
+  s: 'ns-resize',
+  e: 'ew-resize',
+  w: 'ew-resize',
   move: 'all-scroll',
 };
 
@@ -275,7 +289,8 @@ export class ImageEditorEngine {
     if (this.mounted) this.unmount();
     this.container = container;
     this.canvas = document.createElement('canvas');
-    this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+    this.canvas.style.cssText =
+      'position:absolute;inset:0;width:100%;height:100%';
     container.appendChild(this.canvas);
     const ctx = this.canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context not available');
@@ -296,7 +311,8 @@ export class ImageEditorEngine {
       this.markDirty();
     });
     this.themeObserver.observe(document.documentElement, {
-      attributes: true, attributeFilter: ['class'],
+      attributes: true,
+      attributeFilter: ['class'],
     });
 
     this.mounted = true;
@@ -332,13 +348,17 @@ export class ImageEditorEngine {
     this.unmount();
   }
 
-  get isMounted(): boolean { return this.mounted; }
+  get isMounted(): boolean {
+    return this.mounted;
+  }
 
   /* ---------------------------------------------------------------- */
   /*  State                                                           */
   /* ---------------------------------------------------------------- */
 
-  get state(): Readonly<ImageEditorState> { return this._state; }
+  get state(): Readonly<ImageEditorState> {
+    return this._state;
+  }
 
   /**
    * Get the crop rect in original image pixel coordinates.
@@ -347,10 +367,14 @@ export class ImageEditorEngine {
   getCropRect() {
     const angle = totalAngleRad(this._state);
     return stateToImageCropRect(
-      this._state.cropWidth, this._state.cropHeight,
-      this._state.naturalWidth, this._state.naturalHeight,
-      this._state.tx, this._state.ty,
-      this._state.scale, angle,
+      this._state.cropWidth,
+      this._state.cropHeight,
+      this._state.naturalWidth,
+      this._state.naturalHeight,
+      this._state.tx,
+      this._state.ty,
+      this._state.scale,
+      angle,
     );
   }
 
@@ -391,16 +415,24 @@ export class ImageEditorEngine {
         imageError: null,
         naturalWidth: w,
         naturalHeight: h,
-        canUndo: false, canRedo: false, isDirty: false,
-        isDragging: false, activeHandle: null,
-        zoom: 100, zoomMode: 'fit',
-        panOffset: { x: 0, y: 0 }, isPanning: false,
+        canUndo: false,
+        canRedo: false,
+        isDirty: false,
+        isDragging: false,
+        activeHandle: null,
+        zoom: 100,
+        zoomMode: 'fit',
+        panOffset: { x: 0, y: 0 },
+        isPanning: false,
         mode: 'view',
       });
     };
     img.onerror = () => {
       if (this.loadCancelled) return;
-      this.updateState({ imageStatus: 'error', imageError: `Failed to load: ${src}` });
+      this.updateState({
+        imageStatus: 'error',
+        imageError: `Failed to load: ${src}`,
+      });
     };
     img.src = src;
   }
@@ -433,8 +465,12 @@ export class ImageEditorEngine {
     this.preStraightenEditState = null;
     this.history = pushHistory(this.history, pre, this.maxHistory);
     this.updateState({
-      canUndo: true, canRedo: false,
-      isDirty: isEditStateDirty(extractEditState(this._state), this.initialEditState),
+      canUndo: true,
+      canRedo: false,
+      isDirty: isEditStateDirty(
+        extractEditState(this._state),
+        this.initialEditState,
+      ),
     });
   }
 
@@ -453,16 +489,43 @@ export class ImageEditorEngine {
     }
     const { cropW, cropH } = applyCropTemplate(
       template.ratio,
-      this._state.cropWidth, this._state.cropHeight,
-      this._state.naturalWidth, this._state.naturalHeight,
+      this._state.cropWidth,
+      this._state.cropHeight,
+      this._state.naturalWidth,
+      this._state.naturalHeight,
     );
     // Recompute scale and clamp translation for new crop size
     const angle = totalAngleRad(this._state);
-    const minScale = computeMinScale(cropW, cropH, this._state.naturalWidth, this._state.naturalHeight, angle);
+    const minScale = computeMinScale(
+      cropW,
+      cropH,
+      this._state.naturalWidth,
+      this._state.naturalHeight,
+      angle,
+    );
     const scale = Math.max(this._state.scale, minScale);
-    const { maxTx, maxTy } = computeTranslationBounds(cropW, cropH, this._state.naturalWidth, this._state.naturalHeight, scale, angle);
-    const { tx, ty } = clampTranslation(this._state.tx, this._state.ty, maxTx, maxTy);
-    this.pushHistoryAndUpdate({ activeTemplate: template, cropWidth: cropW, cropHeight: cropH, scale, tx, ty });
+    const { maxTx, maxTy } = computeTranslationBounds(
+      cropW,
+      cropH,
+      this._state.naturalWidth,
+      this._state.naturalHeight,
+      scale,
+      angle,
+    );
+    const { tx, ty } = clampTranslation(
+      this._state.tx,
+      this._state.ty,
+      maxTx,
+      maxTy,
+    );
+    this.pushHistoryAndUpdate({
+      activeTemplate: template,
+      cropWidth: cropW,
+      cropHeight: cropH,
+      scale,
+      tx,
+      ty,
+    });
   }
 
   reset(): void {
@@ -477,7 +540,8 @@ export class ImageEditorEngine {
     this.history = { past, future: [current, ...this.history.future] };
     this.updateState({
       ...previous,
-      canUndo: past.length > 0, canRedo: true,
+      canUndo: past.length > 0,
+      canRedo: true,
       isDirty: isEditStateDirty(previous, this.initialEditState),
     });
   }
@@ -490,18 +554,40 @@ export class ImageEditorEngine {
     this.history = { past: [...this.history.past, current], future };
     this.updateState({
       ...next,
-      canUndo: true, canRedo: future.length > 0,
+      canUndo: true,
+      canRedo: future.length > 0,
       isDirty: isEditStateDirty(next, this.initialEditState),
     });
   }
 
-  zoomIn(): void { this.updateState({ zoom: Math.min(ZOOM_MAX, this._state.zoom + ZOOM_STEP), zoomMode: 'manual' }); }
-  zoomOut(): void { this.updateState({ zoom: Math.max(ZOOM_MIN, this._state.zoom - ZOOM_STEP), zoomMode: 'manual' }); }
-  zoomToFit(): void { this.updateState({ zoom: 100, zoomMode: 'fit', panOffset: { x: 0, y: 0 } }); }
-  setZoom(level: number): void { this.updateState({ zoom: Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, level)), zoomMode: 'manual' }); }
+  zoomIn(): void {
+    this.updateState({
+      zoom: Math.min(ZOOM_MAX, this._state.zoom + ZOOM_STEP),
+      zoomMode: 'manual',
+    });
+  }
+  zoomOut(): void {
+    this.updateState({
+      zoom: Math.max(ZOOM_MIN, this._state.zoom - ZOOM_STEP),
+      zoomMode: 'manual',
+    });
+  }
+  zoomToFit(): void {
+    this.updateState({ zoom: 100, zoomMode: 'fit', panOffset: { x: 0, y: 0 } });
+  }
+  setZoom(level: number): void {
+    this.updateState({
+      zoom: Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, level)),
+      zoomMode: 'manual',
+    });
+  }
 
-  enterCropMode(): void { this.updateState({ mode: 'crop' }); }
-  exitCropMode(): void { this.updateState({ mode: 'view' }); }
+  enterCropMode(): void {
+    this.updateState({ mode: 'crop' });
+  }
+  exitCropMode(): void {
+    this.updateState({ mode: 'view' });
+  }
 
   setColors(colors: CropColors): void {
     this.userColors = colors;
@@ -518,16 +604,33 @@ export class ImageEditorEngine {
     straighten: number,
     pushToHistory = true,
   ): void {
-    const angle = (rotation + straighten) * Math.PI / 180;
-    const { naturalWidth: iw, naturalHeight: ih, cropWidth: cw, cropHeight: ch } = this._state;
+    const angle = ((rotation + straighten) * Math.PI) / 180;
+    const {
+      naturalWidth: iw,
+      naturalHeight: ih,
+      cropWidth: cw,
+      cropHeight: ch,
+    } = this._state;
 
     // Enforce minimum scale for new rotation
     const minScale = computeMinScale(cw, ch, iw, ih, angle);
     const scale = Math.max(this._state.scale, minScale);
 
     // Re-clamp translation
-    const { maxTx, maxTy } = computeTranslationBounds(cw, ch, iw, ih, scale, angle);
-    const { tx, ty } = clampTranslation(this._state.tx, this._state.ty, maxTx, maxTy);
+    const { maxTx, maxTy } = computeTranslationBounds(
+      cw,
+      ch,
+      iw,
+      ih,
+      scale,
+      angle,
+    );
+    const { tx, ty } = clampTranslation(
+      this._state.tx,
+      this._state.ty,
+      maxTx,
+      maxTy,
+    );
 
     if (pushToHistory) {
       this.pushHistoryAndUpdate({ rotation, straighten, scale, tx, ty });
@@ -561,7 +664,8 @@ export class ImageEditorEngine {
     const newEdit = extractEditState(newState);
     this.updateState({
       ...partial,
-      canUndo: true, canRedo: false,
+      canUndo: true,
+      canRedo: false,
       isDirty: isEditStateDirty(newEdit, this.initialEditState),
     });
   }
@@ -576,13 +680,18 @@ export class ImageEditorEngine {
     // Convert screen pixel to crop-centered coordinates
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
-    const cropX = (screenX - this.viewportOffsetX) / this.viewportScale - this._state.cropWidth / 2;
-    const cropY = (screenY - this.viewportOffsetY) / this.viewportScale - this._state.cropHeight / 2;
+    const cropX =
+      (screenX - this.viewportOffsetX) / this.viewportScale -
+      this._state.cropWidth / 2;
+    const cropY =
+      (screenY - this.viewportOffsetY) / this.viewportScale -
+      this._state.cropHeight / 2;
     return { x: cropX, y: cropY };
   }
 
   private onPointerDown(e: PointerEvent): void {
-    if (this._state.imageStatus !== 'loaded' || this._state.mode !== 'crop') return;
+    if (this._state.imageStatus !== 'loaded' || this._state.mode !== 'crop')
+      return;
 
     // Alt+click → viewport pan when zoomed
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
@@ -590,7 +699,8 @@ export class ImageEditorEngine {
         e.preventDefault();
         this.canvas?.setPointerCapture(e.pointerId);
         this.panOrigin = {
-          pointerX: e.clientX, pointerY: e.clientY,
+          pointerX: e.clientX,
+          pointerY: e.clientY,
           originalOffset: { ...this._state.panOffset },
         };
         this.updateState({ isPanning: true });
@@ -602,7 +712,13 @@ export class ImageEditorEngine {
     if (!cropPoint) return;
 
     const hitRadius = 16 / this.viewportScale;
-    const handle = hitTestHandles(cropPoint.x, cropPoint.y, this._state.cropWidth, this._state.cropHeight, hitRadius);
+    const handle = hitTestHandles(
+      cropPoint.x,
+      cropPoint.y,
+      this._state.cropWidth,
+      this._state.cropHeight,
+      hitRadius,
+    );
 
     if (handle) {
       e.preventDefault();
@@ -624,8 +740,12 @@ export class ImageEditorEngine {
       e.preventDefault();
       this.updateState({
         panOffset: {
-          x: this.panOrigin.originalOffset.x + (e.clientX - this.panOrigin.pointerX),
-          y: this.panOrigin.originalOffset.y + (e.clientY - this.panOrigin.pointerY),
+          x:
+            this.panOrigin.originalOffset.x +
+            (e.clientX - this.panOrigin.pointerX),
+          y:
+            this.panOrigin.originalOffset.y +
+            (e.clientY - this.panOrigin.pointerY),
         },
       });
       return;
@@ -644,17 +764,23 @@ export class ImageEditorEngine {
         const newTx = orig.tx + dx;
         const newTy = orig.ty + dy;
         const { maxTx, maxTy } = computeTranslationBounds(
-          this._state.cropWidth, this._state.cropHeight,
-          this._state.naturalWidth, this._state.naturalHeight,
-          this._state.scale, angle,
+          this._state.cropWidth,
+          this._state.cropHeight,
+          this._state.naturalWidth,
+          this._state.naturalHeight,
+          this._state.scale,
+          angle,
         );
         const clamped = clampTranslation(newTx, newTy, maxTx, maxTy);
         this._state = { ...this._state, tx: clamped.tx, ty: clamped.ty };
       } else {
         // Resize crop — allow growing, auto-zoom to accommodate
         let { cropW, cropH } = resizeCropFromHandle(
-          this.dragOrigin.handle, dx, dy,
-          orig.cropWidth, orig.cropHeight,
+          this.dragOrigin.handle,
+          dx,
+          dy,
+          orig.cropWidth,
+          orig.cropHeight,
           orig.activeTemplate?.ratio ?? null,
         );
 
@@ -679,12 +805,34 @@ export class ImageEditorEngine {
         // If crop grew: scale adjusts to minScale (zoom out to fit).
         // If crop shrunk: keep current scale (more room to pan).
         const newMinScale = computeMinScale(cropW, cropH, iw, ih, angle);
-        const scale = Math.max(newMinScale, this._state.scale > orig.scale ? this._state.scale : newMinScale);
+        const scale = Math.max(
+          newMinScale,
+          this._state.scale > orig.scale ? this._state.scale : newMinScale,
+        );
 
         // Always re-clamp translation after resize
-        const { maxTx, maxTy } = computeTranslationBounds(cropW, cropH, iw, ih, scale, angle);
-        const clamped = clampTranslation(this._state.tx, this._state.ty, maxTx, maxTy);
-        this._state = { ...this._state, cropWidth: cropW, cropHeight: cropH, scale, tx: clamped.tx, ty: clamped.ty };
+        const { maxTx, maxTy } = computeTranslationBounds(
+          cropW,
+          cropH,
+          iw,
+          ih,
+          scale,
+          angle,
+        );
+        const clamped = clampTranslation(
+          this._state.tx,
+          this._state.ty,
+          maxTx,
+          maxTy,
+        );
+        this._state = {
+          ...this._state,
+          cropWidth: cropW,
+          cropHeight: cropH,
+          scale,
+          tx: clamped.tx,
+          ty: clamped.ty,
+        };
       }
 
       this.markDirty();
@@ -693,10 +841,17 @@ export class ImageEditorEngine {
     }
 
     // Hover cursor
-    if (this._state.imageStatus !== 'loaded' || this._state.mode !== 'crop') return;
+    if (this._state.imageStatus !== 'loaded' || this._state.mode !== 'crop')
+      return;
     const cropPoint = this.screenToCropSpace(e);
     if (!cropPoint || !this.canvas) return;
-    const handle = hitTestHandles(cropPoint.x, cropPoint.y, this._state.cropWidth, this._state.cropHeight, 16 / this.viewportScale);
+    const handle = hitTestHandles(
+      cropPoint.x,
+      cropPoint.y,
+      this._state.cropWidth,
+      this._state.cropHeight,
+      16 / this.viewportScale,
+    );
     this.canvas.style.cursor = handle ? CURSOR_MAP[handle] : 'default';
   }
 
@@ -716,8 +871,10 @@ export class ImageEditorEngine {
       this.history = pushHistory(this.history, preDrag, this.maxHistory);
       const editState = extractEditState(this._state);
       this.updateState({
-        isDragging: false, activeHandle: null,
-        canUndo: true, canRedo: false,
+        isDragging: false,
+        activeHandle: null,
+        canUndo: true,
+        canRedo: false,
         isDirty: isEditStateDirty(editState, this.initialEditState),
       });
     }
@@ -727,11 +884,16 @@ export class ImageEditorEngine {
   /*  Internal — Rendering                                            */
   /* ---------------------------------------------------------------- */
 
-  private markDirty(): void { this.dirty = true; }
+  private markDirty(): void {
+    this.dirty = true;
+  }
 
   private scheduleRender(): void {
     const loop = () => {
-      if (this.dirty) { this.dirty = false; this.render(); }
+      if (this.dirty) {
+        this.dirty = false;
+        this.render();
+      }
       this.rafId = requestAnimationFrame(loop);
     };
     this.rafId = requestAnimationFrame(loop);
@@ -740,7 +902,15 @@ export class ImageEditorEngine {
   private render(): void {
     const { canvas, ctx, image, container, colors } = this;
     const state = this._state;
-    if (!canvas || !ctx || !image || !container || !colors || state.imageStatus !== 'loaded') return;
+    if (
+      !canvas ||
+      !ctx ||
+      !image ||
+      !container ||
+      !colors ||
+      state.imageStatus !== 'loaded'
+    )
+      return;
 
     const dpr = window.devicePixelRatio || 1;
     const containerW = container.clientWidth;
@@ -755,7 +925,17 @@ export class ImageEditorEngine {
     ctx.fillStyle = colors.canvas;
     ctx.fillRect(0, 0, containerW, containerH);
 
-    const { cropWidth: cw, cropHeight: ch, tx, ty, rotation, straighten, flipHorizontal, flipVertical, scale: imgScale } = state;
+    const {
+      cropWidth: cw,
+      cropHeight: ch,
+      tx,
+      ty,
+      rotation,
+      straighten,
+      flipHorizontal,
+      flipVertical,
+      scale: imgScale,
+    } = state;
     const isCropMode = state.mode === 'crop';
     const effectiveZoom = state.zoomMode === 'fit' ? 100 : state.zoom;
 
@@ -767,20 +947,25 @@ export class ImageEditorEngine {
     const vpScale = Math.min(drawW / cw, drawH / ch) * (effectiveZoom / 100);
     const cropScreenW = cw * vpScale;
     const cropScreenH = ch * vpScale;
-    const cropScreenX = (containerW - cropScreenW) / 2 + (state.panOffset.x || 0);
-    const cropScreenY = (containerH - cropScreenH) / 2 + (state.panOffset.y || 0);
+    const cropScreenX =
+      (containerW - cropScreenW) / 2 + (state.panOffset.x || 0);
+    const cropScreenY =
+      (containerH - cropScreenH) / 2 + (state.panOffset.y || 0);
 
     this.viewportScale = vpScale;
     this.viewportOffsetX = cropScreenX;
     this.viewportOffsetY = cropScreenY;
 
-    const angle = (rotation + straighten) * Math.PI / 180;
+    const angle = ((rotation + straighten) * Math.PI) / 180;
 
     if (isCropMode) {
       // ── CROP MODE ───────────────────────────────────────────────
       // Draw the image centered in the crop viewport with transforms
       ctx.save();
-      ctx.translate(cropScreenX + cropScreenW / 2 + tx * vpScale, cropScreenY + cropScreenH / 2 + ty * vpScale);
+      ctx.translate(
+        cropScreenX + cropScreenW / 2 + tx * vpScale,
+        cropScreenY + cropScreenH / 2 + ty * vpScale,
+      );
       ctx.rotate(angle);
       ctx.scale(
         (flipHorizontal ? -1 : 1) * imgScale * vpScale,
@@ -790,7 +975,16 @@ export class ImageEditorEngine {
       ctx.restore();
 
       // Overlay (screen space, NOT rotated)
-      this.renderer.drawScreenOverlay(ctx, containerW, containerH, cropScreenX, cropScreenY, cropScreenW, cropScreenH, colors.overlay);
+      this.renderer.drawScreenOverlay(
+        ctx,
+        containerW,
+        containerH,
+        cropScreenX,
+        cropScreenY,
+        cropScreenW,
+        cropScreenH,
+        colors.overlay,
+      );
 
       // Handles (in crop viewport space)
       ctx.save();
@@ -798,14 +992,16 @@ export class ImageEditorEngine {
       ctx.scale(vpScale, vpScale);
       this.renderer.drawControls(ctx, state, vpScale, colors);
       ctx.restore();
-
     } else {
       // ── VIEW MODE ───────────────────────────────────────────────
       ctx.save();
       ctx.beginPath();
       ctx.rect(cropScreenX, cropScreenY, cropScreenW, cropScreenH);
       ctx.clip();
-      ctx.translate(cropScreenX + cropScreenW / 2 + tx * vpScale, cropScreenY + cropScreenH / 2 + ty * vpScale);
+      ctx.translate(
+        cropScreenX + cropScreenW / 2 + tx * vpScale,
+        cropScreenY + cropScreenH / 2 + ty * vpScale,
+      );
       ctx.rotate(angle);
       ctx.scale(
         (flipHorizontal ? -1 : 1) * imgScale * vpScale,
@@ -831,7 +1027,8 @@ export class ImageEditorEngine {
       return value;
     };
     return {
-      canvas: styles.backgroundColor || read('--image-editor-canvas', '#f0f0f0'),
+      canvas:
+        styles.backgroundColor || read('--image-editor-canvas', '#f0f0f0'),
       border: read('--image-editor-crop-border', '#3b82f6'),
       handle: read('--image-editor-crop-handle', '#3b82f6'),
       grid: read('--image-editor-crop-grid', 'rgba(120,120,120,0.4)'),

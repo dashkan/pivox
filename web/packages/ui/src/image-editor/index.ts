@@ -1,5 +1,8 @@
 export { ImageEditor } from './image-editor';
-export { ImageEditorContext, useImageEditorContext } from './image-editor.context';
+export {
+  ImageEditorContext,
+  useImageEditorContext,
+} from './image-editor.context';
 export { useImageEditorState } from './image-editor.hooks';
 export type {
   ImageEditorContextValue,

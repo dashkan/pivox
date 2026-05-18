@@ -1,6 +1,7 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { LoginFeature } from '@pivox/features/login';
 import { LoginCard } from '@pivox/ui/login-card';
+import { createFileRoute, useRouter } from '@tanstack/react-router';
+
 import { authProviders } from '@/lib/auth-providers';
 
 export const Route = createFileRoute('/auth/login')({ component: LoginPage });

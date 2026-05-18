@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, use } from 'react';
+
 import type { LinkAccountContextValue } from './link-account-card.types';
 
 export const LinkAccountContext = createContext<LinkAccountContextValue | null>(

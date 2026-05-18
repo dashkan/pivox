@@ -1,17 +1,19 @@
 'use client';
 
-import { useActionState, useState } from 'react';
 import {
   getAuth,
   linkWithCredential,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
+import { useActionState, useState } from 'react';
+
 import type {
   LinkAccountActions,
   LinkAccountContextValue,
   LinkAccountState,
 } from '@pivox/ui/link-account-card';
 import type { User } from 'firebase/auth';
+
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 import { clearPendingLink, getPendingLink } from '@/shared/pending-link';
 

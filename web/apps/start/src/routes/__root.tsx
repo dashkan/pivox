@@ -1,10 +1,10 @@
+import { AuthProvider } from '@pivox/features/auth';
 import {
   HeadContent,
   Outlet,
   Scripts,
   createRootRoute,
 } from '@tanstack/react-router';
-import { AuthProvider } from '@pivox/features/auth';
 
 import appCss from '../styles.css?url';
 

@@ -1,16 +1,18 @@
 'use client';
 
-import { useActionState, useState } from 'react';
 import {
   confirmPasswordReset,
   getAuth,
   verifyPasswordResetCode,
 } from 'firebase/auth';
+import { useActionState, useState } from 'react';
+
 import type {
   ResetPasswordActions,
   ResetPasswordContextValue,
   ResetPasswordState,
 } from '@pivox/ui/reset-password-card';
+
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 
 export function useResetPassword(

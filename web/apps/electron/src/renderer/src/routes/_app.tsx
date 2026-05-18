@@ -1,10 +1,10 @@
-import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
 import { AppLayoutFeature } from '@pivox/features/app-layout';
 import { AppLayout, useAppLayoutContext } from '@pivox/ui/app-layout';
-import { UserProfileCard } from '@pivox/ui/user-profile-card';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
+import { UserProfileCard } from '@pivox/ui/user-profile-card';
 import { ElectronUserProfileFeature } from '@renderer/components/electron-user-profile-feature';
 import { authProviders } from '@renderer/lib/auth-providers';
+import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_app')({
   component: AppLayoutRoute,

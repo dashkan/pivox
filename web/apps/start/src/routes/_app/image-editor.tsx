@@ -1,7 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router';
 import { ImageEditorFeature } from '@pivox/features/image-editor';
-import { DEFAULT_CROP_TEMPLATES, ImageEditor } from '@pivox/ui/image-editor';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
+import { DEFAULT_CROP_TEMPLATES, ImageEditor } from '@pivox/ui/image-editor';
+import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_app/image-editor')({
   component: ImageEditorPage,

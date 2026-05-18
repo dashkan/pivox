@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
 // TODO: Configure Google Cloud Console with a Desktop OAuth client ID
 // and set the redirect URI to https://pivox.app/auth/redirect
@@ -13,6 +14,15 @@ type RedirectSearch = {
   error?: string;
 };
 
+function buildDeepLink(params: RedirectSearch) {
+  const qs = new URLSearchParams();
+  if (params.code) qs.set('code', params.code);
+  if (params.state) qs.set('state', params.state);
+  if (params.error) qs.set('error', params.error);
+  const query = qs.toString();
+  return `pivox://auth/callback${query ? `?${query}` : ''}`;
+}
+
 export const Route = createFileRoute('/auth/redirect')({
   validateSearch: (search: Record<string, unknown>): RedirectSearch => ({
     code: (search.code as string) || undefined,
@@ -25,19 +35,11 @@ export const Route = createFileRoute('/auth/redirect')({
 function RedirectPage() {
   const { code, state, error } = Route.useSearch();
 
-  // When accessed from the web (non-Electron), show a message
-  // When the OAuth provider redirects here, forward to the Electron custom protocol
-  if (typeof window !== 'undefined') {
-    const params = new URLSearchParams();
-    if (code) params.set('code', code);
-    if (state) params.set('state', state);
-    if (error) params.set('error', error);
-    const query = params.toString();
-    const deepLink = `pivox://auth/callback${query ? `?${query}` : ''}`;
-
-    // Attempt redirect to Electron app
-    window.location.href = deepLink;
-  }
+  // Side-effecting navigation belongs in an effect, not during render.
+  // Effects don't run server-side so the SSR guard becomes implicit.
+  useEffect(() => {
+    window.location.href = buildDeepLink({ code, state, error });
+  }, [code, state, error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -49,12 +51,7 @@ function RedirectPage() {
             type="button"
             className="text-primary underline-offset-4 hover:underline"
             onClick={() => {
-              const params = new URLSearchParams();
-              if (code) params.set('code', code);
-              if (state) params.set('state', state);
-              if (error) params.set('error', error);
-              const query = params.toString();
-              window.location.href = `pivox://auth/callback${query ? `?${query}` : ''}`;
+              window.location.href = buildDeepLink({ code, state, error });
             }}
           >
             click here to try again

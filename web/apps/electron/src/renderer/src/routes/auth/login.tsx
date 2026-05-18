@@ -1,7 +1,7 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { LoginCard } from '@pivox/ui/login-card';
 import { ElectronLoginFeature } from '@renderer/components/electron-login-feature';
 import { authProviders } from '@renderer/lib/auth-providers';
+import { createFileRoute, useRouter } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/auth/login')({ component: LoginPage });
 

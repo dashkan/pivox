@@ -1,7 +1,9 @@
-import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { BrowserWindow, app, ipcMain, net, shell } from 'electron';
+import { join, resolve } from 'node:path';
+
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
+import { BrowserWindow, app, ipcMain, net, shell } from 'electron';
+
 import icon from '../../resources/icon.png?asset';
 
 const BASE_URL = process.env.PIVOX_WEB_URL || 'https://pivox.ngrok.app';

@@ -1,17 +1,17 @@
 'use client';
 
-import { cn } from '@pivox/primitives/utils';
 import { Button } from '@pivox/primitives/button';
 import { Kbd } from '@pivox/primitives/kbd';
-import { Slider } from '@pivox/primitives/slider';
-import { Toggle } from '@pivox/primitives/toggle';
-import { Tabs, TabsList, TabsTrigger } from '@pivox/primitives/tabs';
 import { Separator } from '@pivox/primitives/separator';
+import { Slider } from '@pivox/primitives/slider';
+import { Tabs, TabsList, TabsTrigger } from '@pivox/primitives/tabs';
+import { Toggle } from '@pivox/primitives/toggle';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@pivox/primitives/tooltip';
+import { cn } from '@pivox/primitives/utils';
 import {
   Crop,
   FlipHorizontal2,
@@ -25,9 +25,14 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import { ImageEditorContext, useImageEditorContext } from './image-editor.context';
-import type { ResizeMode } from '@pivox/image-editor';
+
+import {
+  ImageEditorContext,
+  useImageEditorContext,
+} from './image-editor.context';
+
 import type { ImageEditorContextValue } from './image-editor.types';
+import type { ResizeMode } from '@pivox/image-editor';
 
 /* ------------------------------------------------------------------ */
 /*  ShortcutHint — renders keyboard shortcut text in tooltips          */
@@ -82,6 +87,7 @@ function ImageEditorCanvas({ className }: { className?: string }) {
 
   return (
     <div
+      // eslint-disable-next-line react-hooks/refs -- forwarding the ref-callback to a JSX `ref={}` prop, not reading a `.current` value during render
       ref={meta.containerRef}
       data-slot="image-editor-canvas"
       className={cn(
@@ -177,10 +183,22 @@ function AspectRatioIcon({ ratio }: { ratio: number | null }) {
   if (ratio === null) {
     // Free — dashed rect
     return (
-      <svg width={maxSize} height={maxSize} viewBox="0 0 20 20" className="shrink-0">
+      <svg
+        width={maxSize}
+        height={maxSize}
+        viewBox="0 0 20 20"
+        className="shrink-0"
+      >
         <rect
-          x="2" y="4" width="16" height="12" rx="1"
-          fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2"
+          x="2"
+          y="4"
+          width="16"
+          height="12"
+          rx="1"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeDasharray="2 2"
         />
       </svg>
     );
@@ -197,8 +215,21 @@ function AspectRatioIcon({ ratio }: { ratio: number | null }) {
   const y = Math.round((maxSize - h) / 2);
 
   return (
-    <svg width={maxSize} height={maxSize} viewBox="0 0 20 20" className="shrink-0">
-      <rect x={x} y={y} width={w} height={h} rx="1" fill="currentColor" opacity="0.6" />
+    <svg
+      width={maxSize}
+      height={maxSize}
+      viewBox="0 0 20 20"
+      className="shrink-0"
+    >
+      <rect
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        rx="1"
+        fill="currentColor"
+        opacity="0.6"
+      />
     </svg>
   );
 }
@@ -222,9 +253,7 @@ function ImageEditorTemplatePicker({ className }: { className?: string }) {
           <button
             key={template.label}
             type="button"
-            onClick={() =>
-              actions.applyTemplate(isActive ? null : template)
-            }
+            onClick={() => actions.applyTemplate(isActive ? null : template)}
             aria-pressed={isActive}
             className={cn(
               'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors',
@@ -605,7 +634,10 @@ function ImageEditorSidebarSlot({
   return (
     <div
       data-slot="image-editor-sidebar-slot"
-      className={cn('flex flex-col gap-3 border-l bg-background p-3', className)}
+      className={cn(
+        'flex flex-col gap-3 border-l bg-background p-3',
+        className,
+      )}
     >
       {children}
     </div>

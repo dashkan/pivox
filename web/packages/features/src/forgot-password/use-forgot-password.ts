@@ -1,13 +1,15 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
 import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
+import { useActionState, useRef, useState } from 'react';
+
 import type {
   ForgotPasswordActions,
   ForgotPasswordContextValue,
   ForgotPasswordMeta,
   ForgotPasswordState,
 } from '@pivox/ui/forgot-password-card';
+
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 
 export function useForgotPassword(): ForgotPasswordContextValue {

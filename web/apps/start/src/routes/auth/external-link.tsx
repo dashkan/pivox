@@ -1,5 +1,10 @@
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@pivox/primitives/card';
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
 import { deleteApp, getApps, initializeApp } from 'firebase/app';
 import {
   GithubAuthProvider,
@@ -10,12 +15,7 @@ import {
   linkWithRedirect,
   signInWithCustomToken,
 } from 'firebase/auth';
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@pivox/primitives/card';
+import { useEffect, useState } from 'react';
 
 // Create an isolated Firebase app for this page so it doesn't share
 // IndexedDB state with other tabs. This prevents stale redirect/user

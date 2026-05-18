@@ -1,6 +1,5 @@
 'use client';
 
-import { cn } from '@pivox/primitives/utils';
 import { Button } from '@pivox/primitives/button';
 import {
   DropdownMenu,
@@ -10,8 +9,12 @@ import {
   DropdownMenuTrigger,
 } from '@pivox/primitives/dropdown-menu';
 import { Skeleton } from '@pivox/primitives/skeleton';
+import { cn } from '@pivox/primitives/utils';
+
 import { AppLayoutContext, useAppLayoutContext } from './app-layout.context';
+
 import type { AppLayoutContextValue } from './app-layout.types';
+
 import { UserAvatar } from '@/user-avatar/user-avatar';
 
 /* ------------------------------------------------------------------ */

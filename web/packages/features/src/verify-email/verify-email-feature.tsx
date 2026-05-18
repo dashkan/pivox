@@ -1,6 +1,7 @@
 'use client';
 
 import { VerifyEmailCard } from '@pivox/ui/verify-email-card';
+
 import { useVerifyEmail } from './use-verify-email';
 
 export function VerifyEmailFeature({

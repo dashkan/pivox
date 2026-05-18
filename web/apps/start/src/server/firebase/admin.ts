@@ -1,6 +1,9 @@
-import { cert, getApps, initializeApp, type App } from 'firebase-admin/app'
-import { getAuth } from 'firebase-admin/auth'
-import fs from 'node:fs'
+import fs from 'node:fs';
+
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+
+import type { App } from 'firebase-admin/app';
 
 /**
  * Firebase Admin singleton for server routes.
@@ -18,23 +21,23 @@ import fs from 'node:fs'
  * `signInWithCustomToken()` to complete the sign-in.
  */
 
-let cached: App | undefined
+let cached: App | undefined;
 
 export function firebaseAdmin(): App {
-  if (cached) return cached
+  if (cached) return cached;
   if (getApps().length > 0) {
-    cached = getApps()[0]!
-    return cached
+    cached = getApps()[0]!;
+    return cached;
   }
 
-  const saPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
+  const saPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
   if (saPath && fs.existsSync(saPath)) {
     const json = JSON.parse(fs.readFileSync(saPath, 'utf8')) as {
-      project_id: string
-      client_email: string
-      private_key: string
-    }
+      project_id: string;
+      client_email: string;
+      private_key: string;
+    };
     cached = initializeApp({
       credential: cert({
         projectId: json.project_id,
@@ -42,14 +45,14 @@ export function firebaseAdmin(): App {
         privateKey: json.private_key,
       }),
       projectId: json.project_id,
-    })
-    return cached
+    });
+    return cached;
   }
 
   // Application Default Credentials path. Works on GCP, fails
   // clearly locally if the env var wasn't set.
-  cached = initializeApp()
-  return cached
+  cached = initializeApp();
+  return cached;
 }
 
 /**
@@ -59,6 +62,9 @@ export function firebaseAdmin(): App {
  * the backend can read via the Firebase Auth session (e.g.
  * `provider` for audit/analytics).
  */
-export async function mintCustomToken(uid: string, claims: Record<string, unknown> = {}) {
-  return getAuth(firebaseAdmin()).createCustomToken(uid, claims)
+export async function mintCustomToken(
+  uid: string,
+  claims: Record<string, unknown> = {},
+) {
+  return getAuth(firebaseAdmin()).createCustomToken(uid, claims);
 }

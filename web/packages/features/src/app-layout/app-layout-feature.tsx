@@ -1,6 +1,7 @@
 'use client';
 
 import { AppLayout } from '@pivox/ui/app-layout';
+
 import { useAppLayout } from './use-app-layout';
 
 export function AppLayoutFeature({

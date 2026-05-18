@@ -1,5 +1,5 @@
-import { cn } from '@pivox/primitives/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@pivox/primitives/avatar';
+import { cn } from '@pivox/primitives/utils';
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return '?';

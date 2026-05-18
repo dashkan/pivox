@@ -1,7 +1,5 @@
 'use client';
 
-import { useFormStatus } from 'react-dom';
-import { cn } from '@pivox/primitives/utils';
 import { Button } from '@pivox/primitives/button';
 import {
   Card,
@@ -10,12 +8,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@pivox/primitives/card';
-import { Input } from '@pivox/primitives/input';
 import { Field, FieldError, FieldLabel } from '@pivox/primitives/field';
+import { Input } from '@pivox/primitives/input';
+import { cn } from '@pivox/primitives/utils';
+import { useFormStatus } from 'react-dom';
+
 import {
   ResetPasswordContext,
   useResetPasswordContext,
 } from './reset-password-card.context';
+
 import type { ResetPasswordContextValue } from './reset-password-card.types';
 
 /* ------------------------------------------------------------------ */

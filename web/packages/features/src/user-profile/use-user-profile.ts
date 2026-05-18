@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   EmailAuthProvider,
   GithubAuthProvider,
@@ -18,13 +17,16 @@ import {
   updateProfile,
   verifyBeforeUpdateEmail,
 } from 'firebase/auth';
-import type { AuthProvider, TotpSecret, User } from 'firebase/auth';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
 import type { PivoxAuthProvider } from '@pivox/ui/auth';
 import type {
   UserProfileActions,
   UserProfileContextValue,
   UserProfileState,
 } from '@pivox/ui/user-profile-card';
+import type { AuthProvider, TotpSecret, User } from 'firebase/auth';
+
 import { useAuth } from '@/auth/use-auth';
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 

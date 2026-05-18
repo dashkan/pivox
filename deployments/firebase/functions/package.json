@@ -15,19 +15,19 @@
   "main": "lib/index.js",
   "dependencies": {
     "@google-cloud/functions-framework": "^5.0.2",
-    "firebase-admin": "^13.8.0",
+    "firebase-admin": "^13.10.0",
     "firebase-functions": "^7.2.5",
     "google-auth-library": "^10.6.2"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
-    "eslint": "^10.3.0",
-    "firebase-functions-test": "^3.4.1",
+    "@types/node": "^25.8.0",
+    "eslint": "^10.4.0",
+    "firebase-functions-test": "^3.5.0",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.10"
+    "typescript-eslint": "^8.59.3",
+    "vite": "^8.0.13"
   },
   "private": true,
-  "packageManager": "pnpm@10.33.3+sha512.a19744364a7e248b92657a4ca5973f9354d21caf982579674b1c539f32c7420c47138ad8b1254df07aba9bc782d9b3029e3db34d5dbff974326eb74dac8ff489"
+  "packageManager": "pnpm@11.1.2+sha512.415a1cc25974731e75455c1468371be74c5aa5fb7621b50d4056d222451609f11412f23fd602e6169f1e060466641f798597e1be961a10688836a67b16569499"
 }

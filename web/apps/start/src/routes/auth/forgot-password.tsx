@@ -1,6 +1,6 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { ForgotPasswordFeature } from '@pivox/features/forgot-password';
 import { ForgotPasswordCard } from '@pivox/ui/forgot-password-card';
+import { createFileRoute, useRouter } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/auth/forgot-password')({
   component: ForgotPasswordPage,

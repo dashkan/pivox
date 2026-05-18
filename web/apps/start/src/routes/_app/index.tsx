@@ -1,6 +1,5 @@
-import { Link, createFileRoute } from '@tanstack/react-router';
-import { Button } from '@pivox/primitives/button';
 import { Badge } from '@pivox/primitives/badge';
+import { Button } from '@pivox/primitives/button';
 import {
   Card,
   CardContent,
@@ -8,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@pivox/primitives/card';
+import { Link, createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_app/')({ component: HomePage });
 

@@ -1,7 +1,9 @@
 'use client';
 
 import { UserProfileCard } from '@pivox/ui/user-profile-card';
+
 import { useUserProfile } from './use-user-profile';
+
 import type { PivoxAuthProvider } from '@pivox/ui/auth';
 
 export function UserProfileFeature({

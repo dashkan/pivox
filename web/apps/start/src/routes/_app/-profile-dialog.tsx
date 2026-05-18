@@ -1,6 +1,7 @@
 import { UserProfileFeature } from '@pivox/features/user-profile';
 import { useAppLayoutContext } from '@pivox/ui/app-layout';
 import { UserProfileCard } from '@pivox/ui/user-profile-card';
+
 import { authProviders } from '@/lib/auth-providers';
 
 export default function ProfileDialog() {

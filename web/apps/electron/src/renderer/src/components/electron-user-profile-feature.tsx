@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { getAuth } from 'firebase/auth';
-import { UserProfileCard } from '@pivox/ui/user-profile-card';
-import { useUserProfile } from '@pivox/features/user-profile';
 import { useAuth } from '@pivox/features/auth';
+import { useUserProfile } from '@pivox/features/user-profile';
+import { UserProfileCard } from '@pivox/ui/user-profile-card';
+import { getAuth } from 'firebase/auth';
+import { useEffect, useRef } from 'react';
+
 import type { PivoxAuthProvider } from '@pivox/ui/auth';
 
 const LINK_TIMEOUT_MS = 2 * 60 * 1000;

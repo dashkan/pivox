@@ -1,6 +1,3 @@
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
-import { applyActionCode, checkActionCode, getAuth } from 'firebase/auth';
 import { Button } from '@pivox/primitives/button';
 import {
   Card,
@@ -8,6 +5,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@pivox/primitives/card';
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router';
+import { applyActionCode, checkActionCode, getAuth } from 'firebase/auth';
+import { useEffect, useState } from 'react';
 
 type ActionSearch = {
   mode: string;

@@ -1,6 +1,6 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { LinkAccountFeature } from '@pivox/features/link-account';
 import { LinkAccountCard } from '@pivox/ui/link-account-card';
+import { createFileRoute, useRouter } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/auth/link-account')({
   component: LinkAccountPage,

@@ -1,38 +1,58 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { cn } from '@pivox/primitives/utils';
-import { Button } from '@pivox/primitives/button';
-import { Input } from '@pivox/primitives/input';
-import { Field, FieldLabel } from '@pivox/primitives/field';
-import { Separator } from '@pivox/primitives/separator';
-import { Badge } from '@pivox/primitives/badge';
 import { Alert, AlertAction, AlertDescription } from '@pivox/primitives/alert';
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from '@pivox/primitives/input-otp';
-import { QRCodeSVG } from 'qrcode.react';
+import { Badge } from '@pivox/primitives/badge';
+import { Button } from '@pivox/primitives/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from '@pivox/primitives/dialog';
+import { Field, FieldLabel } from '@pivox/primitives/field';
+import { Input } from '@pivox/primitives/input';
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from '@pivox/primitives/input-otp';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@pivox/primitives/popover';
+import { Separator } from '@pivox/primitives/separator';
+import { cn } from '@pivox/primitives/utils';
+import { QRCodeSVG } from 'qrcode.react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   UserProfileContext,
   useUserProfileContext,
 } from './user-profile-card.context';
+
 import type { UserProfileContextValue } from './user-profile-card.types';
-import { UserAvatar } from '@/user-avatar/user-avatar';
+
 import { AppleIcon, GitHubIcon, GoogleIcon } from '@/shared/social-icons';
+import { UserAvatar } from '@/user-avatar/user-avatar';
+
+/**
+ * Focus the returned input ref whenever `active` flips true.
+ *
+ * Replaces the `autoFocus` prop in user-triggered inline-edit/expand
+ * scenarios. jsx-a11y/no-autofocus rightly flags the prop because it
+ * disorients screen-reader users on initial page load — but our usage
+ * is post-user-click, where focusing the new input IS the intended UX.
+ * The effect-based form expresses the same intent without tripping the
+ * rule.
+ */
+function useAutoFocusWhen(active: boolean) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (active) ref.current?.focus();
+  }, [active]);
+  return ref;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Provider                                                          */
@@ -192,6 +212,7 @@ function ProfileSubsection() {
   const { state, actions } = useUserProfileContext();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(state.displayName ?? '');
+  const nameInputRef = useAutoFocusWhen(editing);
 
   const [avatarOpen, setAvatarOpen] = useState(false);
 
@@ -276,6 +297,7 @@ function ProfileSubsection() {
         </Popover>
         <div className="flex flex-1 flex-col gap-0.5">
           {editing ? (
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- form is an interactive surface (submit button + inputs); onKeyDown catches Escape from any focusable child to cancel the inline edit
             <form
               data-inline-edit
               className="flex items-center gap-2"
@@ -293,10 +315,10 @@ function ProfileSubsection() {
               }}
             >
               <Input
+                ref={nameInputRef}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="h-7 text-sm"
-                autoFocus
               />
               <Button type="submit" size="sm">
                 Save
@@ -327,6 +349,7 @@ function EmailSubsection() {
   const { state, actions } = useUserProfileContext();
   const [editing, setEditing] = useState(false);
   const [newEmail, setNewEmail] = useState('');
+  const emailInputRef = useAutoFocusWhen(editing);
 
   const handleCancel = () => {
     setNewEmail('');
@@ -367,6 +390,7 @@ function EmailSubsection() {
         </div>
       </div>
       {editing && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- form is an interactive surface (submit button + inputs); onKeyDown catches Escape from any focusable child to cancel the inline edit
         <form
           data-inline-edit
           className="mt-3 flex items-center gap-2"
@@ -384,12 +408,12 @@ function EmailSubsection() {
           }}
         >
           <Input
+            ref={emailInputRef}
             type="email"
             placeholder="New email address"
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
             className="h-8 text-sm"
-            autoFocus
           />
           <Button type="submit" size="sm">
             Save
@@ -587,6 +611,7 @@ function SetPasswordSubsection() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const newPasswordInputRef = useAutoFocusWhen(setting);
 
   const handleCancel = () => {
     setSetting(false);
@@ -613,6 +638,7 @@ function SetPasswordSubsection() {
         )}
       </div>
       {setting && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- form is an interactive surface (submit button + inputs); onKeyDown catches Escape from any focusable child to cancel the inline edit
         <form
           data-inline-edit
           className="flex flex-col gap-3"
@@ -647,10 +673,10 @@ function SetPasswordSubsection() {
           <Field>
             <FieldLabel>Password</FieldLabel>
             <Input
+              ref={newPasswordInputRef}
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              autoFocus
             />
           </Field>
           <Field>
@@ -683,6 +709,7 @@ function PasswordSubsection() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const currentPasswordInputRef = useAutoFocusWhen(changing);
 
   const hasPasswordProvider = state.providers.some(
     (p) => p.providerId === 'password',
@@ -711,6 +738,7 @@ function PasswordSubsection() {
         )}
       </div>
       {changing && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- form is an interactive surface (submit button + inputs); onKeyDown catches Escape from any focusable child to cancel the inline edit
         <form
           data-inline-edit
           className="flex flex-col gap-3"
@@ -739,10 +767,10 @@ function PasswordSubsection() {
           <Field>
             <FieldLabel>Current password</FieldLabel>
             <Input
+              ref={currentPasswordInputRef}
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              autoFocus
             />
           </Field>
           <Field>

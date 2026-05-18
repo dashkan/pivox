@@ -1,5 +1,9 @@
 // Re-export all types from the vanilla engine
-import type { CropTemplate, ImageEditorState, ResizeMode } from '@pivox/image-editor';
+import type {
+  CropTemplate,
+  ImageEditorState,
+  ResizeMode,
+} from '@pivox/image-editor';
 
 export type {
   CropColors,

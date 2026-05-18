@@ -1,6 +1,7 @@
 'use client';
 
 import { UserAvatar } from '@pivox/ui/user-avatar';
+
 import { useAuth } from '@/auth/use-auth';
 
 export function AuthAvatar({

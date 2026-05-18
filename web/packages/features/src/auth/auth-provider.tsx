@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useReducer, useState } from 'react';
+
 import { AuthContext } from './use-auth';
+
 import type { User } from 'firebase/auth';
 
 /**
@@ -16,21 +18,21 @@ import type { User } from 'firebase/auth';
 async function patchProviderData(user: User): Promise<void> {
   const idToken = await user.getIdToken();
   const auth = user as unknown as {
-    auth: { config: { apiKey: string }; emulatorConfig?: { host: string; port: number; protocol: string } };
+    auth: {
+      config: { apiKey: string };
+      emulatorConfig?: { host: string; port: number; protocol: string };
+    };
   };
   const apiKey = auth.auth.config.apiKey;
   const emu = auth.auth.emulatorConfig;
   const baseUrl = emu
     ? `${emu.protocol}://${emu.host}:${emu.port}/identitytoolkit.googleapis.com`
     : 'https://identitytoolkit.googleapis.com';
-  const res = await fetch(
-    `${baseUrl}/v1/accounts:lookup?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    },
-  );
+  const res = await fetch(`${baseUrl}/v1/accounts:lookup?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
   if (!res.ok) return;
   const data = await res.json();
   const serverProviders: Array<{

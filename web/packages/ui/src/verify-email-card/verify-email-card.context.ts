@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, use } from 'react';
+
 import type { VerifyEmailContextValue } from './verify-email-card.types';
 
 export const VerifyEmailContext = createContext<VerifyEmailContextValue | null>(

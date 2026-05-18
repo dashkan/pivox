@@ -1,7 +1,9 @@
 'use client';
 
 import { RegistrationCard } from '@pivox/ui/registration-card';
+
 import { useRegistration } from './use-registration';
+
 import type { User } from 'firebase/auth';
 
 export function RegistrationFeature({

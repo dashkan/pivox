@@ -8,7 +8,6 @@
     "declarationMap": true,
     "composite": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }

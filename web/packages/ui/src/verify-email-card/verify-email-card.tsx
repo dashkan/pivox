@@ -1,6 +1,5 @@
 'use client';
 
-import { cn } from '@pivox/primitives/utils';
 import { Button } from '@pivox/primitives/button';
 import {
   Card,
@@ -10,10 +9,13 @@ import {
   CardTitle,
 } from '@pivox/primitives/card';
 import { FieldError } from '@pivox/primitives/field';
+import { cn } from '@pivox/primitives/utils';
+
 import {
   VerifyEmailContext,
   useVerifyEmailContext,
 } from './verify-email-card.context';
+
 import type { VerifyEmailContextValue } from './verify-email-card.types';
 
 /* ------------------------------------------------------------------ */

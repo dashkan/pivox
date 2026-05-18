@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, use } from 'react';
+
 import type { AppLayoutContextValue } from './app-layout.types';
 
 export const AppLayoutContext = createContext<AppLayoutContextValue | null>(

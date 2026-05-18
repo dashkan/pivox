@@ -1,8 +1,8 @@
-import { Suspense, lazy } from 'react';
-import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
 import { AppLayoutFeature } from '@pivox/features/app-layout';
 import { AppLayout } from '@pivox/ui/app-layout';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
+import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
+import { Suspense, lazy } from 'react';
 
 // Lazy-load the profile dialog so it's client-only — it depends on
 // auth context which isn't available during SSR.

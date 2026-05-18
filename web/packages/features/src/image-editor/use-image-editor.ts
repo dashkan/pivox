@@ -1,9 +1,8 @@
 'use client';
 
+import { useImageEditorState } from '@pivox/ui/image-editor';
 import { useEffect, useMemo } from 'react';
-import {
-  useImageEditorState,
-} from '@pivox/ui/image-editor';
+
 import type {
   CropTemplate,
   ImageEditorContextValue,
@@ -165,9 +164,7 @@ export function useImageEditorFeature(
 
   const shortcuts = useMemo(() => {
     const defaults = buildShortcuts(isMac);
-    return shortcutOverrides
-      ? { ...defaults, ...shortcutOverrides }
-      : defaults;
+    return shortcutOverrides ? { ...defaults, ...shortcutOverrides } : defaults;
   }, [isMac, shortcutOverrides]);
 
   const editorState = useImageEditorState({

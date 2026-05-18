@@ -1,6 +1,7 @@
 import { createRouter as createTanStackRouter } from '@tanstack/react-router';
-import { routeTree } from './routeTree.gen';
+
 import { ensureFirebase } from './lib/firebase';
+import { routeTree } from './routeTree.gen';
 
 export function getRouter() {
   ensureFirebase();

@@ -1,5 +1,5 @@
 import { defineConfig, mergeConfig } from 'vitest/config';
-import { tanstackViteConfig } from '@tanstack/vite-config';
+import { pivoxViteConfig } from '../../vite.config.shared.js';
 import packageJson from './package.json';
 
 const config = defineConfig({
@@ -37,9 +37,8 @@ const config = defineConfig({
 
 export default mergeConfig(
   config,
-  tanstackViteConfig({
+  pivoxViteConfig({
     entry: ['./src/index.ts'],
     srcDir: './src',
-    cjs: false,
   }),
 );

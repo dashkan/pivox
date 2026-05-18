@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
 import { getAuth, sendEmailVerification } from 'firebase/auth';
+import { useState } from 'react';
+
 import type {
   VerifyEmailContextValue,
   VerifyEmailState,
 } from '@pivox/ui/verify-email-card';
+
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 
 export function useVerifyEmail(): VerifyEmailContextValue {

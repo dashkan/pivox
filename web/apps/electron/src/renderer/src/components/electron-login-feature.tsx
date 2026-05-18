@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { getAuth, signInWithCustomToken } from 'firebase/auth';
-import { LoginCard } from '@pivox/ui/login-card';
 import { useLogin } from '@pivox/features/login';
-import type { ReactNode } from 'react';
-import type { User } from 'firebase/auth';
+import { LoginCard } from '@pivox/ui/login-card';
+import { getAuth, signInWithCustomToken } from 'firebase/auth';
+import { useEffect, useState } from 'react';
+
 import type { PivoxAuthProvider } from '@pivox/ui/auth';
+import type { User } from 'firebase/auth';
+import type { ReactNode } from 'react';
 
 export function ElectronLoginFeature({
   onSuccess,

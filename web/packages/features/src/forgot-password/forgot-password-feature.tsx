@@ -1,6 +1,7 @@
 'use client';
 
 import { ForgotPasswordCard } from '@pivox/ui/forgot-password-card';
+
 import { useForgotPassword } from './use-forgot-password';
 
 export function ForgotPasswordFeature({

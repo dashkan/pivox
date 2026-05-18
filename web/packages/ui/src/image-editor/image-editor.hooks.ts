@@ -1,9 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageEditorEngine } from '@pivox/image-editor';
-import type { CropTemplate, ImageEditorEditState, ImageEditorState } from '@pivox/image-editor';
-import type { ImageEditorActions, ImageEditorContextValue, ImageEditorMeta, KeyboardShortcutMap } from './image-editor.types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import type {
+  ImageEditorActions,
+  ImageEditorContextValue,
+  ImageEditorMeta,
+  KeyboardShortcutMap,
+} from './image-editor.types';
+import type {
+  CropTemplate,
+  ImageEditorEditState,
+  ImageEditorState,
+} from '@pivox/image-editor';
 
 /* ------------------------------------------------------------------ */
 /*  Options                                                           */
@@ -36,31 +46,33 @@ export function useImageEditorState(
   // Force re-render counter — incremented by engine onChange
   const [, setVersion] = useState(0);
 
-  // Create engine once, wire up onChange immediately
-  const engineRef = useRef<ImageEditorEngine | null>(null);
-  if (!engineRef.current) {
-    const engine = new ImageEditorEngine(engineOptions);
-    // Wire up onChange BEFORE any actions can be called.
-    // This increments a version counter to trigger React re-renders.
-    engine.onChange = () => setVersion((v) => v + 1);
-    engineRef.current = engine;
-  }
-  const engine = engineRef.current;
+  // Create engine once via useState's lazy initializer. setVersion is stable
+  // across renders so it's safe to capture in the engine's onChange closure
+  // at construction time (engine constructor wires it before any action can
+  // fire). engineOptions are captured at first render only, matching the
+  // previous behavior of `if (!engineRef.current)` lazy init.
+  //
+  // Disabling react-hooks/exhaustive-deps on the initial-options closure:
+  // the engine is intentionally constructed once. Updating it on option
+  // changes is the engine's job via its own setters, not React's.
+  const [engine] = useState(() => {
+    const e = new ImageEditorEngine(engineOptions);
+    e.onChange = () => setVersion((v) => v + 1);
+    return e;
+  });
 
-  // Keep onEditChange in sync
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-  engine.onEditChange = onChangeRef.current
-    ? (e) => onChangeRef.current?.(e)
-    : null;
-
-  // Clean up on unmount
+  // Sync the engine's edit-state callback with the latest onChange prop on
+  // every render. Doing this in an effect (instead of during render) keeps
+  // the rule-of-refs happy and avoids the read-during-render concern.
   useEffect(() => {
-    return () => {
-      engineRef.current?.destroy();
-      engineRef.current = null;
-    };
-  }, []);
+    // eslint-disable-next-line react-hooks/immutability -- `engine` is held in useState for identity stability only; it's an imperative resource with its own internal state, not React state. Mutating its callback fields is the engine's intended API.
+    engine.onEditChange = onChange ? (e) => onChange(e) : null;
+  }, [engine, onChange]);
+
+  // Tear down the engine on unmount.
+  useEffect(() => {
+    return () => engine.destroy();
+  }, [engine]);
 
   // Ref callback for the canvas container — mounts/unmounts the engine
   const containerRef = useCallback(

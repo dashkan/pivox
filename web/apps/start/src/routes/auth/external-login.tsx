@@ -1,5 +1,11 @@
+import { Button } from '@pivox/primitives/button';
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@pivox/primitives/card';
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
 import { deleteApp, getApps, initializeApp } from 'firebase/app';
 import {
   GithubAuthProvider,
@@ -9,13 +15,7 @@ import {
   getRedirectResult,
   signInWithRedirect,
 } from 'firebase/auth';
-import { Button } from '@pivox/primitives/button';
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@pivox/primitives/card';
+import { useEffect, useState } from 'react';
 
 type ElectronLoginSearch = {
   provider: string;
