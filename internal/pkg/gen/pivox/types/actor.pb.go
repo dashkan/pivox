@@ -18,6 +18,8 @@
 // 	protoc        (unknown)
 // source: pivox/types/actor.proto
 
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+
 package types
 
 import (

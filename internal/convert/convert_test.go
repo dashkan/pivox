@@ -768,8 +768,8 @@ func TestStorageGatewayToProto(t *testing.T) {
 			checkFunc: func(t *testing.T, pb *storagev1.StorageGateway) {
 				assert.Equal(t, "organizations/acme/storageGateways/gw-1", pb.Name)
 				assert.Equal(t, storagev1.StorageGateway_ACTIVE, pb.State)
-				assert.Equal(t, storagev1.StorageGateway_CERT_ACTIVE, pb.CertState)
-				assert.NotNil(t, pb.CertExpiryTime)
+				assert.Equal(t, storagev1.StorageGateway_Certificate_ACTIVE, pb.GetCertificate().GetState())
+				assert.NotNil(t, pb.GetCertificate().GetExpireTime())
 				assert.Equal(t, map[string]string{"region": "us-east-1"}, pb.Annotations)
 				assert.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, pb.IpAddresses)
 			},
@@ -789,8 +789,8 @@ func TestStorageGatewayToProto(t *testing.T) {
 			orgName: "acme",
 			checkFunc: func(t *testing.T, pb *storagev1.StorageGateway) {
 				assert.Equal(t, storagev1.StorageGateway_PROVISIONING, pb.State)
-				assert.Equal(t, storagev1.StorageGateway_PENDING, pb.CertState)
-				assert.Nil(t, pb.CertExpiryTime)
+				assert.Equal(t, storagev1.StorageGateway_Certificate_PENDING, pb.GetCertificate().GetState())
+				assert.Nil(t, pb.GetCertificate().GetExpireTime())
 				assert.Nil(t, pb.Annotations)
 			},
 		},
@@ -1024,13 +1024,13 @@ func TestCertState(t *testing.T) {
 	tests := []struct {
 		name string
 		db   db.CertState
-		want storagev1.StorageGateway_CertState
+		want storagev1.StorageGateway_Certificate_State
 	}{
-		{"PENDING", db.CertStatePENDING, storagev1.StorageGateway_PENDING},
-		{"ACTIVE", db.CertStateACTIVE, storagev1.StorageGateway_CERT_ACTIVE},
-		{"EXPIRING", db.CertStateEXPIRING, storagev1.StorageGateway_EXPIRING},
-		{"EXPIRED", db.CertStateEXPIRED, storagev1.StorageGateway_EXPIRED},
-		{"unknown defaults to CERT_STATE_UNSPECIFIED", db.CertState("BOGUS"), storagev1.StorageGateway_CERT_STATE_UNSPECIFIED},
+		{"PENDING", db.CertStatePENDING, storagev1.StorageGateway_Certificate_PENDING},
+		{"ACTIVE", db.CertStateACTIVE, storagev1.StorageGateway_Certificate_ACTIVE},
+		{"EXPIRING", db.CertStateEXPIRING, storagev1.StorageGateway_Certificate_EXPIRING},
+		{"EXPIRED", db.CertStateEXPIRED, storagev1.StorageGateway_Certificate_EXPIRED},
+		{"unknown defaults to STATE_UNSPECIFIED", db.CertState("BOGUS"), storagev1.StorageGateway_Certificate_STATE_UNSPECIFIED},
 	}
 
 	for _, tt := range tests {

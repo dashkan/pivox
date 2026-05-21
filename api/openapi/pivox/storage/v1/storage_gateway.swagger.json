@@ -289,15 +289,9 @@
                   "description": "Output only. The currently running software version of the storage\ngateway.",
                   "readOnly": true
                 },
-                "certState": {
-                  "$ref": "#/definitions/StorageGatewayCertState",
-                  "description": "Output only. The current state of the TLS certificate.",
-                  "readOnly": true
-                },
-                "certExpiryTime": {
-                  "type": "string",
-                  "format": "date-time",
-                  "description": "Output only. The expiration time of the TLS certificate.",
+                "certificate": {
+                  "$ref": "#/definitions/StorageGatewayCertificate",
+                  "description": "Output only. The TLS certificate state for this storage gateway.",
                   "readOnly": true
                 },
                 "annotations": {
@@ -626,17 +620,34 @@
     }
   },
   "definitions": {
-    "StorageGatewayCertState": {
+    "StorageGatewayCertificate": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/StorageGatewayCertificateState",
+          "description": "Output only. The current state of the TLS certificate.",
+          "readOnly": true
+        },
+        "expireTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. The expiration time of the TLS certificate.",
+          "readOnly": true
+        }
+      },
+      "description": "The TLS certificate for a storage gateway. Groups the cert\nlifecycle state and expiry so they aren't loose `cert_*` fields\non the gateway resource."
+    },
+    "StorageGatewayCertificateState": {
       "type": "string",
       "enum": [
-        "CERT_STATE_UNSPECIFIED",
+        "STATE_UNSPECIFIED",
         "PENDING",
-        "CERT_ACTIVE",
+        "ACTIVE",
         "EXPIRING",
         "EXPIRED"
       ],
-      "default": "CERT_STATE_UNSPECIFIED",
-      "description": "TLS certificate lifecycle states.\n\n - CERT_STATE_UNSPECIFIED: Unspecified certificate state.\n - PENDING: The certificate is being provisioned.\n - CERT_ACTIVE: The certificate is active and valid.\n - EXPIRING: The certificate is approaching its expiration date.\n - EXPIRED: The certificate has expired."
+      "default": "STATE_UNSPECIFIED",
+      "description": "TLS certificate lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified certificate state.\n - PENDING: The certificate is being provisioned.\n - ACTIVE: The certificate is active and valid.\n - EXPIRING: The certificate is approaching its expiration date.\n - EXPIRED: The certificate has expired."
     },
     "StorageGatewaysCreateStorageSessionBody": {
       "type": "object",
@@ -646,7 +657,7 @@
           "description": "Optional. Override session duration. Default: 1 hour. Capped at\nthe server-configured maximum (`StorageGatewaysConfig.MaxSessionTTL`,\ntypically 8h); requests exceeding the cap are clamped, not\nrejected."
         }
       },
-      "description": "The request sent to the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod."
+      "description": "The request sent to the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod.\n"
     },
     "StorageGatewaysRotateRegistrationTokenBody": {
       "type": "object",
@@ -754,10 +765,10 @@
     "v1CreateStorageSessionResponse": {
       "type": "object",
       "properties": {
-        "expiry": {
+        "expireTime": {
           "type": "string",
           "format": "date-time",
-          "description": "The session expiry time."
+          "description": "The session expiration time."
         },
         "token": {
           "type": "string",
@@ -847,15 +858,9 @@
           "description": "Output only. The currently running software version of the storage\ngateway.",
           "readOnly": true
         },
-        "certState": {
-          "$ref": "#/definitions/StorageGatewayCertState",
-          "description": "Output only. The current state of the TLS certificate.",
-          "readOnly": true
-        },
-        "certExpiryTime": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Output only. The expiration time of the TLS certificate.",
+        "certificate": {
+          "$ref": "#/definitions/StorageGatewayCertificate",
+          "description": "Output only. The TLS certificate state for this storage gateway.",
           "readOnly": true
         },
         "annotations": {

@@ -683,8 +683,8 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	// the cookie's pivox_session= attribute; only the transport
 	// differs.
 	return &storagev1.CreateStorageSessionResponse{
-		Expiry: timestamppb.New(expiry),
-		Token:  jwt,
+		ExpireTime: timestamppb.New(expiry),
+		Token:      jwt,
 	}, nil
 }
 

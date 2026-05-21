@@ -128,14 +128,6 @@ type StorageGatewaysClient interface {
 	//	credential, not an AIP-style resource. The custom-action
 	//	framing fits better than AIP-133 Create. --)
 	//
-	// (-- api-linter: core::0133::request-unknown-fields=disabled
-	//
-	//	aip.dev/not-precedent: see above. --)
-	//
-	// (-- api-linter: core::0133::request-resource-field=disabled
-	//
-	//	aip.dev/not-precedent: see above. --)
-	//
 	// (-- api-linter: core::0133::response-message-name=disabled
 	//
 	//	aip.dev/not-precedent: see above. --)
@@ -331,14 +323,6 @@ type StorageGatewaysServer interface {
 	//	aip.dev/not-precedent: A storage session is an ephemeral
 	//	credential, not an AIP-style resource. The custom-action
 	//	framing fits better than AIP-133 Create. --)
-	//
-	// (-- api-linter: core::0133::request-unknown-fields=disabled
-	//
-	//	aip.dev/not-precedent: see above. --)
-	//
-	// (-- api-linter: core::0133::request-resource-field=disabled
-	//
-	//	aip.dev/not-precedent: see above. --)
 	//
 	// (-- api-linter: core::0133::response-message-name=disabled
 	//

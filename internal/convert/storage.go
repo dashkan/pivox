@@ -26,15 +26,17 @@ func StorageGatewayToProto(gw db.StorageGateway, orgName string, actors map[uuid
 		RegistrationToken: gw.RegistrationToken,
 		TargetVersion:     gw.TargetVersion,
 		CurrentVersion:    gw.CurrentVersion,
-		CertState:         certState(gw.CertState),
-		Etag:              gw.Etag,
-		CreatedBy:         actorOrNil(actors, gw.CreatedBy),
-		CreateTime:        timestamppb.New(gw.CreateTime),
-		UpdatedBy:         actorOrNil(actors, gw.UpdatedBy),
-		UpdateTime:        timestamppb.New(gw.UpdateTime),
+		Certificate: &storagev1.StorageGateway_Certificate{
+			State: certState(gw.CertState),
+		},
+		Etag:       gw.Etag,
+		CreatedBy:  actorOrNil(actors, gw.CreatedBy),
+		CreateTime: timestamppb.New(gw.CreateTime),
+		UpdatedBy:  actorOrNil(actors, gw.UpdatedBy),
+		UpdateTime: timestamppb.New(gw.UpdateTime),
 	}
 	if gw.CertExpiryTime.Valid {
-		pb.CertExpiryTime = timestamppb.New(gw.CertExpiryTime.Time)
+		pb.Certificate.ExpireTime = timestamppb.New(gw.CertExpiryTime.Time)
 	}
 	if len(gw.Annotations) > 0 {
 		annotations := make(map[string]string)
@@ -151,18 +153,18 @@ func storageGatewayState(s db.StorageGatewayState) storagev1.StorageGateway_Stat
 	}
 }
 
-func certState(s db.CertState) storagev1.StorageGateway_CertState {
+func certState(s db.CertState) storagev1.StorageGateway_Certificate_State {
 	switch s {
 	case db.CertStatePENDING:
-		return storagev1.StorageGateway_PENDING
+		return storagev1.StorageGateway_Certificate_PENDING
 	case db.CertStateACTIVE:
-		return storagev1.StorageGateway_CERT_ACTIVE
+		return storagev1.StorageGateway_Certificate_ACTIVE
 	case db.CertStateEXPIRING:
-		return storagev1.StorageGateway_EXPIRING
+		return storagev1.StorageGateway_Certificate_EXPIRING
 	case db.CertStateEXPIRED:
-		return storagev1.StorageGateway_EXPIRED
+		return storagev1.StorageGateway_Certificate_EXPIRED
 	default:
-		return storagev1.StorageGateway_CERT_STATE_UNSPECIFIED
+		return storagev1.StorageGateway_Certificate_STATE_UNSPECIFIED
 	}
 }
 

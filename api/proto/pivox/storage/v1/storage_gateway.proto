@@ -176,10 +176,6 @@ service StorageGateways {
   //     aip.dev/not-precedent: A storage session is an ephemeral
   //     credential, not an AIP-style resource. The custom-action
   //     framing fits better than AIP-133 Create. --)
-  // (-- api-linter: core::0133::request-unknown-fields=disabled
-  //     aip.dev/not-precedent: see above. --)
-  // (-- api-linter: core::0133::request-resource-field=disabled
-  //     aip.dev/not-precedent: see above. --)
   // (-- api-linter: core::0133::response-message-name=disabled
   //     aip.dev/not-precedent: see above. --)
   rpc CreateStorageSession(CreateStorageSessionRequest) returns (CreateStorageSessionResponse) {
@@ -221,22 +217,33 @@ message StorageGateway {
     OFFLINE = 4;
   }
 
-  // TLS certificate lifecycle states.
-  enum CertState {
-    // Unspecified certificate state.
-    CERT_STATE_UNSPECIFIED = 0;
+  // The TLS certificate for a storage gateway. Groups the cert
+  // lifecycle state and expiry so they aren't loose `cert_*` fields
+  // on the gateway resource.
+  message Certificate {
+    // TLS certificate lifecycle states.
+    enum State {
+      // Unspecified certificate state.
+      STATE_UNSPECIFIED = 0;
 
-    // The certificate is being provisioned.
-    PENDING = 1;
+      // The certificate is being provisioned.
+      PENDING = 1;
 
-    // The certificate is active and valid.
-    CERT_ACTIVE = 2;
+      // The certificate is active and valid.
+      ACTIVE = 2;
 
-    // The certificate is approaching its expiration date.
-    EXPIRING = 3;
+      // The certificate is approaching its expiration date.
+      EXPIRING = 3;
 
-    // The certificate has expired.
-    EXPIRED = 4;
+      // The certificate has expired.
+      EXPIRED = 4;
+    }
+
+    // Output only. The current state of the TLS certificate.
+    State state = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+    // Output only. The expiration time of the TLS certificate.
+    google.protobuf.Timestamp expire_time = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   }
 
   // Output only. The resource name of the storage gateway. Format:
@@ -280,11 +287,8 @@ message StorageGateway {
   // gateway.
   string current_version = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The current state of the TLS certificate.
-  CertState cert_state = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The expiration time of the TLS certificate.
-  google.protobuf.Timestamp cert_expiry_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. The TLS certificate state for this storage gateway.
+  Certificate certificate = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Optional. Annotations associated with this storage gateway.
   // Annotations are key-value pairs that can be used to organize and track
@@ -637,6 +641,12 @@ message UpgradeGatewayMetadata {
 // The request sent to the
 // [CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]
 // method.
+//
+// (-- api-linter: core::0133::request-resource-field=disabled
+//     aip.dev/not-precedent: A storage session is an ephemeral credential,
+//     not an AIP resource — see the CreateStorageSession RPC comment. --)
+// (-- api-linter: core::0133::request-unknown-fields=disabled
+//     aip.dev/not-precedent: see above — `ttl` is a non-standard field. --)
 message CreateStorageSessionRequest {
   // Required. The organization this session is scoped to. Format:
   // `organizations/{organization}`. The minted session can only
@@ -659,8 +669,8 @@ message CreateStorageSessionRequest {
 // [CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]
 // method.
 message CreateStorageSessionResponse {
-  // The session expiry time.
-  google.protobuf.Timestamp expiry = 1;
+  // The session expiration time.
+  google.protobuf.Timestamp expire_time = 1;
 
   // The session JWT, also delivered as a Set-Cookie response header
   // for browser flows. Native clients (macOS, Windows) read this

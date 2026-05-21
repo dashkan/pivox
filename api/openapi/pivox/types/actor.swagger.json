@@ -1,7 +1,7 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "pivox/types/actor.proto",
+    "title": "buf:lint:ignore PACKAGE_VERSION_SUFFIX",
     "version": "version not set"
   },
   "consumes": [

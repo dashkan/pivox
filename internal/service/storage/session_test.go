@@ -505,7 +505,7 @@ func TestIntegration_CreateStorageSession_TTLClampedToCap(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	expiry := resp.GetExpiry().AsTime()
+	expiry := resp.GetExpireTime().AsTime()
 	wantUpper := before.Add(8 * time.Hour).Add(5 * time.Second) // small slack for handler latency
 	assert.True(t, expiry.Before(wantUpper),
 		"expiry %v must be clamped to <= now+8h (cap), not honor the requested 24h", expiry)
@@ -532,7 +532,7 @@ func TestIntegration_CreateStorageSession_TTLWithinCapHonored(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	expiry := resp.GetExpiry().AsTime()
+	expiry := resp.GetExpireTime().AsTime()
 	want := before.Add(requested)
 	assert.True(t, expiry.After(want.Add(-1*time.Minute)) && expiry.Before(want.Add(1*time.Minute)),
 		"expiry %v must be ~ now+4h (within cap, honored as-is)", expiry)
@@ -555,7 +555,7 @@ func TestIntegration_CreateStorageSession_TTLDefaultOneHour(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	expiry := resp.GetExpiry().AsTime()
+	expiry := resp.GetExpireTime().AsTime()
 	want := before.Add(1 * time.Hour)
 	assert.True(t, expiry.After(want.Add(-1*time.Minute)) && expiry.Before(want.Add(1*time.Minute)),
 		"unset TTL must default to 1h; got expiry %v", expiry)
