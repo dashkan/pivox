@@ -138,7 +138,7 @@ func (e *sessionTestEnv) seedGatewayWithFilesystemEndpoint(t *testing.T, ctx con
 		Endpoint: &storagev1.Endpoint{
 			DisplayName: endpointID,
 			Configuration: &storagev1.Endpoint_Filesystem{
-				Filesystem: &storagev1.FileSystemConfiguration{
+				Filesystem: &storagev1.FileSystemConfig{
 					Path: "/mnt/" + endpointID,
 				},
 			},
@@ -756,7 +756,7 @@ func TestIntegration_SessionSigningKey_RoundTripsControllerToAgent(t *testing.T)
 		Endpoint: &storagev1.Endpoint{
 			DisplayName: "media",
 			Configuration: &storagev1.Endpoint_Filesystem{
-				Filesystem: &storagev1.FileSystemConfiguration{Path: "/mnt/media"},
+				Filesystem: &storagev1.FileSystemConfig{Path: "/mnt/media"},
 			},
 		},
 	})

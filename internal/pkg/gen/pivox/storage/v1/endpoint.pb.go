@@ -253,7 +253,7 @@ func (x *Endpoint) GetConfiguration() isEndpoint_Configuration {
 	return nil
 }
 
-func (x *Endpoint) GetS3() *S3Configuration {
+func (x *Endpoint) GetS3() *S3Config {
 	if x != nil {
 		if x, ok := x.Configuration.(*Endpoint_S3); ok {
 			return x.S3
@@ -262,7 +262,7 @@ func (x *Endpoint) GetS3() *S3Configuration {
 	return nil
 }
 
-func (x *Endpoint) GetFilesystem() *FileSystemConfiguration {
+func (x *Endpoint) GetFilesystem() *FileSystemConfig {
 	if x != nil {
 		if x, ok := x.Configuration.(*Endpoint_Filesystem); ok {
 			return x.Filesystem
@@ -326,12 +326,12 @@ type isEndpoint_Configuration interface {
 
 type Endpoint_S3 struct {
 	// S3-compatible storage backend (rustfs, AWS S3, etc.).
-	S3 *S3Configuration `protobuf:"bytes,4,opt,name=s3,proto3,oneof"`
+	S3 *S3Config `protobuf:"bytes,4,opt,name=s3,proto3,oneof"`
 }
 
 type Endpoint_Filesystem struct {
 	// Local or network-mounted filesystem (NFS, CIFS, etc.).
-	Filesystem *FileSystemConfiguration `protobuf:"bytes,11,opt,name=filesystem,proto3,oneof"`
+	Filesystem *FileSystemConfig `protobuf:"bytes,11,opt,name=filesystem,proto3,oneof"`
 }
 
 func (*Endpoint_S3) isEndpoint_Configuration() {}
@@ -339,7 +339,7 @@ func (*Endpoint_S3) isEndpoint_Configuration() {}
 func (*Endpoint_Filesystem) isEndpoint_Configuration() {}
 
 // Configuration for an S3-compatible storage backend.
-type S3Configuration struct {
+type S3Config struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. Immutable. The URI of the S3-compatible endpoint
 	// (e.g. `http://localhost:9000` or `https://s3.us-east-1.amazonaws.com`).
@@ -354,26 +354,26 @@ type S3Configuration struct {
 	//
 	// Types that are valid to be assigned to Credentials:
 	//
-	//	*S3Configuration_AccessKey
-	Credentials   isS3Configuration_Credentials `protobuf_oneof:"credentials"`
+	//	*S3Config_AccessKey
+	Credentials   isS3Config_Credentials `protobuf_oneof:"credentials"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *S3Configuration) Reset() {
-	*x = S3Configuration{}
+func (x *S3Config) Reset() {
+	*x = S3Config{}
 	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *S3Configuration) String() string {
+func (x *S3Config) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*S3Configuration) ProtoMessage() {}
+func (*S3Config) ProtoMessage() {}
 
-func (x *S3Configuration) ProtoReflect() protoreflect.Message {
+func (x *S3Config) ProtoReflect() protoreflect.Message {
 	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -385,58 +385,58 @@ func (x *S3Configuration) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use S3Configuration.ProtoReflect.Descriptor instead.
-func (*S3Configuration) Descriptor() ([]byte, []int) {
+// Deprecated: Use S3Config.ProtoReflect.Descriptor instead.
+func (*S3Config) Descriptor() ([]byte, []int) {
 	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *S3Configuration) GetEndpointUri() string {
+func (x *S3Config) GetEndpointUri() string {
 	if x != nil {
 		return x.EndpointUri
 	}
 	return ""
 }
 
-func (x *S3Configuration) GetBucket() string {
+func (x *S3Config) GetBucket() string {
 	if x != nil {
 		return x.Bucket
 	}
 	return ""
 }
 
-func (x *S3Configuration) GetRegion() string {
+func (x *S3Config) GetRegion() string {
 	if x != nil {
 		return x.Region
 	}
 	return ""
 }
 
-func (x *S3Configuration) GetCredentials() isS3Configuration_Credentials {
+func (x *S3Config) GetCredentials() isS3Config_Credentials {
 	if x != nil {
 		return x.Credentials
 	}
 	return nil
 }
 
-func (x *S3Configuration) GetAccessKey() *S3AccessKeyCredentials {
+func (x *S3Config) GetAccessKey() *S3AccessKeyCredentials {
 	if x != nil {
-		if x, ok := x.Credentials.(*S3Configuration_AccessKey); ok {
+		if x, ok := x.Credentials.(*S3Config_AccessKey); ok {
 			return x.AccessKey
 		}
 	}
 	return nil
 }
 
-type isS3Configuration_Credentials interface {
-	isS3Configuration_Credentials()
+type isS3Config_Credentials interface {
+	isS3Config_Credentials()
 }
 
-type S3Configuration_AccessKey struct {
+type S3Config_AccessKey struct {
 	// Static access key credentials.
 	AccessKey *S3AccessKeyCredentials `protobuf:"bytes,4,opt,name=access_key,json=accessKey,proto3,oneof"`
 }
 
-func (*S3Configuration_AccessKey) isS3Configuration_Credentials() {}
+func (*S3Config_AccessKey) isS3Config_Credentials() {}
 
 // Static access key credentials for an S3-compatible backend.
 type S3AccessKeyCredentials struct {
@@ -504,7 +504,7 @@ func (x *S3AccessKeyCredentials) GetSecretAccessKey() string {
 //
 // No credentials are needed — the agent accesses files using the
 // pivox system user's permissions on the mounted filesystem.
-type FileSystemConfiguration struct {
+type FileSystemConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. Immutable. The mount point path on the agent server
 	// (e.g. `/mnt/nfs/pivox-assets`). Must be accessible by the pivox
@@ -514,20 +514,20 @@ type FileSystemConfiguration struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *FileSystemConfiguration) Reset() {
-	*x = FileSystemConfiguration{}
+func (x *FileSystemConfig) Reset() {
+	*x = FileSystemConfig{}
 	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *FileSystemConfiguration) String() string {
+func (x *FileSystemConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FileSystemConfiguration) ProtoMessage() {}
+func (*FileSystemConfig) ProtoMessage() {}
 
-func (x *FileSystemConfiguration) ProtoReflect() protoreflect.Message {
+func (x *FileSystemConfig) ProtoReflect() protoreflect.Message {
 	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -539,12 +539,12 @@ func (x *FileSystemConfiguration) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FileSystemConfiguration.ProtoReflect.Descriptor instead.
-func (*FileSystemConfiguration) Descriptor() ([]byte, []int) {
+// Deprecated: Use FileSystemConfig.ProtoReflect.Descriptor instead.
+func (*FileSystemConfig) Descriptor() ([]byte, []int) {
 	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *FileSystemConfiguration) GetPath() string {
+func (x *FileSystemConfig) GetPath() string {
 	if x != nil {
 		return x.Path
 	}
@@ -1169,15 +1169,15 @@ var File_pivox_storage_v1_endpoint_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xde\a\n" +
+	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xd0\a\n" +
 	"\bEndpoint\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
 	"\xe0A\x02\xbaH\x04r\x02\x18<R\vdisplayName\x12;\n" +
-	"\x05state\x18\x03 \x01(\x0e2 .pivox.storage.v1.Endpoint.StateB\x03\xe0A\x03R\x05state\x123\n" +
-	"\x02s3\x18\x04 \x01(\v2!.pivox.storage.v1.S3ConfigurationH\x00R\x02s3\x12K\n" +
+	"\x05state\x18\x03 \x01(\x0e2 .pivox.storage.v1.Endpoint.StateB\x03\xe0A\x03R\x05state\x12,\n" +
+	"\x02s3\x18\x04 \x01(\v2\x1a.pivox.storage.v1.S3ConfigH\x00R\x02s3\x12D\n" +
 	"\n" +
-	"filesystem\x18\v \x01(\v2).pivox.storage.v1.FileSystemConfigurationH\x00R\n" +
+	"filesystem\x18\v \x01(\v2\".pivox.storage.v1.FileSystemConfigH\x00R\n" +
 	"filesystem\x12E\n" +
 	"\fcache_config\x18\f \x01(\v2\x1d.pivox.storage.v1.CacheConfigB\x03\xe0A\x01R\vcacheConfig\x12R\n" +
 	"\vannotations\x18\x05 \x03(\v2+.pivox.storage.v1.Endpoint.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12\x17\n" +
@@ -1201,8 +1201,8 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\bINACTIVE\x10\x02\x12\x0f\n" +
 	"\vUNREACHABLE\x10\x03:\x86\x01\xeaA\x82\x01\n" +
 	"\x16pivox.storage/Endpoint\x12Sorganizations/{organization}/storageGateways/{storage_gateway}/endpoints/{endpoint}*\tendpoints2\bendpointB\x0f\n" +
-	"\rconfiguration\"\xe1\x01\n" +
-	"\x0fS3Configuration\x121\n" +
+	"\rconfiguration\"\xda\x01\n" +
+	"\bS3Config\x121\n" +
 	"\fendpoint_uri\x18\x01 \x01(\tB\x0e\xe0A\x02\xe0A\x05\xbaH\x05r\x03\x88\x01\x01R\vendpointUri\x12$\n" +
 	"\x06bucket\x18\x02 \x01(\tB\f\xe0A\x02\xe0A\x05\xbaH\x03\xc8\x01\x01R\x06bucket\x12\x1b\n" +
 	"\x06region\x18\x03 \x01(\tB\x03\xe0A\x01R\x06region\x12I\n" +
@@ -1211,8 +1211,8 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\vcredentials\"~\n" +
 	"\x16S3AccessKeyCredentials\x12-\n" +
 	"\raccess_key_id\x18\x01 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\vaccessKeyId\x125\n" +
-	"\x11secret_access_key\x18\x02 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x0fsecretAccessKey\";\n" +
-	"\x17FileSystemConfiguration\x12 \n" +
+	"\x11secret_access_key\x18\x02 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x0fsecretAccessKey\"4\n" +
+	"\x10FileSystemConfig\x12 \n" +
 	"\x04path\x18\x01 \x01(\tB\f\xe0A\x02\xe0A\x05\xbaH\x03\xc8\x01\x01R\x04path\"\xa2\x02\n" +
 	"\vCacheConfig\x12\x1d\n" +
 	"\aenabled\x18\x01 \x01(\bB\x03\xe0A\x01R\aenabled\x12*\n" +
@@ -1286,9 +1286,9 @@ var file_pivox_storage_v1_endpoint_proto_goTypes = []any{
 	(Endpoint_State)(0),             // 0: pivox.storage.v1.Endpoint.State
 	(CacheConfig_EvictionPolicy)(0), // 1: pivox.storage.v1.CacheConfig.EvictionPolicy
 	(*Endpoint)(nil),                // 2: pivox.storage.v1.Endpoint
-	(*S3Configuration)(nil),         // 3: pivox.storage.v1.S3Configuration
+	(*S3Config)(nil),                // 3: pivox.storage.v1.S3Config
 	(*S3AccessKeyCredentials)(nil),  // 4: pivox.storage.v1.S3AccessKeyCredentials
-	(*FileSystemConfiguration)(nil), // 5: pivox.storage.v1.FileSystemConfiguration
+	(*FileSystemConfig)(nil),        // 5: pivox.storage.v1.FileSystemConfig
 	(*CacheConfig)(nil),             // 6: pivox.storage.v1.CacheConfig
 	(*CreateEndpointRequest)(nil),   // 7: pivox.storage.v1.CreateEndpointRequest
 	(*CreateEndpointMetadata)(nil),  // 8: pivox.storage.v1.CreateEndpointMetadata
@@ -1307,15 +1307,15 @@ var file_pivox_storage_v1_endpoint_proto_goTypes = []any{
 }
 var file_pivox_storage_v1_endpoint_proto_depIdxs = []int32{
 	0,  // 0: pivox.storage.v1.Endpoint.state:type_name -> pivox.storage.v1.Endpoint.State
-	3,  // 1: pivox.storage.v1.Endpoint.s3:type_name -> pivox.storage.v1.S3Configuration
-	5,  // 2: pivox.storage.v1.Endpoint.filesystem:type_name -> pivox.storage.v1.FileSystemConfiguration
+	3,  // 1: pivox.storage.v1.Endpoint.s3:type_name -> pivox.storage.v1.S3Config
+	5,  // 2: pivox.storage.v1.Endpoint.filesystem:type_name -> pivox.storage.v1.FileSystemConfig
 	6,  // 3: pivox.storage.v1.Endpoint.cache_config:type_name -> pivox.storage.v1.CacheConfig
 	16, // 4: pivox.storage.v1.Endpoint.annotations:type_name -> pivox.storage.v1.Endpoint.AnnotationsEntry
 	17, // 5: pivox.storage.v1.Endpoint.created_by:type_name -> pivox.types.Actor
 	18, // 6: pivox.storage.v1.Endpoint.create_time:type_name -> google.protobuf.Timestamp
 	17, // 7: pivox.storage.v1.Endpoint.updated_by:type_name -> pivox.types.Actor
 	18, // 8: pivox.storage.v1.Endpoint.update_time:type_name -> google.protobuf.Timestamp
-	4,  // 9: pivox.storage.v1.S3Configuration.access_key:type_name -> pivox.storage.v1.S3AccessKeyCredentials
+	4,  // 9: pivox.storage.v1.S3Config.access_key:type_name -> pivox.storage.v1.S3AccessKeyCredentials
 	1,  // 10: pivox.storage.v1.CacheConfig.eviction_policy:type_name -> pivox.storage.v1.CacheConfig.EvictionPolicy
 	2,  // 11: pivox.storage.v1.CreateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
 	2,  // 12: pivox.storage.v1.ListEndpointsResponse.endpoints:type_name -> pivox.storage.v1.Endpoint
@@ -1348,7 +1348,7 @@ func file_pivox_storage_v1_endpoint_proto_init() {
 		(*Endpoint_Filesystem)(nil),
 	}
 	file_pivox_storage_v1_endpoint_proto_msgTypes[1].OneofWrappers = []any{
-		(*S3Configuration_AccessKey)(nil),
+		(*S3Config_AccessKey)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

@@ -96,7 +96,7 @@ func TestIntegration_Storage_GatewayLifecycle(t *testing.T) {
 			Endpoint: &storagev1.Endpoint{
 				DisplayName: "Local Filesystem",
 				Configuration: &storagev1.Endpoint_Filesystem{
-					Filesystem: &storagev1.FileSystemConfiguration{
+					Filesystem: &storagev1.FileSystemConfig{
 						Path: "/mnt/storage",
 					},
 				},

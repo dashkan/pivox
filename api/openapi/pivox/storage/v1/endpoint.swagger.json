@@ -294,11 +294,11 @@
                   "readOnly": true
                 },
                 "s3": {
-                  "$ref": "#/definitions/v1S3Configuration",
+                  "$ref": "#/definitions/v1S3Config",
                   "description": "S3-compatible storage backend (rustfs, AWS S3, etc.)."
                 },
                 "filesystem": {
-                  "$ref": "#/definitions/v1FileSystemConfiguration",
+                  "$ref": "#/definitions/v1FileSystemConfig",
                   "description": "Local or network-mounted filesystem (NFS, CIFS, etc.)."
                 },
                 "cacheConfig": {
@@ -499,11 +499,11 @@
           "readOnly": true
         },
         "s3": {
-          "$ref": "#/definitions/v1S3Configuration",
+          "$ref": "#/definitions/v1S3Config",
           "description": "S3-compatible storage backend (rustfs, AWS S3, etc.)."
         },
         "filesystem": {
-          "$ref": "#/definitions/v1FileSystemConfiguration",
+          "$ref": "#/definitions/v1FileSystemConfig",
           "description": "Local or network-mounted filesystem (NFS, CIFS, etc.)."
         },
         "cacheConfig": {
@@ -561,7 +561,7 @@
       "default": "STATE_UNSPECIFIED",
       "description": "Endpoint lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state. This is only useful for distinguishing unset values.\n - ACTIVE: The endpoint is active and serving requests.\n - INACTIVE: The endpoint has been deactivated and is not serving requests.\n - UNREACHABLE: The endpoint's storage backend is unreachable."
     },
-    "v1FileSystemConfiguration": {
+    "v1FileSystemConfig": {
       "type": "object",
       "properties": {
         "path": {
@@ -610,7 +610,7 @@
         "secretAccessKey"
       ]
     },
-    "v1S3Configuration": {
+    "v1S3Config": {
       "type": "object",
       "properties": {
         "endpointUri": {
@@ -627,7 +627,7 @@
         },
         "accessKey": {
           "$ref": "#/definitions/v1S3AccessKeyCredentials",
-          "description": "Static access key credentials.\n\nFuture: S3OAuthCredentials oauth = 5;\n Future: S3AssumeRoleCredentials assume_role = 6;"
+          "description": "Static access key credentials."
         }
       },
       "description": "Configuration for an S3-compatible storage backend.",

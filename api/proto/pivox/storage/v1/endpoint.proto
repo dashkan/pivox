@@ -149,10 +149,10 @@ message Endpoint {
   // cannot be changed after creation — delete and recreate the endpoint.
   oneof configuration {
     // S3-compatible storage backend (rustfs, AWS S3, etc.).
-    S3Configuration s3 = 4;
+    S3Config s3 = 4;
 
     // Local or network-mounted filesystem (NFS, CIFS, etc.).
-    FileSystemConfiguration filesystem = 11;
+    FileSystemConfig filesystem = 11;
   }
 
   // Optional. Cache configuration for this endpoint. Controls how agents
@@ -181,7 +181,7 @@ message Endpoint {
 }
 
 // Configuration for an S3-compatible storage backend.
-message S3Configuration {
+message S3Config {
   // Required. Immutable. The URI of the S3-compatible endpoint
   // (e.g. `http://localhost:9000` or `https://s3.us-east-1.amazonaws.com`).
   string endpoint_uri = 1 [
@@ -206,8 +206,6 @@ message S3Configuration {
   oneof credentials {
     // Static access key credentials.
     S3AccessKeyCredentials access_key = 4;
-    // Future: S3OAuthCredentials oauth = 5;
-    // Future: S3AssumeRoleCredentials assume_role = 6;
   }
 }
 
@@ -236,7 +234,7 @@ message S3AccessKeyCredentials {
 //
 // No credentials are needed — the agent accesses files using the
 // pivox system user's permissions on the mounted filesystem.
-message FileSystemConfiguration {
+message FileSystemConfig {
   // Required. Immutable. The mount point path on the agent server
   // (e.g. `/mnt/nfs/pivox-assets`). Must be accessible by the pivox
   // user on all agents in the gateway pool.

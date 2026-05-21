@@ -107,7 +107,7 @@ func EndpointToProto(ep db.StorageEndpoint, gatewayName string, actors map[uuid.
 				}
 				if err := json.Unmarshal(ep.Configuration, &cfg); err == nil {
 					pb.Configuration = &storagev1.Endpoint_S3{
-						S3: &storagev1.S3Configuration{
+						S3: &storagev1.S3Config{
 							EndpointUri: cfg.EndpointURI,
 							Bucket:      cfg.Bucket,
 							Region:      cfg.Region,
@@ -121,7 +121,7 @@ func EndpointToProto(ep db.StorageEndpoint, gatewayName string, actors map[uuid.
 				}
 				if err := json.Unmarshal(ep.Configuration, &cfg); err == nil {
 					pb.Configuration = &storagev1.Endpoint_Filesystem{
-						Filesystem: &storagev1.FileSystemConfiguration{
+						Filesystem: &storagev1.FileSystemConfig{
 							Path: cfg.Path,
 						},
 					}
