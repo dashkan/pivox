@@ -42,7 +42,7 @@ var File_pivox_iam_v1_iam_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_iam_proto_rawDesc = "" +
 	"\n" +
-	"\x16pivox/iam/v1/iam.proto\x12\fpivox.iam.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1bpivox/iam/v1/accounts.proto\x1a\x19pivox/iam/v1/groups.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a\x18pivox/iam/v1/roles.proto\x1a\x18pivox/iam/v1/users.proto\x1a!pivox/permission/v1/options.proto2\xe4\x12\n" +
+	"\x16pivox/iam/v1/iam.proto\x12\fpivox.iam.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1bpivox/iam/v1/accounts.proto\x1a\x19pivox/iam/v1/groups.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a\x18pivox/iam/v1/roles.proto\x1a\x18pivox/iam/v1/users.proto\x1a!pivox/permission/v1/options.proto2\xe4\x12\n" +
 	"\x03Iam\x12|\n" +
 	"\aGetUser\x12\x1c.pivox.iam.v1.GetUserRequest\x1a\x12.pivox.iam.v1.User\"?\xdaA\x04name\x8a\xb5\x18\n" +
 	"users.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/users/*}\x12\x8f\x01\n" +
@@ -143,7 +143,6 @@ func file_pivox_iam_v1_iam_proto_init() {
 	}
 	file_pivox_iam_v1_accounts_proto_init()
 	file_pivox_iam_v1_groups_proto_init()
-	file_pivox_iam_v1_members_proto_init()
 	file_pivox_iam_v1_permissions_proto_init()
 	file_pivox_iam_v1_roles_proto_init()
 	file_pivox_iam_v1_users_proto_init()

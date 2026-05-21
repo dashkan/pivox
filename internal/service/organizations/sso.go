@@ -350,7 +350,9 @@ func validateOidc(o *apiv1.OidcConfig) error {
 				"sso_config.oidc.issuer",
 				"invalid URL: "+err.Error()))
 		}
-		if u.Scheme != "https" && !(u.Scheme == "http" && isLoopbackHost(u.Host)) {
+		isSecure := u.Scheme == "https"
+		isLoopbackHTTP := u.Scheme == "http" && isLoopbackHost(u.Host)
+		if !isSecure && !isLoopbackHTTP {
 			return apierr.InvalidArgument(apierr.FieldViolation(
 				"sso_config.oidc.issuer",
 				"issuer must be https (http only allowed for localhost)"))

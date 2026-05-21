@@ -326,8 +326,8 @@ func (b *OAuthBroker) fetchOIDCDiscovery(ctx context.Context, issuer string) (*o
 
 	// Per RFC 8414 §3, the well-known URL appends `/.well-known/openid-configuration`
 	// to the issuer.
-	url := strings.TrimRight(issuer, "/") + "/.well-known/openid-configuration"
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	wkURL := strings.TrimRight(issuer, "/") + "/.well-known/openid-configuration"
+	req, err := http.NewRequestWithContext(ctx, "GET", wkURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (b *OAuthBroker) fetchOIDCDiscovery(ctx context.Context, issuer string) (*o
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("discovery returned status %d", resp.StatusCode)
 	}
@@ -579,7 +579,7 @@ func (b *OAuthBroker) exchangeCode(ctx context.Context, cfg *providerConfig, cod
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	if err != nil {
 		return nil, err
@@ -718,7 +718,7 @@ func (b *OAuthBroker) renderError(w http.ResponseWriter, r *http.Request, status
 <p>If the problem persists, contact support and reference: <code>%s</code></p>
 </body>
 </html>`
-	fmt.Fprintf(w, tmpl, html.EscapeString(corr))
+	_, _ = fmt.Fprintf(w, tmpl, html.EscapeString(corr))
 }
 
 // requireSecureIssuer enforces the OIDC issuer URL constraints:

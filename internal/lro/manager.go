@@ -335,7 +335,8 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 	if err != nil {
 		return nil, apierr.Internal("failed to begin tx")
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck // Rollback after Commit is a no-op (ErrTxClosed); intentional.
+	// Rollback after Commit is a no-op (ErrTxClosed); intentional.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := db.New(tx)
 
@@ -544,7 +545,6 @@ func (m *Manager) runWork(parent context.Context, opID uuid.UUID, work WorkFunc)
 					m.logger.ErrorContext(ctx, "lro: FailOperation (marshal-error path) DB write failed; row stuck done=false until RecoverPending",
 						"op", opID, "error", dbErr)
 				} else {
-					dbDone = true
 					m.notifyListeners(opID)
 				}
 				return

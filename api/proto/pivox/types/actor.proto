@@ -14,6 +14,7 @@
 
 syntax = "proto3";
 
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
 package pivox.types;
 
 import "google/api/field_behavior.proto";
