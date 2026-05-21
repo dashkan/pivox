@@ -71,7 +71,8 @@ async function consumeTokenCode(code: string): Promise<string> {
   if (!res.ok) {
     throw new Error(`Code exchange failed: ${res.status}`);
   }
-  const data = await res.json();
+  // Shape from internal_hooks.go consumeToken → {"id_token": string}
+  const data = (await res.json()) as { id_token: string };
   return data.id_token;
 }
 
@@ -86,7 +87,8 @@ async function exchangeToken(idToken: string): Promise<string> {
   if (!res.ok) {
     throw new Error(`Token exchange failed: ${res.status}`);
   }
-  const data = await res.json();
+  // Shape from internal_hooks.go exchangeToken → {"custom_token": string}
+  const data = (await res.json()) as { custom_token: string };
   return data.custom_token;
 }
 

@@ -54,7 +54,8 @@ async function exchangeToken(idToken: string): Promise<string> {
   if (!res.ok) {
     throw new Error(`Token exchange failed: ${res.status}`);
   }
-  const data = await res.json();
+  // Shape from internal_hooks.go exchangeToken → {"custom_token": string}
+  const data = (await res.json()) as { custom_token: string };
   return data.custom_token;
 }
 

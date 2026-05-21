@@ -35,14 +35,19 @@ async function patchProviderData(user: User): Promise<void> {
     body: JSON.stringify({ idToken }),
   });
   if (!res.ok) return;
-  const data = await res.json();
-  const serverProviders: Array<{
-    providerId: string;
-    displayName?: string;
-    email?: string;
-    photoUrl?: string;
-    rawId?: string;
-  }> = data.users?.[0]?.providerUserInfo;
+  // Shape from Firebase Identity Toolkit accounts:lookup.
+  const data = (await res.json()) as {
+    users?: Array<{
+      providerUserInfo?: Array<{
+        providerId: string;
+        displayName?: string;
+        email?: string;
+        photoUrl?: string;
+        rawId?: string;
+      }>;
+    }>;
+  };
+  const serverProviders = data.users?.[0]?.providerUserInfo;
   if (!Array.isArray(serverProviders)) return;
 
   // Build the correct provider list from the server response.

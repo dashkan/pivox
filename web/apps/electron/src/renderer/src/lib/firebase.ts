@@ -1,5 +1,4 @@
 import { getApps, initializeApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -10,12 +9,7 @@ const firebaseConfig = {
 export function ensureFirebase() {
   if (getApps().length > 0) return;
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-
-  if (import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_URL) {
-    connectAuthEmulator(auth, import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_URL, {
-      disableWarnings: true,
-    });
-  }
+  // initializeApp registers the app in Firebase's global registry as a
+  // side effect; downstream getAuth() calls retrieve it.
+  initializeApp(firebaseConfig);
 }

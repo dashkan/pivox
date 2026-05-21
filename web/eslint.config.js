@@ -45,8 +45,10 @@ const ignores = {
     '**/vercel/**',
     // generated
     '**/routeTree.gen.ts',
-    // build configs themselves
+    // build configs themselves. The `*.config.*` glob catches the
+    // `.shared` infix on vite.config.shared.js too.
     '**/*.config.{js,ts,mjs,cjs}',
+    '**/*.config.*.{js,ts,mjs,cjs}',
   ],
 };
 
