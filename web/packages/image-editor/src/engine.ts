@@ -303,7 +303,9 @@ export class ImageEditorEngine {
     this.canvas.addEventListener('pointerup', this.boundPointerUp);
     this.canvas.addEventListener('pointercancel', this.boundPointerUp);
 
-    this.resizeObserver = new ResizeObserver(() => this.markDirty());
+    this.resizeObserver = new ResizeObserver(() => {
+      this.markDirty();
+    });
     this.resizeObserver.observe(container);
 
     this.themeObserver = new MutationObserver(() => {

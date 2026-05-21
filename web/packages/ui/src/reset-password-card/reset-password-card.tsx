@@ -90,7 +90,9 @@ function ResetPasswordCardPasswordField({ className }: { className?: string }) {
         type="password"
         autoComplete="new-password"
         value={state.password}
-        onChange={(e) => actions.updatePassword(e.target.value)}
+        onChange={(e) => {
+          actions.updatePassword(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>
@@ -116,7 +118,9 @@ function ResetPasswordCardConfirmPasswordField({
         type="password"
         autoComplete="new-password"
         value={state.confirmPassword}
-        onChange={(e) => actions.updateConfirmPassword(e.target.value)}
+        onChange={(e) => {
+          actions.updateConfirmPassword(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>

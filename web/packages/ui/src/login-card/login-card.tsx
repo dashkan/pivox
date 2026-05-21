@@ -96,7 +96,9 @@ function LoginCardEmailField({ className }: { className?: string }) {
         placeholder="name@example.com"
         autoComplete="email"
         value={state.email}
-        onChange={(e) => actions.updateEmail(e.target.value)}
+        onChange={(e) => {
+          actions.updateEmail(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>
@@ -118,7 +120,9 @@ function LoginCardPasswordField({ className }: { className?: string }) {
         type="password"
         autoComplete="current-password"
         value={state.password}
-        onChange={(e) => actions.updatePassword(e.target.value)}
+        onChange={(e) => {
+          actions.updatePassword(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>
@@ -221,7 +225,9 @@ function LoginCardSocialButtons({
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin('google.com')}
+          onClick={() => {
+            actions.socialLogin('google.com');
+          }}
         >
           <GoogleIcon />
           Sign in with Google
@@ -233,7 +239,9 @@ function LoginCardSocialButtons({
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin('github.com')}
+          onClick={() => {
+            actions.socialLogin('github.com');
+          }}
         >
           <GitHubIcon />
           Sign in with GitHub
@@ -245,7 +253,9 @@ function LoginCardSocialButtons({
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin('apple.com')}
+          onClick={() => {
+            actions.socialLogin('apple.com');
+          }}
         >
           <AppleIcon />
           Sign in with Apple

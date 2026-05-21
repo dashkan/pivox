@@ -128,7 +128,9 @@ function UserProfileCardSidebar({ className }: { className?: string }) {
         type="button"
         data-active={state.activePage === 'account' || undefined}
         className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted data-[active]:bg-muted data-[active]:font-medium data-[active]:text-foreground"
-        onClick={() => actions.setActivePage('account')}
+        onClick={() => {
+          actions.setActivePage('account');
+        }}
       >
         <UserIcon />
         Account
@@ -137,7 +139,9 @@ function UserProfileCardSidebar({ className }: { className?: string }) {
         type="button"
         data-active={state.activePage === 'security' || undefined}
         className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted data-[active]:bg-muted data-[active]:font-medium data-[active]:text-foreground"
-        onClick={() => actions.setActivePage('security')}
+        onClick={() => {
+          actions.setActivePage('security');
+        }}
       >
         <ShieldIcon />
         Security
@@ -317,7 +321,9 @@ function ProfileSubsection() {
               <Input
                 ref={nameInputRef}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                }}
                 className="h-7 text-sm"
               />
               <Button type="submit" size="sm">
@@ -331,7 +337,9 @@ function ProfileSubsection() {
             <button
               type="button"
               className="flex items-center gap-2 text-left"
-              onClick={() => setEditing(true)}
+              onClick={() => {
+                setEditing(true);
+              }}
             >
               <span className="font-medium">
                 {state.displayName || 'No name set'}
@@ -383,7 +391,13 @@ function EmailSubsection() {
             </Button>
           )}
           {!editing && (
-            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setEditing(true);
+              }}
+            >
               Change
             </Button>
           )}
@@ -412,7 +426,9 @@ function EmailSubsection() {
             type="email"
             placeholder="New email address"
             value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
+            onChange={(e) => {
+              setNewEmail(e.target.value);
+            }}
             className="h-8 text-sm"
           />
           <Button type="submit" size="sm">
@@ -476,7 +492,9 @@ function ProviderRow({
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => setConfirming(false)}
+              onClick={() => {
+                setConfirming(false);
+              }}
             >
               Cancel
             </Button>
@@ -492,7 +510,13 @@ function ProviderRow({
             </Button>
           </div>
         ) : (
-          <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setConfirming(true);
+            }}
+          >
             Unlink
           </Button>
         ))}
@@ -576,7 +600,9 @@ function DangerSubsection() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => setConfirming(false)}
+              onClick={() => {
+                setConfirming(false);
+              }}
             >
               Cancel
             </Button>
@@ -595,7 +621,9 @@ function DangerSubsection() {
           <Button
             size="sm"
             variant="destructive"
-            onClick={() => setConfirming(true)}
+            onClick={() => {
+              setConfirming(true);
+            }}
           >
             Delete account
           </Button>
@@ -632,7 +660,13 @@ function SetPasswordSubsection() {
           )}
         </div>
         {!setting && (
-          <Button size="sm" variant="outline" onClick={() => setSetting(true)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setSetting(true);
+            }}
+          >
             Set password
           </Button>
         )}
@@ -676,7 +710,9 @@ function SetPasswordSubsection() {
               ref={newPasswordInputRef}
               type="password"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+              }}
             />
           </Field>
           <Field>
@@ -684,7 +720,9 @@ function SetPasswordSubsection() {
             <Input
               type="password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+              }}
             />
           </Field>
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -732,7 +770,13 @@ function PasswordSubsection() {
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-medium">Password</h3>
         {!changing && (
-          <Button size="sm" variant="outline" onClick={() => setChanging(true)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setChanging(true);
+            }}
+          >
             Change password
           </Button>
         )}
@@ -770,7 +814,9 @@ function PasswordSubsection() {
               ref={currentPasswordInputRef}
               type="password"
               value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
+              onChange={(e) => {
+                setCurrentPassword(e.target.value);
+              }}
             />
           </Field>
           <Field>
@@ -778,7 +824,9 @@ function PasswordSubsection() {
             <Input
               type="password"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+              }}
             />
           </Field>
           <Field>
@@ -786,7 +834,9 @@ function PasswordSubsection() {
             <Input
               type="password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+              }}
             />
           </Field>
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -864,7 +914,12 @@ function MFASubsection() {
               </code>
             </div>
             <div className="flex w-full gap-2">
-              <Button size="sm" onClick={() => setShowVerify(true)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setShowVerify(true);
+                }}
+              >
                 Next
               </Button>
               <Button
@@ -949,7 +1004,9 @@ function MFASubsection() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => setConfirming(false)}
+              onClick={() => {
+                setConfirming(false);
+              }}
             >
               Cancel
             </Button>
@@ -968,7 +1025,9 @@ function MFASubsection() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setConfirming(true)}
+            onClick={() => {
+              setConfirming(true);
+            }}
           >
             Disable
           </Button>

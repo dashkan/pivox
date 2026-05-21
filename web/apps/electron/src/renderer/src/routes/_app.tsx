@@ -39,7 +39,9 @@ function ProfileDialog() {
 
   return (
     <ElectronUserProfileFeature
-      onClose={() => actions.setProfileOpen(false)}
+      onClose={() => {
+        actions.setProfileOpen(false);
+      }}
       open={state.profileOpen}
       providers={authProviders}
     >

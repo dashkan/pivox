@@ -155,7 +155,9 @@ function ImageEditorResizeModePicker({ className }: { className?: string }) {
     <div className={className}>
       <Tabs
         value={state.resizeMode}
-        onValueChange={(v) => actions.setResizeMode(v as ResizeMode)}
+        onValueChange={(v) => {
+          actions.setResizeMode(v as ResizeMode);
+        }}
       >
         <TabsList>
           <TabsTrigger value="crop">Crop</TabsTrigger>
@@ -253,7 +255,9 @@ function ImageEditorTemplatePicker({ className }: { className?: string }) {
           <button
             key={template.label}
             type="button"
-            onClick={() => actions.applyTemplate(isActive ? null : template)}
+            onClick={() => {
+              actions.applyTemplate(isActive ? null : template);
+            }}
             aria-pressed={isActive}
             className={cn(
               'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors',
@@ -333,7 +337,9 @@ function ImageEditorRotateControls({ className }: { className?: string }) {
           onValueChange={([v]) => {
             if (v !== undefined) actions.setStraighten(v);
           }}
-          onValueCommit={() => actions.commitStraighten()}
+          onValueCommit={() => {
+            actions.commitStraighten();
+          }}
           className="w-24"
           aria-label="Straighten angle"
         />

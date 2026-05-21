@@ -9,7 +9,9 @@ export default function ProfileDialog() {
 
   return (
     <UserProfileFeature
-      onClose={() => actions.setProfileOpen(false)}
+      onClose={() => {
+        actions.setProfileOpen(false);
+      }}
       open={state.profileOpen}
       providers={authProviders}
     >

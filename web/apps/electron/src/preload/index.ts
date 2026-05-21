@@ -15,7 +15,9 @@ contextBridge.exposeInMainWorld('api', {
     const handler = (
       _event: Electron.IpcRendererEvent,
       data: { token?: string; state?: string; error?: string },
-    ): void => callback(data);
+    ): void => {
+      callback(data);
+    };
     ipcRenderer.on('auth:deep-link', handler);
     return () => ipcRenderer.removeListener('auth:deep-link', handler);
   },

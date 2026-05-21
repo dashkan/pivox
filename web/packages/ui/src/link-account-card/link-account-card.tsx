@@ -96,7 +96,9 @@ function LinkAccountCardPasswordField({ className }: { className?: string }) {
         type="password"
         autoComplete="current-password"
         value={state.password}
-        onChange={(e) => actions.updatePassword(e.target.value)}
+        onChange={(e) => {
+          actions.updatePassword(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>

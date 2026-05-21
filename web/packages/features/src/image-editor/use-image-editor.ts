@@ -177,7 +177,9 @@ export function useImageEditorFeature(
     if (disableKeyboardShortcuts) return;
     const handler = createKeyHandler(editorState.actions, isMac);
     document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+    };
   }, [editorState.actions, isMac, disableKeyboardShortcuts]);
 
   return editorState;

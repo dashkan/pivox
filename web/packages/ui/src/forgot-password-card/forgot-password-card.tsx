@@ -97,7 +97,9 @@ function ForgotPasswordCardEmailField({ className }: { className?: string }) {
         placeholder="name@example.com"
         autoComplete="email"
         value={state.email}
-        onChange={(e) => actions.updateEmail(e.target.value)}
+        onChange={(e) => {
+          actions.updateEmail(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>

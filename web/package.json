@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@types/eslint-plugin-jsx-a11y": "^6.10.1",
     "concurrently": "^9.2.1",
     "eslint": "^9.36.0",
     "eslint-plugin-import-x": "^4.16.1",

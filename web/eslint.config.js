@@ -54,9 +54,12 @@ const ignores = {
 export const base = [
   ignores,
   js.configs.recommended,
-  ...tseslint.configs.recommended,
+  ...tseslint.configs.strictTypeChecked,
   {
     languageOptions: {
+      parserOptions: {
+        projectService: true,
+      },
       sourceType: 'module',
       ecmaVersion: 2024,
       globals: { ...globals.browser, ...globals.node },
@@ -67,12 +70,19 @@ export const base = [
     },
     rules: {
       // Carried over from previous config
-      'no-case-declarations': 'off',
-      'no-shadow': 'off',
+      // 'no-case-declarations': 'off',
+      // 'no-shadow': 'off',
       // unused-imports/no-unused-imports auto-fixes dead imports;
       // @typescript-eslint/no-unused-vars flags dead locals.
-      'unused-imports/no-unused-imports': 'warn',
-      'no-unused-vars': 'off',
+      // 'unused-imports/no-unused-imports': 'warn',
+      // 'no-unused-vars': 'off',
+      '@typescript-eslint/restrict-template-expressions': [
+        'error',
+        {
+          allowNumber: true,
+          allowBoolean: true,
+        },
+      ],
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {

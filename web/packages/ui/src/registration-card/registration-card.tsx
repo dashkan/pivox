@@ -97,7 +97,9 @@ function RegistrationCardEmailField({ className }: { className?: string }) {
         placeholder="name@example.com"
         autoComplete="email"
         value={state.email}
-        onChange={(e) => actions.updateEmail(e.target.value)}
+        onChange={(e) => {
+          actions.updateEmail(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>
@@ -124,7 +126,9 @@ function RegistrationCardDisplayNameField({
         placeholder="John Doe"
         autoComplete="name"
         value={state.displayName}
-        onChange={(e) => actions.updateDisplayName(e.target.value)}
+        onChange={(e) => {
+          actions.updateDisplayName(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>
@@ -146,7 +150,9 @@ function RegistrationCardPasswordField({ className }: { className?: string }) {
         type="password"
         autoComplete="new-password"
         value={state.password}
-        onChange={(e) => actions.updatePassword(e.target.value)}
+        onChange={(e) => {
+          actions.updatePassword(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>
@@ -172,7 +178,9 @@ function RegistrationCardConfirmPasswordField({
         type="password"
         autoComplete="new-password"
         value={state.confirmPassword}
-        onChange={(e) => actions.updateConfirmPassword(e.target.value)}
+        onChange={(e) => {
+          actions.updateConfirmPassword(e.target.value);
+        }}
         disabled={pending}
       />
     </Field>
@@ -235,7 +243,9 @@ function RegistrationCardSocialButtons({
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin('google.com')}
+          onClick={() => {
+            actions.socialLogin('google.com');
+          }}
         >
           <GoogleIcon />
           Sign up with Google
@@ -247,7 +257,9 @@ function RegistrationCardSocialButtons({
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin('github.com')}
+          onClick={() => {
+            actions.socialLogin('github.com');
+          }}
         >
           <GitHubIcon />
           Sign up with GitHub
@@ -259,7 +271,9 @@ function RegistrationCardSocialButtons({
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin('apple.com')}
+          onClick={() => {
+            actions.socialLogin('apple.com');
+          }}
         >
           <AppleIcon />
           Sign up with Apple

@@ -148,7 +148,11 @@ function AppLayoutHeaderAvatar({ className }: { className?: string }) {
           <p className="text-xs text-muted-foreground">{state.user.email}</p>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => actions.setProfileOpen(true)}>
+        <DropdownMenuItem
+          onClick={() => {
+            actions.setProfileOpen(true);
+          }}
+        >
           Manage account
         </DropdownMenuItem>
         <DropdownMenuSeparator />

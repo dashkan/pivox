@@ -6,6 +6,7 @@
     "declaration": true,
     "declarationMap": true,
     "composite": true,
+    "strict": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*"],

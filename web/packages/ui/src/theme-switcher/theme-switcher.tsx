@@ -41,10 +41,14 @@ export function ThemeSwitcher({ className }: { className?: string }) {
   // useSyncExternalStore avoids both the SSR hydration mismatch *and* the
   // setState-in-effect cascade the manual useEffect dance triggers.
   // The server snapshot returns 'system' to match initial pre-hydration HTML.
-  const theme = useSyncExternalStore(
+  // Explicit <Theme> generic: without it the server-snapshot arrow
+  // `() => 'system'` infers as `() => string`, which widens the inferred
+  // Snapshot to `string`. Pinning the generic keeps `theme` as `Theme`
+  // without an arg cast (which no-unnecessary-type-assertion would flag).
+  const theme = useSyncExternalStore<Theme>(
     subscribeToTheme,
     getStoredTheme,
-    () => 'system' as Theme,
+    () => 'system',
   );
 
   // Apply theme to the document whenever it changes. Side-effecting on
@@ -60,7 +64,9 @@ export function ThemeSwitcher({ className }: { className?: string }) {
       if (getStoredTheme() === 'system') applyTheme('system');
     };
     mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
+    return () => {
+      mql.removeEventListener('change', handler);
+    };
   }, []);
 
   const setTheme = (next: Theme) => {

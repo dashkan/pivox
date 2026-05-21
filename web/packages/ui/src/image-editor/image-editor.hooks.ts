@@ -57,7 +57,9 @@ export function useImageEditorState(
   // changes is the engine's job via its own setters, not React's.
   const [engine] = useState(() => {
     const e = new ImageEditorEngine(engineOptions);
-    e.onChange = () => setVersion((v) => v + 1);
+    e.onChange = () => {
+      setVersion((v) => v + 1);
+    };
     return e;
   });
 
@@ -66,12 +68,18 @@ export function useImageEditorState(
   // the rule-of-refs happy and avoids the read-during-render concern.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability -- `engine` is held in useState for identity stability only; it's an imperative resource with its own internal state, not React state. Mutating its callback fields is the engine's intended API.
-    engine.onEditChange = onChange ? (e) => onChange(e) : null;
+    engine.onEditChange = onChange
+      ? (e) => {
+          onChange(e);
+        }
+      : null;
   }, [engine, onChange]);
 
   // Tear down the engine on unmount.
   useEffect(() => {
-    return () => engine.destroy();
+    return () => {
+      engine.destroy();
+    };
   }, [engine]);
 
   // Ref callback for the canvas container — mounts/unmounts the engine
@@ -92,24 +100,60 @@ export function useImageEditorState(
   // Actions — just delegate to engine methods
   const actions: ImageEditorActions = useMemo(
     () => ({
-      loadImage: (src) => engine.loadImage(src),
-      setResizeMode: (mode) => engine.setResizeMode(mode),
-      rotateClockwise: () => engine.rotateClockwise(),
-      rotateCounterClockwise: () => engine.rotateCounterClockwise(),
-      setStraighten: (degrees) => engine.setStraighten(degrees),
-      commitStraighten: () => engine.commitStraighten(),
-      toggleFlipHorizontal: () => engine.toggleFlipHorizontal(),
-      toggleFlipVertical: () => engine.toggleFlipVertical(),
-      applyTemplate: (template) => engine.applyTemplate(template),
-      reset: () => engine.reset(),
-      undo: () => engine.undo(),
-      redo: () => engine.redo(),
-      zoomIn: () => engine.zoomIn(),
-      zoomOut: () => engine.zoomOut(),
-      zoomToFit: () => engine.zoomToFit(),
-      setZoom: (level) => engine.setZoom(level),
-      enterCropMode: () => engine.enterCropMode(),
-      exitCropMode: () => engine.exitCropMode(),
+      loadImage: (src) => {
+        engine.loadImage(src);
+      },
+      setResizeMode: (mode) => {
+        engine.setResizeMode(mode);
+      },
+      rotateClockwise: () => {
+        engine.rotateClockwise();
+      },
+      rotateCounterClockwise: () => {
+        engine.rotateCounterClockwise();
+      },
+      setStraighten: (degrees) => {
+        engine.setStraighten(degrees);
+      },
+      commitStraighten: () => {
+        engine.commitStraighten();
+      },
+      toggleFlipHorizontal: () => {
+        engine.toggleFlipHorizontal();
+      },
+      toggleFlipVertical: () => {
+        engine.toggleFlipVertical();
+      },
+      applyTemplate: (template) => {
+        engine.applyTemplate(template);
+      },
+      reset: () => {
+        engine.reset();
+      },
+      undo: () => {
+        engine.undo();
+      },
+      redo: () => {
+        engine.redo();
+      },
+      zoomIn: () => {
+        engine.zoomIn();
+      },
+      zoomOut: () => {
+        engine.zoomOut();
+      },
+      zoomToFit: () => {
+        engine.zoomToFit();
+      },
+      setZoom: (level) => {
+        engine.setZoom(level);
+      },
+      enterCropMode: () => {
+        engine.enterCropMode();
+      },
+      exitCropMode: () => {
+        engine.exitCropMode();
+      },
     }),
     [engine],
   );

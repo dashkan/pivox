@@ -40,7 +40,9 @@ function GitHubCompletePage() {
     const timer = window.setTimeout(() => {
       window.close();
     }, 150);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   return (
