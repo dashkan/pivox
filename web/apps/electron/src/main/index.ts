@@ -102,7 +102,7 @@ ipcMain.handle('auth:start-social-login', (_event, provider: string) => {
   const state = randomUUID();
   pendingAuthStates.set(state, Date.now());
   const url = `${BASE_URL}/auth/external-login?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}`;
-  shell.openExternal(url);
+  void shell.openExternal(url);
   return state;
 });
 
@@ -129,7 +129,7 @@ ipcMain.handle(
 
     // The URL contains only the opaque code — the raw ID token never appears in a URL.
     const url = `${BASE_URL}/auth/external-link?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}&code=${encodeURIComponent(code)}`;
-    shell.openExternal(url);
+    void shell.openExternal(url);
     return state;
   },
 );
@@ -137,7 +137,11 @@ ipcMain.handle(
 // --- Window creation ---
 
 function createWindow(): void {
-  mainWindow = new BrowserWindow({
+  // Capture the window in a non-null `const` for use throughout this
+  // function. `mainWindow` is a mutable module-level `let` that the
+  // `closed` handler resets to null, so TS can't narrow it inside the
+  // callbacks below — `win` can.
+  const win = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
@@ -148,27 +152,28 @@ function createWindow(): void {
       sandbox: true, // AUTHN-03: Enable sandbox for renderer process isolation.
     },
   });
+  mainWindow = win;
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow!.show();
+  win.on('ready-to-show', () => {
+    win.show();
 
     // AUTHN-10: Only allow DevTools in development or when explicitly enabled
     // via PIVOX_ENABLE_DEVTOOLS=1 (for diagnosing production builds).
     if (is.dev || process.env.PIVOX_ENABLE_DEVTOOLS === '1') {
-      mainWindow!.webContents.on('before-input-event', (event, input) => {
+      win.webContents.on('before-input-event', (event, input) => {
         if (input.meta && input.alt && input.key === 'i') {
-          mainWindow!.webContents.toggleDevTools();
+          win.webContents.toggleDevTools();
           event.preventDefault();
         }
       });
     }
   });
 
-  mainWindow.on('closed', () => {
+  win.on('closed', () => {
     mainWindow = null;
   });
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  win.webContents.setWindowOpenHandler((details) => {
     // In dev mode, allow Firebase auth popups (accounts.google.com, etc.)
     if (
       is.dev &&
@@ -179,16 +184,16 @@ function createWindow(): void {
     ) {
       return { action: 'allow' };
     }
-    shell.openExternal(details.url);
+    void shell.openExternal(details.url);
     return { action: 'deny' };
   });
 
   // HMR for renderer based on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
+    void win.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    void win.loadFile(join(__dirname, '../renderer/index.html'));
   }
 }
 
@@ -218,6 +223,8 @@ app.whenReady().then(() => {
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+}).catch((err: unknown) => {
+  console.error('[pivox] app startup failed', err);
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

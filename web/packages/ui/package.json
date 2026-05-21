@@ -87,6 +87,7 @@
   },
   "dependencies": {
     "@pivox/image-editor": "workspace:*",
+    "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "lucide-react": "^1.16.0",
     "qrcode.react": "^4.2.0"

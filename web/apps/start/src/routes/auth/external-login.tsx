@@ -24,8 +24,9 @@ type ElectronLoginSearch = {
 
 export const Route = createFileRoute('/auth/external-login')({
   validateSearch: (search: Record<string, unknown>): ElectronLoginSearch => ({
-    provider: String(search.provider || 'google.com'),
-    state: String(search.state || ''),
+    provider:
+      typeof search.provider === 'string' ? search.provider : 'google.com',
+    state: typeof search.state === 'string' ? search.state : '',
   }),
   component: ElectronLoginPage,
 });
@@ -65,7 +66,7 @@ const REDIRECT_KEY = 'pivox:external-login-pending';
 function getIsolatedAuth() {
   const name = 'external-login';
   const existing = getApps().find((a) => a.name === name);
-  if (existing) deleteApp(existing);
+  if (existing) void deleteApp(existing);
   const app = initializeApp(
     {
       apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -132,7 +133,7 @@ function ElectronLoginPage() {
         sessionStorage.setItem(REDIRECT_KEY, '1');
         await signInWithRedirect(auth, authProvider());
       })
-      .catch((e) => {
+      .catch((e: unknown) => {
         sessionStorage.removeItem(REDIRECT_KEY);
         console.error('Electron login error:', e);
         setError(
@@ -163,7 +164,7 @@ function ElectronLoginPage() {
                 const authProvider = providers[provider];
                 if (authProvider) {
                   sessionStorage.setItem(REDIRECT_KEY, '1');
-                  signInWithRedirect(auth, authProvider());
+                  void signInWithRedirect(auth, authProvider());
                 }
               }}
             >

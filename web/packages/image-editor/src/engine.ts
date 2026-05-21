@@ -537,7 +537,8 @@ export class ImageEditorEngine {
   undo(): void {
     if (this.history.past.length === 0) return;
     const past = [...this.history.past];
-    const previous = past.pop()!;
+    const previous = past.pop();
+    if (previous === undefined) return;
     const current = extractEditState(this._state);
     this.history = { past, future: [current, ...this.history.future] };
     this.updateState({
@@ -551,7 +552,8 @@ export class ImageEditorEngine {
   redo(): void {
     if (this.history.future.length === 0) return;
     const future = [...this.history.future];
-    const next = future.shift()!;
+    const next = future.shift();
+    if (next === undefined) return;
     const current = extractEditState(this._state);
     this.history = { past: [...this.history.past, current], future };
     this.updateState({

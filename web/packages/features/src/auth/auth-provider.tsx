@@ -1,5 +1,6 @@
 'use client';
 
+import { reportError } from '@pivox/observability';
 import { useCallback, useEffect, useReducer, useState } from 'react';
 
 import { AuthContext } from './use-auth';
@@ -51,7 +52,8 @@ async function patchProviderData(user: User): Promise<void> {
   // doesn't have, preserving the SDK's internal array reference.
   const pd = user.providerData;
   for (let i = pd.length - 1; i >= 0; i--) {
-    if (!serverProviderIds.has(pd[i]!.providerId)) {
+    const entry = pd[i];
+    if (entry && !serverProviderIds.has(entry.providerId)) {
       pd.splice(i, 1);
     }
   }
@@ -65,13 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
-    import('firebase/auth').then(({ getAuth, onIdTokenChanged }) => {
-      const auth = getAuth();
-      unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
-        setUser(firebaseUser);
-        setLoading(false);
+    import('firebase/auth')
+      .then(({ getAuth, onIdTokenChanged }) => {
+        const auth = getAuth();
+        unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
+          setUser(firebaseUser);
+          setLoading(false);
+        });
+      })
+      .catch((err: unknown) => {
+        reportError(err, { source: 'AuthProvider.import(firebase/auth)' });
       });
-    });
 
     return () => unsubscribe?.();
   }, []);

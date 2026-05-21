@@ -26,6 +26,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@pivox/features": "workspace:*",
+    "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/ui": "workspace:*",
     "@tanstack/react-router": "^1.170.4",

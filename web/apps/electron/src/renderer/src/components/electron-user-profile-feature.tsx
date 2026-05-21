@@ -1,5 +1,6 @@
 import { useAuth } from '@pivox/features/auth';
 import { useUserProfile } from '@pivox/features/user-profile';
+import { asyncHandler } from '@pivox/observability';
 import { UserProfileCard } from '@pivox/ui/user-profile-card';
 import { getAuth } from 'firebase/auth';
 import { useEffect, useRef } from 'react';
@@ -27,23 +28,25 @@ export function ElectronUserProfileFeature({
   useEffect(() => {
     if (import.meta.env.DEV) return;
 
-    const unsubscribe = window.api.onAuthDeepLink(async (data) => {
-      if (data.linked === 'true') {
-        if (linkingTimerRef.current) {
-          clearTimeout(linkingTimerRef.current);
-          linkingTimerRef.current = null;
+    const unsubscribe = window.api.onAuthDeepLink(
+      asyncHandler(async (data) => {
+        if (data.linked === 'true') {
+          if (linkingTimerRef.current) {
+            clearTimeout(linkingTimerRef.current);
+            linkingTimerRef.current = null;
+          }
+          value.actions.setLinkingProvider(null);
+          await refreshUser();
         }
-        value.actions.setLinkingProvider(null);
-        await refreshUser();
-      }
-      if (data.error) {
-        if (linkingTimerRef.current) {
-          clearTimeout(linkingTimerRef.current);
-          linkingTimerRef.current = null;
+        if (data.error) {
+          if (linkingTimerRef.current) {
+            clearTimeout(linkingTimerRef.current);
+            linkingTimerRef.current = null;
+          }
+          value.actions.setLinkingProvider(null);
         }
-        value.actions.setLinkingProvider(null);
-      }
-    });
+      }),
+    );
 
     return unsubscribe;
   }, [refreshUser, value.actions]);

@@ -1,5 +1,6 @@
 import './assets/main.css';
 
+import { installErrorReporters } from '@pivox/observability';
 import {
   RouterProvider,
   createHashHistory,
@@ -11,6 +12,7 @@ import { createRoot } from 'react-dom/client';
 import { ensureFirebase } from './lib/firebase';
 import { routeTree } from './routeTree.gen';
 
+installErrorReporters();
 ensureFirebase();
 const hashHistory = createHashHistory();
 
@@ -25,7 +27,12 @@ declare module '@tanstack/react-router' {
   }
 }
 
-createRoot(document.getElementById('root')!).render(
+const rootEl = document.getElementById('root');
+if (!rootEl) {
+  throw new Error('Root element #root not found in index.html');
+}
+
+createRoot(rootEl).render(
   <StrictMode>
     <RouterProvider router={router} />
   </StrictMode>,

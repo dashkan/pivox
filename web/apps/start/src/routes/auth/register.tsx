@@ -1,4 +1,5 @@
 import { RegistrationFeature } from '@pivox/features/registration';
+import { asyncHandler } from '@pivox/observability';
 import { RegistrationCard } from '@pivox/ui/registration-card';
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 
@@ -13,12 +14,14 @@ function RegisterPage() {
 
   return (
     <RegistrationFeature
-      onSuccess={(user) =>
+      onSuccess={asyncHandler((user) =>
         router.navigate({
           to: user.emailVerified ? '/' : '/auth/verify-email',
-        })
-      }
-      onLinkRequired={() => router.navigate({ to: '/auth/link-account' })}
+        }),
+      )}
+      onLinkRequired={asyncHandler(() =>
+        router.navigate({ to: '/auth/link-account' }),
+      )}
     >
       <RegistrationCard.Root>
         <RegistrationCard.Header />
@@ -30,7 +33,7 @@ function RegisterPage() {
         <RegistrationCard.Separator />
         <RegistrationCard.SocialButtons providers={authProviders} />
         <RegistrationCard.Footer
-          onClick={() => router.navigate({ to: '/auth/login' })}
+          onClick={asyncHandler(() => router.navigate({ to: '/auth/login' }))}
         />
       </RegistrationCard.Root>
     </RegistrationFeature>

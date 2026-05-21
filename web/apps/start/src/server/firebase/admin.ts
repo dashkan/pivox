@@ -25,8 +25,10 @@ let cached: App | undefined;
 
 export function firebaseAdmin(): App {
   if (cached) return cached;
+  // getApps()[0] is typed `App` (this tsconfig has no noUncheckedIndexedAccess);
+  // the `.length > 0` check is the real runtime guard against an empty array.
   if (getApps().length > 0) {
-    cached = getApps()[0]!;
+    cached = getApps()[0];
     return cached;
   }
 

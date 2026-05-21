@@ -1,5 +1,6 @@
 'use client';
 
+import { asyncHandler } from '@pivox/observability';
 import { Alert, AlertAction, AlertDescription } from '@pivox/primitives/alert';
 import { Badge } from '@pivox/primitives/badge';
 import { Button } from '@pivox/primitives/button';
@@ -223,10 +224,13 @@ function ProfileSubsection() {
   // Only show OAuth provider photos — password provider mirrors the
   // top-level user.photoURL so it's not an independent source
   const providerPhotos = state.providers
-    .filter((p) => p.photoURL && p.providerId !== 'password')
+    .filter(
+      (p): p is typeof p & { photoURL: string } =>
+        Boolean(p.photoURL) && p.providerId !== 'password',
+    )
     .map((p) => ({
       providerId: p.providerId,
-      photoURL: p.photoURL!,
+      photoURL: p.photoURL,
       label: providerLabels[p.providerId] ?? p.providerId,
     }));
 
@@ -264,10 +268,10 @@ function ProfileSubsection() {
                       'flex items-center gap-3 rounded-md px-2 py-1.5 text-sm hover:bg-muted',
                       isActive && 'bg-muted',
                     )}
-                    onClick={async () => {
+                    onClick={asyncHandler(async () => {
                       await actions.setPhotoURL(p.photoURL);
                       setAvatarOpen(false);
-                    }}
+                    })}
                   >
                     <UserAvatar src={p.photoURL} name={null} size="sm" />
                     <span className="text-muted-foreground">
@@ -282,10 +286,10 @@ function ProfileSubsection() {
                   <button
                     type="button"
                     className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-muted"
-                    onClick={async () => {
+                    onClick={asyncHandler(async () => {
                       await actions.removePhoto();
                       setAvatarOpen(false);
-                    }}
+                    })}
                   >
                     Remove photo
                   </button>
@@ -305,11 +309,11 @@ function ProfileSubsection() {
             <form
               data-inline-edit
               className="flex items-center gap-2"
-              onSubmit={async (e) => {
+              onSubmit={asyncHandler(async (e) => {
                 e.preventDefault();
                 await actions.updateDisplayName(name);
                 setEditing(false);
-              }}
+              })}
               onReset={handleCancel}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
@@ -385,7 +389,7 @@ function EmailSubsection() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={actions.sendVerificationEmail}
+              onClick={asyncHandler(actions.sendVerificationEmail)}
             >
               Resend verification
             </Button>
@@ -408,11 +412,11 @@ function EmailSubsection() {
         <form
           data-inline-edit
           className="mt-3 flex items-center gap-2"
-          onSubmit={async (e) => {
+          onSubmit={asyncHandler(async (e) => {
             e.preventDefault();
             await actions.changeEmail(newEmail);
             handleCancel();
-          }}
+          })}
           onReset={handleCancel}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -501,10 +505,10 @@ function ProviderRow({
             <Button
               size="sm"
               variant="destructive"
-              onClick={async () => {
+              onClick={asyncHandler(async () => {
                 await onUnlink();
                 setConfirming(false);
-              }}
+              })}
             >
               Confirm
             </Button>
@@ -566,7 +570,7 @@ function ConnectedAccountsSubsection() {
                 'flex items-center justify-between rounded-lg border border-dashed p-3 text-muted-foreground',
                 linking ? 'cursor-not-allowed opacity-50' : 'hover:bg-muted/50',
               )}
-              onClick={() => actions.linkProvider(provider.providerId)}
+              onClick={asyncHandler(() => actions.linkProvider(provider.providerId))}
             >
               <div className="flex items-center gap-3">
                 {Icon && <Icon className="size-4" />}
@@ -609,10 +613,10 @@ function DangerSubsection() {
             <Button
               size="sm"
               variant="destructive"
-              onClick={async () => {
+              onClick={asyncHandler(async () => {
                 await actions.deleteAccount();
                 setConfirming(false);
-              }}
+              })}
             >
               Confirm
             </Button>
@@ -676,7 +680,7 @@ function SetPasswordSubsection() {
         <form
           data-inline-edit
           className="flex flex-col gap-3"
-          onSubmit={async (e) => {
+          onSubmit={asyncHandler(async (e) => {
             e.preventDefault();
             setError(null);
             if (newPassword.length < 6) {
@@ -695,7 +699,7 @@ function SetPasswordSubsection() {
             } catch {
               // error surfaced via context
             }
-          }}
+          })}
           onReset={handleCancel}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -786,7 +790,7 @@ function PasswordSubsection() {
         <form
           data-inline-edit
           className="flex flex-col gap-3"
-          onSubmit={async (e) => {
+          onSubmit={asyncHandler(async (e) => {
             e.preventDefault();
             setError(null);
             if (newPassword !== confirmPassword) {
@@ -799,7 +803,7 @@ function PasswordSubsection() {
             } catch {
               setError('Failed to change password');
             }
-          }}
+          })}
           onReset={handleCancel}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -858,7 +862,7 @@ function PasswordSubsection() {
           <Button
             size="sm"
             variant="ghost"
-            onClick={actions.sendVerificationEmail}
+            onClick={asyncHandler(actions.sendVerificationEmail)}
           >
             Resend verification
           </Button>
@@ -888,7 +892,7 @@ function MFASubsection() {
           <Button
             size="sm"
             variant="outline"
-            onClick={actions.startTotpEnrollment}
+            onClick={asyncHandler(actions.startTotpEnrollment)}
           >
             Enable
           </Button>
@@ -953,11 +957,11 @@ function MFASubsection() {
               <Button
                 size="sm"
                 disabled={otpCode.length !== 6}
-                onClick={async () => {
+                onClick={asyncHandler(async () => {
                   await actions.verifyTotpEnrollment(otpCode);
                   setOtpCode('');
                   setShowVerify(false);
-                }}
+                })}
               >
                 Verify
               </Button>
@@ -1013,10 +1017,10 @@ function MFASubsection() {
             <Button
               size="sm"
               variant="destructive"
-              onClick={async () => {
+              onClick={asyncHandler(async () => {
                 await actions.unenrollTotp();
                 setConfirming(false);
-              }}
+              })}
             >
               Confirm
             </Button>

@@ -23,7 +23,7 @@ import { useEffect, useState } from 'react';
 function getIsolatedAuth() {
   const name = 'external-link';
   const existing = getApps().find((a) => a.name === name);
-  if (existing) deleteApp(existing);
+  if (existing) void deleteApp(existing);
   const app = initializeApp(
     {
       apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -152,7 +152,7 @@ function ElectronLinkPage() {
         sessionStorage.setItem(REDIRECT_KEY, '1');
         await linkWithRedirect(credential.user, makeProvider());
       })
-      .catch((e) => {
+      .catch((e: unknown) => {
         sessionStorage.removeItem(REDIRECT_KEY);
         console.error('Electron link error:', e);
         setError(

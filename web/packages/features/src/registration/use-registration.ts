@@ -1,5 +1,6 @@
 'use client';
 
+import { asyncHandler } from '@pivox/observability';
 import {
   GoogleAuthProvider,
   OAuthProvider,
@@ -87,7 +88,7 @@ export function useRegistration(
     updateConfirmPassword: setConfirmPassword,
     formAction,
 
-    socialLogin: async (provider) => {
+    socialLogin: asyncHandler(async (provider) => {
       setError(null);
       try {
         let result: UserCredential;
@@ -122,7 +123,7 @@ export function useRegistration(
           setError(firebaseErrorMessage(e));
         }
       }
-    },
+    }),
   };
 
   const meta: RegistrationMeta = { emailRef };

@@ -1,4 +1,5 @@
 import { ForgotPasswordFeature } from '@pivox/features/forgot-password';
+import { asyncHandler } from '@pivox/observability';
 import { ForgotPasswordCard } from '@pivox/ui/forgot-password-card';
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 
@@ -17,7 +18,7 @@ function ForgotPasswordPage() {
         <ForgotPasswordCard.SuccessMessage />
         <ForgotPasswordCard.SubmitButton />
         <ForgotPasswordCard.Footer
-          onClick={() => router.navigate({ to: '/auth/login' })}
+          onClick={asyncHandler(() => router.navigate({ to: '/auth/login' }))}
         />
       </ForgotPasswordCard.Root>
     </ForgotPasswordFeature>

@@ -1,4 +1,5 @@
 import { ResetPasswordFeature } from '@pivox/features/reset-password';
+import { asyncHandler } from '@pivox/observability';
 import { ResetPasswordCard } from '@pivox/ui/reset-password-card';
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 
@@ -20,7 +21,7 @@ function ResetPasswordPage() {
   return (
     <ResetPasswordFeature
       oobCode={oobCode}
-      onSuccess={() => router.navigate({ to: '/auth/login' })}
+      onSuccess={asyncHandler(() => router.navigate({ to: '/auth/login' }))}
     >
       <ResetPasswordCard.Root>
         <ResetPasswordCard.Header />
@@ -29,7 +30,7 @@ function ResetPasswordPage() {
         <ResetPasswordCard.SuccessMessage />
         <ResetPasswordCard.SubmitButton />
         <ResetPasswordCard.Footer
-          onClick={() => router.navigate({ to: '/auth/login' })}
+          onClick={asyncHandler(() => router.navigate({ to: '/auth/login' }))}
         />
       </ResetPasswordCard.Root>
     </ResetPasswordFeature>

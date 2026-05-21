@@ -84,6 +84,9 @@ importers:
       '@pivox/features':
         specifier: workspace:*
         version: link:../../packages/features
+      '@pivox/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@pivox/primitives':
         specifier: workspace:*
         version: link:../../packages/primitives
@@ -151,6 +154,9 @@ importers:
       '@pivox/features':
         specifier: workspace:*
         version: link:../../packages/features
+      '@pivox/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@pivox/primitives':
         specifier: workspace:*
         version: link:../../packages/primitives
@@ -236,6 +242,9 @@ importers:
 
   packages/features:
     dependencies:
+      '@pivox/observability':
+        specifier: workspace:*
+        version: link:../observability
       '@pivox/primitives':
         specifier: workspace:*
         version: link:../primitives
@@ -266,6 +275,12 @@ importers:
         version: 8.0.13(@types/node@25.8.0)(jiti@2.7.0)
 
   packages/image-editor:
+    devDependencies:
+      vite:
+        specifier: ^8.0.13
+        version: 8.0.13(@types/node@25.8.0)(jiti@2.7.0)
+
+  packages/observability:
     devDependencies:
       vite:
         specifier: ^8.0.13
@@ -409,6 +424,9 @@ importers:
       '@pivox/image-editor':
         specifier: workspace:*
         version: link:../image-editor
+      '@pivox/observability':
+        specifier: workspace:*
+        version: link:../observability
       '@pivox/primitives':
         specifier: workspace:*
         version: link:../primitives

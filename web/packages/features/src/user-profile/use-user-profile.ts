@@ -1,5 +1,6 @@
 'use client';
 
+import { reportError } from '@pivox/observability';
 import {
   EmailAuthProvider,
   GithubAuthProvider,
@@ -72,7 +73,9 @@ export function useUserProfile(
   const open = options?.open;
   useEffect(() => {
     if (open) {
-      refreshUser().then();
+      refreshUser().catch((err: unknown) => {
+        reportError(err, { source: 'useUserProfile.refreshUser' });
+      });
     }
   }, [open, refreshUser]);
 

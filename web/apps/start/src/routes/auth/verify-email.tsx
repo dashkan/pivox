@@ -1,4 +1,5 @@
 import { VerifyEmailFeature } from '@pivox/features/verify-email';
+import { asyncHandler } from '@pivox/observability';
 import { VerifyEmailCard } from '@pivox/ui/verify-email-card';
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 
@@ -16,7 +17,7 @@ function VerifyEmailPage() {
         <VerifyEmailCard.Message />
         <VerifyEmailCard.ResendButton />
         <VerifyEmailCard.Footer
-          onClick={() => router.navigate({ to: '/auth/login' })}
+          onClick={asyncHandler(() => router.navigate({ to: '/auth/login' }))}
         />
       </VerifyEmailCard.Root>
     </VerifyEmailFeature>

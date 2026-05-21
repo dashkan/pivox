@@ -1,4 +1,5 @@
 import { AppLayoutFeature } from '@pivox/features/app-layout';
+import { asyncHandler } from '@pivox/observability';
 import { AppLayout, useAppLayoutContext } from '@pivox/ui/app-layout';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
 import { UserProfileCard } from '@pivox/ui/user-profile-card';
@@ -15,7 +16,7 @@ function AppLayoutRoute() {
 
   return (
     <AppLayoutFeature
-      onNavigateToLogin={() => router.navigate({ to: '/auth/login' })}
+      onNavigateToLogin={asyncHandler(() => router.navigate({ to: '/auth/login' }))}
     >
       <AppLayout.Root>
         <AppLayout.Header>

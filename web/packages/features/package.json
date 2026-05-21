@@ -79,6 +79,7 @@
     "vite": "^8.0.13"
   },
   "dependencies": {
+    "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/ui": "workspace:*",
     "firebase": "^12.13.0"

@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@pivox/features": "workspace:*",
+    "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/ui": "workspace:*",
     "@tailwindcss/vite": "^4.3.0",

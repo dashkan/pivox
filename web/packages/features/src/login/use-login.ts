@@ -1,5 +1,6 @@
 'use client';
 
+import { asyncHandler } from '@pivox/observability';
 import {
   GoogleAuthProvider,
   OAuthProvider,
@@ -75,7 +76,7 @@ export function useLogin(
     updatePassword: setPassword,
     formAction,
 
-    socialLogin: async (provider) => {
+    socialLogin: asyncHandler(async (provider) => {
       setError(null);
       try {
         let result: UserCredential;
@@ -110,9 +111,9 @@ export function useLogin(
           setError(firebaseErrorMessage(e));
         }
       }
-    },
+    }),
 
-    ssoLogin: async () => {
+    ssoLogin: asyncHandler(async () => {
       setError(null);
       try {
         const auth = getAuth();
@@ -140,7 +141,7 @@ export function useLogin(
           setError(firebaseErrorMessage(e));
         }
       }
-    },
+    }),
   };
 
   const meta: LoginMeta = { emailRef };

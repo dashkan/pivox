@@ -1,3 +1,4 @@
+import { asyncHandler } from '@pivox/observability';
 import { Button } from '@pivox/primitives/button';
 import {
   Card,
@@ -33,7 +34,7 @@ function ActionPage() {
   // resetPassword navigates to its own page
   useEffect(() => {
     if (mode === 'resetPassword') {
-      router.navigate({
+      void router.navigate({
         to: '/auth/reset-password',
         search: { oobCode },
       });
@@ -101,7 +102,7 @@ function VerifyEmailAction({ oobCode }: { oobCode: string }) {
         if (auth.currentUser) await auth.currentUser.reload();
         setStatus('success');
       })
-      .catch((e) => {
+      .catch((e: unknown) => {
         setStatus('error');
         setMessage(actionErrorMessage(e));
       });
@@ -150,7 +151,7 @@ function VerifyAndChangeEmailAction({ oobCode }: { oobCode: string }) {
         if (auth.currentUser) await auth.currentUser.reload();
         setStatus('success');
       })
-      .catch((e) => {
+      .catch((e: unknown) => {
         setStatus('error');
         setMessage(actionErrorMessage(e));
       });
@@ -203,7 +204,7 @@ function RecoverEmailAction({ oobCode }: { oobCode: string }) {
       .then(() => {
         setStatus('success');
       })
-      .catch((e) => {
+      .catch((e: unknown) => {
         setStatus('error');
         setMessage(actionErrorMessage(e));
       });
@@ -251,7 +252,7 @@ function RevertSecondFactorAction({ oobCode }: { oobCode: string }) {
       .then(() => {
         setStatus('confirm');
       })
-      .catch((e) => {
+      .catch((e: unknown) => {
         setStatus('error');
         setMessage(actionErrorMessage(e));
       });
@@ -294,7 +295,7 @@ function RevertSecondFactorAction({ oobCode }: { oobCode: string }) {
           description="Two-step verification was recently added to your account. If you didn't do this, you can remove it now."
         >
           <div className="flex gap-2">
-            <Button size="sm" variant="destructive" onClick={handleRevert}>
+            <Button size="sm" variant="destructive" onClick={asyncHandler(handleRevert)}>
               Remove 2-step verification
             </Button>
             <LinkToLogin label="Cancel" />

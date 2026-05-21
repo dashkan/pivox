@@ -1,5 +1,6 @@
 'use client';
 
+import { asyncHandler } from '@pivox/observability';
 import { Button } from '@pivox/primitives/button';
 import {
   DropdownMenu,
@@ -156,7 +157,7 @@ function AppLayoutHeaderAvatar({ className }: { className?: string }) {
           Manage account
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={actions.signOut}>Sign out</DropdownMenuItem>
+        <DropdownMenuItem onClick={asyncHandler(actions.signOut)}>Sign out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
