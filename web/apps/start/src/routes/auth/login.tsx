@@ -33,7 +33,9 @@ function LoginPage() {
         <LoginCard.Separator />
         <LoginCard.SocialButtons providers={authProviders} />
         <LoginCard.Footer
-          onClick={asyncHandler(() => router.navigate({ to: '/auth/register' }))}
+          onClick={asyncHandler(() =>
+            router.navigate({ to: '/auth/register' }),
+          )}
         />
       </LoginCard.Root>
     </LoginFeature>

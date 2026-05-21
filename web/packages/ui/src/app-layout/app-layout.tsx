@@ -157,7 +157,9 @@ function AppLayoutHeaderAvatar({ className }: { className?: string }) {
           Manage account
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={asyncHandler(actions.signOut)}>Sign out</DropdownMenuItem>
+        <DropdownMenuItem onClick={asyncHandler(actions.signOut)}>
+          Sign out
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

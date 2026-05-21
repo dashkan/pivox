@@ -295,7 +295,11 @@ function RevertSecondFactorAction({ oobCode }: { oobCode: string }) {
           description="Two-step verification was recently added to your account. If you didn't do this, you can remove it now."
         >
           <div className="flex gap-2">
-            <Button size="sm" variant="destructive" onClick={asyncHandler(handleRevert)}>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={asyncHandler(handleRevert)}
+            >
               Remove 2-step verification
             </Button>
             <LinkToLogin label="Cancel" />

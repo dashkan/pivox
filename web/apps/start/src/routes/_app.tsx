@@ -18,7 +18,9 @@ function AppLayoutRoute() {
 
   return (
     <AppLayoutFeature
-      onNavigateToLogin={asyncHandler(() => router.navigate({ to: '/auth/login' }))}
+      onNavigateToLogin={asyncHandler(() =>
+        router.navigate({ to: '/auth/login' }),
+      )}
     >
       <AppLayout.Root>
         <AppLayout.Header>

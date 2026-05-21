@@ -11,7 +11,9 @@ function LinkAccountPage() {
   const router = useRouter();
 
   return (
-    <LinkAccountFeature onSuccess={asyncHandler(() => router.navigate({ to: '/' }))}>
+    <LinkAccountFeature
+      onSuccess={asyncHandler(() => router.navigate({ to: '/' }))}
+    >
       <LinkAccountCard.Root>
         <LinkAccountCard.Header />
         <LinkAccountCard.PasswordField />

@@ -570,7 +570,9 @@ function ConnectedAccountsSubsection() {
                 'flex items-center justify-between rounded-lg border border-dashed p-3 text-muted-foreground',
                 linking ? 'cursor-not-allowed opacity-50' : 'hover:bg-muted/50',
               )}
-              onClick={asyncHandler(() => actions.linkProvider(provider.providerId))}
+              onClick={asyncHandler(() =>
+                actions.linkProvider(provider.providerId),
+              )}
             >
               <div className="flex items-center gap-3">
                 {Icon && <Icon className="size-4" />}
