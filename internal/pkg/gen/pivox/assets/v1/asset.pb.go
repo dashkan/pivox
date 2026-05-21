@@ -2945,11 +2945,11 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x04DONE\x10\x03\"W\n" +
 	"\x17GetAssetMetadataRequest\x12<\n" +
 	"\x04name\x18\x01 \x01(\tB(\xe0A\x02\xfaA\x1c\n" +
-	"\x1apivox.assets/AssetMetadata\xbaH\x03\xc8\x01\x01R\x04name\"\xdc\x01\n" +
+	"\x1apivox.assets/AssetMetadata\xbaH\x03\xc8\x01\x01R\x04name\"\xe1\x01\n" +
 	"\rAssetMetadata\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x128\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x03R\bmetadata:x\xeaAu\n" +
-	"\x1apivox.assets/AssetMetadata\x12Corganizations/{organization}/spaces/{space}/assets/{asset}/metadata*\bmetadata2\bmetadata2\x86\x12\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x03R\bmetadata:}\xeaAz\n" +
+	"\x1apivox.assets/AssetMetadata\x12Corganizations/{organization}/spaces/{space}/assets/{asset}/metadata*\bmetadata2\rassetMetadata2\x86\x12\n" +
 	"\x06Assets\x12\xd5\x01\n" +
 	"\vCreateAsset\x12#.pivox.assets.v1.CreateAssetRequest\x1a\x1d.google.longrunning.Operation\"\x81\x01\xcaA\x1c\n" +
 	"\x05Asset\x12\x13CreateAssetMetadata\xdaA\fparent,asset\x8a\xb5\x18\x14assets.assets.create\x82\xd3\xe4\x93\x025:\x05asset\",/v1/{parent=organizations/*/spaces/*}/assets\x12\x97\x01\n" +

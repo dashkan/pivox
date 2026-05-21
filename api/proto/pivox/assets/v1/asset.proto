@@ -975,7 +975,7 @@ message AssetMetadata {
     type: "pivox.assets/AssetMetadata"
     pattern: "organizations/{organization}/spaces/{space}/assets/{asset}/metadata"
     plural: "metadata"
-    singular: "metadata"
+    singular: "assetMetadata"
   };
 
   // Output only. The resource name. Format:
