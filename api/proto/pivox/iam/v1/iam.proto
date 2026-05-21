@@ -119,11 +119,12 @@ service Iam {
   // No permission annotation: on the membership-exempt list, like
   // CreateOrganization, so memberless callers (stuck in a
   // half-bootstrapped state) can still delete their account.
+  // (-- api-linter: core::0127::http-template-pattern=disabled
+  //     aip.dev/not-precedent: Only support deleting own account. --)
+  // (-- api-linter: core::0156::forbidden-methods=disabled
+  //     aip.dev/not-precedent: Only support deleting own account. --)
   rpc DeleteAccount(DeleteAccountRequest) returns (google.longrunning.Operation) {
-    option (google.api.http) = {
-      post: "/v1/{name=accounts/me}:delete"
-      body: "*"
-    };
+    option (google.api.http) = {delete: "/v1/{name=accounts/me}"};
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
       response_type: "google.protobuf.Empty"

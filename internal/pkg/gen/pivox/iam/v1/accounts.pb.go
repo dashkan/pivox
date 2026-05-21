@@ -313,10 +313,10 @@ var File_pivox_iam_v1_accounts_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_accounts_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/iam/v1/accounts.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\"Z\n" +
+	"\x1bpivox/iam/v1/accounts.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\"a\n" +
 	"\aAccount\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name:6\xeaA3\n" +
-	"\x11pivox.iam/Account\x12\vaccounts/me*\baccounts2\aaccount\"K\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name:=\xeaA:\n" +
+	"\x11pivox.iam/Account\x12\x12accounts/{account}*\baccounts2\aaccount\"K\n" +
 	"\x14DeleteAccountRequest\x123\n" +
 	"\x04name\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
 	"\x11pivox.iam/Account\xbaH\x03\xc8\x01\x01R\x04name\"\x92\x02\n" +

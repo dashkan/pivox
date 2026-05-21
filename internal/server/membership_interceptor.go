@@ -54,8 +54,8 @@ var membershipExemptMethods = map[string]bool{
 	"/pivox.api.v1.Organizations/ListOrganizations":  true,
 	"/pivox.api.v1.Organizations/AcceptInvitation":   true,
 	"/pivox.api.v1.Organizations/GetInvitation":      true,
-	// DeleteAccount targets the singleton accounts/me — no org
-	// scope. A user stuck in a half-bootstrapped state (firebase
+	// DeleteAccount targets accounts/me, the caller's own account —
+	// no org scope. A user stuck in a half-bootstrapped state (firebase
 	// identity exists, no org memberships) must still be able to
 	// delete their account; gating this on membership would lock
 	// them out of recovery.

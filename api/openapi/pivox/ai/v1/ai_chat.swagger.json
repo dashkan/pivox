@@ -1932,7 +1932,10 @@
           "readOnly": true
         }
       },
-      "description": "A tool result produced by executing a tool call."
+      "description": "A tool result produced by executing a tool call.",
+      "required": [
+        "toolCallId"
+      ]
     }
   }
 }

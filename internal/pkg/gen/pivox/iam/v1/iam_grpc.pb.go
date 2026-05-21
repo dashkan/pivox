@@ -130,6 +130,13 @@ type IamClient interface {
 	// No permission annotation: on the membership-exempt list, like
 	// CreateOrganization, so memberless callers (stuck in a
 	// half-bootstrapped state) can still delete their account.
+	// (-- api-linter: core::0127::http-template-pattern=disabled
+	//
+	//	aip.dev/not-precedent: Only support deleting own account. --)
+	//
+	// (-- api-linter: core::0156::forbidden-methods=disabled
+	//
+	//	aip.dev/not-precedent: Only support deleting own account  --)
 	DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Gets a role by resource name. v1 returns only system roles
 	// (owner, admin, editor, viewer); custom roles are deferred.
@@ -393,6 +400,13 @@ type IamServer interface {
 	// No permission annotation: on the membership-exempt list, like
 	// CreateOrganization, so memberless callers (stuck in a
 	// half-bootstrapped state) can still delete their account.
+	// (-- api-linter: core::0127::http-template-pattern=disabled
+	//
+	//	aip.dev/not-precedent: Only support deleting own account. --)
+	//
+	// (-- api-linter: core::0156::forbidden-methods=disabled
+	//
+	//	aip.dev/not-precedent: Only support deleting own account  --)
 	DeleteAccount(context.Context, *DeleteAccountRequest) (*longrunningpb.Operation, error)
 	// Gets a role by resource name. v1 returns only system roles
 	// (owner, admin, editor, viewer); custom roles are deferred.

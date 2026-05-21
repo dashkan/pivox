@@ -52,7 +52,7 @@ option go_package = "pivox/iam/v1;iampb";
 message Account {
   option (google.api.resource) = {
     type: "pivox.iam/Account"
-    pattern: "accounts/me"
+    pattern: "accounts/{account}"
     plural: "accounts"
     singular: "account"
   };
