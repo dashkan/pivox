@@ -6,6 +6,12 @@ import { BrowserWindow, app, ipcMain, net, shell } from 'electron';
 
 import icon from '../../resources/icon.png?asset';
 
+import {
+  brokerBaseUrl,
+  handleAuthCompleteDeepLink,
+  startBrokerLogin,
+} from './broker-auth';
+
 const BASE_URL = process.env.PIVOX_WEB_URL || 'https://pivox.ngrok.app';
 
 let mainWindow: BrowserWindow | null = null;
@@ -80,7 +86,11 @@ function handleDeepLink(url: string): void {
 // macOS: open-url fires when app is already running or launched via protocol
 app.on('open-url', (event, url) => {
   event.preventDefault();
-  handleDeepLink(url);
+  // Broker `scheme` transport first; fall back to the legacy
+  // custom-token deep link (removed once the bridge is deleted).
+  if (!handleAuthCompleteDeepLink(url)) {
+    handleDeepLink(url);
+  }
 });
 
 // Windows/Linux: second-instance fires when a new instance is launched with the protocol URL
@@ -91,7 +101,7 @@ app.on('second-instance', (_event, argv) => {
   }
 
   const deepLinkUrl = argv.find((arg) => arg.startsWith('pivox://'));
-  if (deepLinkUrl) {
+  if (deepLinkUrl && !handleAuthCompleteDeepLink(deepLinkUrl)) {
     handleDeepLink(deepLinkUrl);
   }
 });
@@ -133,6 +143,21 @@ ipcMain.handle(
     return state;
   },
 );
+
+// Broker OAuth flow (loopback / custom-scheme transport — see
+// broker-auth.ts). The renderer is repointed from auth:start-social-login
+// to this handler in a later phase; sign-in vs. account-link is the
+// renderer's decision once it holds the returned credential.
+ipcMain.handle(
+  'auth:start-broker-login',
+  async (_event, input: { provider: string; loginHint?: string }) => {
+    const result = await startBrokerLogin(input);
+    mainWindow?.focus();
+    return result;
+  },
+);
+
+ipcMain.handle('app:get-broker-base-url', () => brokerBaseUrl());
 
 // --- Window creation ---
 

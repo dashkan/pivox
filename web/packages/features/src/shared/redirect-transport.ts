@@ -90,3 +90,23 @@ export function parseBrokerRedirect(fragment: string): BrokerRedirectResult {
     ...(nonce ? { nonce } : {}),
   };
 }
+
+/**
+ * Builds the broker's `/start` URL for `provider`. The transport opens
+ * it in the system browser (Electron) or a popup (web); `returnUrl` is
+ * where the broker redirects back with the credential fragment.
+ */
+export function buildBrokerStartUrl(input: {
+  baseUrl: string;
+  provider: string;
+  returnUrl: string;
+  loginHint?: string;
+}): string {
+  const origin = input.baseUrl.replace(/\/$/, '');
+  const params = new URLSearchParams({ return: input.returnUrl });
+  if (input.loginHint) {
+    params.set('login_hint', input.loginHint);
+  }
+  const provider = encodeURIComponent(input.provider);
+  return `${origin}/internal/v1/auth/${provider}/start?${params.toString()}`;
+}

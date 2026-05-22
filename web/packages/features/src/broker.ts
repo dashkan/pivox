@@ -11,6 +11,9 @@ export type {
   BrokerRedirectResult,
   RedirectTransport,
 } from '@/shared/redirect-transport';
-export { parseBrokerRedirect } from '@/shared/redirect-transport';
+export {
+  buildBrokerStartUrl,
+  parseBrokerRedirect,
+} from '@/shared/redirect-transport';
 export { buildBrokerCredential } from '@/shared/broker-credential';
 export { resolveSsoProvider } from '@/shared/resolve-sso-provider';

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseBrokerRedirect } from '@/shared/redirect-transport';
+import {
+  buildBrokerStartUrl,
+  parseBrokerRedirect,
+} from '@/shared/redirect-transport';
 
 describe('parseBrokerRedirect', () => {
   it('parses a GitHub success fragment', () => {
@@ -171,5 +174,66 @@ describe('parseBrokerRedirect', () => {
       ok: false,
       error: 'invalid_broker_response',
     });
+  });
+});
+
+describe('buildBrokerStartUrl', () => {
+  it('builds the broker start URL for a static provider', () => {
+    const url = new URL(
+      buildBrokerStartUrl({
+        baseUrl: 'https://pivox.test',
+        provider: 'github',
+        returnUrl: 'pivox://auth-complete?es=abc',
+      }),
+    );
+    expect(url.origin).toBe('https://pivox.test');
+    expect(url.pathname).toBe('/internal/v1/auth/github/start');
+    expect(url.searchParams.get('return')).toBe('pivox://auth-complete?es=abc');
+    expect(url.searchParams.has('login_hint')).toBe(false);
+  });
+
+  it('includes login_hint when provided', () => {
+    const url = new URL(
+      buildBrokerStartUrl({
+        baseUrl: 'https://pivox.test',
+        provider: 'github',
+        returnUrl: 'pivox://auth-complete',
+        loginHint: 'user@example.com',
+      }),
+    );
+    expect(url.searchParams.get('login_hint')).toBe('user@example.com');
+  });
+
+  it('places an OIDC provider id in the path', () => {
+    const url = new URL(
+      buildBrokerStartUrl({
+        baseUrl: 'https://pivox.test',
+        provider: 'oidc.acme',
+        returnUrl: 'pivox://auth-complete',
+      }),
+    );
+    expect(url.pathname).toBe('/internal/v1/auth/oidc.acme/start');
+  });
+
+  it('trims a trailing slash from the base URL', () => {
+    const url = buildBrokerStartUrl({
+      baseUrl: 'https://pivox.test/',
+      provider: 'github',
+      returnUrl: 'pivox://auth-complete',
+    });
+    expect(
+      url.startsWith('https://pivox.test/internal/v1/auth/github/start'),
+    ).toBe(true);
+  });
+
+  it('percent-encodes the return URL so its delimiters do not leak', () => {
+    const url = buildBrokerStartUrl({
+      baseUrl: 'https://pivox.test',
+      provider: 'github',
+      returnUrl: 'http://127.0.0.1:5400/cb?es=abc',
+    });
+    expect(url).toContain(
+      'return=http%3A%2F%2F127.0.0.1%3A5400%2Fcb%3Fes%3Dabc',
+    );
   });
 });
