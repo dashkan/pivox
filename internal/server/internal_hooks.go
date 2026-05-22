@@ -69,9 +69,6 @@ type InternalHooks struct {
 // short TTLs, the auth chain, and response-shape uniformity.
 func (h *InternalHooks) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/v1/auth:syncIdentity", h.syncAuth(h.syncIdentity))
-	mux.HandleFunc("POST /internal/v1/auth:exchangeToken", h.exchangeToken)
-	mux.HandleFunc("POST /internal/v1/auth:depositToken", h.depositToken)
-	mux.HandleFunc("POST /internal/v1/auth:consumeToken", h.consumeToken)
 	mux.HandleFunc("POST /internal/v1/auth:createDelegatedAuthSession", h.createDelegatedAuthSession)
 	mux.HandleFunc("POST /internal/v1/auth:completeDelegatedAuthSession", h.completeDelegatedAuthSession)
 	mux.HandleFunc("POST /internal/v1/auth:pollDelegatedAuthSession", h.pollDelegatedAuthSession)
@@ -141,127 +138,6 @@ func (h *InternalHooks) syncIdentity(w http.ResponseWriter, r *http.Request) {
 		"identity_id": identity.ID.String(),
 	}); err != nil {
 		h.logger.Warn("write sync-identity response failed", "error", err)
-	}
-}
-
-// exchangeToken verifies a Firebase ID token and returns a custom token.
-// This endpoint authenticates via the Firebase ID token itself (cryptographically
-// signed by Google), so no shared secret is required.
-func (h *InternalHooks) exchangeToken(w http.ResponseWriter, r *http.Request) {
-	// AUTHN-05: Limit request body (this endpoint only reads headers, but defense-in-depth).
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
-
-	authHeader := r.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		http.Error(w, "missing or invalid authorization header", http.StatusUnauthorized)
-		return
-	}
-	idToken := strings.TrimPrefix(authHeader, "Bearer ")
-
-	identity, err := h.auth.VerifyToken(r.Context(), idToken)
-	if err != nil {
-		h.logger.Warn("failed to verify ID token", "error", err)
-		http.Error(w, "invalid ID token", http.StatusUnauthorized)
-		return
-	}
-
-	customToken, err := h.auth.CreateCustomToken(r.Context(), identity.UID)
-	if err != nil {
-		h.logger.Error("failed to create custom token", "uid", identity.UID, "error", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	h.logger.Info("token exchanged", "uid", identity.UID)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{
-		"custom_token": customToken,
-	}); err != nil {
-		h.logger.Warn("write exchange-token response failed", "error", err)
-	}
-}
-
-// depositTokenRequest is the payload for the token deposit endpoint.
-type depositTokenRequest struct {
-	IDToken string `json:"id_token"`
-}
-
-// depositToken stores a Firebase ID token behind a short-lived, single-use
-// opaque code. The Electron app calls this so the raw ID token never appears
-// in a URL query parameter (AUTHN-04).
-func (h *InternalHooks) depositToken(w http.ResponseWriter, r *http.Request) {
-	// AUTHN-05: ID tokens are ~1-2 KB; 8 KB is generous.
-	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
-
-	var req depositTokenRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if req.IDToken == "" {
-		http.Error(w, "id_token is required", http.StatusBadRequest)
-		return
-	}
-
-	// Verify the token is valid before storing it — reject garbage early.
-	if _, err := h.auth.VerifyToken(r.Context(), req.IDToken); err != nil {
-		h.logger.Warn("deposit: invalid ID token", "error", err)
-		http.Error(w, "invalid ID token", http.StatusUnauthorized)
-		return
-	}
-
-	code, err := h.queries.CreateAuthTokenCode(r.Context(), req.IDToken)
-	if err != nil {
-		h.logger.Error("failed to create auth token code", "error", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{
-		"code": code.Code.String(),
-	}); err != nil {
-		h.logger.Warn("write deposit-token response failed", "error", err)
-	}
-}
-
-// consumeTokenRequest is the payload for the token consume endpoint.
-type consumeTokenRequest struct {
-	Code string `json:"code"`
-}
-
-// consumeToken exchanges a single-use opaque code for the original ID token.
-// The code is atomically marked as consumed — replay is not possible.
-func (h *InternalHooks) consumeToken(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
-
-	var req consumeTokenRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	codeUUID, err := uuid.Parse(req.Code)
-	if err != nil {
-		http.Error(w, "invalid code format", http.StatusBadRequest)
-		return
-	}
-
-	tokenCode, err := h.queries.ConsumeAuthTokenCode(r.Context(), codeUUID)
-	if err != nil {
-		// No rows = expired, consumed, or nonexistent.
-		h.logger.Warn("consume: invalid or expired code", "code", req.Code, "error", err)
-		http.Error(w, "invalid or expired code", http.StatusUnauthorized)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{
-		"id_token": tokenCode.IDToken,
-	}); err != nil {
-		h.logger.Warn("write consume-token response failed", "error", err)
 	}
 }
 

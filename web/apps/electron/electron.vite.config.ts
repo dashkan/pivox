@@ -5,7 +5,19 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  main: {},
+  main: {
+    build: {
+      // `@pivox/features` is an ESM-only workspace package with no CJS
+      // (`require`) export condition. electron-vite externalizes deps
+      // for the CJS main process by default, which leaves a runtime
+      // `require('@pivox/features/broker')` that fails to resolve.
+      // Exclude it so Vite bundles it into the main process instead —
+      // the intended treatment for first-party workspace packages.
+      externalizeDeps: {
+        exclude: ['@pivox/features'],
+      },
+    },
+  },
   preload: {},
   renderer: {
     resolve: {

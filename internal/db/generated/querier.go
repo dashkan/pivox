@@ -52,9 +52,6 @@ type Querier interface {
 	// was never created, already completed, or has expired.
 	CompleteDelegatedAuthSession(ctx context.Context, arg CompleteDelegatedAuthSessionParams) (DelegatedAuthSession, error)
 	CompleteOperation(ctx context.Context, arg CompleteOperationParams) (Operation, error)
-	// Atomically consumes a code and returns the ID token.
-	// Returns no rows if the code doesn't exist, is expired, or was already consumed.
-	ConsumeAuthTokenCode(ctx context.Context, code uuid.UUID) (AuthTokenCode, error)
 	// Atomically deletes an approved session and returns its custom token. This is
 	// the poll path — a single statement ensures the token is single-use even
 	// under concurrent pollers. No-row result means the session is still pending,
@@ -103,8 +100,6 @@ type Querier interface {
 	CreateAssetArtifactVersion(ctx context.Context, arg CreateAssetArtifactVersionParams) (AiArtifactVersion, error)
 	CreateAssetRendition(ctx context.Context, arg CreateAssetRenditionParams) (AssetRendition, error)
 	CreateAssetVersion(ctx context.Context, arg CreateAssetVersionParams) (AssetVersion, error)
-	// Stores a Firebase ID token behind a short-lived opaque code.
-	CreateAuthTokenCode(ctx context.Context, idToken string) (AuthTokenCode, error)
 	// `created_by` doubles as the conversation owner / authorization
 	// key (the `users/{user}` resource path segment). NOT NULL on the
 	// column; every conversation has a creator.
@@ -168,8 +163,6 @@ type Querier interface {
 	// (cancel in-flight LROs, last-VERIFIED-domain-on-enabled-SSO check)
 	// before this fires.
 	DeleteDomain(ctx context.Context, arg DeleteDomainParams) error
-	// Cleanup: remove codes older than 10 minutes (all should be expired by then).
-	DeleteExpiredAuthTokenCodes(ctx context.Context) error
 	// Cleanup: remove sessions past their expiry. Run periodically.
 	DeleteExpiredDelegatedAuthSessions(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error

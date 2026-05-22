@@ -1,8 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
 
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
-import { BrowserWindow, app, ipcMain, net, shell } from 'electron';
+import { BrowserWindow, app, ipcMain, shell } from 'electron';
 
 import icon from '../../resources/icon.png?asset';
 
@@ -12,16 +11,7 @@ import {
   startBrokerLogin,
 } from './broker-auth';
 
-const BASE_URL = process.env.PIVOX_WEB_URL || 'https://pivox.ngrok.app';
-
 let mainWindow: BrowserWindow | null = null;
-
-// AUTHN-08: Use a Map with TTL instead of a single global variable.
-// Each entry stores the timestamp it was created.
-const pendingAuthStates = new Map<string, number>();
-
-// Maximum age for a pending auth state (5 minutes).
-const AUTH_STATE_MAX_AGE_MS = 5 * 60 * 1000;
 
 // --- Single instance lock + protocol registration ---
 
@@ -39,61 +29,20 @@ if (process.defaultApp) {
 }
 
 // --- Deep link handling ---
+//
+// The only deep link the app handles is the broker's
+// `pivox://auth-complete` callback (the `scheme` transport — see
+// broker-auth.ts). Any other URL is ignored.
 
-function handleDeepLink(url: string): void {
-  if (!mainWindow) return;
-
-  try {
-    const parsed = new URL(url);
-    const token = parsed.searchParams.get('token');
-    const state = parsed.searchParams.get('state');
-    const error = parsed.searchParams.get('error');
-    const linked = parsed.searchParams.get('linked');
-
-    // AUTHN-08: Validate against the Map and check expiry.
-    if (state) {
-      const timestamp = pendingAuthStates.get(state);
-      if (!timestamp || Date.now() - timestamp > AUTH_STATE_MAX_AGE_MS) {
-        pendingAuthStates.delete(state);
-        mainWindow.webContents.send('auth:deep-link', {
-          error:
-            'State mismatch or expired — possible CSRF attack. Please try again.',
-        });
-        return;
-      }
-      pendingAuthStates.delete(state);
-    }
-
-    console.log('deep-link received:', {
-      hasToken: !!token,
-      state,
-      linked,
-      error,
-    });
-    mainWindow.webContents.send('auth:deep-link', {
-      token,
-      state,
-      linked,
-      error,
-    });
-  } catch {
-    mainWindow.webContents.send('auth:deep-link', {
-      error: 'Invalid deep link URL.',
-    });
-  }
-}
-
-// macOS: open-url fires when app is already running or launched via protocol
+// macOS: open-url fires when the app is already running or was
+// launched via the protocol.
 app.on('open-url', (event, url) => {
   event.preventDefault();
-  // Broker `scheme` transport first; fall back to the legacy
-  // custom-token deep link (removed once the bridge is deleted).
-  if (!handleAuthCompleteDeepLink(url)) {
-    handleDeepLink(url);
-  }
+  handleAuthCompleteDeepLink(url);
 });
 
-// Windows/Linux: second-instance fires when a new instance is launched with the protocol URL
+// Windows/Linux: second-instance fires when a new instance is launched
+// with the protocol URL.
 app.on('second-instance', (_event, argv) => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -101,53 +50,16 @@ app.on('second-instance', (_event, argv) => {
   }
 
   const deepLinkUrl = argv.find((arg) => arg.startsWith('pivox://'));
-  if (deepLinkUrl && !handleAuthCompleteDeepLink(deepLinkUrl)) {
-    handleDeepLink(deepLinkUrl);
+  if (deepLinkUrl) {
+    handleAuthCompleteDeepLink(deepLinkUrl);
   }
 });
 
 // --- IPC handlers ---
 
-ipcMain.handle('auth:start-social-login', (_event, provider: string) => {
-  const state = randomUUID();
-  pendingAuthStates.set(state, Date.now());
-  const url = `${BASE_URL}/auth/external-login?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}`;
-  void shell.openExternal(url);
-  return state;
-});
-
-// AUTHN-04: Deposit the ID token server-side and pass only an opaque code in the URL.
-ipcMain.handle(
-  'auth:start-link-provider',
-  async (_event, provider: string, idToken: string) => {
-    const state = randomUUID();
-    pendingAuthStates.set(state, Date.now());
-
-    // Deposit the ID token on the backend and receive a single-use code.
-    const res = await net.fetch(`${BASE_URL}/internal/v1/auth:depositToken`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id_token: idToken }),
-    });
-
-    if (!res.ok) {
-      pendingAuthStates.delete(state);
-      throw new Error(`Failed to deposit token: ${res.status}`);
-    }
-
-    const { code } = (await res.json()) as { code: string };
-
-    // The URL contains only the opaque code — the raw ID token never appears in a URL.
-    const url = `${BASE_URL}/auth/external-link?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}&code=${encodeURIComponent(code)}`;
-    void shell.openExternal(url);
-    return state;
-  },
-);
-
 // Broker OAuth flow (loopback / custom-scheme transport — see
-// broker-auth.ts). The renderer is repointed from auth:start-social-login
-// to this handler in a later phase; sign-in vs. account-link is the
-// renderer's decision once it holds the returned credential.
+// broker-auth.ts). Sign-in vs. account-link is the renderer's
+// decision once it holds the returned credential.
 ipcMain.handle(
   'auth:start-broker-login',
   async (_event, input: { provider: string; loginHint?: string }) => {

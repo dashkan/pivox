@@ -16,7 +16,6 @@ DROP TABLE IF EXISTS assets;
 
 -- Auth / IAM / org
 DROP TABLE IF EXISTS delegated_auth_sessions;
-DROP TABLE IF EXISTS auth_token_codes;
 DROP TABLE IF EXISTS sso_configs;
 DROP TABLE IF EXISTS domains;
 DROP TABLE IF EXISTS public_email_domains;

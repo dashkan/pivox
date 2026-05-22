@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/riverqueue/river"
@@ -18,15 +17,14 @@ type CleanupAuthArgs struct{}
 // Kind implements river.JobArgs.
 func (CleanupAuthArgs) Kind() string { return "cleanup_auth" }
 
-// CleanupAuthWorker deletes expired auth_token_codes and
-// delegated_auth_sessions every tick. Replaces the pre-River
-// inline goroutine in cmd/pivox-cloud/main.go (deleted in cutover)
-// — same two SQL calls, periodic invocation driven by River.
+// CleanupAuthWorker deletes expired delegated_auth_sessions every
+// tick. Replaces the pre-River inline goroutine in
+// cmd/pivox-cloud/main.go — same SQL call, periodic invocation
+// driven by River.
 //
-// The two cleanups are independent: a failure on one does NOT
-// suppress the other (matches pre-River inline behavior). Errors
-// from either are joined and returned so River sees the failure
-// and retries on its schedule, but both calls were attempted.
+// This worker previously also reaped auth_token_codes; that table
+// backed the Electron custom-token bridge, which was removed when
+// auth moved to the OAuth broker.
 type CleanupAuthWorker struct {
 	river.WorkerDefaults[CleanupAuthArgs]
 
@@ -36,14 +34,9 @@ type CleanupAuthWorker struct {
 
 // Work implements river.Worker[CleanupAuthArgs].
 func (w *CleanupAuthWorker) Work(ctx context.Context, _ *river.Job[CleanupAuthArgs]) error {
-	var errs []error
-	if err := w.Queries.DeleteExpiredAuthTokenCodes(ctx); err != nil {
-		w.Logger.ErrorContext(ctx, "cleanup_auth: DeleteExpiredAuthTokenCodes failed", "error", err)
-		errs = append(errs, err)
-	}
 	if err := w.Queries.DeleteExpiredDelegatedAuthSessions(ctx); err != nil {
 		w.Logger.ErrorContext(ctx, "cleanup_auth: DeleteExpiredDelegatedAuthSessions failed", "error", err)
-		errs = append(errs, err)
+		return err
 	}
-	return errors.Join(errs...)
+	return nil
 }

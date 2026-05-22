@@ -1,10 +1,10 @@
 {
   "name": "@pivox/electron",
   "version": "1.0.0",
-  "description": "An Electron application with React and TypeScript",
+  "description": "Pivox desktop application",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "Pivox",
+  "homepage": "https://pivox.app",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",

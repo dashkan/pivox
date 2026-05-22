@@ -99,7 +99,14 @@ function handleLoopbackRequest(
   const path = (req.url ?? '').split('?')[0] ?? '';
 
   if (req.method === 'GET' && path === '/cb') {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    // `Connection: close` on every loopback response keeps each request
+    // one-shot — no keep-alive idle connection lingers to hold the
+    // ephemeral port open after the flow settles and server.close()
+    // runs. (server.close() is graceful: it waits for open connections.)
+    res.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      Connection: 'close',
+    });
     res.end(BOUNCE_PAGE);
     return;
   }
@@ -113,7 +120,7 @@ function handleLoopbackRequest(
       received += chunk.length;
       if (received > MAX_TOKEN_BODY_BYTES) {
         aborted = true;
-        res.writeHead(413);
+        res.writeHead(413, { Connection: 'close' });
         res.end();
         req.destroy();
         return;
@@ -122,7 +129,10 @@ function handleLoopbackRequest(
     });
     req.on('end', () => {
       if (aborted) return;
-      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.writeHead(200, {
+        'content-type': 'text/plain',
+        Connection: 'close',
+      });
       res.end('ok');
       const body = Buffer.concat(chunks).toString('utf8');
       // Cross-check the `es` the broker round-tripped before settling:
@@ -140,7 +150,7 @@ function handleLoopbackRequest(
     return;
   }
 
-  res.writeHead(404);
+  res.writeHead(404, { Connection: 'close' });
   res.end();
 }
 

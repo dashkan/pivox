@@ -896,14 +896,6 @@ type AssetVersion struct {
 	CreateTime     time.Time   `json:"create_time"`
 }
 
-type AuthTokenCode struct {
-	Code       uuid.UUID `json:"code"`
-	IDToken    string    `json:"id_token"`
-	Consumed   bool      `json:"consumed"`
-	CreateTime time.Time `json:"create_time"`
-	ExpireTime time.Time `json:"expire_time"`
-}
-
 type Dashboard struct {
 	ID             uuid.UUID          `json:"id"`
 	SpaceID        uuid.UUID          `json:"space_id"`
