@@ -26,8 +26,9 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
-// OAuthBroker drives federated sign-in (GitHub today; OIDC SSO via
-// per-org SsoConfig rows) for native and web clients. Pairs with
+// OAuthBroker drives federated sign-in (GitHub and Google as static
+// providers; OIDC SSO via per-org SsoConfig rows) for native and web
+// clients. Pairs with
 // oauth_broker_state.go for the HMAC-signed `state` token that
 // round-trips through the IdP redirect.
 //
@@ -169,10 +170,16 @@ type providerConfig struct {
 	// GitHub specifically defaults to form-encoded responses unless
 	// asked for JSON via Accept: application/json.
 	tokenRequestHeaders map[string]string
-	// kind tells the callback how to interpret the token response.
-	// "github_access_token" → return raw access_token to native.
-	// "oidc_id_token"       → return id_token; native then builds an
-	//                         OAuthCredential with this provider id.
+	// prompt, when non-empty, is sent as the OAuth `prompt` authorize
+	// parameter. Static providers set it explicitly (Google →
+	// "select_account"); OIDC SSO providers leave it empty and have
+	// `prompt=login` forced separately in start().
+	prompt string
+	// kind tells the callback how to interpret the token response and
+	// the client which Firebase credential to build:
+	//   "github_access_token" → GithubAuthProvider.credential
+	//   "google_id_token"     → GoogleAuthProvider.credential (no nonce)
+	//   "oidc_id_token"       → OAuthProvider(id).credential + rawNonce
 	kind credentialKind
 }
 
@@ -180,6 +187,7 @@ type credentialKind string
 
 const (
 	kindGitHubAccessToken credentialKind = "github_access_token"
+	kindGoogleIDToken     credentialKind = "google_id_token"
 	kindOIDCIDToken       credentialKind = "oidc_id_token"
 )
 
@@ -202,10 +210,10 @@ func (b *OAuthBroker) resolveProviderConfig(ctx context.Context, providerID stri
 }
 
 // staticProvider returns the env-backed config for non-DB providers
-// (currently just GitHub). Returns (nil, false) when the provider is
+// (GitHub and Google). Returns (nil, false) when the provider is
 // unknown OR its credentials aren't set in the env — the latter
 // case is treated as "not configured" rather than a config error so
-// dev environments without a GitHub client don't fail boot.
+// dev environments without those clients don't fail boot.
 func (b *OAuthBroker) staticProvider(providerID string) (*providerConfig, bool) {
 	switch providerID {
 	case "github":
@@ -222,6 +230,27 @@ func (b *OAuthBroker) staticProvider(providerID string) (*providerConfig, bool) 
 			clientSecret:         b.cfg.GitHubClientSecret,
 			tokenRequestHeaders:  map[string]string{"Accept": "application/json"},
 			kind:                 kindGitHubAccessToken,
+		}, true
+	case "google":
+		if b.cfg.GoogleClientID == "" || b.cfg.GoogleClientSecret == "" {
+			return nil, false
+		}
+		return &providerConfig{
+			id:           "google",
+			authorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
+			tokenURL:     "https://oauth2.googleapis.com/token",
+			// openid yields the id_token; email+profile populate the
+			// claims Firebase consumes. Endpoints are hard-coded —
+			// staticProvider is synchronous (no discovery round-trip)
+			// and Google's OIDC endpoints have been stable for years.
+			scopes:       []string{"openid", "email", "profile"},
+			clientID:     b.cfg.GoogleClientID,
+			clientSecret: b.cfg.GoogleClientSecret,
+			// Account picker, not prompt=login — a "Sign in with
+			// Google" click shouldn't force a password re-entry on an
+			// existing Google session.
+			prompt: "select_account",
+			kind:   kindGoogleIDToken,
 		}, true
 	}
 	return nil, false
@@ -421,6 +450,12 @@ func (b *OAuthBroker) start(w http.ResponseWriter, r *http.Request) {
 	if hint := r.URL.Query().Get("login_hint"); hint != "" {
 		q.Set("login_hint", hint)
 	}
+	// Static providers declare their authorize-time `prompt`
+	// explicitly (Google → select_account). OIDC SSO providers leave
+	// it empty and get prompt=login forced in the block below.
+	if cfg.prompt != "" {
+		q.Set("prompt", cfg.prompt)
+	}
 	// OIDC nonce convention (matches Firebase's Apple-Sign-In and
 	// generic OIDC contract): the value sent to the IdP in the
 	// authorize request is `SHA256(rawNonce)` (hex); the IdP echoes
@@ -531,7 +566,7 @@ func (b *OAuthBroker) callback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		frag.Set("token", tokens.AccessToken)
-	case kindOIDCIDToken:
+	case kindOIDCIDToken, kindGoogleIDToken:
 		if tokens.IDToken == "" {
 			b.renderError(w, r, http.StatusBadGateway, "missing_id_token", nil)
 			return
@@ -540,10 +575,15 @@ func (b *OAuthBroker) callback(w http.ResponseWriter, r *http.Request) {
 		if tokens.AccessToken != "" {
 			frag.Set("access_token", tokens.AccessToken)
 		}
-		// Native rebuilds the OAuthCredential with the rawNonce
-		// equal to the value originally sent in the authorize
-		// request — that's the `n` field of state.
-		frag.Set("nonce", state.N)
+		// Corporate OIDC: the client rebuilds an OAuthCredential and
+		// Firebase verifies sha256(rawNonce) against the id_token's
+		// nonce claim, so echo the raw nonce (the `n` field of state).
+		// Google does NOT use the nonce flow — GoogleAuthProvider's
+		// credential takes no rawNonce — and start() never sent a
+		// nonce, so there is nothing to echo.
+		if cfg.kind == kindOIDCIDToken {
+			frag.Set("nonce", state.N)
+		}
 	}
 	returnURL.Fragment = frag.Encode()
 	http.Redirect(w, r, returnURL.String(), http.StatusFound)
@@ -601,17 +641,29 @@ func (b *OAuthBroker) callbackURL(providerID string) string {
 	return strings.TrimRight(b.cfg.BaseURL, "/") + "/internal/v1/auth/" + providerID + "/callback"
 }
 
-// isAllowedReturnURL guards against open-redirect abuse — only the
-// native scheme `pivox://` and same-origin web URLs (relative to
-// our base URL) are accepted as a `return=` value.
+// isAllowedReturnURL guards against open-redirect abuse. Three caller
+// shapes are accepted as a `return=` value: the native `pivox://`
+// custom scheme, an http loopback URL (Electron's RFC 8252 loopback
+// server), and same-origin web URLs relative to our base URL.
 func (b *OAuthBroker) isAllowedReturnURL(candidate string) bool {
 	u, err := url.Parse(candidate)
 	if err != nil {
 		return false
 	}
+	// Native apps (SwiftUI / .NET) catch the redirect via the pivox://
+	// custom scheme.
 	if u.Scheme == "pivox" {
 		return true
 	}
+	// Electron catches the redirect with an ephemeral http server on a
+	// loopback IP (RFC 8252). Restricted to literal loopback IPs (not
+	// the "localhost" hostname) so the credential can only ever land
+	// on the user's own machine without trusting name resolution.
+	// Userinfo is rejected — a clean loopback return URL never has it.
+	if u.Scheme == "http" && u.User == nil && isLoopbackIPHost(u.Host) {
+		return true
+	}
+	// Browser apps redirect back to a same-origin web page.
 	if b.cfg.BaseURL == "" {
 		return false
 	}
@@ -741,17 +793,42 @@ func requireSecureIssuer(issuer string) error {
 	return fmt.Errorf("issuer must be https (got scheme=%q host=%q)", u.Scheme, u.Host)
 }
 
+// splitHostNoPort extracts the host from a host[:port] string,
+// stripping IPv6 brackets. net.SplitHostPort strips brackets only
+// when a port is present; a port-less bracketed IPv6 host ("[::1]")
+// would otherwise keep them and fail netip.ParseAddr.
+func splitHostNoPort(host string) string {
+	h := host
+	if hostOnly, _, err := net.SplitHostPort(h); err == nil {
+		h = hostOnly
+	}
+	h = strings.TrimPrefix(h, "[")
+	return strings.TrimSuffix(h, "]")
+}
+
 // isLocalhostHost reports whether the host (with optional port) is
 // a loopback address — `localhost`, `127.0.0.0/8`, or `::1`.
 func isLocalhostHost(host string) bool {
-	h, _, err := net.SplitHostPort(host)
-	if err != nil {
-		h = host
-	}
+	h := splitHostNoPort(host)
 	if h == "localhost" {
 		return true
 	}
 	addr, err := netip.ParseAddr(h)
+	if err != nil {
+		return false
+	}
+	return addr.IsLoopback()
+}
+
+// isLoopbackIPHost reports whether host (with optional port) is a
+// loopback IP literal — 127.0.0.0/8 or ::1. Unlike isLocalhostHost it
+// deliberately rejects the "localhost" hostname: the OAuth return-URL
+// allowlist must resolve to loopback without trusting name resolution
+// (RFC 8252 §8.3 recommends the IP literal). Kept separate from
+// isLocalhostHost so the two security gates stay independently
+// auditable; both share splitHostNoPort so a parsing fix reaches both.
+func isLoopbackIPHost(host string) bool {
+	addr, err := netip.ParseAddr(splitHostNoPort(host))
 	if err != nil {
 		return false
 	}

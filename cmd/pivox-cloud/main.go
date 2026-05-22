@@ -103,6 +103,8 @@ func main() {
 	f.String("oauth-broker-app-key", envOrDefault("PIVOX_APP_KEY", ""), "HMAC key for OAuth broker state token (≥32 bytes)")
 	f.String("github-client-id", envOrDefault("GITHUB_CLIENT_ID", ""), "GitHub OAuth app client ID (broker)")
 	f.String("github-client-secret", envOrDefault("GITHUB_CLIENT_SECRET", ""), "GitHub OAuth app client secret (broker)")
+	f.String("google-client-id", envOrDefault("GOOGLE_CLIENT_ID", ""), "Google OAuth (Web app) client ID (broker)")
+	f.String("google-client-secret", envOrDefault("GOOGLE_CLIENT_SECRET", ""), "Google OAuth (Web app) client secret (broker)")
 
 	addSyncAuthFlags(rootCmd)
 
@@ -150,6 +152,8 @@ func serve(cmd *cobra.Command, args []string) error {
 			BaseURL:            must(f.GetString("oauth-broker-base-url")),
 			GitHubClientID:     must(f.GetString("github-client-id")),
 			GitHubClientSecret: must(f.GetString("github-client-secret")),
+			GoogleClientID:     must(f.GetString("google-client-id")),
+			GoogleClientSecret: must(f.GetString("google-client-secret")),
 		},
 	}
 

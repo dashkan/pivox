@@ -49,6 +49,13 @@ type OAuthBrokerConfig struct {
 	// GitHub OAuth app credentials. Empty disables GitHub federation.
 	GitHubClientID     string
 	GitHubClientSecret string
+
+	// Google OAuth (Web application) client credentials. Empty
+	// disables Google federation. The client must live in the same
+	// GCP project as the Firebase project so Firebase trusts the
+	// id_token the broker mints.
+	GoogleClientID     string
+	GoogleClientSecret string
 }
 
 // DelegatedAuthConfig controls the delegated auth session flow used by
