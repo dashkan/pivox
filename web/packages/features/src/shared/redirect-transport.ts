@@ -41,16 +41,32 @@ export type BrokerRedirectResult =
   | { ok: false; error: string; errorDescription?: string };
 
 /**
- * Opens the broker OAuth flow for `provider` and resolves with the
- * parsed result. Implemented per platform — a popup + callback page in
- * the browser, a loopback HTTP server (or custom scheme) in Electron —
- * so feature code stays transport-agnostic.
+ * The platform boundary for broker-driven auth. Implemented per
+ * platform — a popup + callback page in the browser, a loopback HTTP
+ * server (or custom scheme) in Electron — so feature code stays
+ * transport-agnostic.
+ *
+ * Both methods need the Cloud Controller origin that hosts the broker;
+ * each implementation knows its own (same-origin for the web app, an
+ * absolute origin resolved over IPC for Electron), so callers never
+ * pass a base URL.
  */
 export interface RedirectTransport {
+  /**
+   * Opens the broker OAuth flow for `provider` and resolves with the
+   * parsed result.
+   */
   runBrokerOAuth(input: {
     provider: string;
     loginHint?: string;
   }): Promise<BrokerRedirectResult>;
+
+  /**
+   * Resolves the Firebase OIDC provider id for an email's domain via
+   * the broker's `:resolveProvider` endpoint, or `null` when the
+   * domain has no enabled SSO. Rejects on network / non-404 errors.
+   */
+  resolveSsoProvider(email: string): Promise<string | null>;
 }
 
 /**

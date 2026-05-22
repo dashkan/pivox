@@ -4,6 +4,7 @@ import { LoginCard } from '@pivox/ui/login-card';
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 
 import { authProviders } from '@/lib/auth-providers';
+import { browserRedirectTransport } from '@/lib/browser-redirect-transport';
 
 export const Route = createFileRoute('/auth/login')({ component: LoginPage });
 
@@ -12,6 +13,7 @@ function LoginPage() {
 
   return (
     <LoginFeature
+      transport={browserRedirectTransport}
       onSuccess={asyncHandler(() => router.navigate({ to: '/' }))}
       onLinkRequired={asyncHandler(() =>
         router.navigate({ to: '/auth/link-account' }),

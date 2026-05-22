@@ -1,7 +1,8 @@
+import { LoginFeature } from '@pivox/features/login';
 import { asyncHandler } from '@pivox/observability';
 import { LoginCard } from '@pivox/ui/login-card';
-import { ElectronLoginFeature } from '@renderer/components/electron-login-feature';
 import { authProviders } from '@renderer/lib/auth-providers';
+import { ipcRedirectTransport } from '@renderer/lib/ipc-redirect-transport';
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/auth/login')({ component: LoginPage });
@@ -10,7 +11,8 @@ function LoginPage() {
   const router = useRouter();
 
   return (
-    <ElectronLoginFeature
+    <LoginFeature
+      transport={ipcRedirectTransport}
       onSuccess={asyncHandler(() => router.navigate({ to: '/' }))}
       onLinkRequired={asyncHandler(() =>
         router.navigate({ to: '/auth/link-account' }),
@@ -37,6 +39,6 @@ function LoginPage() {
           )}
         />
       </LoginCard.Root>
-    </ElectronLoginFeature>
+    </LoginFeature>
   );
 }

@@ -14,14 +14,10 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AuthVerifyEmailRouteImport } from './routes/auth/verify-email'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
 import { Route as AuthRegisterRouteImport } from './routes/auth/register'
-import { Route as AuthRedirectRouteImport } from './routes/auth/redirect'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthLinkAccountRouteImport } from './routes/auth/link-account'
-import { Route as AuthGithubCompleteRouteImport } from './routes/auth/github-complete'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
-import { Route as AuthExternalLoginRouteImport } from './routes/auth/external-login'
-import { Route as AuthExternalLinkRouteImport } from './routes/auth/external-link'
-import { Route as AuthDoneRouteImport } from './routes/auth/done'
+import { Route as AuthBrokerCallbackRouteImport } from './routes/auth/broker-callback'
 import { Route as AuthActionRouteImport } from './routes/auth/action'
 import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
@@ -50,11 +46,6 @@ const AuthRegisterRoute = AuthRegisterRouteImport.update({
   path: '/auth/register',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthRedirectRoute = AuthRedirectRouteImport.update({
-  id: '/auth/redirect',
-  path: '/auth/redirect',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
@@ -65,29 +56,14 @@ const AuthLinkAccountRoute = AuthLinkAccountRouteImport.update({
   path: '/auth/link-account',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthGithubCompleteRoute = AuthGithubCompleteRouteImport.update({
-  id: '/auth/github-complete',
-  path: '/auth/github-complete',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   id: '/auth/forgot-password',
   path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthExternalLoginRoute = AuthExternalLoginRouteImport.update({
-  id: '/auth/external-login',
-  path: '/auth/external-login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthExternalLinkRoute = AuthExternalLinkRouteImport.update({
-  id: '/auth/external-link',
-  path: '/auth/external-link',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthDoneRoute = AuthDoneRouteImport.update({
-  id: '/auth/done',
-  path: '/auth/done',
+const AuthBrokerCallbackRoute = AuthBrokerCallbackRouteImport.update({
+  id: '/auth/broker-callback',
+  path: '/auth/broker-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthActionRoute = AuthActionRouteImport.update({
@@ -111,14 +87,10 @@ export interface FileRoutesByFullPath {
   '/about': typeof AppAboutRoute
   '/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
-  '/auth/done': typeof AuthDoneRoute
-  '/auth/external-link': typeof AuthExternalLinkRoute
-  '/auth/external-login': typeof AuthExternalLoginRoute
+  '/auth/broker-callback': typeof AuthBrokerCallbackRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
-  '/auth/github-complete': typeof AuthGithubCompleteRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
-  '/auth/redirect': typeof AuthRedirectRoute
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
@@ -127,14 +99,10 @@ export interface FileRoutesByTo {
   '/about': typeof AppAboutRoute
   '/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
-  '/auth/done': typeof AuthDoneRoute
-  '/auth/external-link': typeof AuthExternalLinkRoute
-  '/auth/external-login': typeof AuthExternalLoginRoute
+  '/auth/broker-callback': typeof AuthBrokerCallbackRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
-  '/auth/github-complete': typeof AuthGithubCompleteRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
-  '/auth/redirect': typeof AuthRedirectRoute
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
@@ -146,14 +114,10 @@ export interface FileRoutesById {
   '/_app/about': typeof AppAboutRoute
   '/_app/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
-  '/auth/done': typeof AuthDoneRoute
-  '/auth/external-link': typeof AuthExternalLinkRoute
-  '/auth/external-login': typeof AuthExternalLoginRoute
+  '/auth/broker-callback': typeof AuthBrokerCallbackRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
-  '/auth/github-complete': typeof AuthGithubCompleteRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
-  '/auth/redirect': typeof AuthRedirectRoute
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
@@ -166,14 +130,10 @@ export interface FileRouteTypes {
     | '/about'
     | '/image-editor'
     | '/auth/action'
-    | '/auth/done'
-    | '/auth/external-link'
-    | '/auth/external-login'
+    | '/auth/broker-callback'
     | '/auth/forgot-password'
-    | '/auth/github-complete'
     | '/auth/link-account'
     | '/auth/login'
-    | '/auth/redirect'
     | '/auth/register'
     | '/auth/reset-password'
     | '/auth/verify-email'
@@ -182,14 +142,10 @@ export interface FileRouteTypes {
     | '/about'
     | '/image-editor'
     | '/auth/action'
-    | '/auth/done'
-    | '/auth/external-link'
-    | '/auth/external-login'
+    | '/auth/broker-callback'
     | '/auth/forgot-password'
-    | '/auth/github-complete'
     | '/auth/link-account'
     | '/auth/login'
-    | '/auth/redirect'
     | '/auth/register'
     | '/auth/reset-password'
     | '/auth/verify-email'
@@ -200,14 +156,10 @@ export interface FileRouteTypes {
     | '/_app/about'
     | '/_app/image-editor'
     | '/auth/action'
-    | '/auth/done'
-    | '/auth/external-link'
-    | '/auth/external-login'
+    | '/auth/broker-callback'
     | '/auth/forgot-password'
-    | '/auth/github-complete'
     | '/auth/link-account'
     | '/auth/login'
-    | '/auth/redirect'
     | '/auth/register'
     | '/auth/reset-password'
     | '/auth/verify-email'
@@ -217,14 +169,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthActionRoute: typeof AuthActionRoute
-  AuthDoneRoute: typeof AuthDoneRoute
-  AuthExternalLinkRoute: typeof AuthExternalLinkRoute
-  AuthExternalLoginRoute: typeof AuthExternalLoginRoute
+  AuthBrokerCallbackRoute: typeof AuthBrokerCallbackRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
-  AuthGithubCompleteRoute: typeof AuthGithubCompleteRoute
   AuthLinkAccountRoute: typeof AuthLinkAccountRoute
   AuthLoginRoute: typeof AuthLoginRoute
-  AuthRedirectRoute: typeof AuthRedirectRoute
   AuthRegisterRoute: typeof AuthRegisterRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   AuthVerifyEmailRoute: typeof AuthVerifyEmailRoute
@@ -267,13 +215,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/redirect': {
-      id: '/auth/redirect'
-      path: '/auth/redirect'
-      fullPath: '/auth/redirect'
-      preLoaderRoute: typeof AuthRedirectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth/login': {
       id: '/auth/login'
       path: '/auth/login'
@@ -288,13 +229,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthLinkAccountRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/github-complete': {
-      id: '/auth/github-complete'
-      path: '/auth/github-complete'
-      fullPath: '/auth/github-complete'
-      preLoaderRoute: typeof AuthGithubCompleteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth/forgot-password': {
       id: '/auth/forgot-password'
       path: '/auth/forgot-password'
@@ -302,25 +236,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/external-login': {
-      id: '/auth/external-login'
-      path: '/auth/external-login'
-      fullPath: '/auth/external-login'
-      preLoaderRoute: typeof AuthExternalLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/external-link': {
-      id: '/auth/external-link'
-      path: '/auth/external-link'
-      fullPath: '/auth/external-link'
-      preLoaderRoute: typeof AuthExternalLinkRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/done': {
-      id: '/auth/done'
-      path: '/auth/done'
-      fullPath: '/auth/done'
-      preLoaderRoute: typeof AuthDoneRouteImport
+    '/auth/broker-callback': {
+      id: '/auth/broker-callback'
+      path: '/auth/broker-callback'
+      fullPath: '/auth/broker-callback'
+      preLoaderRoute: typeof AuthBrokerCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/action': {
@@ -364,14 +284,10 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthActionRoute: AuthActionRoute,
-  AuthDoneRoute: AuthDoneRoute,
-  AuthExternalLinkRoute: AuthExternalLinkRoute,
-  AuthExternalLoginRoute: AuthExternalLoginRoute,
+  AuthBrokerCallbackRoute: AuthBrokerCallbackRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
-  AuthGithubCompleteRoute: AuthGithubCompleteRoute,
   AuthLinkAccountRoute: AuthLinkAccountRoute,
   AuthLoginRoute: AuthLoginRoute,
-  AuthRedirectRoute: AuthRedirectRoute,
   AuthRegisterRoute: AuthRegisterRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
   AuthVerifyEmailRoute: AuthVerifyEmailRoute,

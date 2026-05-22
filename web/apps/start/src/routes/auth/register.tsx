@@ -4,6 +4,7 @@ import { RegistrationCard } from '@pivox/ui/registration-card';
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 
 import { authProviders } from '@/lib/auth-providers';
+import { browserRedirectTransport } from '@/lib/browser-redirect-transport';
 
 export const Route = createFileRoute('/auth/register')({
   component: RegisterPage,
@@ -14,6 +15,7 @@ function RegisterPage() {
 
   return (
     <RegistrationFeature
+      transport={browserRedirectTransport}
       onSuccess={asyncHandler((user) =>
         router.navigate({
           to: user.emailVerified ? '/' : '/auth/verify-email',

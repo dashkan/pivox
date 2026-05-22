@@ -543,6 +543,12 @@ var/
 wheels/
 share/python-wheels/
 *.egg-info/
+
+# `lib/` / `lib64/` above come from a Python .gitignore template. The
+# web/ TypeScript source trees legitimately use `src/lib/` for app
+# modules — keep those tracked rather than relying on `git add -f`.
+!web/apps/start/src/lib/
+!web/apps/electron/src/renderer/src/lib/
 .installed.cfg
 *.egg
 MANIFEST
