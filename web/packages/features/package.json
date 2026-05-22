@@ -27,6 +27,10 @@
       "types": "./dist/esm/auth.d.ts",
       "import": "./dist/esm/auth.js"
     },
+    "./broker": {
+      "types": "./dist/esm/broker.d.ts",
+      "import": "./dist/esm/broker.js"
+    },
     "./verify-email": {
       "types": "./dist/esm/verify-email.d.ts",
       "import": "./dist/esm/verify-email.js"

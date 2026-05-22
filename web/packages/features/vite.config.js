@@ -52,6 +52,7 @@ export default mergeConfig(
       './src/forgot-password.ts',
       './src/reset-password.ts',
       './src/auth.ts',
+      './src/broker.ts',
       './src/verify-email.ts',
       './src/link-account.ts',
       './src/auth-avatar.ts',
