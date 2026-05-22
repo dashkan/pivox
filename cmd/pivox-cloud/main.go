@@ -504,6 +504,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		apiv1.RegisterTagBindingsHandlerFromEndpoint,
 		apiv1.RegisterApiKeysHandlerFromEndpoint,
 		apiv1.RegisterDashboardsHandlerFromEndpoint,
+		iamv1.RegisterIamHandlerFromEndpoint,
 		storagev1.RegisterStorageGatewaysHandlerFromEndpoint,
 		storagev1.RegisterAgentsHandlerFromEndpoint,
 		storagev1.RegisterEndpointsHandlerFromEndpoint,
