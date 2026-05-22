@@ -1,14 +1,23 @@
 import { useAuth } from '@pivox/features/auth';
+import { buildBrokerCredential } from '@pivox/features/broker';
 import { useUserProfile } from '@pivox/features/user-profile';
-import { asyncHandler } from '@pivox/observability';
 import { UserProfileCard } from '@pivox/ui/user-profile-card';
-import { getAuth } from 'firebase/auth';
-import { useEffect, useRef } from 'react';
+import { getAuth, linkWithCredential } from 'firebase/auth';
 
 import type { PivoxAuthProvider } from '@pivox/ui/auth';
+import type { ReactNode } from 'react';
 
-const LINK_TIMEOUT_MS = 2 * 60 * 1000;
+// Firebase provider id -> broker provider path segment.
+const BROKER_PROVIDER: Record<string, string> = {
+  'google.com': 'google',
+  'github.com': 'github',
+};
 
+/**
+ * Electron account-linking. linkProvider runs the broker flow in the
+ * system browser, then links the returned credential to the signed-in
+ * user — replacing the deposit/consume custom-token bridge.
+ */
 export function ElectronUserProfileFeature({
   onClose,
   open,
@@ -18,80 +27,38 @@ export function ElectronUserProfileFeature({
   onClose?: () => void;
   open?: boolean;
   providers?: Array<PivoxAuthProvider>;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const value = useUserProfile(onClose, { open, providers });
   const { refreshUser } = useAuth();
-  const linkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Listen for deep link callbacks to refresh user after linking
-  useEffect(() => {
-    if (import.meta.env.DEV) return;
-
-    const unsubscribe = window.api.onAuthDeepLink(
-      asyncHandler(async (data) => {
-        if (data.linked === 'true') {
-          if (linkingTimerRef.current) {
-            clearTimeout(linkingTimerRef.current);
-            linkingTimerRef.current = null;
+  const overridden = {
+    ...value,
+    actions: {
+      ...value.actions,
+      linkProvider: async (providerId: string): Promise<void> => {
+        const user = getAuth().currentUser;
+        if (!user) return;
+        value.actions.setLinkingProvider(providerId);
+        try {
+          const result = await window.api.startBrokerLogin({
+            provider: BROKER_PROVIDER[providerId] ?? providerId,
+          });
+          if (result.ok) {
+            await linkWithCredential(user, buildBrokerCredential(result));
+            await refreshUser();
           }
-          value.actions.setLinkingProvider(null);
-          await refreshUser();
-        }
-        if (data.error) {
-          if (linkingTimerRef.current) {
-            clearTimeout(linkingTimerRef.current);
-            linkingTimerRef.current = null;
-          }
+        } catch {
+          // Linking failed — surfaced by the card clearing its state.
+        } finally {
           value.actions.setLinkingProvider(null);
         }
-      }),
-    );
-
-    return unsubscribe;
-  }, [refreshUser, value.actions]);
-
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => {
-      if (linkingTimerRef.current) clearTimeout(linkingTimerRef.current);
-    };
-  }, []);
-
-  // Override linkProvider for production builds
-  const overriddenValue = import.meta.env.DEV
-    ? value
-    : {
-        ...value,
-        actions: {
-          ...value.actions,
-          linkProvider: async (providerId: string) => {
-            try {
-              const auth = getAuth();
-              const user = auth.currentUser;
-              if (!user) throw new Error('Not signed in');
-
-              value.actions.setLinkingProvider(providerId);
-              linkingTimerRef.current = setTimeout(() => {
-                value.actions.setLinkingProvider(null);
-                linkingTimerRef.current = null;
-              }, LINK_TIMEOUT_MS);
-
-              const idToken = await user.getIdToken();
-              await window.api.startLinkProvider(providerId, idToken);
-            } catch {
-              if (linkingTimerRef.current) {
-                clearTimeout(linkingTimerRef.current);
-                linkingTimerRef.current = null;
-              }
-              value.actions.setLinkingProvider(null);
-            }
-          },
-        },
-      };
+      },
+    },
+  };
 
   return (
-    <UserProfileCard.Provider value={overriddenValue}>
+    <UserProfileCard.Provider value={overridden}>
       {children}
     </UserProfileCard.Provider>
   );
