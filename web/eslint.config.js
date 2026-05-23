@@ -43,8 +43,11 @@ const ignores = {
     // vendored third-party code — not ours to lint
     '**/shadcn/**',
     '**/vercel/**',
-    // generated
-    '**/routeTree.gen.ts',
+    // generated — any `*.gen.{ts,tsx}` file under `src/` or elsewhere.
+    // Catches Tanstack Router's `routeTree.gen.ts` and `@pivox/client`'s
+    // `src/generated/types.gen.ts` (openapi-typescript output) without
+    // each consumer having to add its own ignore pattern.
+    '**/*.gen.{ts,tsx}',
     // build configs themselves. The `*.config.*` glob catches the
     // `.shared` infix on vite.config.shared.js too.
     '**/*.config.{js,ts,mjs,cjs}',

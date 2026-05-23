@@ -1,0 +1,59 @@
+{
+  "name": "@pivox/client",
+  "version": "1.0.0",
+  "description": "Typed Pivox Cloud API client — openapi-fetch over the generated OpenAPI 3.1 spec, with optional openapi-react-query bindings.",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js"
+    },
+    "./react-query": {
+      "types": "./dist/esm/react-query.d.ts",
+      "import": "./dist/esm/react-query.js"
+    },
+    "./types": {
+      "types": "./dist/esm/generated/types.gen.d.ts",
+      "import": "./dist/esm/generated/types.gen.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "clean": "premove ./build ./dist",
+    "gen:types": "openapi-typescript ../../../api/openapi/v3/pivox.yaml --output ./src/generated/types.gen.ts",
+    "test:build": "publint --strict",
+    "test:eslint": "eslint ./src",
+    "test:lib": "vitest --passWithNoTests",
+    "test:lib:dev": "pnpm test:lib --watch",
+    "test:types": "tsc && tsc -p tsconfig.test.json"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.80.0",
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.95.2",
+    "@types/react": "^19.2.7",
+    "openapi-typescript": "^7.13.0",
+    "react": "^19.2.6",
+    "vite": "^8.0.13"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0",
+    "openapi-react-query": "^0.5.4"
+  }
+}

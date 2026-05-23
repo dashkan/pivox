@@ -19,6 +19,7 @@
     "web:build:image-editor": "pnpm --filter @pivox/image-editor run build",
     "web:build:features": "pnpm --filter @pivox/features build",
     "web:build:ui": "pnpm --filter @pivox/ui build",
+    "web:build:client": "pnpm --filter @pivox/client build",
     "web:clean": "pnpm clean",
     "web:start": "pnpm --filter @pivox/start dev",
     "electron:start": "pnpm --filter @pivox/electron dev"

@@ -3,14 +3,15 @@
 	configure-app-macos ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin \
-	proto-generate-openapi-v3 api-lint \
+	proto-generate-openapi-v3 proto-generate-typescript api-lint \
 	lint-icons \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down firebase-deploy clean-fn-revisions \
 	ai-native \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
 	test-native-ui \
-	web-primitives web-image-editor web-features web-ui web-start electron-start
+	web-primitives web-image-editor web-features web-ui web-client \
+	web-start electron-start
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
@@ -116,7 +117,7 @@ generate:
 # new descriptors — currently the permission registry, but the
 # pattern extends to anything else built via `//go:generate` that
 # walks proto descriptors.
-proto-generate: proto-generate-go proto-generate-native proto-generate-openapi-v3 generate
+proto-generate: proto-generate-go proto-generate-openapi-v3 proto-generate-typescript generate
 
 # Go codegen (BE + internal gRPC types).
 proto-generate-go:
@@ -141,6 +142,22 @@ proto-generate-openapi-v3:
 	pnpx @scalar/cli@$(SCALAR_CLI_VERSION) document upgrade \
 	  api/openapi/v2/pivox.swagger.yaml \
 	  --output api/openapi/v3/pivox.yaml
+
+# Generate TypeScript types from the OpenAPI v3 spec into the
+# @pivox/client package. Runs `pnpm gen:types` in web/packages/client,
+# which invokes openapi-typescript (pinned via devDependencies) and
+# writes src/generated/types.gen.ts. The `.gen.ts` suffix puts the
+# file under the global `*.gen.{ts,tsx}` ignore in eslint.config.js
+# and `*.gen.ts` in .prettierignore — generated code is excluded from
+# lint and formatting.
+#
+# Precondition: `cd web && pnpm install` has run at least once, so the
+# pinned openapi-typescript binary exists in @pivox/client's
+# node_modules. CI runs install before make; fresh local checkouts
+# should follow the same order. Same pattern as the other web targets
+# (web-features, web-start, ...) — none of them guard for install.
+proto-generate-typescript:
+	cd web/packages/client && pnpm gen:types
 
 # Build `protoc-gen-grpc-swift-2` from the grpc-swift-protobuf SwiftPM
 # checkout that PivoxModels' `swift package resolve` populates. There is
@@ -333,6 +350,9 @@ web-features:
 web-ui:
 	pnpm run --dir web web:build:ui --watch
 
+web-client:
+	pnpm run --dir web web:build:client --watch
+
 web-start:
 	pnpm run --dir web web:start
 
@@ -348,8 +368,8 @@ electron-start:
 dev:
 	pnpx concurrently \
 		--kill-others \
-		--names "cloud,worker,ollama,nginx,ngrok,web-primitives,web-image-editor,web-features,web-ui,start" \
-		--prefix-colors "yellow,green,red,cyan,magenta,blue,gray,gray,gray,gray,white" \
+		--names "cloud,worker,ollama,nginx,ngrok,web-primitives,web-image-editor,web-features,web-ui,web-client,start" \
+		--prefix-colors "yellow,green,red,cyan,magenta,blue,gray,gray,gray,gray,gray,white" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
 		"$(MAKE) ollama-serve" \
@@ -359,4 +379,5 @@ dev:
 		"$(MAKE) web-image-editor" \
 		"$(MAKE) web-features" \
 		"$(MAKE) web-ui" \
+		"$(MAKE) web-client" \
 		"$(MAKE) web-start"
