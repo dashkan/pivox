@@ -3,12 +3,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolveSsoProvider } from '@/shared/resolve-sso-provider';
 
 function mockFetch(status: number, body?: unknown) {
-  return vi.fn(
-    async () =>
+  return vi.fn(() =>
+    Promise.resolve(
       new Response(body === undefined ? null : JSON.stringify(body), {
         status,
         headers: { 'content-type': 'application/json' },
       }),
+    ),
   );
 }
 
@@ -72,9 +73,7 @@ describe('resolveSsoProvider', () => {
   it('propagates a network failure from fetch', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => {
-        throw new Error('network down');
-      }),
+      vi.fn(() => Promise.reject(new Error('network down'))),
     );
     await expect(
       resolveSsoProvider('user@acme.com', 'https://pivox.test'),
@@ -84,7 +83,9 @@ describe('resolveSsoProvider', () => {
   it('throws when a 200 response body is not valid JSON', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('<html>not json</html>', { status: 200 })),
+      vi.fn(() =>
+        Promise.resolve(new Response('<html>not json</html>', { status: 200 })),
+      ),
     );
     await expect(
       resolveSsoProvider('user@acme.com', 'https://pivox.test'),

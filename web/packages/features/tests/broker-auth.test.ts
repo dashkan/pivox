@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
+
+import type { BrokerRedirectResult } from '@/shared/redirect-transport';
+import type { RedirectTransport } from '@/shared/redirect-transport';
+
 import {
   BROKER_PROVIDER,
   brokerErrorMessage,
   signInViaBroker,
 } from '@/shared/broker-auth';
-
-import type { BrokerRedirectResult } from '@/shared/redirect-transport';
-import type { RedirectTransport } from '@/shared/redirect-transport';
 
 describe('brokerErrorMessage', () => {
   it('treats access_denied and popup_closed as cancellation', () => {

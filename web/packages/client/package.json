@@ -31,7 +31,7 @@
     "test:eslint": "eslint ./src",
     "test:lib": "vitest --passWithNoTests",
     "test:lib:dev": "pnpm test:lib --watch",
-    "test:types": "tsc && tsc -p tsconfig.test.json"
+    "test:types": "tsc && tsc -p tests/tsconfig.json"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.80.0",
@@ -46,11 +46,11 @@
     }
   },
   "devDependencies": {
-    "@tanstack/react-query": "^5.95.2",
-    "@types/react": "^19.2.7",
+    "@tanstack/react-query": "^5.100.11",
+    "@types/react": "^19.2.15",
     "openapi-typescript": "^7.13.0",
     "react": "^19.2.6",
-    "vite": "^8.0.13"
+    "vite": "^8.0.14"
   },
   "dependencies": {
     "openapi-fetch": "^0.17.0",
