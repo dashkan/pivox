@@ -1,0 +1,30 @@
+# Top-level OpenAPI v2 metadata for the merged spec emitted by
+# protoc-gen-openapiv2. Consumed via `openapi_configuration=` in buf.gen.yaml.
+#
+# With `allow_merge=true`, the plugin builds a single swagger object and
+# pulls top-level fields (info, schemes, consumes, produces, ...) from the
+# proto file whose path matches `file:` below. The matched path must be
+# the file path that buf emits in the CodeGeneratorRequest — i.e. relative
+# to the buf input root (`api/proto`), NOT the repo root.
+#
+# Today `pivox/agent/v1/agent.proto` is what buf emits first (alphabetical),
+# so we hang the swagger metadata off of it. If we ever add a proto that
+# sorts before `pivox/agent/...`, move the `file:` reference accordingly —
+# the merged output's `info` falls back to that file's auto-generated title
+# otherwise.
+openapiOptions:
+  file:
+    - file: pivox/agent/v1/agent.proto
+      option:
+        info:
+          title: Pivox API
+          version: "1.0"
+          description: |
+            Pivox Cloud Controller — gRPC + REST surface for organizations,
+            spaces, IAM, assets, storage, and AI chat.
+        schemes:
+          - HTTPS
+        consumes:
+          - application/json
+        produces:
+          - application/json

@@ -136,7 +136,7 @@ type IamClient interface {
 	//
 	// (-- api-linter: core::0156::forbidden-methods=disabled
 	//
-	//	aip.dev/not-precedent: Only support deleting own account  --)
+	//	aip.dev/not-precedent: Only support deleting own account. --)
 	DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Gets a role by resource name. v1 returns only system roles
 	// (owner, admin, editor, viewer); custom roles are deferred.
@@ -406,7 +406,7 @@ type IamServer interface {
 	//
 	// (-- api-linter: core::0156::forbidden-methods=disabled
 	//
-	//	aip.dev/not-precedent: Only support deleting own account  --)
+	//	aip.dev/not-precedent: Only support deleting own account. --)
 	DeleteAccount(context.Context, *DeleteAccountRequest) (*longrunningpb.Operation, error)
 	// Gets a role by resource name. v1 returns only system roles
 	// (owner, admin, editor, viewer); custom roles are deferred.

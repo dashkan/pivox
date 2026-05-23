@@ -2,7 +2,8 @@
 	air air-worker mocks dev log-pivox-app-macos run-app-macos build-app-macos \
 	configure-app-macos ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
-	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
+	proto-generate-go proto-generate-native build-grpc-swift-2-plugin \
+	proto-generate-openapi-v3 api-lint \
 	lint-icons \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down firebase-deploy clean-fn-revisions \
@@ -115,7 +116,7 @@ generate:
 # new descriptors — currently the permission registry, but the
 # pattern extends to anything else built via `//go:generate` that
 # walks proto descriptors.
-proto-generate: proto-generate-go proto-generate-native generate
+proto-generate: proto-generate-go proto-generate-native proto-generate-openapi-v3 generate
 
 # Go codegen (BE + internal gRPC types).
 proto-generate-go:
@@ -126,6 +127,20 @@ proto-generate-go:
 # there is no shared C++ chat client to generate bridges for.
 proto-generate-native: build-grpc-swift-2-plugin
 	$(TOOL) buf generate --template buf.gen.native.swift.yaml
+
+# Upgrade the merged OpenAPI v2 spec directly to OpenAPI v3.1 using
+# @scalar/cli. grpc-gateway's protoc-gen-openapiv3 is alpha/unpublished,
+# so we bridge through scalar's upgrader until that lands.
+#
+# Version is pinned for supply-chain reasons — bump deliberately, not via
+# `latest`. Invoked through `pnpx` so the package is fetched into the pnpm
+# content-addressable store rather than npm's mutable cache.
+SCALAR_CLI_VERSION ?= 1.9.4
+proto-generate-openapi-v3:
+	@mkdir -p api/openapi/v3
+	pnpx @scalar/cli@$(SCALAR_CLI_VERSION) document upgrade \
+	  api/openapi/v2/pivox.swagger.yaml \
+	  --output api/openapi/v3/pivox.yaml
 
 # Build `protoc-gen-grpc-swift-2` from the grpc-swift-protobuf SwiftPM
 # checkout that PivoxModels' `swift package resolve` populates. There is

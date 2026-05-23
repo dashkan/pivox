@@ -28,6 +28,11 @@ plugins:
     opt:
       - module=github.com/dashkan/pivox/internal/pkg/gen
   - local: protoc-gen-openapiv2
-    out: api/openapi
+    out: api/openapi/v2
+    strategy: all
     opt:
       - expand_slashed_path_patterns=true
+      - allow_merge=true
+      - merge_file_name=pivox
+      - output_format=yaml
+      - openapi_configuration=api/openapiv2.config.yaml
