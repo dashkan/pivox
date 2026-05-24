@@ -48,6 +48,7 @@ export default mergeConfig(
   pivoxViteConfig({
     entry: [
       './src/api.ts',
+      './src/org-gate.ts',
       './src/login.ts',
       './src/registration.ts',
       './src/forgot-password.ts',

@@ -17,6 +17,7 @@ import { Route as AuthRegisterRouteImport } from './routes/auth/register'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthLinkAccountRouteImport } from './routes/auth/link-account'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
+import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
 import { Route as AuthBrokerCallbackRouteImport } from './routes/auth/broker-callback'
 import { Route as AuthActionRouteImport } from './routes/auth/action'
 import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
@@ -61,6 +62,11 @@ const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCreateOrgRoute = AuthCreateOrgRouteImport.update({
+  id: '/auth/create-org',
+  path: '/auth/create-org',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthBrokerCallbackRoute = AuthBrokerCallbackRouteImport.update({
   id: '/auth/broker-callback',
   path: '/auth/broker-callback',
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/broker-callback': typeof AuthBrokerCallbackRoute
+  '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/broker-callback': typeof AuthBrokerCallbackRoute
+  '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/_app/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/broker-callback': typeof AuthBrokerCallbackRoute
+  '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/image-editor'
     | '/auth/action'
     | '/auth/broker-callback'
+    | '/auth/create-org'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/image-editor'
     | '/auth/action'
     | '/auth/broker-callback'
+    | '/auth/create-org'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/_app/image-editor'
     | '/auth/action'
     | '/auth/broker-callback'
+    | '/auth/create-org'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -170,6 +182,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthActionRoute: typeof AuthActionRoute
   AuthBrokerCallbackRoute: typeof AuthBrokerCallbackRoute
+  AuthCreateOrgRoute: typeof AuthCreateOrgRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthLinkAccountRoute: typeof AuthLinkAccountRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -236,6 +249,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/create-org': {
+      id: '/auth/create-org'
+      path: '/auth/create-org'
+      fullPath: '/auth/create-org'
+      preLoaderRoute: typeof AuthCreateOrgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/broker-callback': {
       id: '/auth/broker-callback'
       path: '/auth/broker-callback'
@@ -285,6 +305,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthActionRoute: AuthActionRoute,
   AuthBrokerCallbackRoute: AuthBrokerCallbackRoute,
+  AuthCreateOrgRoute: AuthCreateOrgRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthLinkAccountRoute: AuthLinkAccountRoute,
   AuthLoginRoute: AuthLoginRoute,

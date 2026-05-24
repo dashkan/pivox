@@ -17,6 +17,7 @@ import { Route as AuthRegisterRouteImport } from './routes/auth/register'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthLinkAccountRouteImport } from './routes/auth/link-account'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
+import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -57,9 +58,15 @@ const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCreateOrgRoute = AuthCreateOrgRouteImport.update({
+  id: '/auth/create-org',
+  path: '/auth/create-org',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -68,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/auth/verify-email': typeof AuthVerifyEmailRoute
 }
 export interface FileRoutesByTo {
+  '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -79,6 +87,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth/create-org'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/auth/verify-email'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/auth/create-org'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/auth/create-org'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -120,6 +132,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  AuthCreateOrgRoute: typeof AuthCreateOrgRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthLinkAccountRoute: typeof AuthLinkAccountRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -186,6 +199,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/create-org': {
+      id: '/auth/create-org'
+      path: '/auth/create-org'
+      fullPath: '/auth/create-org'
+      preLoaderRoute: typeof AuthCreateOrgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -201,6 +221,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  AuthCreateOrgRoute: AuthCreateOrgRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthLinkAccountRoute: AuthLinkAccountRoute,
   AuthLoginRoute: AuthLoginRoute,
