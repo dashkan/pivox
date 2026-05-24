@@ -267,6 +267,9 @@ importers:
 
   packages/features:
     dependencies:
+      '@pivox/client':
+        specifier: workspace:*
+        version: link:../client
       '@pivox/observability':
         specifier: workspace:*
         version: link:../observability

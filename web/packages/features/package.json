@@ -7,6 +7,10 @@
   "license": "ISC",
   "type": "module",
   "exports": {
+    "./api": {
+      "types": "./dist/esm/api.d.ts",
+      "import": "./dist/esm/api.js"
+    },
     "./login": {
       "types": "./dist/esm/login.d.ts",
       "import": "./dist/esm/login.js"
@@ -83,6 +87,7 @@
     "vite": "^8.0.14"
   },
   "dependencies": {
+    "@pivox/client": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/ui": "workspace:*",
