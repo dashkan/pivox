@@ -131,3 +131,70 @@ message DeleteAccountMetadata {
   // for client-side correlation.
   string account = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
+
+// AccountOrganization is the slim, caller-scoped projection of an
+// org the authenticated caller has membership in. Intentionally NOT
+// a `google.api.resource` — it's a derived view (Organization joined
+// with the caller's role binding), not a durable, independently
+// addressable entity. Get/Update/Delete don't apply; only the
+// `ListAccountOrganizations` projection.
+//
+// Distinct from `pivox.api/Organization` (the full resource on
+// `/v1/organizations/{org}`): the post-sign-in bootstrap and
+// org-picker UIs need (slug, display_name, role) without the full
+// Organization's Actor fields, etag, annotations, timestamps, and
+// lifecycle state. Soft-deleted orgs are excluded from this view —
+// those surface only through `Organizations.ListOrganizations` for
+// the undelete UX.
+message AccountOrganization {
+  // The canonical Organization this view derives from.
+  // Format: `organizations/{organization}`.
+  string organization = 1 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.resource_reference) = {type: "pivox.api/Organization"}
+  ];
+
+  // Human-readable organization name shown in pickers.
+  string display_name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Caller's effective role on this org. One of `owner`, `admin`,
+  // `editor`, `viewer` — the v1 system roles. When the caller has
+  // both a direct binding and group-mediated bindings on the same
+  // org, the highest-precedence role wins
+  // (owner > admin > editor > viewer). Bindings to non-system roles
+  // are excluded from this view in v1.
+  string role = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `Iam.ListAccountOrganizations`.
+message ListAccountOrganizationsRequest {
+  // Required. The parent. Must be `accounts/me`. The caller is
+  // implicit from the authentication context.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Account"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Maximum number of orgs to return. Accepted but ignored
+  // in v1 — the underlying query caps at 1000 and a single caller
+  // having more memberships than that isn't a realistic case.
+  int32 page_size = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Page token from a previous response. Accepted but
+  // ignored in v1; reserved for the day pagination matters.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for `Iam.ListAccountOrganizations`.
+message ListAccountOrganizationsResponse {
+  // The active organizations the caller has membership in. Field
+  // name matches the lowercase-plural of the message being listed
+  // (`AccountOrganization` → `account_organizations`) per AIP-132,
+  // even though `AccountOrganization` is not a `google.api.resource`.
+  repeated AccountOrganization account_organizations = 1;
+
+  // Token for the next page of results. Always empty in v1
+  // (pagination isn't implemented; the query caps at 1000).
+  string next_page_token = 2;
+}

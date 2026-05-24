@@ -49,11 +49,18 @@ const (
 //     inviting org in the same transaction.
 //   - `GetInvitation` — lets an invitee inspect the invitation
 //     pointing at their email before accepting it.
+//   - `Iam.ListAccountOrganizations` — the same bootstrap shape as
+//     `Organizations.ListOrganizations`, but for the slim
+//     account-scoped view used by the web org-gate. Gating "do I
+//     have membership?" on prior membership is chicken-and-egg; the
+//     query is hard-scoped to the caller's own bindings so there is
+//     no over-disclosure vector beyond what authn already grants.
 var membershipExemptMethods = map[string]bool{
 	"/pivox.api.v1.Organizations/CreateOrganization": true,
 	"/pivox.api.v1.Organizations/ListOrganizations":  true,
 	"/pivox.api.v1.Organizations/AcceptInvitation":   true,
 	"/pivox.api.v1.Organizations/GetInvitation":      true,
+	"/pivox.iam.v1.Iam/ListAccountOrganizations":     true,
 	// DeleteAccount targets accounts/me, the caller's own account —
 	// no org scope. A user stuck in a half-bootstrapped state (firebase
 	// identity exists, no org memberships) must still be able to

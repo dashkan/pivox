@@ -42,14 +42,15 @@ var File_pivox_iam_v1_iam_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_iam_proto_rawDesc = "" +
 	"\n" +
-	"\x16pivox/iam/v1/iam.proto\x12\fpivox.iam.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1bpivox/iam/v1/accounts.proto\x1a\x19pivox/iam/v1/groups.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a\x18pivox/iam/v1/roles.proto\x1a\x18pivox/iam/v1/users.proto\x1a!pivox/permission/v1/options.proto2\xda\x12\n" +
+	"\x16pivox/iam/v1/iam.proto\x12\fpivox.iam.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1bpivox/iam/v1/accounts.proto\x1a\x19pivox/iam/v1/groups.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a\x18pivox/iam/v1/roles.proto\x1a\x18pivox/iam/v1/users.proto\x1a!pivox/permission/v1/options.proto2\x93\x14\n" +
 	"\x03Iam\x12|\n" +
 	"\aGetUser\x12\x1c.pivox.iam.v1.GetUserRequest\x1a\x12.pivox.iam.v1.User\"?\xdaA\x04name\x8a\xb5\x18\n" +
 	"users.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/users/*}\x12\x8f\x01\n" +
 	"\tListUsers\x12\x1e.pivox.iam.v1.ListUsersRequest\x1a\x1f.pivox.iam.v1.ListUsersResponse\"A\xdaA\x06parent\x8a\xb5\x18\n" +
 	"users.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{parent=organizations/*}/users\x12\x88\x01\n" +
 	"\n" +
-	"DeleteUser\x12\x1f.pivox.iam.v1.DeleteUserRequest\x1a\x16.google.protobuf.Empty\"A\xdaA\x04name\x8a\xb5\x18\fusers.delete\x82\xd3\xe4\x93\x02$*\"/v1/{name=organizations/*/users/*}\x12\xae\x01\n" +
+	"DeleteUser\x12\x1f.pivox.iam.v1.DeleteUserRequest\x1a\x16.google.protobuf.Empty\"A\xdaA\x04name\x8a\xb5\x18\fusers.delete\x82\xd3\xe4\x93\x02$*\"/v1/{name=organizations/*/users/*}\x12\xb6\x01\n" +
+	"\x18ListAccountOrganizations\x12-.pivox.iam.v1.ListAccountOrganizationsRequest\x1a..pivox.iam.v1.ListAccountOrganizationsResponse\";\xdaA\x06parent\x90\xb5\x18\x01\x82\xd3\xe4\x93\x02(\x12&/v1/{parent=accounts/me}/organizations\x12\xae\x01\n" +
 	"\rDeleteAccount\x12\".pivox.iam.v1.DeleteAccountRequest\x1a\x1d.google.longrunning.Operation\"Z\xcaA.\n" +
 	"\x15google.protobuf.Empty\x12\x15DeleteAccountMetadata\xdaA\x04name\x90\xb5\x18\x01\x82\xd3\xe4\x93\x02\x18*\x16/v1/{name=accounts/me}\x12|\n" +
 	"\aGetRole\x12\x1c.pivox.iam.v1.GetRoleRequest\x1a\x12.pivox.iam.v1.Role\"?\xdaA\x04name\x8a\xb5\x18\n" +
@@ -70,67 +71,71 @@ const file_pivox_iam_v1_iam_proto_rawDesc = "" +
 	"\x10com.pivox.iam.v1B\bIamProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var file_pivox_iam_v1_iam_proto_goTypes = []any{
-	(*GetUserRequest)(nil),             // 0: pivox.iam.v1.GetUserRequest
-	(*ListUsersRequest)(nil),           // 1: pivox.iam.v1.ListUsersRequest
-	(*DeleteUserRequest)(nil),          // 2: pivox.iam.v1.DeleteUserRequest
-	(*DeleteAccountRequest)(nil),       // 3: pivox.iam.v1.DeleteAccountRequest
-	(*GetRoleRequest)(nil),             // 4: pivox.iam.v1.GetRoleRequest
-	(*ListRolesRequest)(nil),           // 5: pivox.iam.v1.ListRolesRequest
-	(*ListPermissionsRequest)(nil),     // 6: pivox.iam.v1.ListPermissionsRequest
-	(*GetGroupRequest)(nil),            // 7: pivox.iam.v1.GetGroupRequest
-	(*ListGroupsRequest)(nil),          // 8: pivox.iam.v1.ListGroupsRequest
-	(*CreateGroupRequest)(nil),         // 9: pivox.iam.v1.CreateGroupRequest
-	(*UpdateGroupRequest)(nil),         // 10: pivox.iam.v1.UpdateGroupRequest
-	(*DeleteGroupRequest)(nil),         // 11: pivox.iam.v1.DeleteGroupRequest
-	(*AddGroupMembersRequest)(nil),     // 12: pivox.iam.v1.AddGroupMembersRequest
-	(*RemoveGroupMembersRequest)(nil),  // 13: pivox.iam.v1.RemoveGroupMembersRequest
-	(*ListGroupMembersRequest)(nil),    // 14: pivox.iam.v1.ListGroupMembersRequest
-	(*User)(nil),                       // 15: pivox.iam.v1.User
-	(*ListUsersResponse)(nil),          // 16: pivox.iam.v1.ListUsersResponse
-	(*emptypb.Empty)(nil),              // 17: google.protobuf.Empty
-	(*longrunningpb.Operation)(nil),    // 18: google.longrunning.Operation
-	(*Role)(nil),                       // 19: pivox.iam.v1.Role
-	(*ListRolesResponse)(nil),          // 20: pivox.iam.v1.ListRolesResponse
-	(*ListPermissionsResponse)(nil),    // 21: pivox.iam.v1.ListPermissionsResponse
-	(*Group)(nil),                      // 22: pivox.iam.v1.Group
-	(*ListGroupsResponse)(nil),         // 23: pivox.iam.v1.ListGroupsResponse
-	(*AddGroupMembersResponse)(nil),    // 24: pivox.iam.v1.AddGroupMembersResponse
-	(*RemoveGroupMembersResponse)(nil), // 25: pivox.iam.v1.RemoveGroupMembersResponse
-	(*ListGroupMembersResponse)(nil),   // 26: pivox.iam.v1.ListGroupMembersResponse
+	(*GetUserRequest)(nil),                   // 0: pivox.iam.v1.GetUserRequest
+	(*ListUsersRequest)(nil),                 // 1: pivox.iam.v1.ListUsersRequest
+	(*DeleteUserRequest)(nil),                // 2: pivox.iam.v1.DeleteUserRequest
+	(*ListAccountOrganizationsRequest)(nil),  // 3: pivox.iam.v1.ListAccountOrganizationsRequest
+	(*DeleteAccountRequest)(nil),             // 4: pivox.iam.v1.DeleteAccountRequest
+	(*GetRoleRequest)(nil),                   // 5: pivox.iam.v1.GetRoleRequest
+	(*ListRolesRequest)(nil),                 // 6: pivox.iam.v1.ListRolesRequest
+	(*ListPermissionsRequest)(nil),           // 7: pivox.iam.v1.ListPermissionsRequest
+	(*GetGroupRequest)(nil),                  // 8: pivox.iam.v1.GetGroupRequest
+	(*ListGroupsRequest)(nil),                // 9: pivox.iam.v1.ListGroupsRequest
+	(*CreateGroupRequest)(nil),               // 10: pivox.iam.v1.CreateGroupRequest
+	(*UpdateGroupRequest)(nil),               // 11: pivox.iam.v1.UpdateGroupRequest
+	(*DeleteGroupRequest)(nil),               // 12: pivox.iam.v1.DeleteGroupRequest
+	(*AddGroupMembersRequest)(nil),           // 13: pivox.iam.v1.AddGroupMembersRequest
+	(*RemoveGroupMembersRequest)(nil),        // 14: pivox.iam.v1.RemoveGroupMembersRequest
+	(*ListGroupMembersRequest)(nil),          // 15: pivox.iam.v1.ListGroupMembersRequest
+	(*User)(nil),                             // 16: pivox.iam.v1.User
+	(*ListUsersResponse)(nil),                // 17: pivox.iam.v1.ListUsersResponse
+	(*emptypb.Empty)(nil),                    // 18: google.protobuf.Empty
+	(*ListAccountOrganizationsResponse)(nil), // 19: pivox.iam.v1.ListAccountOrganizationsResponse
+	(*longrunningpb.Operation)(nil),          // 20: google.longrunning.Operation
+	(*Role)(nil),                             // 21: pivox.iam.v1.Role
+	(*ListRolesResponse)(nil),                // 22: pivox.iam.v1.ListRolesResponse
+	(*ListPermissionsResponse)(nil),          // 23: pivox.iam.v1.ListPermissionsResponse
+	(*Group)(nil),                            // 24: pivox.iam.v1.Group
+	(*ListGroupsResponse)(nil),               // 25: pivox.iam.v1.ListGroupsResponse
+	(*AddGroupMembersResponse)(nil),          // 26: pivox.iam.v1.AddGroupMembersResponse
+	(*RemoveGroupMembersResponse)(nil),       // 27: pivox.iam.v1.RemoveGroupMembersResponse
+	(*ListGroupMembersResponse)(nil),         // 28: pivox.iam.v1.ListGroupMembersResponse
 }
 var file_pivox_iam_v1_iam_proto_depIdxs = []int32{
 	0,  // 0: pivox.iam.v1.Iam.GetUser:input_type -> pivox.iam.v1.GetUserRequest
 	1,  // 1: pivox.iam.v1.Iam.ListUsers:input_type -> pivox.iam.v1.ListUsersRequest
 	2,  // 2: pivox.iam.v1.Iam.DeleteUser:input_type -> pivox.iam.v1.DeleteUserRequest
-	3,  // 3: pivox.iam.v1.Iam.DeleteAccount:input_type -> pivox.iam.v1.DeleteAccountRequest
-	4,  // 4: pivox.iam.v1.Iam.GetRole:input_type -> pivox.iam.v1.GetRoleRequest
-	5,  // 5: pivox.iam.v1.Iam.ListRoles:input_type -> pivox.iam.v1.ListRolesRequest
-	6,  // 6: pivox.iam.v1.Iam.ListPermissions:input_type -> pivox.iam.v1.ListPermissionsRequest
-	7,  // 7: pivox.iam.v1.Iam.GetGroup:input_type -> pivox.iam.v1.GetGroupRequest
-	8,  // 8: pivox.iam.v1.Iam.ListGroups:input_type -> pivox.iam.v1.ListGroupsRequest
-	9,  // 9: pivox.iam.v1.Iam.CreateGroup:input_type -> pivox.iam.v1.CreateGroupRequest
-	10, // 10: pivox.iam.v1.Iam.UpdateGroup:input_type -> pivox.iam.v1.UpdateGroupRequest
-	11, // 11: pivox.iam.v1.Iam.DeleteGroup:input_type -> pivox.iam.v1.DeleteGroupRequest
-	12, // 12: pivox.iam.v1.Iam.AddGroupMembers:input_type -> pivox.iam.v1.AddGroupMembersRequest
-	13, // 13: pivox.iam.v1.Iam.RemoveGroupMembers:input_type -> pivox.iam.v1.RemoveGroupMembersRequest
-	14, // 14: pivox.iam.v1.Iam.ListGroupMembers:input_type -> pivox.iam.v1.ListGroupMembersRequest
-	15, // 15: pivox.iam.v1.Iam.GetUser:output_type -> pivox.iam.v1.User
-	16, // 16: pivox.iam.v1.Iam.ListUsers:output_type -> pivox.iam.v1.ListUsersResponse
-	17, // 17: pivox.iam.v1.Iam.DeleteUser:output_type -> google.protobuf.Empty
-	18, // 18: pivox.iam.v1.Iam.DeleteAccount:output_type -> google.longrunning.Operation
-	19, // 19: pivox.iam.v1.Iam.GetRole:output_type -> pivox.iam.v1.Role
-	20, // 20: pivox.iam.v1.Iam.ListRoles:output_type -> pivox.iam.v1.ListRolesResponse
-	21, // 21: pivox.iam.v1.Iam.ListPermissions:output_type -> pivox.iam.v1.ListPermissionsResponse
-	22, // 22: pivox.iam.v1.Iam.GetGroup:output_type -> pivox.iam.v1.Group
-	23, // 23: pivox.iam.v1.Iam.ListGroups:output_type -> pivox.iam.v1.ListGroupsResponse
-	22, // 24: pivox.iam.v1.Iam.CreateGroup:output_type -> pivox.iam.v1.Group
-	22, // 25: pivox.iam.v1.Iam.UpdateGroup:output_type -> pivox.iam.v1.Group
-	22, // 26: pivox.iam.v1.Iam.DeleteGroup:output_type -> pivox.iam.v1.Group
-	24, // 27: pivox.iam.v1.Iam.AddGroupMembers:output_type -> pivox.iam.v1.AddGroupMembersResponse
-	25, // 28: pivox.iam.v1.Iam.RemoveGroupMembers:output_type -> pivox.iam.v1.RemoveGroupMembersResponse
-	26, // 29: pivox.iam.v1.Iam.ListGroupMembers:output_type -> pivox.iam.v1.ListGroupMembersResponse
-	15, // [15:30] is the sub-list for method output_type
-	0,  // [0:15] is the sub-list for method input_type
+	3,  // 3: pivox.iam.v1.Iam.ListAccountOrganizations:input_type -> pivox.iam.v1.ListAccountOrganizationsRequest
+	4,  // 4: pivox.iam.v1.Iam.DeleteAccount:input_type -> pivox.iam.v1.DeleteAccountRequest
+	5,  // 5: pivox.iam.v1.Iam.GetRole:input_type -> pivox.iam.v1.GetRoleRequest
+	6,  // 6: pivox.iam.v1.Iam.ListRoles:input_type -> pivox.iam.v1.ListRolesRequest
+	7,  // 7: pivox.iam.v1.Iam.ListPermissions:input_type -> pivox.iam.v1.ListPermissionsRequest
+	8,  // 8: pivox.iam.v1.Iam.GetGroup:input_type -> pivox.iam.v1.GetGroupRequest
+	9,  // 9: pivox.iam.v1.Iam.ListGroups:input_type -> pivox.iam.v1.ListGroupsRequest
+	10, // 10: pivox.iam.v1.Iam.CreateGroup:input_type -> pivox.iam.v1.CreateGroupRequest
+	11, // 11: pivox.iam.v1.Iam.UpdateGroup:input_type -> pivox.iam.v1.UpdateGroupRequest
+	12, // 12: pivox.iam.v1.Iam.DeleteGroup:input_type -> pivox.iam.v1.DeleteGroupRequest
+	13, // 13: pivox.iam.v1.Iam.AddGroupMembers:input_type -> pivox.iam.v1.AddGroupMembersRequest
+	14, // 14: pivox.iam.v1.Iam.RemoveGroupMembers:input_type -> pivox.iam.v1.RemoveGroupMembersRequest
+	15, // 15: pivox.iam.v1.Iam.ListGroupMembers:input_type -> pivox.iam.v1.ListGroupMembersRequest
+	16, // 16: pivox.iam.v1.Iam.GetUser:output_type -> pivox.iam.v1.User
+	17, // 17: pivox.iam.v1.Iam.ListUsers:output_type -> pivox.iam.v1.ListUsersResponse
+	18, // 18: pivox.iam.v1.Iam.DeleteUser:output_type -> google.protobuf.Empty
+	19, // 19: pivox.iam.v1.Iam.ListAccountOrganizations:output_type -> pivox.iam.v1.ListAccountOrganizationsResponse
+	20, // 20: pivox.iam.v1.Iam.DeleteAccount:output_type -> google.longrunning.Operation
+	21, // 21: pivox.iam.v1.Iam.GetRole:output_type -> pivox.iam.v1.Role
+	22, // 22: pivox.iam.v1.Iam.ListRoles:output_type -> pivox.iam.v1.ListRolesResponse
+	23, // 23: pivox.iam.v1.Iam.ListPermissions:output_type -> pivox.iam.v1.ListPermissionsResponse
+	24, // 24: pivox.iam.v1.Iam.GetGroup:output_type -> pivox.iam.v1.Group
+	25, // 25: pivox.iam.v1.Iam.ListGroups:output_type -> pivox.iam.v1.ListGroupsResponse
+	24, // 26: pivox.iam.v1.Iam.CreateGroup:output_type -> pivox.iam.v1.Group
+	24, // 27: pivox.iam.v1.Iam.UpdateGroup:output_type -> pivox.iam.v1.Group
+	24, // 28: pivox.iam.v1.Iam.DeleteGroup:output_type -> pivox.iam.v1.Group
+	26, // 29: pivox.iam.v1.Iam.AddGroupMembers:output_type -> pivox.iam.v1.AddGroupMembersResponse
+	27, // 30: pivox.iam.v1.Iam.RemoveGroupMembers:output_type -> pivox.iam.v1.RemoveGroupMembersResponse
+	28, // 31: pivox.iam.v1.Iam.ListGroupMembers:output_type -> pivox.iam.v1.ListGroupMembersResponse
+	16, // [16:32] is the sub-list for method output_type
+	0,  // [0:16] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name

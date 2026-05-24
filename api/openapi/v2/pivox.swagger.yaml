@@ -71,6 +71,61 @@ paths:
           type: string
       tags:
         - Iam
+  /v1/accounts/me/organizations:
+    get:
+      summary: |-
+        Lists the active organizations the authenticated caller has
+        membership in. Slim, caller-scoped view — (slug, display_name,
+        role) — distinct from `Organizations.ListOrganizations`, which
+        returns the full Organization resource and is reserved for the
+        admin/undelete UX. Used by the post-sign-in bootstrap to detect
+        the zero-membership state and by the in-app org picker.
+      description: |-
+        Soft-deleted orgs are excluded — those surface only through
+        `Organizations.ListOrganizations` (which the undelete UX needs).
+
+        On the membership-exempt list, like
+        `Organizations.ListOrganizations`: this RPC IS the bootstrap
+        membership query, so gating it on membership would be
+        chicken-and-egg. Authn still runs; the result only ever surfaces
+        the caller's own memberships, so there is no over-disclosure
+        vector beyond what authentication already grants.
+      operationId: Iam_ListAccountOrganizations
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1ListAccountOrganizationsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: parent
+          description: |-
+            Required. The parent. Must be `accounts/me`. The caller is
+            implicit from the authentication context.
+          in: path
+          required: true
+          type: string
+        - name: pageSize
+          description: |-
+            Optional. Maximum number of orgs to return. Accepted but ignored
+            in v1 — the underlying query caps at 1000 and a single caller
+            having more memberships than that isn't a realistic case.
+          in: query
+          required: false
+          type: integer
+          format: int32
+        - name: pageToken
+          description: |-
+            Optional. Page token from a previous response. Accepted but
+            ignored in v1; reserved for the day pagination matters.
+          in: query
+          required: false
+          type: string
+      tags:
+        - Iam
   /v1/keys:lookupKey:
     get:
       summary: |-
@@ -9566,6 +9621,44 @@ definitions:
         $ref: '#/definitions/v1Invitation'
         description: The accepted invitation.
     description: Response message for `AcceptInvitation`.
+  v1AccountOrganization:
+    type: object
+    properties:
+      organization:
+        type: string
+        description: |-
+          The canonical Organization this view derives from.
+          Format: `organizations/{organization}`.
+        readOnly: true
+      displayName:
+        type: string
+        description: Human-readable organization name shown in pickers.
+        readOnly: true
+      role:
+        type: string
+        description: |-
+          Caller's effective role on this org. One of `owner`, `admin`,
+          `editor`, `viewer` — the v1 system roles. When the caller has
+          both a direct binding and group-mediated bindings on the same
+          org, the highest-precedence role wins
+          (owner > admin > editor > viewer). Bindings to non-system roles
+          are excluded from this view in v1.
+        readOnly: true
+    description: |-
+      AccountOrganization is the slim, caller-scoped projection of an
+      org the authenticated caller has membership in. Intentionally NOT
+      a `google.api.resource` — it's a derived view (Organization joined
+      with the caller's role binding), not a durable, independently
+      addressable entity. Get/Update/Delete don't apply; only the
+      `ListAccountOrganizations` projection.
+
+      Distinct from `pivox.api/Organization` (the full resource on
+      `/v1/organizations/{org}`): the post-sign-in bootstrap and
+      org-picker UIs need (slug, display_name, role) without the full
+      Organization's Actor fields, etag, annotations, timestamps, and
+      lifecycle state. Soft-deleted orgs are excluded from this view —
+      those surface only through `Organizations.ListOrganizations` for
+      the undelete UX.
   v1AddGroupMembersResponse:
     type: object
     description: Response message for `Iam.AddGroupMembers`.
@@ -11469,6 +11562,25 @@ definitions:
        - DELIVERED: Artist uploaded the deliverable.
        - APPROVED: Producer approved this item.
        - REVISION_REQUESTED: Producer requested changes on this item.
+  v1ListAccountOrganizationsResponse:
+    type: object
+    properties:
+      accountOrganizations:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1AccountOrganization'
+        description: |-
+          The active organizations the caller has membership in. Field
+          name matches the lowercase-plural of the message being listed
+          (`AccountOrganization` → `account_organizations`) per AIP-132,
+          even though `AccountOrganization` is not a `google.api.resource`.
+      nextPageToken:
+        type: string
+        description: |-
+          Token for the next page of results. Always empty in v1
+          (pagination isn't implemented; the query caps at 1000).
+    description: Response message for `Iam.ListAccountOrganizations`.
   v1ListAgentsResponse:
     type: object
     properties:

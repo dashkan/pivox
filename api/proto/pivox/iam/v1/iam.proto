@@ -100,6 +100,33 @@ service Iam {
     option (pivox.permission.v1.required_permission) = "users.delete";
   }
 
+  // Lists the active organizations the authenticated caller has
+  // membership in. Slim, caller-scoped view — (slug, display_name,
+  // role) — distinct from `Organizations.ListOrganizations`, which
+  // returns the full Organization resource and is reserved for the
+  // admin/undelete UX. Used by the post-sign-in bootstrap to detect
+  // the zero-membership state and by the in-app org picker.
+  //
+  // Soft-deleted orgs are excluded — those surface only through
+  // `Organizations.ListOrganizations` (which the undelete UX needs).
+  //
+  // On the membership-exempt list, like
+  // `Organizations.ListOrganizations`: this RPC IS the bootstrap
+  // membership query, so gating it on membership would be
+  // chicken-and-egg. Authn still runs; the result only ever surfaces
+  // the caller's own memberships, so there is no over-disclosure
+  // vector beyond what authentication already grants.
+  // (-- api-linter: core::0127::http-template-pattern=disabled
+  //     aip.dev/not-precedent: Only support listing the caller's
+  //     own account organizations; `accounts/me` is the only valid
+  //     parent since there is no other account a caller can
+  //     address. Parallels the same disable on DeleteAccount. --)
+  rpc ListAccountOrganizations(ListAccountOrganizationsRequest) returns (ListAccountOrganizationsResponse) {
+    option (google.api.http) = {get: "/v1/{parent=accounts/me}/organizations"};
+    option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.exempt) = true;
+  }
+
   // Deletes the authenticated caller's Pivox account (LRO). Cascades
   // through Pivox-side state across every org the caller is in, then
   // deletes the underlying Firebase Auth identity. Cross-org by

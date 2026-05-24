@@ -309,6 +309,216 @@ func (x *DeleteAccountMetadata) GetAccount() string {
 	return ""
 }
 
+// AccountOrganization is the slim, caller-scoped projection of an
+// org the authenticated caller has membership in. Intentionally NOT
+// a `google.api.resource` — it's a derived view (Organization joined
+// with the caller's role binding), not a durable, independently
+// addressable entity. Get/Update/Delete don't apply; only the
+// `ListAccountOrganizations` projection.
+//
+// Distinct from `pivox.api/Organization` (the full resource on
+// `/v1/organizations/{org}`): the post-sign-in bootstrap and
+// org-picker UIs need (slug, display_name, role) without the full
+// Organization's Actor fields, etag, annotations, timestamps, and
+// lifecycle state. Soft-deleted orgs are excluded from this view —
+// those surface only through `Organizations.ListOrganizations` for
+// the undelete UX.
+type AccountOrganization struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The canonical Organization this view derives from.
+	// Format: `organizations/{organization}`.
+	Organization string `protobuf:"bytes,1,opt,name=organization,proto3" json:"organization,omitempty"`
+	// Human-readable organization name shown in pickers.
+	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	// Caller's effective role on this org. One of `owner`, `admin`,
+	// `editor`, `viewer` — the v1 system roles. When the caller has
+	// both a direct binding and group-mediated bindings on the same
+	// org, the highest-precedence role wins
+	// (owner > admin > editor > viewer). Bindings to non-system roles
+	// are excluded from this view in v1.
+	Role          string `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccountOrganization) Reset() {
+	*x = AccountOrganization{}
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountOrganization) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountOrganization) ProtoMessage() {}
+
+func (x *AccountOrganization) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountOrganization.ProtoReflect.Descriptor instead.
+func (*AccountOrganization) Descriptor() ([]byte, []int) {
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AccountOrganization) GetOrganization() string {
+	if x != nil {
+		return x.Organization
+	}
+	return ""
+}
+
+func (x *AccountOrganization) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *AccountOrganization) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+// Request message for `Iam.ListAccountOrganizations`.
+type ListAccountOrganizationsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. The parent. Must be `accounts/me`. The caller is
+	// implicit from the authentication context.
+	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
+	// Optional. Maximum number of orgs to return. Accepted but ignored
+	// in v1 — the underlying query caps at 1000 and a single caller
+	// having more memberships than that isn't a realistic case.
+	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// Optional. Page token from a previous response. Accepted but
+	// ignored in v1; reserved for the day pagination matters.
+	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccountOrganizationsRequest) Reset() {
+	*x = ListAccountOrganizationsRequest{}
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccountOrganizationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccountOrganizationsRequest) ProtoMessage() {}
+
+func (x *ListAccountOrganizationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccountOrganizationsRequest.ProtoReflect.Descriptor instead.
+func (*ListAccountOrganizationsRequest) Descriptor() ([]byte, []int) {
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListAccountOrganizationsRequest) GetParent() string {
+	if x != nil {
+		return x.Parent
+	}
+	return ""
+}
+
+func (x *ListAccountOrganizationsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListAccountOrganizationsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+// Response message for `Iam.ListAccountOrganizations`.
+type ListAccountOrganizationsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The active organizations the caller has membership in. Field
+	// name matches the lowercase-plural of the message being listed
+	// (`AccountOrganization` → `account_organizations`) per AIP-132,
+	// even though `AccountOrganization` is not a `google.api.resource`.
+	AccountOrganizations []*AccountOrganization `protobuf:"bytes,1,rep,name=account_organizations,json=accountOrganizations,proto3" json:"account_organizations,omitempty"`
+	// Token for the next page of results. Always empty in v1
+	// (pagination isn't implemented; the query caps at 1000).
+	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccountOrganizationsResponse) Reset() {
+	*x = ListAccountOrganizationsResponse{}
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccountOrganizationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccountOrganizationsResponse) ProtoMessage() {}
+
+func (x *ListAccountOrganizationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccountOrganizationsResponse.ProtoReflect.Descriptor instead.
+func (*ListAccountOrganizationsResponse) Descriptor() ([]byte, []int) {
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListAccountOrganizationsResponse) GetAccountOrganizations() []*AccountOrganization {
+	if x != nil {
+		return x.AccountOrganizations
+	}
+	return nil
+}
+
+func (x *ListAccountOrganizationsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 var File_pivox_iam_v1_accounts_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_accounts_proto_rawDesc = "" +
@@ -330,7 +540,21 @@ const file_pivox_iam_v1_accounts_proto_rawDesc = "" +
 	"\x14REVOKING_MEMBERSHIPS\x10\x02\x12\x1a\n" +
 	"\x16DELETING_PIVOX_RECORDS\x10\x03\x12\x1e\n" +
 	"\x1aDELETING_FIREBASE_IDENTITY\x10\x04\x12\r\n" +
-	"\tCOMPLETED\x10\x05B\xb1\x01\n" +
+	"\tCOMPLETED\x10\x05\"\x9a\x01\n" +
+	"\x13AccountOrganization\x12B\n" +
+	"\forganization\x18\x01 \x01(\tB\x1e\xe0A\x03\xfaA\x18\n" +
+	"\x16pivox.api/OrganizationR\forganization\x12&\n" +
+	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12\x17\n" +
+	"\x04role\x18\x03 \x01(\tB\x03\xe0A\x03R\x04role\"\xa0\x01\n" +
+	"\x1fListAccountOrganizationsRequest\x127\n" +
+	"\x06parent\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
+	"\x11pivox.iam/Account\xbaH\x03\xc8\x01\x01R\x06parent\x12 \n" +
+	"\tpage_size\x18\x02 \x01(\x05B\x03\xe0A\x01R\bpageSize\x12\"\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\"\xa2\x01\n" +
+	" ListAccountOrganizationsResponse\x12V\n" +
+	"\x15account_organizations\x18\x01 \x03(\v2!.pivox.iam.v1.AccountOrganizationR\x14accountOrganizations\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenB\xb1\x01\n" +
 	"\x10com.pivox.iam.v1B\rAccountsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var (
@@ -346,20 +570,24 @@ func file_pivox_iam_v1_accounts_proto_rawDescGZIP() []byte {
 }
 
 var file_pivox_iam_v1_accounts_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pivox_iam_v1_accounts_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_pivox_iam_v1_accounts_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_pivox_iam_v1_accounts_proto_goTypes = []any{
-	(DeleteAccountMetadata_Phase)(0), // 0: pivox.iam.v1.DeleteAccountMetadata.Phase
-	(*Account)(nil),                  // 1: pivox.iam.v1.Account
-	(*DeleteAccountRequest)(nil),     // 2: pivox.iam.v1.DeleteAccountRequest
-	(*DeleteAccountMetadata)(nil),    // 3: pivox.iam.v1.DeleteAccountMetadata
+	(DeleteAccountMetadata_Phase)(0),         // 0: pivox.iam.v1.DeleteAccountMetadata.Phase
+	(*Account)(nil),                          // 1: pivox.iam.v1.Account
+	(*DeleteAccountRequest)(nil),             // 2: pivox.iam.v1.DeleteAccountRequest
+	(*DeleteAccountMetadata)(nil),            // 3: pivox.iam.v1.DeleteAccountMetadata
+	(*AccountOrganization)(nil),              // 4: pivox.iam.v1.AccountOrganization
+	(*ListAccountOrganizationsRequest)(nil),  // 5: pivox.iam.v1.ListAccountOrganizationsRequest
+	(*ListAccountOrganizationsResponse)(nil), // 6: pivox.iam.v1.ListAccountOrganizationsResponse
 }
 var file_pivox_iam_v1_accounts_proto_depIdxs = []int32{
 	0, // 0: pivox.iam.v1.DeleteAccountMetadata.phase:type_name -> pivox.iam.v1.DeleteAccountMetadata.Phase
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	4, // 1: pivox.iam.v1.ListAccountOrganizationsResponse.account_organizations:type_name -> pivox.iam.v1.AccountOrganization
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_pivox_iam_v1_accounts_proto_init() }
@@ -373,7 +601,7 @@ func file_pivox_iam_v1_accounts_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_iam_v1_accounts_proto_rawDesc), len(file_pivox_iam_v1_accounts_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

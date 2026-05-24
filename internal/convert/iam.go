@@ -124,3 +124,17 @@ func RoleToProto(r db.Role, orgName string, permissions []string) *iampb.Role {
 	}
 	return pb
 }
+
+// AccountOrganizationToProto converts a slim membership row from
+// `ListAccountOrganizationsForIdentity` to the wire shape returned by
+// `Iam.ListAccountOrganizations`. The row already carries the
+// highest-precedence role (the SQL collapses direct + group-mediated
+// bindings); the converter only re-formats the Organization resource
+// name from the org slug.
+func AccountOrganizationToProto(row db.ListAccountOrganizationsForIdentityRow) *iampb.AccountOrganization {
+	return &iampb.AccountOrganization{
+		Organization: fmt.Sprintf("organizations/%s", row.Slug),
+		DisplayName:  row.DisplayName,
+		Role:         row.RoleName,
+	}
+}

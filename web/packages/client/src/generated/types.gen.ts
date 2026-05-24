@@ -40,6 +40,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/me/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists the active organizations the authenticated caller has
+         *     membership in. Slim, caller-scoped view — (slug, display_name,
+         *     role) — distinct from `Organizations.ListOrganizations`, which
+         *     returns the full Organization resource and is reserved for the
+         *     admin/undelete UX. Used by the post-sign-in bootstrap to detect
+         *     the zero-membership state and by the in-app org picker.
+         * @description Soft-deleted orgs are excluded — those surface only through
+         *     `Organizations.ListOrganizations` (which the undelete UX needs).
+         *
+         *     On the membership-exempt list, like
+         *     `Organizations.ListOrganizations`: this RPC IS the bootstrap
+         *     membership query, so gating it on membership would be
+         *     chicken-and-egg. Authn still runs; the result only ever surfaces
+         *     the caller's own memberships, so there is no over-disclosure
+         *     vector beyond what authentication already grants.
+         */
+        get: operations["Iam_ListAccountOrganizations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/keys:lookupKey": {
         parameters: {
             query?: never;
@@ -3346,6 +3379,40 @@ export interface components {
             /** @description The accepted invitation. */
             invitation?: components["schemas"]["v1Invitation"];
         };
+        /**
+         * @description AccountOrganization is the slim, caller-scoped projection of an
+         *     org the authenticated caller has membership in. Intentionally NOT
+         *     a `google.api.resource` — it's a derived view (Organization joined
+         *     with the caller's role binding), not a durable, independently
+         *     addressable entity. Get/Update/Delete don't apply; only the
+         *     `ListAccountOrganizations` projection.
+         *
+         *     Distinct from `pivox.api/Organization` (the full resource on
+         *     `/v1/organizations/{org}`): the post-sign-in bootstrap and
+         *     org-picker UIs need (slug, display_name, role) without the full
+         *     Organization's Actor fields, etag, annotations, timestamps, and
+         *     lifecycle state. Soft-deleted orgs are excluded from this view —
+         *     those surface only through `Organizations.ListOrganizations` for
+         *     the undelete UX.
+         */
+        v1AccountOrganization: {
+            /**
+             * @description The canonical Organization this view derives from.
+             *     Format: `organizations/{organization}`.
+             */
+            readonly organization?: string;
+            /** @description Human-readable organization name shown in pickers. */
+            readonly displayName?: string;
+            /**
+             * @description Caller's effective role on this org. One of `owner`, `admin`,
+             *     `editor`, `viewer` — the v1 system roles. When the caller has
+             *     both a direct binding and group-mediated bindings on the same
+             *     org, the highest-precedence role wins
+             *     (owner > admin > editor > viewer). Bindings to non-system roles
+             *     are excluded from this view in v1.
+             */
+            readonly role?: string;
+        };
         /** @description Response message for `Iam.AddGroupMembers`. */
         v1AddGroupMembersResponse: Record<string, never>;
         /**
@@ -4880,6 +4947,21 @@ export interface components {
          * @enum {string}
          */
         v1LineItemState: "STATE_UNSPECIFIED" | "PENDING" | "IN_PROGRESS" | "DELIVERED" | "APPROVED" | "REVISION_REQUESTED";
+        /** @description Response message for `Iam.ListAccountOrganizations`. */
+        v1ListAccountOrganizationsResponse: {
+            /**
+             * @description The active organizations the caller has membership in. Field
+             *     name matches the lowercase-plural of the message being listed
+             *     (`AccountOrganization` → `account_organizations`) per AIP-132,
+             *     even though `AccountOrganization` is not a `google.api.resource`.
+             */
+            accountOrganizations?: components["schemas"]["v1AccountOrganization"][];
+            /**
+             * @description Token for the next page of results. Always empty in v1
+             *     (pagination isn't implemented; the query caps at 1000).
+             */
+            nextPageToken?: string;
+        };
         /**
          * @description The response returned from the
          *     [ListAgents][pivox.storage.v1.Agents.ListAgents] method.
@@ -6536,6 +6618,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["longrunningOperation"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Iam_ListAccountOrganizations: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Optional. Maximum number of orgs to return. Accepted but ignored
+                 *     in v1 — the underlying query caps at 1000 and a single caller
+                 *     having more memberships than that isn't a realistic case.
+                 */
+                pageSize?: number;
+                /**
+                 * @description Optional. Page token from a previous response. Accepted but
+                 *     ignored in v1; reserved for the day pagination matters.
+                 */
+                pageToken?: string;
+            };
+            header?: never;
+            path: {
+                /**
+                 * @description Required. The parent. Must be `accounts/me`. The caller is
+                 *     implicit from the authentication context.
+                 */
+                parent: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListAccountOrganizationsResponse"];
                 };
             };
             /** @description An unexpected error response. */

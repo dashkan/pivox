@@ -35,21 +35,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Iam_GetUser_FullMethodName            = "/pivox.iam.v1.Iam/GetUser"
-	Iam_ListUsers_FullMethodName          = "/pivox.iam.v1.Iam/ListUsers"
-	Iam_DeleteUser_FullMethodName         = "/pivox.iam.v1.Iam/DeleteUser"
-	Iam_DeleteAccount_FullMethodName      = "/pivox.iam.v1.Iam/DeleteAccount"
-	Iam_GetRole_FullMethodName            = "/pivox.iam.v1.Iam/GetRole"
-	Iam_ListRoles_FullMethodName          = "/pivox.iam.v1.Iam/ListRoles"
-	Iam_ListPermissions_FullMethodName    = "/pivox.iam.v1.Iam/ListPermissions"
-	Iam_GetGroup_FullMethodName           = "/pivox.iam.v1.Iam/GetGroup"
-	Iam_ListGroups_FullMethodName         = "/pivox.iam.v1.Iam/ListGroups"
-	Iam_CreateGroup_FullMethodName        = "/pivox.iam.v1.Iam/CreateGroup"
-	Iam_UpdateGroup_FullMethodName        = "/pivox.iam.v1.Iam/UpdateGroup"
-	Iam_DeleteGroup_FullMethodName        = "/pivox.iam.v1.Iam/DeleteGroup"
-	Iam_AddGroupMembers_FullMethodName    = "/pivox.iam.v1.Iam/AddGroupMembers"
-	Iam_RemoveGroupMembers_FullMethodName = "/pivox.iam.v1.Iam/RemoveGroupMembers"
-	Iam_ListGroupMembers_FullMethodName   = "/pivox.iam.v1.Iam/ListGroupMembers"
+	Iam_GetUser_FullMethodName                  = "/pivox.iam.v1.Iam/GetUser"
+	Iam_ListUsers_FullMethodName                = "/pivox.iam.v1.Iam/ListUsers"
+	Iam_DeleteUser_FullMethodName               = "/pivox.iam.v1.Iam/DeleteUser"
+	Iam_ListAccountOrganizations_FullMethodName = "/pivox.iam.v1.Iam/ListAccountOrganizations"
+	Iam_DeleteAccount_FullMethodName            = "/pivox.iam.v1.Iam/DeleteAccount"
+	Iam_GetRole_FullMethodName                  = "/pivox.iam.v1.Iam/GetRole"
+	Iam_ListRoles_FullMethodName                = "/pivox.iam.v1.Iam/ListRoles"
+	Iam_ListPermissions_FullMethodName          = "/pivox.iam.v1.Iam/ListPermissions"
+	Iam_GetGroup_FullMethodName                 = "/pivox.iam.v1.Iam/GetGroup"
+	Iam_ListGroups_FullMethodName               = "/pivox.iam.v1.Iam/ListGroups"
+	Iam_CreateGroup_FullMethodName              = "/pivox.iam.v1.Iam/CreateGroup"
+	Iam_UpdateGroup_FullMethodName              = "/pivox.iam.v1.Iam/UpdateGroup"
+	Iam_DeleteGroup_FullMethodName              = "/pivox.iam.v1.Iam/DeleteGroup"
+	Iam_AddGroupMembers_FullMethodName          = "/pivox.iam.v1.Iam/AddGroupMembers"
+	Iam_RemoveGroupMembers_FullMethodName       = "/pivox.iam.v1.Iam/RemoveGroupMembers"
+	Iam_ListGroupMembers_FullMethodName         = "/pivox.iam.v1.Iam/ListGroupMembers"
 )
 
 // IamClient is the client API for Iam service.
@@ -111,6 +112,29 @@ type IamClient interface {
 	// The {user} segment is `firebase_identities.id`. The literal `me`
 	// is not a valid {user} segment; v1 has no self-leave-org.
 	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Lists the active organizations the authenticated caller has
+	// membership in. Slim, caller-scoped view — (slug, display_name,
+	// role) — distinct from `Organizations.ListOrganizations`, which
+	// returns the full Organization resource and is reserved for the
+	// admin/undelete UX. Used by the post-sign-in bootstrap to detect
+	// the zero-membership state and by the in-app org picker.
+	//
+	// Soft-deleted orgs are excluded — those surface only through
+	// `Organizations.ListOrganizations` (which the undelete UX needs).
+	//
+	// On the membership-exempt list, like
+	// `Organizations.ListOrganizations`: this RPC IS the bootstrap
+	// membership query, so gating it on membership would be
+	// chicken-and-egg. Authn still runs; the result only ever surfaces
+	// the caller's own memberships, so there is no over-disclosure
+	// vector beyond what authentication already grants.
+	// (-- api-linter: core::0127::http-template-pattern=disabled
+	//
+	//	aip.dev/not-precedent: Only support listing the caller's
+	//	own account organizations; `accounts/me` is the only valid
+	//	parent since there is no other account a caller can
+	//	address. Parallels the same disable on DeleteAccount. --)
+	ListAccountOrganizations(ctx context.Context, in *ListAccountOrganizationsRequest, opts ...grpc.CallOption) (*ListAccountOrganizationsResponse, error)
 	// Deletes the authenticated caller's Pivox account (LRO). Cascades
 	// through Pivox-side state across every org the caller is in, then
 	// deletes the underlying Firebase Auth identity. Cross-org by
@@ -196,6 +220,16 @@ func (c *iamClient) DeleteUser(ctx context.Context, in *DeleteUserRequest, opts 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Iam_DeleteUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) ListAccountOrganizations(ctx context.Context, in *ListAccountOrganizationsRequest, opts ...grpc.CallOption) (*ListAccountOrganizationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAccountOrganizationsResponse)
+	err := c.cc.Invoke(ctx, Iam_ListAccountOrganizations_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -381,6 +415,29 @@ type IamServer interface {
 	// The {user} segment is `firebase_identities.id`. The literal `me`
 	// is not a valid {user} segment; v1 has no self-leave-org.
 	DeleteUser(context.Context, *DeleteUserRequest) (*emptypb.Empty, error)
+	// Lists the active organizations the authenticated caller has
+	// membership in. Slim, caller-scoped view — (slug, display_name,
+	// role) — distinct from `Organizations.ListOrganizations`, which
+	// returns the full Organization resource and is reserved for the
+	// admin/undelete UX. Used by the post-sign-in bootstrap to detect
+	// the zero-membership state and by the in-app org picker.
+	//
+	// Soft-deleted orgs are excluded — those surface only through
+	// `Organizations.ListOrganizations` (which the undelete UX needs).
+	//
+	// On the membership-exempt list, like
+	// `Organizations.ListOrganizations`: this RPC IS the bootstrap
+	// membership query, so gating it on membership would be
+	// chicken-and-egg. Authn still runs; the result only ever surfaces
+	// the caller's own memberships, so there is no over-disclosure
+	// vector beyond what authentication already grants.
+	// (-- api-linter: core::0127::http-template-pattern=disabled
+	//
+	//	aip.dev/not-precedent: Only support listing the caller's
+	//	own account organizations; `accounts/me` is the only valid
+	//	parent since there is no other account a caller can
+	//	address. Parallels the same disable on DeleteAccount. --)
+	ListAccountOrganizations(context.Context, *ListAccountOrganizationsRequest) (*ListAccountOrganizationsResponse, error)
 	// Deletes the authenticated caller's Pivox account (LRO). Cascades
 	// through Pivox-side state across every org the caller is in, then
 	// deletes the underlying Firebase Auth identity. Cross-org by
@@ -450,6 +507,9 @@ func (UnimplementedIamServer) ListUsers(context.Context, *ListUsersRequest) (*Li
 }
 func (UnimplementedIamServer) DeleteUser(context.Context, *DeleteUserRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteUser not implemented")
+}
+func (UnimplementedIamServer) ListAccountOrganizations(context.Context, *ListAccountOrganizationsRequest) (*ListAccountOrganizationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAccountOrganizations not implemented")
 }
 func (UnimplementedIamServer) DeleteAccount(context.Context, *DeleteAccountRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAccount not implemented")
@@ -558,6 +618,24 @@ func _Iam_DeleteUser_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IamServer).DeleteUser(ctx, req.(*DeleteUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_ListAccountOrganizations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAccountOrganizationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).ListAccountOrganizations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_ListAccountOrganizations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).ListAccountOrganizations(ctx, req.(*ListAccountOrganizationsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -796,6 +874,10 @@ var Iam_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteUser",
 			Handler:    _Iam_DeleteUser_Handler,
+		},
+		{
+			MethodName: "ListAccountOrganizations",
+			Handler:    _Iam_ListAccountOrganizations_Handler,
 		},
 		{
 			MethodName: "DeleteAccount",

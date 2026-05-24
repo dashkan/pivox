@@ -33,6 +33,44 @@ SELECT DISTINCT o.*
  ORDER BY o.id ASC
  LIMIT 1000;
 
+-- name: ListAccountOrganizationsForIdentity :many
+-- Caller-scoped slim view: (active org, highest-precedence role) for
+-- an identity. Combines direct user bindings and group-mediated
+-- bindings, then collapses to one row per org with the highest
+-- precedence role winning (owner > admin > editor > viewer).
+--
+-- Differences from ListOrganizationsForIdentity (above):
+--   - Excludes soft-deleted orgs. The undelete UX runs against the
+--     full Organizations.ListOrganizations; this slim view is for
+--     post-sign-in bootstrap + org-picker, which doesn't want
+--     tombstones in the list.
+--   - JOINs roles and surfaces role_name. The CASE expression pins
+--     v1's static system-role set; bindings to any other role are
+--     excluded entirely by the WHERE filter. Adding a v2 role
+--     requires updating this expression AND the precedence test —
+--     otherwise the binding silently disappears from the view.
+SELECT DISTINCT ON (o.id)
+  o.id, o.name AS slug, o.display_name, r.name AS role_name
+  FROM organizations o
+  JOIN org_members om ON om.org_id = o.id
+  JOIN roles r ON r.id = om.role_id
+ WHERE o.state = 'ACTIVE'
+   AND r.name IN ('owner', 'admin', 'editor', 'viewer')
+   AND (
+     om.user_id = $1
+     OR om.group_id IN (
+       SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $1
+     )
+   )
+ ORDER BY o.id,
+   CASE r.name
+     WHEN 'owner'  THEN 1
+     WHEN 'admin'  THEN 2
+     WHEN 'editor' THEN 3
+     WHEN 'viewer' THEN 4
+   END
+ LIMIT 1000;
+
 -- name: CountOwnersByOrg :one
 -- Counts org_members rows whose role is the system 'owner' role for
 -- this org, regardless of principal kind. Used by membership-mutation

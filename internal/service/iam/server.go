@@ -97,6 +97,46 @@ func NewIamServer(cfg Config) *IamServer {
 	}
 }
 
+// ListAccountOrganizations returns the active organizations the
+// authenticated caller has membership in, projected to a slim
+// (organization, display_name, role) shape. Distinct from
+// `Organizations.ListOrganizations` (which returns the full
+// Organization resource and includes soft-deleted orgs for the
+// undelete UX). Drives the post-sign-in bootstrap (zero results
+// route the client to the create-org screen) and the in-app
+// org-picker UI.
+//
+// `parent` MUST be the literal `accounts/me`; the caller is implicit
+// from the authentication context. The membership-exempt interceptor
+// allowlist short-circuits the membership check for this method —
+// gating "do I have membership?" on prior membership would be
+// chicken-and-egg.
+//
+// `page_size` / `page_token` on the request are accepted but ignored
+// in v1; the underlying query caps at 1000 rows and a single caller
+// having more memberships than that isn't a realistic case.
+func (s *IamServer) ListAccountOrganizations(ctx context.Context, req *iampb.ListAccountOrganizationsRequest) (*iampb.ListAccountOrganizationsResponse, error) {
+	if req.GetParent() != "accounts/me" {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("parent",
+			"expected accounts/me; the caller is implicit from authentication context"))
+	}
+	identityID, err := s.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListAccountOrganizationsForIdentity(ctx, convert.PgUUID(identityID))
+	if err != nil {
+		slog.ErrorContext(ctx, "iam: list account organizations failed",
+			"identity_id", identityID, "error", err)
+		return nil, apierr.Internal("list account organizations")
+	}
+	out := make([]*iampb.AccountOrganization, len(rows))
+	for i, r := range rows {
+		out[i] = convert.AccountOrganizationToProto(r)
+	}
+	return &iampb.ListAccountOrganizationsResponse{AccountOrganizations: out}, nil
+}
+
 // ListPermissions returns the global permission catalog. Permissions
 // are static / code-defined in v1; this RPC just echoes the seeded
 // rows. The catalog is small (~100 entries) so v1 returns the full

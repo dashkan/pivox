@@ -204,6 +204,77 @@ func (q *Queries) HardDeleteIdentity(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const listAccountOrganizationsForIdentity = `-- name: ListAccountOrganizationsForIdentity :many
+SELECT DISTINCT ON (o.id)
+  o.id, o.name AS slug, o.display_name, r.name AS role_name
+  FROM organizations o
+  JOIN org_members om ON om.org_id = o.id
+  JOIN roles r ON r.id = om.role_id
+ WHERE o.state = 'ACTIVE'
+   AND r.name IN ('owner', 'admin', 'editor', 'viewer')
+   AND (
+     om.user_id = $1
+     OR om.group_id IN (
+       SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $1
+     )
+   )
+ ORDER BY o.id,
+   CASE r.name
+     WHEN 'owner'  THEN 1
+     WHEN 'admin'  THEN 2
+     WHEN 'editor' THEN 3
+     WHEN 'viewer' THEN 4
+   END
+ LIMIT 1000
+`
+
+type ListAccountOrganizationsForIdentityRow struct {
+	ID          uuid.UUID `json:"id"`
+	Slug        string    `json:"slug"`
+	DisplayName string    `json:"display_name"`
+	RoleName    string    `json:"role_name"`
+}
+
+// Caller-scoped slim view: (active org, highest-precedence role) for
+// an identity. Combines direct user bindings and group-mediated
+// bindings, then collapses to one row per org with the highest
+// precedence role winning (owner > admin > editor > viewer).
+//
+// Differences from ListOrganizationsForIdentity (above):
+//   - Excludes soft-deleted orgs. The undelete UX runs against the
+//     full Organizations.ListOrganizations; this slim view is for
+//     post-sign-in bootstrap + org-picker, which doesn't want
+//     tombstones in the list.
+//   - JOINs roles and surfaces role_name. The CASE expression pins
+//     v1's static system-role set; bindings to any other role are
+//     excluded entirely by the WHERE filter. Adding a v2 role
+//     requires updating this expression AND the precedence test —
+//     otherwise the binding silently disappears from the view.
+func (q *Queries) ListAccountOrganizationsForIdentity(ctx context.Context, userID pgtype.UUID) ([]ListAccountOrganizationsForIdentityRow, error) {
+	rows, err := q.db.Query(ctx, listAccountOrganizationsForIdentity, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAccountOrganizationsForIdentityRow{}
+	for rows.Next() {
+		var i ListAccountOrganizationsForIdentityRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.DisplayName,
+			&i.RoleName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrganizationsForIdentity = `-- name: ListOrganizationsForIdentity :many
 
 SELECT DISTINCT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
