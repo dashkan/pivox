@@ -19,6 +19,10 @@
       "types": "./dist/esm/registration-card.d.ts",
       "import": "./dist/esm/registration-card.js"
     },
+    "./create-org-card": {
+      "types": "./dist/esm/create-org-card.d.ts",
+      "import": "./dist/esm/create-org-card.js"
+    },
     "./forgot-password-card": {
       "types": "./dist/esm/forgot-password-card.d.ts",
       "import": "./dist/esm/forgot-password-card.js"

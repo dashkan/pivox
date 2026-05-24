@@ -11,6 +11,10 @@
       "types": "./dist/esm/api.d.ts",
       "import": "./dist/esm/api.js"
     },
+    "./create-org": {
+      "types": "./dist/esm/create-org.d.ts",
+      "import": "./dist/esm/create-org.js"
+    },
     "./org-gate": {
       "types": "./dist/esm/org-gate.d.ts",
       "import": "./dist/esm/org-gate.js"

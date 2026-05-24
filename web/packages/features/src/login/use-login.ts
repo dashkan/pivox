@@ -4,6 +4,7 @@ import { asyncHandler } from '@pivox/observability';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { useActionState, useRef, useState } from 'react';
 
+import type { RedirectTransport } from '@/shared/redirect-transport';
 import type {
   LoginActions,
   LoginContextValue,
@@ -16,7 +17,6 @@ import type { User } from 'firebase/auth';
 import { BROKER_PROVIDER, signInViaBroker } from '@/shared/broker-auth';
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 
-import type { RedirectTransport } from '@/shared/redirect-transport';
 
 /**
  * Login state machine — email-first.

@@ -49,6 +49,7 @@ export default mergeConfig(
     entry: [
       './src/login-card.ts',
       './src/registration-card.ts',
+      './src/create-org-card.ts',
       './src/forgot-password-card.ts',
       './src/reset-password-card.ts',
       './src/verify-email-card.ts',

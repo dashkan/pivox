@@ -1,21 +1,30 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { CreateOrgFeature } from '@pivox/features/create-org';
+import { asyncHandler } from '@pivox/observability';
+import { CreateOrgCard } from '@pivox/ui/create-org-card';
+import { createFileRoute, useRouter } from '@tanstack/react-router';
 
-// Placeholder so OrgGateFeature's redirect has a target. The real
-// create-org form (mirroring native Auth/CreateOrgView.swift) lands in
-// Phase 7 task 3.
+import { apiClient } from '@/lib/api-client';
+
 export const Route = createFileRoute('/auth/create-org')({
-  component: CreateOrgPlaceholder,
+  component: CreateOrgPage,
 });
 
-function CreateOrgPlaceholder() {
+function CreateOrgPage() {
+  const router = useRouter();
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="flex max-w-sm flex-col items-center gap-2 text-center">
-        <h1 className="text-lg font-medium">Create your organization</h1>
-        <p className="text-sm text-muted-foreground">
-          The create-org form is coming next.
-        </p>
-      </div>
-    </div>
+    <CreateOrgFeature
+      apiClient={apiClient}
+      onSuccess={asyncHandler(() => router.navigate({ to: '/' }))}
+      onSignOut={asyncHandler(() => router.navigate({ to: '/auth/login' }))}
+    >
+      <CreateOrgCard.Root>
+        <CreateOrgCard.Header />
+        <CreateOrgCard.DisplayNameField />
+        <CreateOrgCard.ShortNameField />
+        <CreateOrgCard.SlugHint />
+        <CreateOrgCard.SubmitButton />
+        <CreateOrgCard.Footer />
+      </CreateOrgCard.Root>
+    </CreateOrgFeature>
   );
 }

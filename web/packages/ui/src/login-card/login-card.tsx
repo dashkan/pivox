@@ -123,7 +123,6 @@ function LoginCardPasswordField({ className }: { className?: string }) {
         name="password"
         type="password"
         autoComplete="current-password"
-        autoFocus
         value={state.password}
         onChange={(e) => {
           actions.updatePassword(e.target.value);
