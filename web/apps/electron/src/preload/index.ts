@@ -8,6 +8,4 @@ contextBridge.exposeInMainWorld('api', {
     loginHint?: string;
   }): Promise<BrokerRedirectResult> =>
     ipcRenderer.invoke('auth:start-broker-login', input),
-  getBrokerBaseUrl: (): Promise<string> =>
-    ipcRenderer.invoke('app:get-broker-base-url'),
 });

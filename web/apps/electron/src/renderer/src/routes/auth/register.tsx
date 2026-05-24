@@ -2,7 +2,7 @@ import { RegistrationFeature } from '@pivox/features/registration';
 import { asyncHandler } from '@pivox/observability';
 import { RegistrationCard } from '@pivox/ui/registration-card';
 import { authProviders } from '@renderer/lib/auth-providers';
-import { ipcRedirectTransport } from '@renderer/lib/ipc-redirect-transport';
+import { electronRedirectTransport } from '@renderer/lib/electron-redirect-transport';
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/auth/register')({
@@ -14,7 +14,7 @@ function RegisterPage() {
 
   return (
     <RegistrationFeature
-      transport={ipcRedirectTransport}
+      transport={electronRedirectTransport}
       onSuccess={asyncHandler(() =>
         router.navigate({ to: '/auth/verify-email' }),
       )}

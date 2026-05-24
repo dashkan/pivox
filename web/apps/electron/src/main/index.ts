@@ -5,11 +5,7 @@ import { BrowserWindow, app, ipcMain, shell } from 'electron';
 
 import icon from '../../resources/icon.png?asset';
 
-import {
-  brokerBaseUrl,
-  handleAuthCompleteDeepLink,
-  startBrokerLogin,
-} from './broker-auth';
+import { handleAuthCompleteDeepLink, startBrokerLogin } from './broker-auth';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -68,8 +64,6 @@ ipcMain.handle(
     return result;
   },
 );
-
-ipcMain.handle('app:get-broker-base-url', () => brokerBaseUrl());
 
 // --- Window creation ---
 

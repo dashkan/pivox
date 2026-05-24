@@ -12,9 +12,11 @@ import {
 } from '@pivox/features/broker';
 import { shell } from 'electron';
 
-// The Cloud Controller origin that hosts the OAuth broker. Same
-// default as the rest of the app; PIVOX_WEB_URL overrides it.
-const BROKER_BASE_URL = process.env.PIVOX_WEB_URL || 'https://pivox.ngrok.app';
+// The Pivox app origin — REST gateway, OAuth broker hooks, and the
+// web app itself all live behind it (nginx fans them out). Same env
+// var as the renderer reads, so main + renderer agree without IPC.
+// Falls back to the dev ngrok tunnel when unset.
+const BASE_URL = import.meta.env.VITE_BASE_URL || 'https://pivox.ngrok.app';
 
 // How long a broker flow may stay open before it is abandoned. The
 // external system browser gives no "user closed the tab" signal, so a
@@ -173,7 +175,7 @@ export function startBrokerLogin(input: {
 
     const startUrl = (returnUrl: string): string =>
       buildBrokerStartUrl({
-        baseUrl: BROKER_BASE_URL,
+        baseUrl: BASE_URL,
         provider: input.provider,
         returnUrl,
         ...(input.loginHint ? { loginHint: input.loginHint } : {}),
@@ -240,9 +242,4 @@ export function handleAuthCompleteDeepLink(url: string): boolean {
   }
   settleFlow(es, parseBrokerRedirect(url));
   return true;
-}
-
-/** The Cloud Controller origin — exposed to the renderer for resolveSsoProvider. */
-export function brokerBaseUrl(): string {
-  return BROKER_BASE_URL;
 }

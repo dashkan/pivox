@@ -8,4 +8,6 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_AUTH_DOMAIN: string;
   readonly VITE_FIREBASE_PROJECT_ID: string;
   readonly VITE_AUTH_PROVIDERS?: string;
+  /** Pivox app origin — REST gateway + broker hooks + SPA. */
+  readonly VITE_BASE_URL?: string;
 }
