@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 
 import { useOrgGate } from './use-org-gate';
 
-import type { ApiClient } from '@pivox/features/api';
+import type { ApiClient } from '@pivox/client';
 
 /**
  * Gates the authenticated app shell on the user having ≥1 organization.

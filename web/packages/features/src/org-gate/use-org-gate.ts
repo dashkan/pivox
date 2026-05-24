@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useAuth } from '@/auth/use-auth';
 
-import type { ApiClient } from '@pivox/features/api';
+import type { ApiClient } from '@pivox/client';
 
 export type OrgGateStatus = 'loading' | 'ready' | 'empty' | 'error';
 

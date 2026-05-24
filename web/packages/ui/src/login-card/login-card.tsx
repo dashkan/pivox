@@ -112,6 +112,10 @@ function LoginCardEmailField({ className }: { className?: string }) {
 function LoginCardPasswordField({ className }: { className?: string }) {
   const { state, actions } = useLoginContext();
   const { pending } = useFormStatus();
+  // Conditional MOUNT, not just hidden — keeps password managers from
+  // prompting during the email-only step. Matches the SwiftUI native
+  // LoginView (see native/platform/macos/swift/Auth/LoginView.swift).
+  if (state.step !== 'password') return null;
   return (
     <Field className={cn('px-4', className)}>
       <FieldLabel>Password</FieldLabel>
@@ -119,6 +123,7 @@ function LoginCardPasswordField({ className }: { className?: string }) {
         name="password"
         type="password"
         autoComplete="current-password"
+        autoFocus
         value={state.password}
         onChange={(e) => {
           actions.updatePassword(e.target.value);
@@ -155,6 +160,9 @@ function LoginCardForgotPassword({
   onClick: () => void;
   className?: string;
 }) {
+  const { state } = useLoginContext();
+  // Only relevant once the user is past the email step.
+  if (state.step !== 'password') return null;
   return (
     <button
       type="button"
@@ -176,11 +184,27 @@ function LoginCardForgotPassword({
 function LoginCardSubmitButton({ className }: { className?: string }) {
   const { state } = useLoginContext();
   const { pending } = useFormStatus();
+  // Step 1 (email) needs only an email; step 2 (password) needs both.
+  // The disabled mirror keeps the button from firing a no-op submit
+  // before the user has filled the required fields for the step.
+  const trimmedEmail = state.email.trim();
+  const disabled =
+    pending ||
+    trimmedEmail.length === 0 ||
+    (state.step === 'password' && state.password.length === 0);
+  const label =
+    state.step === 'password'
+      ? pending
+        ? 'Signing in…'
+        : 'Sign in'
+      : pending
+        ? 'Please wait…'
+        : 'Continue';
   return (
     <div className={cn('flex flex-col gap-4 px-4', className)}>
       {state.error && <FieldError>{state.error}</FieldError>}
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? 'Please wait…' : 'Sign in'}
+      <Button type="submit" className="w-full" disabled={disabled}>
+        {label}
       </Button>
     </div>
   );
@@ -266,26 +290,6 @@ function LoginCardSocialButtons({
 }
 
 /* ------------------------------------------------------------------ */
-/*  SSOButton                                                         */
-/* ------------------------------------------------------------------ */
-
-function LoginCardSSOButton({ className }: { className?: string }) {
-  const { actions } = useLoginContext();
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      className={cn('mx-4 w-auto', className)}
-      disabled={pending}
-      onClick={actions.ssoLogin}
-    >
-      Sign in with SSO
-    </Button>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /*  Footer                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -327,7 +331,6 @@ export const LoginCard = {
   SubmitButton: LoginCardSubmitButton,
   Separator: LoginCardSeparator,
   SocialButtons: LoginCardSocialButtons,
-  SSOButton: LoginCardSSOButton,
   Footer: LoginCardFooter,
   Context: LoginContext,
 };
