@@ -1,5 +1,6 @@
 import { AppLayoutFeature } from '@pivox/features/app-layout';
 import { OrgGateFeature } from '@pivox/features/org-gate';
+import { VerifyEmailLink } from '@pivox/features/verify-email';
 import { asyncHandler } from '@pivox/observability';
 import { AppLayout } from '@pivox/ui/app-layout';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
@@ -35,6 +36,11 @@ function AppLayoutRoute() {
           <AppLayout.Header>
             <AppLayout.HeaderTitle>Pivox</AppLayout.HeaderTitle>
             <AppLayout.HeaderNav>
+              <VerifyEmailLink
+                onClick={() => {
+                  void router.navigate({ to: '/auth/verify-email' });
+                }}
+              />
               <ThemeSwitcher />
               <AppLayout.HeaderAvatar />
             </AppLayout.HeaderNav>

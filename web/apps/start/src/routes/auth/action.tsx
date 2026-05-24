@@ -90,6 +90,7 @@ function ActionPage() {
 /* ------------------------------------------------------------------ */
 
 function VerifyEmailAction({ oobCode }: { oobCode: string }) {
+  const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
     'loading',
   );
@@ -99,14 +100,25 @@ function VerifyEmailAction({ oobCode }: { oobCode: string }) {
     const auth = getAuth();
     applyActionCode(auth, oobCode)
       .then(async () => {
+        // reload() refreshes the locally-cached user so the next read
+        // of `emailVerified` (e.g. by AuthProvider's listeners or the
+        // app shell) sees the verified flag the action just flipped.
         if (auth.currentUser) await auth.currentUser.reload();
         setStatus('success');
+        // Land the user back in the app — the org gate (or the auth
+        // gate, if they're not signed in here) takes over from here.
+        // A short pause lets the success message register before the
+        // navigation; the action URL is typically opened in a new tab
+        // anyway so the original tab can refresh independently.
+        window.setTimeout(() => {
+          void router.navigate({ to: '/' });
+        }, 600);
       })
       .catch((e: unknown) => {
         setStatus('error');
         setMessage(actionErrorMessage(e));
       });
-  }, [oobCode]);
+  }, [oobCode, router]);
 
   if (status === 'loading') {
     return (

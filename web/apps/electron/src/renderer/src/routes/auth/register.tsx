@@ -15,9 +15,7 @@ function RegisterPage() {
   return (
     <RegistrationFeature
       transport={electronRedirectTransport}
-      onSuccess={asyncHandler(() =>
-        router.navigate({ to: '/auth/verify-email' }),
-      )}
+      onSuccess={asyncHandler(() => router.navigate({ to: '/' }))}
       onLinkRequired={asyncHandler(() =>
         router.navigate({ to: '/auth/link-account' }),
       )}
