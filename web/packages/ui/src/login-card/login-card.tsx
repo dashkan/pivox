@@ -187,9 +187,19 @@ function LoginCardPasswordInput({
 /* ------------------------------------------------------------------ */
 
 function LoginCardRememberMe({ className }: { className?: string }) {
+  const { state, actions } = useLoginContext();
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <Checkbox id="remember" />
+      <Checkbox
+        id="remember"
+        checked={state.rememberEmail}
+        // Radix's CheckedState is `boolean | 'indeterminate'`. We never
+        // use the indeterminate tri-state for this control, so collapse
+        // anything non-true to false.
+        onCheckedChange={(next) => {
+          actions.setRememberEmail(next === true);
+        }}
+      />
       <Label htmlFor="remember" className="text-sm font-normal">
         Remember me
       </Label>

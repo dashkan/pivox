@@ -14,11 +14,25 @@ export interface LoginState {
   password: string;
   error: string | null;
   step: LoginStep;
+  /**
+   * Whether the user wants their email auto-filled next visit. Toggled
+   * by `<LoginCard.RememberMe>`. The hook persists `state.email` to
+   * localStorage on a successful sign-in when true; clears the slot
+   * (unconditionally, including any previously stored value from
+   * another sign-in path) when false. Defaults to true.
+   *
+   * This is NOT a "stay signed in" flag — Firebase Auth's default web
+   * persistence (`browserLocalPersistence`) already keeps the user
+   * signed in across browser restarts. "Remember me" here is purely
+   * the email-autofill UX.
+   */
+  rememberEmail: boolean;
 }
 
 export interface LoginActions {
   updateEmail: (email: string) => void;
   updatePassword: (password: string) => void;
+  setRememberEmail: (next: boolean) => void;
   /**
    * Single form action covering both steps. The feature hook branches
    * on `state.step` internally: step 1 resolves the email's SSO
