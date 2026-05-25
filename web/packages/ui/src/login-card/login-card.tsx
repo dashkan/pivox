@@ -14,6 +14,7 @@ import { Input } from '@pivox/primitives/input';
 import { Label } from '@pivox/primitives/label';
 import { Separator } from '@pivox/primitives/separator';
 import { cn } from '@pivox/primitives/utils';
+import { useEffect, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { LoginContext, useLoginContext } from './login-card.context';
@@ -116,20 +117,68 @@ function LoginCardPasswordField({ className }: { className?: string }) {
   // prompting during the email-only step. Matches the SwiftUI native
   // LoginView (see native/platform/macos/swift/Auth/LoginView.swift).
   if (state.step !== 'password') return null;
+  return <LoginCardPasswordInput state={state} actions={actions} pending={pending} className={className} />;
+}
+
+// Inner component scoped to the password step so the focus effect
+// fires exactly once on mount (the parent only renders this child
+// during the password step). Two reasons we bypass the obvious
+// `autoFocus` / ref-on-Input path:
+//   1. The `<Input>` primitive is the shadcn-vendored function
+//      component whose ref-forwarding behavior across the `{...props}`
+//      spread we don't fully control across regen.
+//   2. The form is mid-submit when this component mounts —
+//      useActionState flips `pending` back to false in the same commit
+//      that mounts the password field, but the browser's
+//      focus-restoration to the just-clicked Continue button can race
+//      against React's autoFocus pass.
+// requestAnimationFrame defers the focus call past the commit and
+// past any focus-restoration the browser does post-submit. We scope
+// the input lookup to a container ref + querySelector (instead of
+// document.getElementsByName) so a hypothetical second `name="password"`
+// elsewhere in the DOM — global search bar with a password field,
+// future overlay — can't ever steal focus from us.
+function LoginCardPasswordInput({
+  state,
+  actions,
+  pending,
+  className,
+}: {
+  state: ReturnType<typeof useLoginContext>['state'];
+  actions: ReturnType<typeof useLoginContext>['actions'];
+  pending: boolean;
+  className?: string;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const raf = window.requestAnimationFrame(() => {
+      const el = container.querySelector<HTMLInputElement>(
+        'input[name="password"]',
+      );
+      el?.focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(raf);
+    };
+  }, []);
   return (
-    <Field className={cn('px-4', className)}>
-      <FieldLabel>Password</FieldLabel>
-      <Input
-        name="password"
-        type="password"
-        autoComplete="current-password"
-        value={state.password}
-        onChange={(e) => {
-          actions.updatePassword(e.target.value);
-        }}
-        disabled={pending}
-      />
-    </Field>
+    <div ref={containerRef}>
+      <Field className={cn('px-4', className)}>
+        <FieldLabel>Password</FieldLabel>
+        <Input
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          value={state.password}
+          onChange={(e) => {
+            actions.updatePassword(e.target.value);
+          }}
+          disabled={pending}
+        />
+      </Field>
+    </div>
   );
 }
 

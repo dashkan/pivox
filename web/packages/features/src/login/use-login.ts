@@ -2,7 +2,7 @@
 
 import { asyncHandler } from '@pivox/observability';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 
 import type { RedirectTransport } from '@/shared/redirect-transport';
 import type {
@@ -33,6 +33,17 @@ import { firebaseErrorMessage } from '@/shared/firebase-error';
  * decision is stale. Mirrors the SwiftUI native LoginView (see
  * native/platform/macos/swift/Auth/LoginView.swift).
  *
+ * **Step is controlled by the caller via `step` + `onStepChange`.** The
+ * route lifts step into the URL search (`?step=password`) so the
+ * browser back button moves password→email naturally — a single
+ * mutating-state component would make the whole flow invisible to
+ * history. The hook treats `step` as authoritative and never holds an
+ * internal copy.
+ *
+ * `onStepChange` takes an optional `{ replace: true }` to mark
+ * auto-corrections (rollback on email edit, refresh-fallback) so they
+ * don't pollute history — the user didn't intend those navigations.
+ *
  * Social and SSO sign-in (both branches of `signInViaBroker`) go
  * through the injected `transport` — a browser popup on the web, a
  * loopback / custom-scheme flow in Electron — so this hook stays
@@ -40,15 +51,34 @@ import { firebaseErrorMessage } from '@/shared/firebase-error';
  */
 export function useLogin(input: {
   transport: RedirectTransport;
+  step: LoginStep;
+  onStepChange: (step: LoginStep, opts?: { replace?: boolean }) => void;
   onSuccess?: (user: User) => void;
   onLinkRequired?: (email: string) => void;
 }): LoginContextValue {
-  const { transport, onSuccess, onLinkRequired } = input;
+  const { transport, step, onStepChange, onSuccess, onLinkRequired } = input;
   const emailRef = useRef<HTMLInputElement | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<LoginStep>('email');
+
+  // Refresh / deep-link fallback. If the URL lands us on
+  // `?step=password` with no email in component state (we always start
+  // empty — email is intentionally NOT persisted in the URL for
+  // privacy), the password step has no context. Push the user back to
+  // the email step and `replace` the history entry so the orphaned
+  // password URL doesn't sit in history. One-shot on mount; subsequent
+  // step transitions are driven by the form action / updateEmail.
+  useEffect(() => {
+    if (step === 'password' && !email) {
+      onStepChange('email', { replace: true });
+    }
+    // Intentionally [] — this is a one-shot mount-time URL
+    // reconciliation, not a continuous invariant. The forward step
+    // transition (email → password) sets email first inside the same
+    // action, so this effect must not re-fire and bounce us back.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // useActionState captures `step`/`email`/`password` per render; on
   // submit React invokes the latest closure, so the freshly-set step
@@ -78,7 +108,7 @@ export function useLogin(input: {
       // public endpoint with anti-enumeration shape, and the password
       // path's invalid-credentials response already covers the
       // bad-account case with the same non-disclosing message.
-      setStep('password');
+      onStepChange('password');
       return;
     }
     // step === 'password'
@@ -98,11 +128,13 @@ export function useLogin(input: {
   // Editing the email after the SSO resolve invalidates the decision
   // (different domain may have different SSO config or none at all).
   // Drop back to step 'email' and clear the password so a stale value
-  // can't be submitted against the new email.
+  // can't be submitted against the new email. `replace: true` because
+  // this isn't a user-intended navigation — the user is editing a
+  // field, not pressing Back; we shouldn't push a new history entry.
   const updateEmail = (next: string): void => {
     setEmail(next);
     if (step === 'password') {
-      setStep('email');
+      onStepChange('email', { replace: true });
       setPassword('');
     }
   };
