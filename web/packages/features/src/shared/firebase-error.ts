@@ -4,8 +4,15 @@ export function firebaseErrorMessage(e: unknown): string {
     switch (code) {
       case 'auth/invalid-email':
         return 'Invalid email address';
+      // `auth/user-disabled` is intentionally collapsed into the
+      // generic invalid-credential bucket. Firebase returns this code
+      // BEFORE validating the password, so a distinct message would
+      // let anyone probe emails to discover which accounts exist (and
+      // are disabled). Same anti-enumeration posture as the broker's
+      // `:resolveProvider` 404 collapsing. Disabled users need to
+      // contact an admin to learn the actual reason; we don't surface
+      // it on the unauthenticated sign-in surface.
       case 'auth/user-disabled':
-        return 'This account has been disabled';
       case 'auth/user-not-found':
       case 'auth/wrong-password':
       case 'auth/invalid-credential':
