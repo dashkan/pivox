@@ -88,6 +88,10 @@ func (m *MockedFirebaseAuth) DeleteUser(ctx context.Context, uid string) error {
 	return m.Mock.DeleteUser(ctx, uid)
 }
 
+func (m *MockedFirebaseAuth) UserExists(ctx context.Context, uid string) (bool, error) {
+	return m.Mock.UserExists(ctx, uid)
+}
+
 func (m *MockedFirebaseAuth) CreateOidcProvider(ctx context.Context, cfg authn.OidcProviderConfig) error {
 	return m.Mock.CreateOidcProvider(ctx, cfg)
 }

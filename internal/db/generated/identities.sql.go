@@ -55,6 +55,42 @@ func (q *Queries) GetIdentitiesByIDs(ctx context.Context, ids []uuid.UUID) ([]Id
 	return items, nil
 }
 
+const getIdentityByEmail = `-- name: GetIdentityByEmail :one
+SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE email = $1 AND is_deleted = false
+`
+
+// GetIdentityByEmail resolves a live identity (is_deleted=false) by
+// email. Used by the syncIdentity defensive tombstone path: when an
+// UpsertIdentity attempt hits the partial unique email index
+// (`idx_identities_email_unique`), the handler looks up the colliding
+// row by email, verifies via Firebase Admin SDK whether the existing
+// row's firebase_uid is still active, and either rejects (still
+// active) or tombstones + retries (confirmed orphan from an
+// out-of-band Firebase delete).
+//
+// Returns ErrNoRows if no live identity has this email — shouldn't
+// happen if called right after a 23505 on the email index, but
+// callers handle it defensively.
+func (q *Queries) GetIdentityByEmail(ctx context.Context, email string) (Identity, error) {
+	row := q.db.QueryRow(ctx, getIdentityByEmail, email)
+	var i Identity
+	err := row.Scan(
+		&i.ID,
+		&i.FirebaseUid,
+		&i.Email,
+		&i.EmailVerified,
+		&i.DisplayName,
+		&i.PhotoUrl,
+		&i.Disabled,
+		&i.IsDeleted,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.LastLoginTime,
+		&i.DeleteTime,
+	)
+	return i, err
+}
+
 const getIdentityByFirebaseUID = `-- name: GetIdentityByFirebaseUID :one
 SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE firebase_uid = $1 AND is_deleted = false
 `
@@ -110,6 +146,53 @@ func (q *Queries) GetIdentityByID(ctx context.Context, id uuid.UUID) (Identity, 
 		&i.DeleteTime,
 	)
 	return i, err
+}
+
+const listLiveIdentityFirebaseUIDs = `-- name: ListLiveIdentityFirebaseUIDs :many
+SELECT id, firebase_uid
+  FROM identities
+ WHERE is_deleted = false
+   AND firebase_uid <> ''
+   AND id > $1::uuid
+ ORDER BY id ASC
+ LIMIT $2::int
+`
+
+type ListLiveIdentityFirebaseUIDsParams struct {
+	AfterID uuid.UUID `json:"after_id"`
+	Limit   int32     `json:"limit"`
+}
+
+type ListLiveIdentityFirebaseUIDsRow struct {
+	ID          uuid.UUID `json:"id"`
+	FirebaseUid string    `json:"firebase_uid"`
+}
+
+// ListLiveIdentityFirebaseUIDs pages through live identities
+// ordered by `id` (uuidv7, monotonic-ish), returning batches of
+// (id, firebase_uid) for the identity-reconciliation worker to
+// bulk-check against the auth provider. `after_id` is the last id
+// from the previous page; pass `uuid.Nil` (or '00000000-...') for
+// the first page. `limit` caps the batch size — the worker batches
+// at 100 to match the Firebase Admin SDK's GetUsers per-call cap.
+func (q *Queries) ListLiveIdentityFirebaseUIDs(ctx context.Context, arg ListLiveIdentityFirebaseUIDsParams) ([]ListLiveIdentityFirebaseUIDsRow, error) {
+	rows, err := q.db.Query(ctx, listLiveIdentityFirebaseUIDs, arg.AfterID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveIdentityFirebaseUIDsRow{}
+	for rows.Next() {
+		var i ListLiveIdentityFirebaseUIDsRow
+		if err := rows.Scan(&i.ID, &i.FirebaseUid); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const softDeleteIdentity = `-- name: SoftDeleteIdentity :one

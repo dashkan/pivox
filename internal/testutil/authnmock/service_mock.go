@@ -503,6 +503,72 @@ func (_c *MockService_UpdateSamlProvider_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
+// UserExists provides a mock function for the type MockService
+func (_mock *MockService) UserExists(ctx context.Context, uid string) (bool, error) {
+	ret := _mock.Called(ctx, uid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UserExists")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return returnFunc(ctx, uid)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = returnFunc(ctx, uid)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, uid)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_UserExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UserExists'
+type MockService_UserExists_Call struct {
+	*mock.Call
+}
+
+// UserExists is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uid string
+func (_e *MockService_Expecter) UserExists(ctx interface{}, uid interface{}) *MockService_UserExists_Call {
+	return &MockService_UserExists_Call{Call: _e.mock.On("UserExists", ctx, uid)}
+}
+
+func (_c *MockService_UserExists_Call) Run(run func(ctx context.Context, uid string)) *MockService_UserExists_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_UserExists_Call) Return(b bool, err error) *MockService_UserExists_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockService_UserExists_Call) RunAndReturn(run func(ctx context.Context, uid string) (bool, error)) *MockService_UserExists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // VerifyToken provides a mock function for the type MockService
 func (_mock *MockService) VerifyToken(ctx context.Context, token string) (*authn.Identity, error) {
 	ret := _mock.Called(ctx, token)

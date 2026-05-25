@@ -13,6 +13,9 @@ import (
 // Panics on missing required fields (Queries / Logger / Auth) — startup-
 // time programmer errors fail loud on boot.
 func NewInternalHooks(cfg InternalHooksConfig) (*InternalHooks, error) {
+	if cfg.Pool == nil {
+		panic("server: InternalHooksConfig.Pool is required")
+	}
 	if cfg.Queries == nil {
 		panic("server: InternalHooksConfig.Queries is required")
 	}
@@ -34,6 +37,7 @@ func NewInternalHooks(cfg InternalHooksConfig) (*InternalHooks, error) {
 	}
 
 	h := &InternalHooks{
+		pool:          cfg.Pool,
 		queries:       cfg.Queries,
 		logger:        cfg.Logger,
 		auth:          cfg.Auth,

@@ -45,6 +45,37 @@ RETURNING *;
 -- name: GetIdentityByFirebaseUID :one
 SELECT * FROM identities WHERE firebase_uid = $1 AND is_deleted = false;
 
+-- GetIdentityByEmail resolves a live identity (is_deleted=false) by
+-- email. Used by the syncIdentity defensive tombstone path: when an
+-- UpsertIdentity attempt hits the partial unique email index
+-- (`idx_identities_email_unique`), the handler looks up the colliding
+-- row by email, verifies via Firebase Admin SDK whether the existing
+-- row's firebase_uid is still active, and either rejects (still
+-- active) or tombstones + retries (confirmed orphan from an
+-- out-of-band Firebase delete).
+--
+-- Returns ErrNoRows if no live identity has this email — shouldn't
+-- happen if called right after a 23505 on the email index, but
+-- callers handle it defensively.
+-- name: GetIdentityByEmail :one
+SELECT * FROM identities WHERE email = $1 AND is_deleted = false;
+
+-- ListLiveIdentityFirebaseUIDs pages through live identities
+-- ordered by `id` (uuidv7, monotonic-ish), returning batches of
+-- (id, firebase_uid) for the identity-reconciliation worker to
+-- bulk-check against the auth provider. `after_id` is the last id
+-- from the previous page; pass `uuid.Nil` (or '00000000-...') for
+-- the first page. `limit` caps the batch size — the worker batches
+-- at 100 to match the Firebase Admin SDK's GetUsers per-call cap.
+-- name: ListLiveIdentityFirebaseUIDs :many
+SELECT id, firebase_uid
+  FROM identities
+ WHERE is_deleted = false
+   AND firebase_uid <> ''
+   AND id > sqlc.arg('after_id')::uuid
+ ORDER BY id ASC
+ LIMIT sqlc.arg('limit')::int;
+
 -- GetIdentityByID looks up by primary key. Used by DeleteUser's
 -- DELETING_PIVOX_RECORDS phase to capture the firebase_uid before
 -- the row is soft-deleted, so the subsequent

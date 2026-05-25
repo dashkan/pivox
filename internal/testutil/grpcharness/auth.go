@@ -48,6 +48,20 @@ func (testAuthService) CreateCustomToken(_ context.Context, uid string) (string,
 
 func (testAuthService) DeleteUser(_ context.Context, _ string) error { return nil }
 
+// UserExists in the harness mirrors VerifyToken: a UID is "present"
+// iff an identities row exists for it. Tests that need a specific
+// orphan / non-orphan outcome should construct a MockedFirebaseAuth
+// and set expectations directly.
+func (s testAuthService) UserExists(ctx context.Context, uid string) (bool, error) {
+	if s.queries == nil {
+		return true, nil
+	}
+	if _, err := s.queries.GetIdentityByFirebaseUID(ctx, uid); err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
 func (testAuthService) CreateOidcProvider(_ context.Context, _ authn.OidcProviderConfig) error {
 	return nil
 }

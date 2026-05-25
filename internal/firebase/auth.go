@@ -104,6 +104,63 @@ func (s *AuthService) DeleteUser(ctx context.Context, uid string) error {
 	return nil
 }
 
+// UserExists reports whether Firebase Auth has a user with this UID.
+// Returns `(false, nil)` ONLY when Firebase confirms the user does
+// not exist — any other error is propagated so callers can
+// distinguish "confirmed orphan" from "network blip". The
+// identity-reconciliation worker and the syncIdentity defensive
+// tombstone path both depend on this distinction.
+func (s *AuthService) UserExists(ctx context.Context, uid string) (bool, error) {
+	if _, err := s.authClient.GetUser(ctx, uid); err != nil {
+		if auth.IsUserNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// firebaseGetUsersMax mirrors the Firebase Admin SDK's documented cap
+// for GetUsers — 100 identifiers per call. Callers are responsible
+// for chunking; the implementation rejects oversized batches loudly
+// rather than silently truncating.
+const firebaseGetUsersMax = 100
+
+// MissingUsers returns the subset of `uids` that Firebase reports as
+// not existing. Empty slice means all UIDs were found. Batches
+// larger than the Firebase Admin SDK's per-call cap of 100 are
+// rejected — the caller is the right place to chunk, since chunking
+// here would hide quota costs and obscure failure granularity.
+func (s *AuthService) MissingUsers(ctx context.Context, uids []string) ([]string, error) {
+	if len(uids) == 0 {
+		return nil, nil
+	}
+	if len(uids) > firebaseGetUsersMax {
+		return nil, fmt.Errorf("firebase: MissingUsers exceeds per-call cap of %d (got %d)",
+			firebaseGetUsersMax, len(uids))
+	}
+	identifiers := make([]auth.UserIdentifier, len(uids))
+	for i, uid := range uids {
+		identifiers[i] = auth.UIDIdentifier{UID: uid}
+	}
+	result, err := s.authClient.GetUsers(ctx, identifiers)
+	if err != nil {
+		return nil, err
+	}
+	// `result.NotFound` is the list of identifiers the SDK couldn't
+	// resolve. Extract the UID from each. The SDK does not return
+	// the original identifier — callers that supplied non-UID
+	// identifiers (email, phone) would need a different shape; we
+	// only supply UIDIdentifiers above, so the cast is exhaustive.
+	missing := make([]string, 0, len(result.NotFound))
+	for _, ident := range result.NotFound {
+		if uidIdent, ok := ident.(auth.UIDIdentifier); ok {
+			missing = append(missing, uidIdent.UID)
+		}
+	}
+	return missing, nil
+}
+
 // CreateOidcProvider creates a Firebase Auth OIDC provider config
 // from the provider-agnostic shape on the authn.Service interface.
 // Translates the boolean code/id_token flags into Firebase's

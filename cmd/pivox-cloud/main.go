@@ -545,6 +545,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// HTTP mux: internal hooks + gRPC gateway (fallback)
 	httpMux := http.NewServeMux()
 	hooks, err := server.NewInternalHooks(server.InternalHooksConfig{
+		Pool:          pool,
 		Queries:       queries,
 		SyncAuth:      cfg.SyncAuth,
 		DelegatedAuth: cfg.DelegatedAuth,

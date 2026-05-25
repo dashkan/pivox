@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -12,16 +13,29 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/config"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/identity"
 )
+
+// emailUniqueIndexName is the partial-unique index on identities.email
+// (see 000001_init.up.sql). Detected by name on a 23505 pgError so the
+// syncIdentity defensive path can distinguish "email-orphan collision"
+// from any other unique-constraint violation.
+const emailUniqueIndexName = "idx_identities_email_unique"
 
 // InternalHooksConfig is the constructor input for NewInternalHooks.
 type InternalHooksConfig struct {
+	// Pool is the database pool. Required by syncIdentity's
+	// orphan-collision recovery path, which wraps a tombstone +
+	// member-cascade in a transaction. Single-statement endpoints
+	// use `Queries` directly.
+	Pool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// SyncAuth carries OIDC validation settings for the
@@ -45,6 +59,7 @@ type InternalHooksConfig struct {
 // public gRPC/REST API. These are called by Firebase Functions and other
 // internal services.
 type InternalHooks struct {
+	pool          db.TxBeginner
 	queries       db.Querier
 	logger        *slog.Logger
 	auth          authn.Service
@@ -106,7 +121,7 @@ func (h *InternalHooks) syncIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	identity, err := h.queries.UpsertIdentity(r.Context(), db.UpsertIdentityParams{
+	params := db.UpsertIdentityParams{
 		FirebaseUid:   req.FirebaseUID,
 		Email:         req.Email,
 		EmailVerified: req.EmailVerified,
@@ -114,11 +129,33 @@ func (h *InternalHooks) syncIdentity(w http.ResponseWriter, r *http.Request) {
 		PhotoUrl:      req.PhotoURL,
 		Disabled:      req.Disabled,
 		LastLoginTime: pgtype.Timestamptz{}, // not set on creation
-	})
+	}
+	identityRow, err := h.queries.UpsertIdentity(r.Context(), params)
 	if err != nil {
-		h.logger.Error("failed to upsert identity", "firebase_uid", req.FirebaseUID, "error", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		// Detect the orphan-email collision (out-of-band Firebase
+		// delete left the Pivox identity alive, user re-registers
+		// the same email → Firebase mints a new uid → ON CONFLICT
+		// (firebase_uid) doesn't fire → INSERT path → 23505 on the
+		// partial unique email index).
+		if isOrphanEmailCollision(err) {
+			identityRow, err = h.recoverOrphanEmailCollision(r.Context(), params)
+		}
+		if err != nil {
+			// Already-active email collision is reported as 409 so
+			// the blocking function can surface a clean
+			// "email already in use" path to the client; everything
+			// else is an opaque 500.
+			if errors.Is(err, errEmailStillActive) {
+				h.logger.Warn("syncIdentity: email already in use",
+					"firebase_uid", req.FirebaseUID, "email", req.Email)
+				http.Error(w, "email already in use", http.StatusConflict)
+				return
+			}
+			h.logger.Error("failed to upsert identity",
+				"firebase_uid", req.FirebaseUID, "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Drop any cached Actor — the upsert may have changed
@@ -127,18 +164,101 @@ func (h *InternalHooks) syncIdentity(w http.ResponseWriter, r *http.Request) {
 	// call is a no-op for the create path; the cost is one map
 	// delete per webhook call.
 	if h.audit != nil {
-		h.audit.Invalidate(identity.ID)
+		h.audit.Invalidate(identityRow.ID)
 	}
 
-	h.logger.Info("identity synced", "firebase_uid", req.FirebaseUID, "identity_id", identity.ID)
+	h.logger.Info("identity synced", "firebase_uid", req.FirebaseUID, "identity_id", identityRow.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{
-		"identity_id": identity.ID.String(),
+		"identity_id": identityRow.ID.String(),
 	}); err != nil {
 		h.logger.Warn("write sync-identity response failed", "error", err)
 	}
+}
+
+// errEmailStillActive signals the email-collision case where the
+// pre-existing identity's firebase_uid is still active in the auth
+// provider — i.e., NOT an out-of-band-deleted orphan. The handler
+// turns this into a 409 so the blocking function can surface a
+// "email already in use" path to the client. Distinct from "internal
+// error" because the retry shape is different (user-error vs ours).
+var errEmailStillActive = errors.New("syncIdentity: email already bound to an active firebase user")
+
+// isOrphanEmailCollision reports whether the error is a 23505 unique-
+// violation on the partial unique email index — the orphan-email
+// collision signature. Any other unique violation (firebase_uid
+// recycled, etc.) returns false so the caller's outer error path
+// runs unchanged.
+func isOrphanEmailCollision(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	return pgErr.Code == "23505" && pgErr.ConstraintName == emailUniqueIndexName
+}
+
+// recoverOrphanEmailCollision handles the orphan-email collision
+// detected by isOrphanEmailCollision. Sequence:
+//
+//  1. Lookup the live identity row by email.
+//  2. Ask Firebase Admin SDK whether the existing firebase_uid is
+//     still active.
+//     3a. If active → return errEmailStillActive (the handler maps to 409).
+//     3b. If gone → tombstone the orphan + drop memberships in a tx,
+//     then re-call UpsertIdentity with the new uid (the partial
+//     unique index excludes the tombstoned row, so the second
+//     attempt INSERTs cleanly).
+//     3c. If the Admin SDK lookup itself errors → propagate as internal
+//     error. Never tombstone on uncertainty.
+//
+// SECURITY: the Firebase-side existence check is load-bearing. Without
+// it, an attacker who knew a victim's email could re-register at
+// Firebase (which is open by default) → trigger syncIdentity → and if
+// we blindly tombstoned the colliding row, the victim would lose
+// their orgs + PII. The Admin SDK call confirms the original UID is
+// actually gone before we touch anything.
+func (h *InternalHooks) recoverOrphanEmailCollision(
+	ctx context.Context, params db.UpsertIdentityParams,
+) (db.Identity, error) {
+	existing, err := h.queries.GetIdentityByEmail(ctx, params.Email)
+	if err != nil {
+		// Shouldn't happen if we hit 23505 on the email index, but
+		// guard against the race where the row was deleted between
+		// our INSERT attempt and the lookup.
+		return db.Identity{}, err
+	}
+	if existing.FirebaseUid == params.FirebaseUid {
+		// Same uid — the upsert should have hit the firebase_uid
+		// ON CONFLICT path. If we're here, something is weird;
+		// return the existing row and let the caller decide.
+		return existing, nil
+	}
+	stillActive, err := h.auth.UserExists(ctx, existing.FirebaseUid)
+	if err != nil {
+		h.logger.Error("syncIdentity: UserExists lookup failed during orphan recovery",
+			"existing_firebase_uid", existing.FirebaseUid, "error", err)
+		return db.Identity{}, err
+	}
+	if stillActive {
+		return db.Identity{}, errEmailStillActive
+	}
+	// Confirmed orphan. Tombstone + drop memberships, then retry
+	// the upsert. The partial unique email index excludes tombstoned
+	// rows so the second INSERT succeeds.
+	h.logger.Warn("syncIdentity: tombstoning orphaned identity for email re-registration",
+		"email", params.Email,
+		"orphan_identity_id", existing.ID,
+		"orphan_firebase_uid", existing.FirebaseUid,
+		"new_firebase_uid", params.FirebaseUid)
+	if err := identity.TombstoneOrphaned(ctx, h.pool, existing.ID, h.logger); err != nil {
+		return db.Identity{}, err
+	}
+	if h.audit != nil {
+		h.audit.Invalidate(existing.ID)
+	}
+	return h.queries.UpsertIdentity(ctx, params)
 }
 
 // ---------------------------------------------------------------------------

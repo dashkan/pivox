@@ -35,6 +35,14 @@ type Service interface {
 	// after a transient failure.
 	DeleteUser(ctx context.Context, uid string) error
 
+	// UserExists reports whether the provider has a user with this UID.
+	// `(true, nil)` when present, `(false, nil)` when the provider
+	// confirms not-found, `(false, err)` for transient failures. Used
+	// by syncIdentity's defensive tombstone-on-collision path, which
+	// MUST distinguish "confirmed orphan" from "lookup failed" so we
+	// don't tombstone a still-active user on a network blip.
+	UserExists(ctx context.Context, uid string) (bool, error)
+
 	// CreateOidcProvider creates an OIDC provider configuration in the
 	// underlying identity provider. The provider id is server-generated
 	// upstream (e.g. "oidc.<org-slug>") and stored on the SsoConfig row.
