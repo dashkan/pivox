@@ -21,7 +21,7 @@ export interface OrgGateActions {
 
 /**
  * Bootstraps the user's org membership after sign-in. Asks the cloud
- * for the user's organizations once Firebase has a user; passes
+ * for the user's active organizations once Firebase has a user; passes
  * through unauthenticated renders so an outer auth gate can drive its
  * own redirect.
  *
@@ -29,6 +29,13 @@ export interface OrgGateActions {
  *   - status: 'ready'   — user has ≥1 org (or unauthenticated pass-through).
  *   - status: 'empty'   — user has zero orgs; caller routes to create-org.
  *   - status: 'error'   — the list call failed; surface retry.
+ *
+ * Uses `Iam.ListAccountOrganizations` (`GET /v1/accounts/me/organizations`)
+ * — the slim, caller-scoped, ACTIVE-only view purpose-built for the
+ * bootstrap. `Organizations.ListOrganizations` is intentionally NOT
+ * used here: it includes soft-deleted orgs (for the undelete UX), so
+ * a user whose only membership is on a soft-deleted org would skip
+ * the create-org gate and land in the app shell with no usable org.
  *
  * The status is derived from (authLoading, user, fetchOutcome), and
  * fetchOutcome is only written from the fetch's async `.then()` /
@@ -65,15 +72,26 @@ export function useOrgGate(input: { apiClient: ApiClient }): OrgGateState & {
 
     let cancelled = false;
     void apiClient
-      .GET('/v1/organizations', {})
-      .then(({ data, error: respError }) => {
+      // The path template is a literal (`accounts/me` is baked into
+      // the URL by the proto's `{parent=accounts/me}` binding), but
+      // openapi-typescript still types `parent` as a required path
+      // param so we pass the literal value here. openapi-fetch
+      // doesn't substitute it (there's no placeholder) — typing
+      // ceremony only.
+      .GET('/v1/accounts/me/organizations', {
+        params: { path: { parent: 'accounts/me' } },
+      })
+      .then((resp) => {
         if (cancelled) return;
-        if (respError ?? !data) {
+        // openapi-fetch returns a discriminated union; branch on
+        // `resp.error` (not destructured) so TS narrowing across
+        // both branches stays intact.
+        if (resp.error) {
           setError("Couldn't load your organizations. Please try again.");
           setFetchOutcome('error');
           return;
         }
-        const count = data.organizations?.length ?? 0;
+        const count = resp.data.accountOrganizations?.length ?? 0;
         setError(null);
         setFetchOutcome(count === 0 ? 'empty' : 'ready');
       })

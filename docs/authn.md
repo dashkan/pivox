@@ -266,7 +266,7 @@ app.setAsDefaultProtocolClient('pivox')
 - `auth:start-social-login(provider)` — generates state nonce, opens `${BASE_URL}/auth/electron-login?provider=...&state=...`
 - `auth:start-link-provider(provider, idToken)` — generates state nonce, opens `${BASE_URL}/auth/electron-link?provider=...&state=...&token=...`
 
-`BASE_URL` comes from `PIVOX_WEB_URL` env var, defaults to `https://pivox.ngrok.app`.
+`BASE_URL` comes from the `VITE_BASE_URL` env var, defaults to `https://pivox.ngrok.app`. Because `VITE_BASE_URL` is a Vite-prefixed variable, electron-vite inlines it at **build time** into both the main and renderer bundles — runtime `VITE_BASE_URL=...` prefixes on the launched binary have no effect. Override via a `.env` file (or direnv) before `pnpm build` / `pnpm dev`.
 
 ### Electron Preload IPC Bridge
 
@@ -477,11 +477,11 @@ Called by Firebase Functions (`syncAccountOnCreate`, `syncAccountOnSignIn`). Ups
 | `VITE_FIREBASE_AUTH_DOMAIN` | `pivox-cloud.firebaseapp.com` | Standard Firebase domain (Electron uses `signInWithCustomToken`, not redirects) |
 | `VITE_FIREBASE_PROJECT_ID` | `pivox-cloud` | Must match |
 
-**Runtime** (main process):
+**Build-time** (main + renderer, baked in via Vite's `VITE_*` substitution):
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `PIVOX_WEB_URL` | `https://pivox.ngrok.app` | Base URL for external browser OAuth pages |
+| `VITE_BASE_URL` | `https://pivox.ngrok.app` | Pivox app origin — REST gateway + broker hooks. Set before `pnpm build` / `pnpm dev` (direnv or `.env`). Runtime prefixes do nothing — Vite substitutes at compile time. |
 
 ---
 
@@ -588,7 +588,7 @@ The built `.app` uses `.env.production` values baked at build time:
 - `VITE_FIREBASE_AUTH_DOMAIN=pivox-cloud.firebaseapp.com`
 - `VITE_FIREBASE_PROJECT_ID=pivox-cloud`
 
-The main process reads `PIVOX_WEB_URL` at runtime (defaults to `https://pivox.ngrok.app`). Since `pnpm prod` runs ngrok, the built Electron app's OAuth flow goes through ngrok to the local start app and Go backend.
+The main process reads `import.meta.env.VITE_BASE_URL` at build time (defaults to `https://pivox.ngrok.app`); electron-vite substitutes the literal string into the CJS main bundle. Since `pnpm prod` runs ngrok, the built Electron app's OAuth flow goes through ngrok to the local start app and Go backend.
 
 **Flow when clicking "Sign in with Google":**
 1. Built Electron main process opens `https://pivox.ngrok.app/auth/external-login?provider=google&state=<nonce>`
@@ -600,9 +600,14 @@ The main process reads `PIVOX_WEB_URL` at runtime (defaults to `https://pivox.ng
 7. Page triggers `pivox://auth/callback?token=<customToken>&state=<nonce>` deep link
 8. macOS routes `pivox://` to the built `.app` → main process validates state → renderer calls `signInWithCustomToken`
 
-**To override `PIVOX_WEB_URL` at runtime:**
+**To override `VITE_BASE_URL` — it's a build-time substitution, not a runtime env var:**
 ```bash
-PIVOX_WEB_URL=https://pivox.ngrok.app open web/apps/electron/dist/mac-arm64/pivox-electron.app
+# Either set it via direnv / .env before building:
+VITE_BASE_URL=https://my-tunnel.ngrok.app pnpm --filter @pivox/electron build:mac
+# Or set it in a checked-in/.envrc.* before the build. A runtime
+# `VITE_BASE_URL=... open ...` prefix on the launched binary does NOT
+# take effect — Vite has already inlined whatever value was set at
+# build time.
 ```
 
 **macOS notes:**
@@ -818,7 +823,7 @@ This produces a `.app` that:
 - Uses the Firebase emulator (renderer connects to `:9099`)
 - Does NOT use `import.meta.env.DEV` branches (production code paths)
 - Uses deep links, `pivox://` protocol, `signInWithCustomToken`
-- Sets `PIVOX_WEB_URL=http://localhost:8081` (or `:3000`) at runtime
+- Sets `VITE_BASE_URL=http://localhost:8081` (or `:3000`) at **build time** (the prod build script reads it via `.env.local-prod` before `electron-vite build`)
 
 **Limitation:** Real OAuth still doesn't work (emulator). The deep link flow can be tested with email/password by adjusting the bridge pages, or by using a custom test flow that bypasses OAuth redirect and directly mints tokens.
 

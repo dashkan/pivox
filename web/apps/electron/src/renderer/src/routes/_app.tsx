@@ -18,12 +18,7 @@ function AppLayoutRoute() {
   const router = useRouter();
 
   return (
-    <OrgGateFeature
-      apiClient={apiClient}
-      onCreateOrgRequired={() => {
-        void router.navigate({ to: '/auth/create-org' });
-      }}
-    >
+    <OrgGateFeature apiClient={apiClient}>
       <AppLayoutFeature
         onNavigateToLogin={asyncHandler(() =>
           router.navigate({ to: '/auth/login' }),

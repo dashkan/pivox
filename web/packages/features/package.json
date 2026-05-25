@@ -81,6 +81,7 @@
     "test:types": "tsc"
   },
   "peerDependencies": {
+    "@tanstack/react-router": "^1.168.0",
     "@types/react": "^19.2.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -88,6 +89,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
+    "@tanstack/react-router": "^1.170.7",
     "@types/react": "^19.2.15",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

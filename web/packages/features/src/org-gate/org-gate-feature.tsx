@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Navigate } from '@tanstack/react-router';
 
 import { useOrgGate } from './use-org-gate';
 
@@ -11,43 +11,46 @@ import type { ApiClient } from '@pivox/client';
  *
  *   - While Firebase auth is settling or the list call is in flight,
  *     renders a tiny "Loading your organizations…" splash.
- *   - When the user has zero orgs, calls `onCreateOrgRequired` once so
- *     the parent route can navigate to the create-org screen; renders
- *     the splash in the meantime so the user isn't staring at empty UI.
+ *   - When the user has zero orgs, returns a `<Navigate />` to
+ *     `/auth/create-org`. The router primitive is Strict-Mode-safe
+ *     (handles the double-render dedup internally) and avoids the
+ *     effect-driven imperative-navigate anti-pattern.
  *   - On a list-call failure, renders an inline error with a retry.
  *   - On the unauthenticated path, passes through — the surrounding
  *     auth gate (login redirect) drives that case.
+ *
+ * The destination (`/auth/create-org`) is hardcoded inside the feature
+ * because that's literally what this gate is for. Earlier versions
+ * took an `onCreateOrgRequired` callback prop; that indirection had
+ * no consumer that wanted a different destination and was the source
+ * of an inline-arrow `useEffect` re-fire bug.
  */
 export function OrgGateFeature({
   apiClient,
-  onCreateOrgRequired,
   children,
 }: {
   apiClient: ApiClient;
-  onCreateOrgRequired: () => void;
   children: React.ReactNode;
 }) {
   const { status, error, actions } = useOrgGate({ apiClient });
 
-  // Fire the redirect callback from an effect so it doesn't run during
-  // render (and so React 18 strict-mode double-mount sees the same
-  // empty state and dispatches a single navigate).
-  useEffect(() => {
-    if (status === 'empty') {
-      onCreateOrgRequired();
-    }
-  }, [status, onCreateOrgRequired]);
+  if (status === 'empty') {
+    return <Navigate to="/auth/create-org" replace />;
+  }
 
   if (status === 'ready') {
     return <>{children}</>;
   }
 
   if (status === 'error') {
-    return <OrgGateError message={error ?? 'Something went wrong.'} onRetry={actions.retry} />;
+    return (
+      <OrgGateError
+        message={error ?? 'Something went wrong.'}
+        onRetry={actions.retry}
+      />
+    );
   }
 
-  // 'loading' and 'empty' both show the splash. 'empty' transitions
-  // away as soon as the parent's redirect lands.
   return <OrgGateSplash />;
 }
 

@@ -52,18 +52,20 @@ export function useCreateOrg(input: {
     }
 
     try {
-      const { data, error: respError } = await apiClient.POST(
-        '/v1/organizations',
-        {
-          params: { query: { organizationId } },
-          body: { displayName: trimmedName },
-        },
-      );
-      if (respError ?? !data) {
+      const resp = await apiClient.POST('/v1/organizations', {
+        params: { query: { organizationId } },
+        body: { displayName: trimmedName },
+      });
+      // openapi-fetch returns a discriminated union: `{ data, error? }`
+      // for success vs `{ data?, error }` for failure. Branch on
+      // `resp.error` first so the type narrowing on `resp.data` /
+      // `resp.error` is preserved — destructuring up front flattens
+      // the union and trips eslint's no-unnecessary-condition rule.
+      if (resp.error) {
         // grpc-gateway returns rpcStatus on error; surface its
-        // message if present, fall back to a generic line otherwise.
+        // message if present.
         setError(
-          respError.message ??
+          resp.error.message ??
             "Couldn't create your organization. Please try again.",
         );
         return;
@@ -72,11 +74,12 @@ export function useCreateOrg(input: {
       // should always be true and `response` carries the org. Mirror
       // the SwiftUI client's defensive unpack (see
       // native/platform/macos/swift/Auth/OrgsClient.swift).
-      if (data.error) {
-        setError(data.error.message ?? "Couldn't create your organization.");
+      const op = resp.data;
+      if (op.error) {
+        setError(op.error.message ?? "Couldn't create your organization.");
         return;
       }
-      if (!data.done) {
+      if (!op.done) {
         setError(
           'Organization creation is taking longer than expected. Please refresh.',
         );

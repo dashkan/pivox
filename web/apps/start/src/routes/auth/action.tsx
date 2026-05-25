@@ -6,9 +6,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@pivox/primitives/card';
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router';
+import { Link, Navigate, createFileRoute } from '@tanstack/react-router';
 import { applyActionCode, checkActionCode, getAuth } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type ActionSearch = {
   mode: string;
@@ -28,25 +28,14 @@ export const Route = createFileRoute('/auth/action')({
 });
 
 function ActionPage() {
-  const router = useRouter();
   const { mode, oobCode } = Route.useSearch();
 
-  // resetPassword navigates to its own page
-  useEffect(() => {
-    if (mode === 'resetPassword') {
-      void router.navigate({
-        to: '/auth/reset-password',
-        search: { oobCode },
-      });
-    }
-  }, [mode, oobCode, router]);
-
+  // resetPassword is a thin redirect to the dedicated reset screen.
+  // Render <Navigate /> directly — the router handles the imperative
+  // navigate internally and is Strict-Mode-safe, unlike an effect-
+  // driven router.navigate which would double-fire in dev.
   if (mode === 'resetPassword') {
-    return (
-      <ActionLayout>
-        <p className="text-sm text-muted-foreground">Redirecting...</p>
-      </ActionLayout>
-    );
+    return <Navigate to="/auth/reset-password" search={{ oobCode }} replace />;
   }
 
   if (!oobCode) {
@@ -90,13 +79,23 @@ function ActionPage() {
 /* ------------------------------------------------------------------ */
 
 function VerifyEmailAction({ oobCode }: { oobCode: string }) {
-  const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
     'loading',
   );
   const [message, setMessage] = useState('');
+  // applyActionCode consumes the oobCode on the server; a second call
+  // with the same code rejects with auth/invalid-action-code. React
+  // 18 Strict Mode runs effects twice in dev, which would clobber the
+  // first call's success with the second call's "already used" error.
+  // The ref guards against any double-invoke (Strict Mode dev, future
+  // re-mount paths) by ensuring applyActionCode runs exactly once per
+  // mounted oobCode.
+  const applied = useRef(false);
 
   useEffect(() => {
+    if (applied.current) return;
+    applied.current = true;
+
     const auth = getAuth();
     applyActionCode(auth, oobCode)
       .then(async () => {
@@ -105,20 +104,20 @@ function VerifyEmailAction({ oobCode }: { oobCode: string }) {
         // app shell) sees the verified flag the action just flipped.
         if (auth.currentUser) await auth.currentUser.reload();
         setStatus('success');
-        // Land the user back in the app — the org gate (or the auth
-        // gate, if they're not signed in here) takes over from here.
-        // A short pause lets the success message register before the
-        // navigation; the action URL is typically opened in a new tab
-        // anyway so the original tab can refresh independently.
-        window.setTimeout(() => {
-          void router.navigate({ to: '/' });
-        }, 600);
       })
       .catch((e: unknown) => {
         setStatus('error');
         setMessage(actionErrorMessage(e));
       });
-  }, [oobCode, router]);
+  }, [oobCode]);
+
+  // Land the user back in the app once verified. Returning <Navigate />
+  // from render avoids the effect-driven router.navigate anti-pattern
+  // (which the router warns against) and dodges the setTimeout
+  // cleanup-tracking the previous version needed.
+  if (status === 'success') {
+    return <Navigate to="/" replace />;
+  }
 
   if (status === 'loading') {
     return (
@@ -128,23 +127,10 @@ function VerifyEmailAction({ oobCode }: { oobCode: string }) {
     );
   }
 
-  if (status === 'error') {
-    return (
-      <ActionLayout>
-        <ActionCard title="Verification failed" description={message}>
-          <LinkToLogin />
-        </ActionCard>
-      </ActionLayout>
-    );
-  }
-
   return (
     <ActionLayout>
-      <ActionCard
-        title="Email verified"
-        description="Your email address has been verified."
-      >
-        <LinkToLogin label="Continue" />
+      <ActionCard title="Verification failed" description={message}>
+        <LinkToLogin />
       </ActionCard>
     </ActionLayout>
   );
