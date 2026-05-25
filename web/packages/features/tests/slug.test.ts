@@ -31,9 +31,9 @@ describe('slugify', () => {
   });
 
   it('truncates to 20 characters', () => {
-    expect(slugify('a-very-long-organization-name-here').length).toBeLessThanOrEqual(
-      20,
-    );
+    expect(
+      slugify('a-very-long-organization-name-here').length,
+    ).toBeLessThanOrEqual(20);
   });
 });
 

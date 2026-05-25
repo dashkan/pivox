@@ -24,7 +24,6 @@ import { firebaseErrorMessage } from '@/shared/firebase-error';
  */
 const LAST_EMAIL_STORAGE_KEY = 'pivox.login.last-email';
 
-
 /**
  * Login state machine — email-first.
  *

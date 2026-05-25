@@ -3,7 +3,11 @@ import { asyncHandler } from '@pivox/observability';
 import { LoginCard } from '@pivox/ui/login-card';
 import { authProviders } from '@renderer/lib/auth-providers';
 import { electronRedirectTransport } from '@renderer/lib/electron-redirect-transport';
-import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
+import {
+  createFileRoute,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router';
 
 import type { LoginStep } from '@pivox/ui/login-card';
 

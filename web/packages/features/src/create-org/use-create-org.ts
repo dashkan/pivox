@@ -13,7 +13,6 @@ import type {
 import { useAuth } from '@/auth/use-auth';
 import { isValidSlug, slugify } from '@/create-org/slug';
 
-
 /**
  * Drives the create-org screen. Owns the slug auto-derive UX (mirrors
  * SwiftUI native `CreateOrgView`), the form submit through

@@ -81,26 +81,26 @@
     "test:types": "tsc"
   },
   "peerDependencies": {
-    "@tanstack/react-router": "^1.168.0",
-    "@types/react": "^19.2.7",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tailwindcss": "^4.0.0"
+    "@tanstack/react-router": "1.170.8",
+    "@types/react": "19.2.15",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tailwindcss": "4.3.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.0",
-    "@tanstack/react-router": "^1.170.7",
-    "@types/react": "^19.2.15",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "tailwindcss": "^4.3.0",
-    "vite": "^8.0.14"
+    "@tailwindcss/vite": "4.3.0",
+    "@tanstack/react-router": "1.170.8",
+    "@types/react": "19.2.15",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tailwindcss": "4.3.0",
+    "vite": "8.0.14"
   },
   "dependencies": {
     "@pivox/client": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/ui": "workspace:*",
-    "firebase": "^12.13.0"
+    "firebase": "12.13.0"
   }
 }

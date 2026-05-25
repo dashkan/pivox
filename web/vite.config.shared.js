@@ -64,7 +64,12 @@ export function pivoxViteConfig(options) {
         except: options.bundledDeps ?? [],
       }),
       dts({
-        outDir: `${outDir}/esm`,
+        // vite-plugin-dts v5 renamed `outDir` → `outDirs` (plural,
+        // single or array). Old `outDir` is silently ignored and the
+        // plugin defaults to emitting at `dist/` instead of
+        // `dist/esm/`, which breaks every consumer that resolves
+        // types via the `exports.types` paths in package.json.
+        outDirs: `${outDir}/esm`,
         entryRoot: options.srcDir,
         include: options.srcDir,
         exclude: options.exclude,

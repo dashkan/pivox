@@ -21,7 +21,6 @@ import type { User } from 'firebase/auth';
 import { BROKER_PROVIDER, signInViaBroker } from '@/shared/broker-auth';
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 
-
 /**
  * Registration state machine. Email/password registration goes through
  * the Firebase SDK directly; social sign-up runs through the OAuth

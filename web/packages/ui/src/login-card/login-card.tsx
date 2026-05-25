@@ -117,7 +117,14 @@ function LoginCardPasswordField({ className }: { className?: string }) {
   // prompting during the email-only step. Matches the SwiftUI native
   // LoginView (see native/platform/macos/swift/Auth/LoginView.swift).
   if (state.step !== 'password') return null;
-  return <LoginCardPasswordInput state={state} actions={actions} pending={pending} className={className} />;
+  return (
+    <LoginCardPasswordInput
+      state={state}
+      actions={actions}
+      pending={pending}
+      className={className}
+    />
+  );
 }
 
 // Inner component scoped to the password step so the focus effect

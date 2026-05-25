@@ -13,8 +13,7 @@ function recordingFetch(body: unknown = {}): {
 } {
   const calls: Request[] = [];
   const fetch: typeof globalThis.fetch = (input, init) => {
-    const request =
-      input instanceof Request ? input : new Request(input, init);
+    const request = input instanceof Request ? input : new Request(input, init);
     calls.push(request);
     return Promise.resolve(
       new Response(JSON.stringify(body), {

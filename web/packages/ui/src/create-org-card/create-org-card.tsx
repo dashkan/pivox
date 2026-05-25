@@ -135,12 +135,7 @@ function CreateOrgCardShortNameField({ className }: { className?: string }) {
 
 function CreateOrgCardSlugHint({ className }: { className?: string }) {
   return (
-    <p
-      className={cn(
-        'px-4 text-xs text-muted-foreground',
-        className,
-      )}
-    >
+    <p className={cn('px-4 text-xs text-muted-foreground', className)}>
       Permanent. 4–20 characters · lowercase letters, numbers, hyphens · must
       start with a letter.
     </p>

@@ -12,7 +12,6 @@ import { createPivoxApiClient } from '@pivox/features/api';
  * hydration, the module re-evaluates with `window` defined and the
  * real origin lands in `baseUrl`.
  */
-const BASE_URL =
-  typeof window === 'undefined' ? '' : window.location.origin;
+const BASE_URL = typeof window === 'undefined' ? '' : window.location.origin;
 
 export const apiClient = createPivoxApiClient({ baseUrl: BASE_URL });

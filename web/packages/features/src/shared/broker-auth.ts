@@ -1,6 +1,5 @@
 import { OAuthProvider, getAuth, signInWithCredential } from 'firebase/auth';
 
-
 import type { RedirectTransport } from '@/shared/redirect-transport';
 import type { FirebaseError } from 'firebase/app';
 import type { User } from 'firebase/auth';

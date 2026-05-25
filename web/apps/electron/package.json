@@ -24,31 +24,31 @@
     "build:linux": "pnpm run build && electron-builder --linux"
   },
   "dependencies": {
-    "@electron-toolkit/preload": "^3.0.2",
-    "@electron-toolkit/utils": "^4.0.0",
+    "@electron-toolkit/preload": "3.0.2",
+    "@electron-toolkit/utils": "4.0.0",
     "@pivox/features": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/ui": "workspace:*",
-    "@tanstack/react-router": "^1.170.7",
-    "electron-updater": "^6.3.9",
-    "firebase": "^12.13.0"
+    "@tanstack/react-router": "1.170.8",
+    "electron-updater": "6.8.3",
+    "firebase": "12.13.0"
   },
   "devDependencies": {
-    "@electron-toolkit/tsconfig": "^2.0.0",
-    "@tailwindcss/vite": "^4.3.0",
-    "@tanstack/router-plugin": "^1.168.10",
-    "@types/node": "^25.9.1",
-    "@types/react": "^19.2.15",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.2",
-    "electron": "^42.2.0",
-    "electron-builder": "^26.0.12",
-    "electron-vite": "^5.0.0",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "tailwindcss": "^4.3.0",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.14"
+    "@electron-toolkit/tsconfig": "2.0.0",
+    "@tailwindcss/vite": "4.3.0",
+    "@tanstack/router-plugin": "1.168.11",
+    "@types/node": "25.9.1",
+    "@types/react": "19.2.15",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "electron": "42.2.0",
+    "electron-builder": "26.8.1",
+    "electron-vite": "5.0.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tailwindcss": "4.3.0",
+    "typescript": "6.0.3",
+    "vite": "8.0.14"
   }
 }

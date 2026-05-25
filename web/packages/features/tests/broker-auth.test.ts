@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-
 import type { BrokerRedirectResult } from '@/shared/redirect-transport';
 import type { RedirectTransport } from '@/shared/redirect-transport';
 
@@ -58,7 +57,9 @@ describe('signInViaBroker', () => {
       { setError, onSuccess, onLinkRequired },
     );
 
-    expect(setError).toHaveBeenCalledWith('Sign-in timed out. Please try again.');
+    expect(setError).toHaveBeenCalledWith(
+      'Sign-in timed out. Please try again.',
+    );
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onLinkRequired).not.toHaveBeenCalled();
   });
