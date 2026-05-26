@@ -26,13 +26,17 @@
   "dependencies": {
     "@electron-toolkit/preload": "3.0.2",
     "@electron-toolkit/utils": "4.0.0",
+    "@pivox/client": "workspace:*",
     "@pivox/features": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/ui": "workspace:*",
+    "@tanstack/react-query": "5.100.14",
     "@tanstack/react-router": "1.170.8",
+    "[email protected]": "link:@tanstack/[email protected]",
     "electron-updater": "6.8.3",
-    "firebase": "12.13.0"
+    "firebase": "12.13.0",
+    "lucide-react": "1.16.0"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "2.0.0",

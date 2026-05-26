@@ -12,6 +12,8 @@ import {
 import { SidebarMenuButton, useSidebar } from '@pivox/primitives/sidebar';
 import { ChevronsUpDownIcon, LogOutIcon, UserIcon } from 'lucide-react';
 
+import { useAppShellContext } from './app-shell.context';
+
 /**
  * Shape the user needs to be displayable in the menu. Matches the
  * relevant subset of Firebase's `User` (or our hydrated
@@ -30,22 +32,18 @@ export interface NavUserUser {
  * Notifications" items dropped, replaced with the two actions we
  * actually expose: open the profile dialog and sign out.
  *
- * Controlled via callbacks so the consumer owns the side effects —
- * `onManageAccount` flips the profile-dialog state in the feature
- * hook; `onSignOut` calls `useAuth().signOut()` which (in start)
- * routes through the session-cookie clear + Firebase signOut +
- * post-sign-out redirect chain.
+ * Consumes AppShellContext for the user shape + setProfileOpen /
+ * signOut actions. Returns null when there's no user (defensive
+ * single-frame guard between sign-out completing and the route
+ * gate's redirect committing).
  */
-export function NavUser({
-  user,
-  onManageAccount,
-  onSignOut,
-}: {
-  user: NavUserUser;
-  onManageAccount: () => void;
-  onSignOut: () => void;
-}) {
+export function AppShellNavUser() {
+  const { state, actions } = useAppShellContext();
   const { isMobile } = useSidebar();
+
+  if (!state.user) return null;
+
+  const user = state.user;
   const initials = (user.displayName ?? user.email ?? 'U')
     .split(/\s+/)
     .map((p) => p[0])
@@ -109,12 +107,20 @@ export function NavUser({
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onManageAccount}>
+        <DropdownMenuItem
+          onClick={() => {
+            actions.setProfileOpen(true);
+          }}
+        >
           <UserIcon />
           Manage Account
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onSignOut}>
+        <DropdownMenuItem
+          onClick={() => {
+            void actions.signOut();
+          }}
+        >
           <LogOutIcon />
           Sign Out
         </DropdownMenuItem>

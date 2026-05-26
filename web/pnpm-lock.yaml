@@ -81,6 +81,9 @@ importers:
       '@electron-toolkit/utils':
         specifier: 4.0.0
         version: 4.0.0(electron@42.2.0)
+      '@pivox/client':
+        specifier: workspace:*
+        version: link:../../packages/client
       '@pivox/features':
         specifier: workspace:*
         version: link:../../packages/features
@@ -93,15 +96,24 @@ importers:
       '@pivox/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@tanstack/react-query':
+        specifier: 5.100.14
+        version: 5.100.14(react@19.2.6)
       '@tanstack/react-router':
         specifier: 1.170.8
         version: 1.170.8(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '[email protected]':
+        specifier: link:@tanstack/[email protected]
+        version: link:@tanstack/[email protected]
       electron-updater:
         specifier: 6.8.3
         version: 6.8.3
       firebase:
         specifier: 12.13.0
         version: 12.13.0
+      lucide-react:
+        specifier: 1.16.0
+        version: 1.16.0(react@19.2.6)
     devDependencies:
       '@electron-toolkit/tsconfig':
         specifier: 2.0.0
@@ -151,6 +163,9 @@ importers:
 
   apps/start:
     dependencies:
+      '@pivox/client':
+        specifier: workspace:*
+        version: link:../../packages/client
       '@pivox/features':
         specifier: workspace:*
         version: link:../../packages/features
@@ -169,6 +184,9 @@ importers:
       '@tanstack/react-devtools':
         specifier: 0.10.5
         version: 0.10.5(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(csstype@3.2.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(solid-js@1.9.13)
+      '@tanstack/react-query':
+        specifier: 5.100.14
+        version: 5.100.14(react@19.2.6)
       '@tanstack/react-router':
         specifier: 1.170.8
         version: 1.170.8(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -184,6 +202,9 @@ importers:
       '@tanstack/router-plugin':
         specifier: 1.168.11
         version: 1.168.11(@tanstack/react-router@1.170.8(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(vite@8.0.14(@types/node@25.9.1)(jiti@2.7.0))
+      '[email protected]':
+        specifier: link:@tanstack/[email protected]
+        version: link:@tanstack/[email protected]
       firebase:
         specifier: 12.13.0
         version: 12.13.0

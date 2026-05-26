@@ -1,3 +1,4 @@
+import { createReactQueryApi } from '@pivox/client/react-query';
 import { createPivoxApiClient } from '@pivox/features/api';
 
 /**
@@ -15,3 +16,13 @@ import { createPivoxApiClient } from '@pivox/features/api';
 const BASE_URL = typeof window === 'undefined' ? '' : window.location.origin;
 
 export const apiClient = createPivoxApiClient({ baseUrl: BASE_URL });
+
+/**
+ * React Query hooks bound to the Pivox API spec. Consumers do
+ * `$api.useQuery('get', '/v1/...', { params: {...} })` and get
+ * fully-typed args + response.
+ *
+ * Requires `<QueryClientProvider client={queryClient}>` somewhere
+ * above the consumer — wired in `__root.tsx`.
+ */
+export const $api = createReactQueryApi(apiClient);

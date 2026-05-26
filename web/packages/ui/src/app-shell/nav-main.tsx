@@ -16,6 +16,8 @@ import {
 import { Link } from '@tanstack/react-router';
 import { ChevronRightIcon } from 'lucide-react';
 
+import { useAppShellContext } from './app-shell.context';
+
 /**
  * Top-level nav item with optional subitems. `href` is an absolute
  * path; the feature hook is responsible for assembling correct route
@@ -33,12 +35,14 @@ export interface NavMainItem {
   items?: { title: string; href: string }[];
 }
 
-export function NavMain({ items }: { items: NavMainItem[] }) {
+export function AppShellNavMain() {
+  const { state } = useAppShellContext();
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
-        {items.map((item) => (
+        {state.navMain.map((item) => (
           <Collapsible
             key={item.title}
             asChild

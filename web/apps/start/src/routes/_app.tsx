@@ -3,11 +3,62 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@pivox/primitives/sidebar';
-import { AppSidebar } from '@pivox/ui/app-shell';
+import { AppShell } from '@pivox/ui/app-shell';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router';
+import { TerminalSquareIcon } from 'lucide-react';
+
+import type { AppShellContextValue } from '@pivox/ui/app-shell';
 
 import { getServerSession } from '@/server/auth-session';
+
+/**
+ * TEMPORARY sample data for AppShell. Replaced by AppShellFeature in
+ * Stage B2, which will own the real queries (orgs, spaces), user
+ * info from useAuth, active-org persistence in localStorage, and
+ * the createOrganization / signOut handlers.
+ *
+ * Lives at the route level (not in @pivox/ui) so it's clear this is
+ * scaffolding-only — `git grep SAMPLE_APP_SHELL` finds the one place
+ * to delete when the real provider lands.
+ */
+const SAMPLE_APP_SHELL: AppShellContextValue = {
+  state: {
+    user: {
+      displayName: 'Sample User',
+      email: '[email protected]',
+      photoURL: null,
+    },
+    orgs: [
+      { organization: 'organizations/acme', displayName: 'Acme Inc' },
+      { organization: 'organizations/example', displayName: 'Example Co' },
+    ],
+    orgsLoading: false,
+    activeOrganization: 'organizations/acme',
+    spaces: [],
+    spacesLoading: false,
+    navMain: [
+      {
+        title: 'Playground',
+        href: '/',
+        icon: <TerminalSquareIcon />,
+        isActive: true,
+        items: [
+          { title: 'History', href: '/' },
+          { title: 'Starred', href: '/' },
+          { title: 'Settings', href: '/' },
+        ],
+      },
+    ],
+    profileOpen: false,
+  },
+  actions: {
+    setActiveOrganization: () => undefined,
+    createOrganization: () => undefined,
+    setProfileOpen: () => undefined,
+    signOut: () => undefined,
+  },
+};
 
 export const Route = createFileRoute('/_app')({
   /**
@@ -73,17 +124,19 @@ export const Route = createFileRoute('/_app')({
  */
 function AppLayoutRoute() {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <div className="ms-auto">
-            <ThemeSwitcher />
-          </div>
-        </header>
-        <Outlet />
-      </SidebarInset>
-    </SidebarProvider>
+    <AppShell.Provider value={SAMPLE_APP_SHELL}>
+      <SidebarProvider>
+        <AppShell.Sidebar />
+        <SidebarInset>
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger className="-ml-1" />
+            <div className="ms-auto">
+              <ThemeSwitcher />
+            </div>
+          </header>
+          <Outlet />
+        </SidebarInset>
+      </SidebarProvider>
+    </AppShell.Provider>
   );
 }

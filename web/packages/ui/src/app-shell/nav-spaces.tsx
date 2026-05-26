@@ -24,11 +24,13 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 
+import { useAppShellContext } from './app-shell.context';
+
 /**
  * Shape a space needs to be listable in the sidebar group. Maps to
  * the subset of fields the Space proto from `/v1/organizations/
  * {organization}/spaces` actually carries. `icon` is client-side
- * derived (icon or initials) — the API doesn't ship one.
+ * derived — the API doesn't ship one.
  *
  * `href` is the absolute path to the space landing page,
  * constructed by the feature hook (typically `/spaces/<slug>`).
@@ -44,20 +46,21 @@ export interface NavSpacesSpace {
 /**
  * Sidebar group listing the caller's spaces in the active
  * organization. Hidden when the sidebar is collapsed to icon mode
- * (spaces don't have meaningful single-icon representations).
+ * (spaces don't have meaningful single-icon shorthand).
  *
  * The per-item menu (View / Share / Delete) is intentionally inert
- * placeholder content for Stage B1 — wiring those actions is a
- * later iteration once the underlying space operations exist.
+ * placeholder content — wiring those actions is a later iteration
+ * once the underlying space operations exist.
  */
-export function NavSpaces({ spaces }: { spaces: NavSpacesSpace[] }) {
+export function AppShellNavSpaces() {
+  const { state } = useAppShellContext();
   const { isMobile } = useSidebar();
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Spaces</SidebarGroupLabel>
       <SidebarMenu>
-        {spaces.map((sp) => (
+        {state.spaces.map((sp) => (
           <SidebarMenuItem key={sp.space}>
             <SidebarMenuButton asChild>
               <Link to={sp.href}>
