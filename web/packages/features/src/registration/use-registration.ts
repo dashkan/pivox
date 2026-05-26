@@ -31,7 +31,12 @@ import { firebaseErrorMessage } from '@/shared/firebase-error';
  */
 export function useRegistration(input: {
   transport: RedirectTransport;
-  onSuccess?: (user: User) => void;
+  /**
+   * Awaitable so consumers can do server-side work (e.g. mint a
+   * Firebase session cookie) before navigation. Sync handlers still
+   * satisfy the `void | Promise<void>` union.
+   */
+  onSuccess?: (user: User) => void | Promise<void>;
   onLinkRequired?: (email: string) => void;
 }): RegistrationContextValue {
   const { transport, onSuccess, onLinkRequired } = input;
@@ -60,7 +65,7 @@ export function useRegistration(input: {
       );
       await updateProfile(credential.user, { displayName: displayName.trim() });
       await sendEmailVerification(credential.user);
-      onSuccess?.(credential.user);
+      await onSuccess?.(credential.user);
     } catch (e) {
       setError(firebaseErrorMessage(e));
     }

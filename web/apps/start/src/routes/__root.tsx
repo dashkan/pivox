@@ -8,6 +8,8 @@ import {
 
 import appCss from '../styles.css?url';
 
+import { clearSession, createSession } from '@/server/auth-session';
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -23,7 +25,16 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <AuthProvider>
+    <AuthProvider
+      onBeforeSignOut={() => clearSession()}
+      // Proactive cookie refresh — Firebase rotates the ID token
+      // every ~55 min while the app is open; each rotation re-mints
+      // the cookie so the 14-day window slides forward continuously.
+      // An actively-used app never sees cookie expiry; inactivity
+      // beyond 14 days falls through to the verify-session interim
+      // recovery flow on the next visit.
+      onTokenRefresh={(idToken) => createSession({ data: { idToken } })}
+    >
       <Outlet />
     </AuthProvider>
   );

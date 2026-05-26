@@ -5,6 +5,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router';
 
 import { authProviders } from '@/lib/auth-providers';
 import { browserRedirectTransport } from '@/lib/browser-redirect-transport';
+import { createSession } from '@/server/auth-session';
 
 export const Route = createFileRoute('/auth/register')({
   component: RegisterPage,
@@ -16,7 +17,13 @@ function RegisterPage() {
   return (
     <RegistrationFeature
       transport={browserRedirectTransport}
-      onSuccess={asyncHandler(() => router.navigate({ to: '/' }))}
+      // Mint the server-side session cookie before navigating — same
+      // reason as `/auth/login`, see that route for the rationale.
+      onSuccess={async (user) => {
+        const idToken = await user.getIdToken();
+        await createSession({ data: { idToken } });
+        await router.navigate({ to: '/' });
+      }}
       onLinkRequired={asyncHandler(() =>
         router.navigate({ to: '/auth/link-account' }),
       )}

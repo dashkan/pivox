@@ -59,7 +59,13 @@ export function useLogin(input: {
   transport: RedirectTransport;
   step: LoginStep;
   onStepChange: (step: LoginStep, opts?: { replace?: boolean }) => void;
-  onSuccess?: (user: User) => void;
+  /**
+   * Awaitable so consumers can do server-side work (e.g. mint a
+   * Firebase session cookie) before navigation. Sync handlers still
+   * satisfy the `void | Promise<void>` union — Electron passes a
+   * plain sync handler, start awaits a `createSession` round-trip.
+   */
+  onSuccess?: (user: User) => void | Promise<void>;
   onLinkRequired?: (email: string) => void;
 }): LoginContextValue {
   const { transport, step, onStepChange, onSuccess, onLinkRequired } = input;
@@ -154,9 +160,9 @@ export function useLogin(input: {
   // toggle the checkbox while an async sign-in is in flight). A
   // stable identity from useCallback would freeze that closure at
   // mount and lose post-toggle changes.
-  const handleSuccess = (user: User): void => {
+  const handleSuccess = async (user: User): Promise<void> => {
     persistEmailPreference(user.email ?? email);
-    onSuccess?.(user);
+    await onSuccess?.(user);
   };
 
   // useActionState captures `step`/`email`/`password` per render; on
@@ -198,7 +204,7 @@ export function useLogin(input: {
         email,
         password,
       );
-      handleSuccess(credential.user);
+      await handleSuccess(credential.user);
     } catch (e) {
       setError(firebaseErrorMessage(e));
     }

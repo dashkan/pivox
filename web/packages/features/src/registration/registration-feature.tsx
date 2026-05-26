@@ -14,7 +14,7 @@ export function RegistrationFeature({
   children,
 }: {
   transport: RedirectTransport;
-  onSuccess?: (user: User) => void;
+  onSuccess?: (user: User) => void | Promise<void>;
   onLinkRequired?: (email: string) => void;
   children: React.ReactNode;
 }) {

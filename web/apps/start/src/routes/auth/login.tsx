@@ -11,6 +11,7 @@ import type { LoginStep } from '@pivox/ui/login-card';
 
 import { authProviders } from '@/lib/auth-providers';
 import { browserRedirectTransport } from '@/lib/browser-redirect-transport';
+import { createSession } from '@/server/auth-session';
 
 /**
  * Search schema. `step` lives in the URL so the browser back button
@@ -33,18 +34,39 @@ import { browserRedirectTransport } from '@/lib/browser-redirect-transport';
  */
 type LoginSearch = {
   step?: LoginStep;
+  /**
+   * Post-login destination. Set by `_app`'s beforeLoad when an
+   * unauthenticated visit gets redirected here, preserved through
+   * the flow, and navigated to on successful sign-in. Validator
+   * enforces same-origin (must start with '/') so a forged
+   * `?return=https://evil.com` can't turn login into an open redirect.
+   */
+  return?: string;
 };
 
 export const Route = createFileRoute('/auth/login')({
-  validateSearch: (search: Record<string, unknown>): LoginSearch =>
-    search.step === 'password' ? { step: 'password' } : {},
+  validateSearch: (search: Record<string, unknown>): LoginSearch => {
+    const out: LoginSearch = {};
+    if (search.step === 'password') out.step = 'password';
+    // Path-relative + reject `//host/path` (protocol-relative URL —
+    // `startsWith('/')` returns true but browsers treat it as
+    // cross-origin, which would be an open redirect).
+    if (
+      typeof search.return === 'string' &&
+      search.return.startsWith('/') &&
+      !search.return.startsWith('//')
+    ) {
+      out.return = search.return;
+    }
+    return out;
+  },
   component: LoginPage,
 });
 
 function LoginPage() {
   const router = useRouter();
   const navigate = useNavigate({ from: '/auth/login' });
-  const { step = 'email' } = Route.useSearch();
+  const { step = 'email', return: returnUrl } = Route.useSearch();
 
   return (
     <LoginFeature
@@ -63,7 +85,15 @@ function LoginPage() {
           replace: opts?.replace,
         })
       }
-      onSuccess={asyncHandler(() => router.navigate({ to: '/' }))}
+      // Mint the server-side session cookie BEFORE navigating — the
+      // destination route's beforeLoad reads the cookie via
+      // `getServerSession`, so without this round-trip the user would
+      // hit the gate with an empty cookie and bounce back here.
+      onSuccess={async (user) => {
+        const idToken = await user.getIdToken();
+        await createSession({ data: { idToken } });
+        await router.navigate({ to: returnUrl ?? '/' });
+      }}
       onLinkRequired={asyncHandler(() =>
         router.navigate({ to: '/auth/link-account' }),
       )}

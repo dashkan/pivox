@@ -47,9 +47,16 @@ export function brokerErrorMessage(code: string): string {
   }
 }
 
-/** Callbacks `signInViaBroker` invokes as the flow resolves. */
+/**
+ * Callbacks `signInViaBroker` invokes as the flow resolves.
+ *
+ * `onSuccess` is awaitable so consumers can do server-side work
+ * (e.g. minting a Firebase session cookie via `createSession`) before
+ * the caller moves on / navigates. Sync handlers still satisfy the
+ * `void | Promise<void>` union.
+ */
 export interface BrokerSignInHandlers {
-  onSuccess?: (user: User) => void;
+  onSuccess?: (user: User) => void | Promise<void>;
   onLinkRequired?: (email: string) => void;
   setError: (message: string) => void;
 }
@@ -90,7 +97,7 @@ export async function signInViaBroker(
       getAuth(),
       buildBrokerCredential(result),
     );
-    handlers.onSuccess?.(credential.user);
+    await handlers.onSuccess?.(credential.user);
   } catch (e) {
     const err = e as FirebaseError;
     if (

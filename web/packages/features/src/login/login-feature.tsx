@@ -25,7 +25,7 @@ export function LoginFeature({
    * history entry doesn't survive in the back stack.
    */
   onStepChange: (step: LoginStep, opts?: { replace?: boolean }) => void;
-  onSuccess?: (user: User) => void;
+  onSuccess?: (user: User) => void | Promise<void>;
   onLinkRequired?: (email: string) => void;
   children: React.ReactNode;
 }) {

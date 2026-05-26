@@ -63,14 +63,28 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
  * (`{ user, cookiePresent }`); the gate branches on `cookiePresent`
  * when `user` is null.
  *
- * checkRevoked
- * ────────────
+ * checkRevoked trade-off
+ * ──────────────────────
  * `verifySessionCookie(cookie, true)` makes Firebase hit its backend
  * to confirm the cookie hasn't been revoked (sign-out elsewhere,
  * password change, admin-disabled account). This is one extra RPC per
- * authenticated request but it's the right default — without it, a
- * revoked session cookie keeps working until natural expiry, which is
- * a real security gap for the "sign out everywhere" flow.
+ * authenticated request — at every navigation through the `_app`
+ * gate, that's perceptible latency on every link click.
+ *
+ * We DON'T pass checkRevoked: it stays default-false. Revocations
+ * still propagate via the proactive refresh path: AuthProvider's
+ * `onTokenRefresh` calls `createSession` (which uses `verifyIdToken`,
+ * NOT cookie verification) on every Firebase ID-token rotation
+ * (~every 55 min while active). If the underlying refresh token was
+ * revoked, `getIdToken()` throws on the client, the refresh fails,
+ * and the next navigation hits an expired cookie → the verify-session
+ * recovery flow fires, also fails (refresh token revoked), and the
+ * user lands on /auth/login. Net latency from revocation to forced
+ * sign-out: bounded by the token rotation interval (~55 min).
+ *
+ * Apps that need immediate revocation propagation should re-add
+ * `verifySessionCookie(cookie, true)` and accept the per-navigation
+ * latency, or move the check to a separate periodic worker.
  */
 
 const COOKIE_NAME = '__pivox_session';
@@ -232,10 +246,11 @@ export const getServerSession = createServerFn({ method: 'GET' }).handler(
     if (!cookie) return { user: null, cookiePresent: false };
     try {
       const auth = getAuth(firebaseAdmin());
-      const decoded: DecodedIdToken = await auth.verifySessionCookie(
-        cookie,
-        true,
-      );
+      // checkRevoked stays default-false — see the trade-off note in
+      // the file header. Revocations propagate via proactive refresh
+      // within ~55 min instead of synchronously, with the win that
+      // every authenticated navigation skips a Firebase backend RPC.
+      const decoded: DecodedIdToken = await auth.verifySessionCookie(cookie);
       return { user: toServerSession(decoded), cookiePresent: true };
     } catch {
       return { user: null, cookiePresent: true };
