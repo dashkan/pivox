@@ -1,11 +1,9 @@
 import { AppLayoutFeature } from '@pivox/features/app-layout';
-import { OrgGateFeature } from '@pivox/features/org-gate';
 import { AppLayout } from '@pivox/ui/app-layout';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router';
 import { Suspense, lazy } from 'react';
 
-import { apiClient } from '@/lib/api-client';
 import { getServerSession } from '@/server/auth-session';
 
 // Lazy-load the profile dialog so it's client-only — it depends on
@@ -62,24 +60,22 @@ export const Route = createFileRoute('/_app')({
 
 function AppLayoutRoute() {
   return (
-    <OrgGateFeature apiClient={apiClient}>
-      <AppLayoutFeature>
-        <AppLayout.Root>
-          <AppLayout.Header>
-            <AppLayout.HeaderTitle>Pivox</AppLayout.HeaderTitle>
-            <AppLayout.HeaderNav>
-              <ThemeSwitcher />
-              <AppLayout.HeaderAvatar />
-            </AppLayout.HeaderNav>
-          </AppLayout.Header>
-          <AppLayout.Content>
-            <Outlet />
-          </AppLayout.Content>
-        </AppLayout.Root>
-        <Suspense>
-          <ProfileDialog />
-        </Suspense>
-      </AppLayoutFeature>
-    </OrgGateFeature>
+    <AppLayoutFeature>
+      <AppLayout.Root>
+        <AppLayout.Header>
+          <AppLayout.HeaderTitle>Pivox</AppLayout.HeaderTitle>
+          <AppLayout.HeaderNav>
+            <ThemeSwitcher />
+            <AppLayout.HeaderAvatar />
+          </AppLayout.HeaderNav>
+        </AppLayout.Header>
+        <AppLayout.Content>
+          <Outlet />
+        </AppLayout.Content>
+      </AppLayout.Root>
+      <Suspense>
+        <ProfileDialog />
+      </Suspense>
+    </AppLayoutFeature>
   );
 }
