@@ -22,7 +22,8 @@ type Config struct {
 	// Cloud Controller does not implement app-level per-IP limits;
 	// abuse defenses live in single-use codes, TTLs, response-shape
 	// uniformity, and the auth chain.
-	SyncAuth      SyncAuthConfig
+	SyncAuth      ServiceAccountAuthConfig
+	SsrAuth       ServiceAccountAuthConfig
 	DelegatedAuth DelegatedAuthConfig
 	OAuthBroker   OAuthBrokerConfig
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/audit"
+	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/config"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -107,6 +108,7 @@ func main() {
 	f.String("google-client-secret", envOrDefault("GOOGLE_CLIENT_SECRET", ""), "Google OAuth (Web app) client secret (broker)")
 
 	addSyncAuthFlags(rootCmd)
+	addSsrAuthFlags(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -143,6 +145,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		DebugPort:       must(f.GetString("debug-port")),
 		LogLevel:        must(f.GetString("log-level")),
 		SyncAuth:        loadSyncAuthConfig(cmd),
+		SsrAuth:         loadSsrAuthConfig(cmd),
 		DelegatedAuth: config.DelegatedAuthConfig{
 			SessionTTL:   sessionTTL,
 			PollInterval: pollInterval,
@@ -155,6 +158,16 @@ func serve(cmd *cobra.Command, args []string) error {
 			GoogleClientID:     must(f.GetString("google-client-id")),
 			GoogleClientSecret: must(f.GetString("google-client-secret")),
 		},
+	}
+	// SsrAuth audience inherits from SyncAuth's audience when the
+	// SSR-specific flag isn't set. Most deployments target a single
+	// backend URL so duplicating the flag would be busywork; this
+	// fallback lets `--audience` cover both surfaces with the
+	// override available when an operator wants distinct audiences.
+	// Applied here (post-load) so loadSsrAuthConfig doesn't reach
+	// into addSyncAuthFlags' registration.
+	if cfg.SsrAuth.Audience == "" {
+		cfg.SsrAuth.Audience = cfg.SyncAuth.Audience
 	}
 
 	var level slog.Level
@@ -250,18 +263,36 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 
 	// Firebase auth service. Verifies Firebase ID tokens from
-	// browser/native clients via Firebase Admin SDK.
-	//
-	// TODO(SSR Phase 2): wrap with server.NewCompositeAuthService
-	// when wiring the SSR-acting-as path. The composite routes by
-	// JWT iss claim — SA-signed tokens to the SSR verifier, every-
-	// thing else to authSvc. The composite is wired ONLY into the
-	// gRPC chain (AuthInterceptor / AuthStreamInterceptor); the
-	// InternalHooks delegated-auth surface MUST receive the bare
-	// authSvc (see internal_hooks.go: InternalHooksConfig.Auth).
+	// browser/native clients via Firebase Admin SDK. Stays the bare
+	// service for InternalHooks (delegated-auth flow expects real
+	// Firebase UIDs from identity.UID).
 	authSvc, err := firebase.NewAuthService(ctx)
 	if err != nil {
 		return fmt.Errorf("initialize Firebase auth: %w", err)
+	}
+
+	// authChainSvc is what the gRPC AuthInterceptor / HTTP RequireAuth
+	// see — the same authSvc when SSR is disabled, or a composite
+	// (Firebase + SA-signed JWT verifier) when configured. The
+	// composite routes by JWT `iss` claim; tokens from SSR's service
+	// account go to keyfunc-backed verification, everything else
+	// falls through to Firebase. See internal/server/composite_auth.go.
+	//
+	// Firebase-specific surfaces (InternalHooks delegated-auth,
+	// service Config.Auth fields that call CreateCustomToken / SSO
+	// provider methods / DeleteUser) keep the bare authSvc — those
+	// operations only make sense for Firebase identities.
+	var authChainSvc authn.Service = authSvc
+	if cfg.SsrAuth.Enabled() {
+		ssrVerify, err := server.NewKeyfuncSsrVerifier(ctx, cfg.SsrAuth)
+		if err != nil {
+			return fmt.Errorf("initialize SSR verifier: %w", err)
+		}
+		authChainSvc = server.NewCompositeAuthService(authSvc, ssrVerify)
+		logger.Info("SSR auth path enabled",
+			"audience", cfg.SsrAuth.Audience,
+			"allowed_service_accounts", cfg.SsrAuth.AllowedServiceAccounts,
+		)
 	}
 
 	// gRPC server
@@ -293,7 +324,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		// from the operator's perspective.
 		grpc.ChainUnaryInterceptor(
 			server.LoggingUnaryInterceptor(logger),
-			server.AuthInterceptor(authSvc),
+			server.AuthInterceptor(authChainSvc),
 			// Membership check runs after Auth so the caller's UID is
 			// in context, and before Permission/Validate so we don't
 			// leak field shape errors to memberless callers.
@@ -306,7 +337,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		),
 		grpc.ChainStreamInterceptor(
 			server.LoggingStreamInterceptor(logger),
-			server.AuthStreamInterceptor(authSvc),
+			server.AuthStreamInterceptor(authChainSvc),
 			server.MembershipRequiredStreamInterceptor(queries),
 			permissionStreamInterceptor,
 		),
@@ -610,7 +641,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// forwards the bearer to the gRPC backend, where AuthInterceptor
 	// re-verifies) but Firebase verify is local + key-cached, so the
 	// cost is ~1ms and worth the "set and forget" simplicity.
-	authMW := server.RequireAuth(authSvc, logger)
+	authMW := server.RequireAuth(authChainSvc, logger)
 	httpMux.Handle("/", authMW(gwMux))
 
 	// SSE bypasses HTTP auth on purpose. The handler is a thin proxy

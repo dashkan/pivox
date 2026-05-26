@@ -40,7 +40,7 @@ type InternalHooksConfig struct {
 	Queries db.Querier
 	// SyncAuth carries OIDC validation settings for the
 	// auth:syncIdentity endpoint.
-	SyncAuth config.SyncAuthConfig
+	SyncAuth config.ServiceAccountAuthConfig
 	// DelegatedAuth governs the delegated-auth endpoints.
 	DelegatedAuth config.DelegatedAuthConfig
 	// Logger is the slog.Logger used for warning/error events.
