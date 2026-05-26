@@ -1,7 +1,6 @@
 'use client';
 
 import { asyncHandler } from '@pivox/observability';
-import { Button } from '@pivox/primitives/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -120,13 +119,11 @@ function AppLayoutHeaderAvatar({ className }: { className?: string }) {
     return <Skeleton className="size-8 rounded-full" />;
   }
 
-  if (!state.user) {
-    return (
-      <Button size="sm" onClick={actions.navigateToLogin}>
-        Sign in
-      </Button>
-    );
-  }
+  // Defensive guard for the single render cycle between sign-out
+  // completing (user becomes null) and AuthGateFeature committing
+  // its <Navigate /> redirect — plus tests / stories that render
+  // AppLayout without the gate. `null` keeps both quiet.
+  if (!state.user) return null;
 
   return (
     <DropdownMenu>

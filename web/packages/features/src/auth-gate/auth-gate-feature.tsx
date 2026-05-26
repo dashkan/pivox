@@ -1,0 +1,41 @@
+'use client';
+
+import { Navigate } from '@tanstack/react-router';
+
+import { useAuth } from '@/auth/use-auth';
+
+/**
+ * Gates the authenticated app shell on the user having a Firebase
+ * session. Wrap any route subtree that should only render for signed-
+ * in users; unauthenticated visits redirect to `/auth/login`.
+ *
+ *   - While Firebase auth is settling, renders a tiny "Loading…"
+ *     splash so we don't flash content for an unresolved state.
+ *   - When there's no user, returns `<Navigate to="/auth/login" />`.
+ *     Router primitive is Strict-Mode-safe and avoids the
+ *     effect-driven imperative-navigate anti-pattern.
+ *   - When there's a user, renders children. Downstream gates
+ *     (`OrgGateFeature`, etc.) layer their own preconditions on top.
+ *
+ * The destination is hardcoded because the gate's purpose IS the
+ * redirect; there's no use case for a different login URL.
+ *
+ * Mirrors the SwiftUI native auth check at
+ * `native/platform/macos/swift/Auth/AuthGate.swift`.
+ */
+export function AuthGateFeature({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) return <AuthGateLoading />;
+  if (!user) return <Navigate to="/auth/login" replace />;
+
+  return <>{children}</>;
+}
+
+function AuthGateLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <p className="text-sm text-muted-foreground">Loading…</p>
+    </div>
+  );
+}

@@ -6,9 +6,7 @@ import type { AppLayoutContextValue } from '@pivox/ui/app-layout';
 
 import { useAuth } from '@/auth/use-auth';
 
-export function useAppLayout(
-  onNavigateToLogin: () => void,
-): AppLayoutContextValue {
+export function useAppLayout(): AppLayoutContextValue {
   const { user, loading, signOut } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -30,7 +28,6 @@ export function useAppLayout(
         setProfileOpen(false);
         await signOut();
       },
-      navigateToLogin: onNavigateToLogin,
     },
   };
 }

@@ -11,7 +11,6 @@ export interface AppLayoutState {
 export interface AppLayoutActions {
   setProfileOpen: (open: boolean) => void;
   signOut: () => Promise<void>;
-  navigateToLogin: () => void;
 }
 
 export interface AppLayoutContextValue {

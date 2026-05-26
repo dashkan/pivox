@@ -13,5 +13,14 @@ export default [
       'react-refresh/only-export-components': 'off',
     },
   },
-  globalIgnores(['**/node_modules', '**/dist', '**/out']),
+  // public/ holds static assets served as-is (e.g. theme-init.js,
+  // the FOUC-prevention bootstrap loaded synchronously before React).
+  // Not part of the TypeScript project — eslint's project-service
+  // can't type-check it and errors out otherwise.
+  globalIgnores([
+    '**/node_modules',
+    '**/dist',
+    '**/out',
+    'src/renderer/public/**',
+  ]),
 ];

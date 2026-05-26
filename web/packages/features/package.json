@@ -39,6 +39,10 @@
       "types": "./dist/esm/auth.d.ts",
       "import": "./dist/esm/auth.js"
     },
+    "./auth-gate": {
+      "types": "./dist/esm/auth-gate.d.ts",
+      "import": "./dist/esm/auth-gate.js"
+    },
     "./broker": {
       "types": "./dist/esm/broker.d.ts",
       "import": "./dist/esm/broker.js"
