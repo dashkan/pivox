@@ -9,6 +9,7 @@ require (
 	cloud.google.com/go/kms v1.31.0
 	cloud.google.com/go/longrunning v1.0.0
 	firebase.google.com/go/v4 v4.20.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7

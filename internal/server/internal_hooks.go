@@ -47,6 +47,20 @@ type InternalHooksConfig struct {
 	// Required.
 	Logger *slog.Logger
 	// Auth is the authn service. Required.
+	//
+	// MUST be the bare Firebase service (firebase.NewAuthService),
+	// NOT the SSR composite (server.NewCompositeAuthService). The
+	// delegated-auth flow (completeDelegatedAuthSession) reads
+	// `identity.UID` and passes it to `CreateCustomToken` — that's
+	// valid only for real Firebase UIDs. The SSR composite
+	// synthesizes Identity with the Pivox UUID in `UID`, which would
+	// cause CreateCustomToken to mint tokens for non-existent
+	// Firebase users.
+	//
+	// There is no architectural path for SSR-acting-as tokens to
+	// reach these endpoints (they're for native-app interactive
+	// sign-in, not server-to-server), but the type system can't
+	// enforce the wiring — code review must.
 	Auth authn.Service
 	// AuditResolver receives Invalidate() calls when the
 	// syncIdentity webhook upserts an existing identity row.

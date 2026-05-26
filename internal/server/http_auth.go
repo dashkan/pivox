@@ -9,11 +9,15 @@ import (
 	"github.com/dashkan/pivox/internal/authn"
 )
 
-// RequireAuth returns an HTTP middleware that verifies a Firebase
-// bearer token from the Authorization header and augments the request
+// RequireAuth returns an HTTP middleware that verifies a bearer
+// token from the Authorization header and augments the request
 // context with the same pivoxUserIDKey claim that the gRPC
 // AuthInterceptor sets. Both transports converge on the same
 // authenticateBearer core in auth_interceptor.go so they cannot drift.
+//
+// Token-type routing (Firebase ID token vs SSR SA-signed JWT) is
+// handled inside the authn.Service implementation — production wires
+// CompositeAuthService; tests use either.
 //
 // On failure: writes 401 with the body "unauthorized" and logs the
 // reason at warn level. The body is intentionally generic so that

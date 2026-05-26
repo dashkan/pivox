@@ -14,16 +14,14 @@ import (
 
 // pivoxUserIDKey is the context key for the caller's per-Pivox
 // `identities.id` UUID. Populated by the auth interceptor from the
-// `pivox_user_id` Firebase ID-token custom claim, set during
-// identity sync by the Firebase blocking function.
+// `pivox_user_id` Firebase ID-token custom claim (browser/native
+// clients) or the `actor_uid` claim of an SA-signed JWT (SSR server
+// acting on behalf of a user — see CompositeAuthService in
+// composite_auth.go).
 //
-// This is the ONLY identifier the auth chain propagates. All
-// membership tables (`org_members.principal_id`,
+// All membership tables (`org_members.principal_id`,
 // `space_members.principal_id`, `group_members.user_id`) reference
 // this UUID — it's the universal user identifier across the API.
-// The Firebase UID itself is not propagated: nothing downstream
-// needs it (the JWT claim already carries the Pivox-side translation,
-// so a per-RPC `GetIdentityByFirebaseUID` lookup would be pure waste).
 type pivoxUserIDKey struct{}
 
 // Canonical Unauthenticated messages. Centralized so both the unary
@@ -65,15 +63,24 @@ func MustPivoxUserID(ctx context.Context) uuid.UUID {
 	return id
 }
 
-// authenticateBearer is the transport-agnostic core of Firebase bearer
+// authenticateBearer is the transport-agnostic core of bearer
 // authentication. Caller passes the bearer header value already
 // extracted from its transport (gRPC metadata, HTTP Authorization
-// header). Returns the context augmented with pivoxUserIDKey, or an
-// apierr.Unauthenticated error.
+// header). Returns the context augmented with pivoxUserIDKey, or
+// an apierr.Unauthenticated error.
 //
-// This is the single source of truth for "Firebase bearer auth"
-// across the codebase — gRPC unary/stream interceptors and the HTTP
-// middleware in http_auth.go all converge here so they cannot drift.
+// The interceptor doesn't know or care which kind of token this is
+// (Firebase ID token, SA-signed SSR JWT, anything else we add) —
+// it asks `auth.VerifyToken` and trusts whatever Identity comes back.
+// Routing across token shapes lives in the authn.Service
+// implementation; in production that's CompositeAuthService, which
+// inspects the JWT issuer and dispatches accordingly. Tests can pass
+// a bare Firebase service or a composite — the interceptor doesn't
+// change either way.
+//
+// This is the single source of truth for "bearer auth" across the
+// codebase — gRPC unary/stream interceptors and the HTTP middleware
+// in http_auth.go all converge here so they cannot drift.
 func authenticateBearer(ctx context.Context, auth authn.Service, bearerHeader string) (context.Context, error) {
 	if bearerHeader == "" {
 		return nil, apierr.Unauthenticated(errMissingAuthHeader)
@@ -87,14 +94,13 @@ func authenticateBearer(ctx context.Context, auth authn.Service, bearerHeader st
 	if err != nil {
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}
-	// `pivox_user_id` is set by the Firebase blocking function during
-	// identity sync. Every authenticated token must carry it — handlers
-	// downstream rely on `MustPivoxUserID(ctx)` for ownership checks
-	// and panic if the claim is missing. Reject here with the same
-	// Unauthenticated message used for token verification failures so
-	// clients can't probe whether their token is missing the claim vs.
-	// invalid; the right client response in either case is "refresh
-	// the ID token (forcing a re-mint that runs the blocking fn)."
+	// Every authenticated token must carry pivox_user_id. The
+	// Firebase blocking function sets it on Firebase ID tokens; the
+	// SSR composite path sets it explicitly when it mints an
+	// Identity from a verified SA-signed JWT. Reject here with the
+	// same Unauthenticated message used for verification failures
+	// so clients can't probe to distinguish "missing claim" from
+	// "bad signature" — both should trigger a token-refresh path.
 	claim, ok := identity.Claims["pivox_user_id"].(string)
 	if !ok || claim == "" {
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
@@ -122,8 +128,11 @@ func authenticate(ctx context.Context, auth authn.Service) (context.Context, err
 	return authenticateBearer(ctx, auth, authHeaders[0])
 }
 
-// AuthInterceptor returns a gRPC unary server interceptor that verifies
-// Firebase bearer tokens via the provided authn.Service.
+// AuthInterceptor returns a gRPC unary server interceptor that
+// verifies bearer tokens via the provided authn.Service. The service
+// is responsible for any token-type routing internally — production
+// wires CompositeAuthService (Firebase + SSR-SA-signed); tests can
+// pass either.
 //
 // Scope: this interceptor is registered on the public gRPC server only.
 // Service-to-service traffic (e.g. AgentService) lives on a separate

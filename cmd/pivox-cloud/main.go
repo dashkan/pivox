@@ -249,7 +249,16 @@ func serve(cmd *cobra.Command, args []string) error {
 		logger.Error("failed to recover pending operations", "error", err)
 	}
 
-	// Firebase
+	// Firebase auth service. Verifies Firebase ID tokens from
+	// browser/native clients via Firebase Admin SDK.
+	//
+	// TODO(SSR Phase 2): wrap with server.NewCompositeAuthService
+	// when wiring the SSR-acting-as path. The composite routes by
+	// JWT iss claim — SA-signed tokens to the SSR verifier, every-
+	// thing else to authSvc. The composite is wired ONLY into the
+	// gRPC chain (AuthInterceptor / AuthStreamInterceptor); the
+	// InternalHooks delegated-auth surface MUST receive the bare
+	// authSvc (see internal_hooks.go: InternalHooksConfig.Auth).
 	authSvc, err := firebase.NewAuthService(ctx)
 	if err != nil {
 		return fmt.Errorf("initialize Firebase auth: %w", err)
