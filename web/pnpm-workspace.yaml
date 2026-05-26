@@ -13,6 +13,22 @@ allowBuilds:
 overrides:
   '@types/react': '^19.2.7'
   '@types/react-dom': '^19.2.3'
+# `react-jsx-parser@2.4.1` declares `@types/react: ^18.3.12` and
+# `@types/react-dom: ^18.3.1` as optionalDependencies. The `overrides`
+# block above steers consumers in the resolution graph to @19, so
+# nothing actually USES the @18 install — `pnpm why @types/react@18`
+# returns empty. But pnpm still creates the .pnpm/@types+react@18
+# directory because the optionalDep is requested. typescript-eslint's
+# project service walks the filesystem and treats both type-root
+# directories as conflicting, surfacing 80+ no-unsafe-assignment
+# errors across features that consume @pivox/ui (via primitives).
+# `ignoredOptionalDependencies` tells pnpm to skip installing the
+# optional deps entirely — the override does the steering, this
+# eliminates the orphan install. Drop these entries if/when
+# react-jsx-parser ships a release with @types/react ^19.
+ignoredOptionalDependencies:
+  - '@types/react'
+  - '@types/react-dom'
 cleanupUnusedCatalogs: true
 linkWorkspacePackages: true
 preferWorkspacePackages: true
