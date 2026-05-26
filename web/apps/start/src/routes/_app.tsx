@@ -1,14 +1,14 @@
-import { AppLayoutFeature } from '@pivox/features/app-layout';
-import { AppLayout } from '@pivox/ui/app-layout';
+import { Separator } from '@pivox/primitives/separator';
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@pivox/primitives/sidebar';
+import { AppSidebar } from '@pivox/ui/app-shell';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router';
-import { Suspense, lazy } from 'react';
 
 import { getServerSession } from '@/server/auth-session';
-
-// Lazy-load the profile dialog so it's client-only — it depends on
-// auth context which isn't available during SSR.
-const ProfileDialog = lazy(() => import('./_app/-profile-dialog'));
 
 export const Route = createFileRoute('/_app')({
   /**
@@ -58,24 +58,37 @@ export const Route = createFileRoute('/_app')({
   component: AppLayoutRoute,
 });
 
+/**
+ * Post-auth app shell. shadcn sidebar-07 layout: collapsible
+ * sidebar on the left, main content area on the right. Top bar
+ * inside the inset carries the sidebar trigger + theme toggle
+ * (the trigger is the only way to collapse the sidebar when no
+ * keyboard shortcut is bound).
+ *
+ * Stage C of the post-login layout work: the sidebar mounts with
+ * SAMPLE DATA from packages/ui/src/app-shell/app-sidebar.tsx. The
+ * profile-dialog and sign-out interactions in the nav-user menu
+ * are wired to stubs (// wired in Stage B2) — Stage B2 brings in
+ * the AppShellFeature that connects orgs/spaces queries +
+ * profile-dialog state + useAuth().signOut().
+ */
 function AppLayoutRoute() {
   return (
-    <AppLayoutFeature>
-      <AppLayout.Root>
-        <AppLayout.Header>
-          <AppLayout.HeaderTitle>Pivox</AppLayout.HeaderTitle>
-          <AppLayout.HeaderNav>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator
+            orientation="vertical"
+            className="mr-2 data-[orientation=vertical]:h-4"
+          />
+          <div className="ms-auto">
             <ThemeSwitcher />
-            <AppLayout.HeaderAvatar />
-          </AppLayout.HeaderNav>
-        </AppLayout.Header>
-        <AppLayout.Content>
-          <Outlet />
-        </AppLayout.Content>
-      </AppLayout.Root>
-      <Suspense>
-        <ProfileDialog />
-      </Suspense>
-    </AppLayoutFeature>
+          </div>
+        </header>
+        <Outlet />
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
