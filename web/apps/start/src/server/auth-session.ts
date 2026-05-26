@@ -105,9 +105,18 @@ const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
  * client actually consumes (route context, AuthProvider hydration).
  * Keep this lean — anything more is just exfiltrating PII through the
  * router state hash on the wire.
+ *
+ * `pivoxUserId` is the per-Pivox `identities.id` UUID, set by the
+ * Firebase blocking function during identity sync and embedded as a
+ * `pivox_user_id` custom claim on every authenticated token. Server-
+ * side prefetch (Phase 4+) mints SSR-acting-as JWTs keyed on this
+ * UUID. `null` means the blocking function hasn't fired yet for this
+ * Firebase identity — a race window that resolves on the next ID
+ * token refresh.
  */
 export interface ServerSession {
   uid: string;
+  pivoxUserId: string | null;
   email: string | null;
   emailVerified: boolean;
   displayName: string | null;
@@ -151,9 +160,11 @@ function toServerSession(decoded: DecodedIdToken): ServerSession {
     email_verified?: boolean;
     name?: string;
     picture?: string;
+    pivox_user_id?: string;
   };
   return {
     uid: claims.uid,
+    pivoxUserId: claims.pivox_user_id ?? null,
     email: claims.email ?? null,
     emailVerified: Boolean(claims.email_verified),
     displayName: claims.name ?? null,
