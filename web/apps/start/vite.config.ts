@@ -28,7 +28,19 @@ const config = defineConfig({
         // from node_modules, which is the only shape that works.
         // Same pattern applies to the auth subpath we actually
         // consume from server-side code (auth-session.ts).
-        external: [/^@sentry\//, 'firebase-admin', /^firebase-admin\//],
+        //
+        // `google-auth-library` is a Node-only package that we
+        // consume directly in pivox-actor-token.ts for SSR
+        // iamcredentials.signJwt minting. It has the same
+        // bundling-hostile shape as firebase-admin (gRPC transports,
+        // dynamic ADC discovery, conditional native module loads),
+        // so it lives in externals for identical reasons.
+        external: [
+          /^@sentry\//,
+          'firebase-admin',
+          /^firebase-admin\//,
+          'google-auth-library',
+        ],
       },
       routeRules: {
         '/__/auth/**': {
