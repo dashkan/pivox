@@ -172,19 +172,14 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
 			"expected accounts/me; the caller is implicit from authentication context"))
 	}
-	if s.lroManager == nil || s.caller == nil {
-		// Read-only deployments construct IamServer with nil deps;
-		// fail loudly here rather than null-deref'ing inside the
-		// work fn. Note: s.auth is no longer required on pivox-cloud
-		// (the worker holds the Firebase auth dep) but caller +
-		// lroManager are still mandatory for the entry point.
-		return nil, apierr.Internal("DeleteAccount is not configured on this server (caller/lroManager deps missing)")
+	if s.lroManager == nil {
+		// Read-only deployments construct IamServer with nil
+		// LROManager; fail loudly here rather than null-deref'ing
+		// inside the work fn.
+		return nil, apierr.Internal("DeleteAccount is not configured on this server (lroManager dep missing)")
 	}
 
-	firebaseIdentityID, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	firebaseIdentityID := server.MustPivoxUserID(ctx)
 
 	initialMeta := &iampb.DeleteAccountMetadata{
 		Phase:   iampb.DeleteAccountMetadata_VALIDATING,

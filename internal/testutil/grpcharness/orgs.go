@@ -12,7 +12,6 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/organizations"
 )
 
@@ -52,9 +51,7 @@ func registerOrganizationsServer(h *Harness, s *grpc.Server) {
 		Queries:    h.Queries,
 		Auth:       h.Auth,
 		Codec:      codec,
-		ReadUID:    server.AuthenticatedUID,
 		Resolver:   permission.NewResolver(h.Queries),
-		Caller:     server.NewCallerIdentityResolver(h.Queries),
 		LROManager: h.LROManager,
 		Encryptor:  h.Encryptor,
 	}))

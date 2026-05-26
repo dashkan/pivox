@@ -2,7 +2,6 @@ package organizations
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
@@ -26,12 +25,6 @@ import (
 	"github.com/dashkan/pivox/internal/server"
 )
 
-// AuthContextReader extracts the caller's Firebase UID from the
-// request context. Injected so unit tests can stub the auth context
-// without wiring the gRPC interceptor. Production wires this to
-// `server.AuthenticatedUID` (set by AuthInterceptor).
-type AuthContextReader func(ctx context.Context) (uid string, ok bool)
-
 type OrganizationsServer struct {
 	apiv1.UnimplementedOrganizationsServer
 	pool     db.RWPool
@@ -39,9 +32,7 @@ type OrganizationsServer struct {
 	auth     authn.Service
 	filter   *filter.ResourceFilter
 	codec    *appkey.Codec
-	readUID  AuthContextReader
 	resolver *permission.Resolver
-	caller   server.CallerIdentityResolver
 	// audit inflates created_by/updated_by/deleted_by UUIDs into
 	// Actor protos. Optional in tests that don't assert on audit
 	// output (the converters tolerate a nil map).
@@ -68,17 +59,10 @@ type Config struct {
 	Auth authn.Service
 	// Codec opaque-encodes resource names. Required.
 	Codec *appkey.Codec
-	// ReadUID extracts the caller's Firebase UID from context.
-	// Required.
-	ReadUID AuthContextReader
 	// Resolver gates per-resource permission checks. Optional;
 	// nil is acceptable in unit tests that don't exercise the
 	// permission paths.
 	Resolver *permission.Resolver
-	// Caller resolves the caller identity for handlers that need
-	// the pivox identity_id. Required in production; unit tests
-	// stub via struct literal.
-	Caller server.CallerIdentityResolver
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
 	// Optional; nil leaves Actor fields unset.
 	AuditResolver *audit.Resolver
@@ -108,21 +92,13 @@ func NewOrganizationsServer(cfg Config) *OrganizationsServer {
 	if cfg.Codec == nil {
 		panic("organizations: Config.Codec is required")
 	}
-	if cfg.ReadUID == nil {
-		panic("organizations: Config.ReadUID is required")
-	}
-	if cfg.Caller == nil {
-		panic("organizations: Config.Caller is required")
-	}
 	return &OrganizationsServer{
 		pool:       cfg.Pool,
 		queries:    cfg.Queries,
 		auth:       cfg.Auth,
 		filter:     filter.OrganizationFilter(),
 		codec:      cfg.Codec,
-		readUID:    cfg.ReadUID,
 		resolver:   cfg.Resolver,
-		caller:     cfg.Caller,
 		audit:      cfg.AuditResolver,
 		lroManager: cfg.LROManager,
 		encryptor:  cfg.Encryptor,
@@ -195,26 +171,11 @@ func (s *OrganizationsServer) resolveOrgActors(ctx context.Context, orgs []db.Or
 // that ceiling, something else is wrong.
 func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.ListOrganizationsRequest) (*apiv1.ListOrganizationsResponse, error) {
 	_ = req // request fields intentionally unused; see method comment
-	uid, ok := s.readUID(ctx)
-	if !ok {
-		return nil, apierr.Unauthenticated("missing authenticated caller")
-	}
+	identityID := server.MustPivoxUserID(ctx)
 
-	caller, err := s.queries.GetIdentityByFirebaseUID(ctx, uid)
+	rows, err := s.queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(identityID))
 	if err != nil {
-		// No firebase_identity row yet (race with the sync-identity
-		// webhook on a freshly-Firebase-registered user). Memberless
-		// state — return an empty list so the client routes through
-		// the org-creation bootstrap path.
-		if errors.Is(err, pgx.ErrNoRows) {
-			return &apiv1.ListOrganizationsResponse{}, nil
-		}
-		return nil, apierr.HandleResourceError(err, "Identity", uid)
-	}
-
-	rows, err := s.queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(caller.ID))
-	if err != nil {
-		slog.ErrorContext(ctx, "list organizations failed", "identity_id", caller.ID, "error", err)
+		slog.ErrorContext(ctx, "list organizations failed", "identity_id", identityID, "error", err)
 		return nil, apierr.Internal("list organizations")
 	}
 
@@ -230,19 +191,12 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 }
 
 func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*longrunningpb.Operation, error) {
-	// Resolve caller → firebase_identity row. The caller's Firebase
-	// UID comes from the auth interceptor; we map it to a Pivox
-	// `identities` row so the new org can record both the
-	// immutable founder pointer (`created_by_identity_id`)
-	// and the per-org owner membership.
-	uid, ok := s.readUID(ctx)
-	if !ok {
-		return nil, apierr.Unauthenticated("missing authenticated caller")
-	}
-	caller, err := s.queries.GetIdentityByFirebaseUID(ctx, uid)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Identity", uid)
-	}
+	// Caller identity UUID — the universal user UUID post-Phase-7.
+	// AuthInterceptor extracted it from the verified token's
+	// `pivox_user_id` claim. Used as both the immutable founder
+	// pointer (`created_by_identity_id`) and the principal of the
+	// owner membership seeded below.
+	callerID := server.MustPivoxUserID(ctx)
 
 	// organization_id is required at the wire boundary —
 	// protovalidate enforces ^[a-z][a-z0-9-]{3,19}$ which rejects
@@ -250,6 +204,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	// unreachable; clients always supply a slug.
 	orgSlug := req.GetOrganizationId()
 
+	var err error
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "begin transaction failed", "error", err)
@@ -263,7 +218,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		ID:          uuid.New(),
 		Name:        orgSlug,
 		DisplayName: req.GetOrganization().GetDisplayName(),
-		CreatedBy:   convert.PgUUID(caller.ID),
+		CreatedBy:   convert.PgUUID(callerID),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Organization", orgSlug)
@@ -275,7 +230,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	// a failure here rolls the whole bootstrap back, so no half-formed
 	// org ever exists. "≥1 owner per org" is established by definition
 	// for new orgs from this point forward.
-	if err := bootstrapOrgRoles(ctx, qtx, org.ID, caller.ID); err != nil {
+	if err := bootstrapOrgRoles(ctx, qtx, org.ID, callerID); err != nil {
 		slog.ErrorContext(ctx, "bootstrap org roles failed", "org_id", org.ID, "error", err)
 		return nil, apierr.Internal("bootstrap org roles")
 	}

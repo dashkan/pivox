@@ -12,17 +12,18 @@ import (
 	"github.com/dashkan/pivox/internal/authn"
 )
 
-// authContextKey is the context key for the authenticated UID.
-type authContextKey struct{}
-
 // pivoxUserIDKey is the context key for the caller's per-Pivox
-// `identities.id` UUID. Populated by the auth interceptor
-// from the `pivox_user_id` Firebase ID-token custom claim, which is
-// set during identity sync by the Firebase blocking function.
+// `identities.id` UUID. Populated by the auth interceptor from the
+// `pivox_user_id` Firebase ID-token custom claim, set during
+// identity sync by the Firebase blocking function.
 //
-// All membership tables (`org_members.principal_id`,
+// This is the ONLY identifier the auth chain propagates. All
+// membership tables (`org_members.principal_id`,
 // `space_members.principal_id`, `group_members.user_id`) reference
 // this UUID — it's the universal user identifier across the API.
+// The Firebase UID itself is not propagated: nothing downstream
+// needs it (the JWT claim already carries the Pivox-side translation,
+// so a per-RPC `GetIdentityByFirebaseUID` lookup would be pure waste).
 type pivoxUserIDKey struct{}
 
 // Canonical Unauthenticated messages. Centralized so both the unary
@@ -34,31 +35,6 @@ const (
 	errInvalidAuthFormat  = "invalid authorization format"
 	errInvalidOrExpiredID = "invalid or expired token"
 )
-
-// AuthenticatedUID extracts the verified UID from the context.
-// Returns the UID and true if present, or an empty string and false if the
-// request was not authenticated (e.g., a public endpoint).
-func AuthenticatedUID(ctx context.Context) (string, bool) {
-	uid, ok := ctx.Value(authContextKey{}).(string)
-	return uid, ok
-}
-
-// WithAuthenticatedUID returns a new context with the given UID set,
-// as if the auth interceptor had verified it. Intended for tests.
-func WithAuthenticatedUID(ctx context.Context, uid string) context.Context {
-	return context.WithValue(ctx, authContextKey{}, uid)
-}
-
-// MustAuthenticatedUID extracts the verified UID from the context.
-// Panics if the context does not contain an authenticated UID — only call
-// this from handlers that are known to be behind the auth interceptor.
-func MustAuthenticatedUID(ctx context.Context) string {
-	uid, ok := AuthenticatedUID(ctx)
-	if !ok {
-		panic("server: MustAuthenticatedUID called without authenticated context")
-	}
-	return uid
-}
 
 // PivoxUserID extracts the verified Pivox user UUID
 // (`identities.id`) from the context. Returns the UUID and
@@ -92,8 +68,8 @@ func MustPivoxUserID(ctx context.Context) uuid.UUID {
 // authenticateBearer is the transport-agnostic core of Firebase bearer
 // authentication. Caller passes the bearer header value already
 // extracted from its transport (gRPC metadata, HTTP Authorization
-// header). Returns the context augmented with authContextKey and
-// pivoxUserIDKey, or an apierr.Unauthenticated error.
+// header). Returns the context augmented with pivoxUserIDKey, or an
+// apierr.Unauthenticated error.
 //
 // This is the single source of truth for "Firebase bearer auth"
 // across the codebase — gRPC unary/stream interceptors and the HTTP
@@ -111,7 +87,6 @@ func authenticateBearer(ctx context.Context, auth authn.Service, bearerHeader st
 	if err != nil {
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}
-	ctx = context.WithValue(ctx, authContextKey{}, identity.UID)
 	// `pivox_user_id` is set by the Firebase blocking function during
 	// identity sync. Every authenticated token must carry it — handlers
 	// downstream rely on `MustPivoxUserID(ctx)` for ownership checks

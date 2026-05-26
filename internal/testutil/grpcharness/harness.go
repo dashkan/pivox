@@ -149,14 +149,13 @@ func New(t *testing.T, opts ...Option) *Harness {
 	}
 
 	permResolver := permission.NewResolver(queries)
-	callerIdentity := server.NewCallerIdentityResolver(queries)
 	permissionInterceptor := server.PermissionInterceptor(
 		server.GeneratedRegistry, server.GeneratedExempt,
-		queries, permResolver, callerIdentity,
+		queries, permResolver,
 	)
 	permissionStreamInterceptor := server.PermissionStreamInterceptor(
 		server.GeneratedRegistry, server.GeneratedExempt,
-		queries, permResolver, callerIdentity,
+		queries, permResolver,
 	)
 	validator, err := protovalidate.New()
 	require.NoError(t, err)

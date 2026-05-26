@@ -12,7 +12,6 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/spaces"
 )
 
@@ -36,7 +35,6 @@ func registerSpacesServer(h *Harness, s *grpc.Server) {
 		Queries:    h.Queries,
 		Codec:      codec,
 		Resolver:   permission.NewResolver(h.Queries),
-		Caller:     server.NewCallerIdentityResolver(h.Queries),
 		LROManager: h.LROManager,
 	}))
 }

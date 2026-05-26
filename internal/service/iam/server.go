@@ -35,7 +35,6 @@ type IamServer struct {
 	pool       db.TxBeginner
 	queries    db.Querier
 	auth       authn.Service
-	caller     server.CallerIdentityResolver
 	lroManager *lro.Manager
 	// audit is non-nil when the resolver wants invalidation
 	// callbacks on identity mutations (DeleteAccount soft-delete).
@@ -43,9 +42,9 @@ type IamServer struct {
 	audit *audit.Resolver
 }
 
-// Config is the constructor input for IamServer. The auth/caller/
-// LROManager deps are required by DeleteUser (a global LRO that ends
-// with a Firebase Auth deletion); read-only handlers (ListPermissions,
+// Config is the constructor input for IamServer. The auth + LROManager
+// deps are required by DeleteUser (a global LRO that ends with a
+// Firebase Auth deletion); read-only handlers (ListPermissions,
 // GetRole, ListRoles) ignore them. Unit tests that exercise only
 // reads build an IamServer struct literal directly.
 type Config struct {
@@ -57,8 +56,6 @@ type Config struct {
 	Queries db.Querier
 	// Auth is the authn service. Required.
 	Auth authn.Service
-	// Caller resolves the caller identity. Required.
-	Caller server.CallerIdentityResolver
 	// LROManager drives DeleteUser. Required.
 	LROManager *lro.Manager
 	// AuditResolver receives Invalidate() calls when identities
@@ -81,9 +78,6 @@ func NewIamServer(cfg Config) *IamServer {
 	if cfg.Auth == nil {
 		panic("iam: Config.Auth is required")
 	}
-	if cfg.Caller == nil {
-		panic("iam: Config.Caller is required")
-	}
 	if cfg.LROManager == nil {
 		panic("iam: Config.LROManager is required")
 	}
@@ -91,7 +85,6 @@ func NewIamServer(cfg Config) *IamServer {
 		pool:       cfg.Pool,
 		queries:    cfg.Queries,
 		auth:       cfg.Auth,
-		caller:     cfg.Caller,
 		lroManager: cfg.LROManager,
 		audit:      cfg.AuditResolver,
 	}
@@ -121,10 +114,7 @@ func (s *IamServer) ListAccountOrganizations(ctx context.Context, req *iampb.Lis
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("parent",
 			"expected accounts/me; the caller is implicit from authentication context"))
 	}
-	identityID, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	identityID := server.MustPivoxUserID(ctx)
 	rows, err := s.queries.ListAccountOrganizationsForIdentity(ctx, convert.PgUUID(identityID))
 	if err != nil {
 		slog.ErrorContext(ctx, "iam: list account organizations failed",

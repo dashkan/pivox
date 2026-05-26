@@ -14,7 +14,6 @@ import (
 	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/aichat/model"
 )
 
@@ -84,7 +83,9 @@ func (s *Server) runGenerate(
 	// InputMessage.role not in {ASSISTANT, SYSTEM}, tool-role has a
 	// tool_result with tool_call_id) is enforced by the protovalidate
 	// interceptor — by the time this runs, the request is well-formed.
-	_ = server.MustAuthenticatedUID(ctx) // surfaces the unauth error early
+	// AuthInterceptor + MembershipInterceptor + PermissionInterceptor
+	// have all gated on identity by this point; no need for a
+	// belt-and-suspenders assertion here.
 
 	// Validate the parent org is well-formed and exists. Cross-org
 	// tenancy itself is enforced upstream by the permission

@@ -228,10 +228,7 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 		return nil, err
 	}
 
-	caller, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	caller := server.MustPivoxUserID(ctx)
 
 	// Tx-wrapped: role lookup + principal-existence check + insert run
 	// atomically. Mirrors the org-scope CreateMember pattern.

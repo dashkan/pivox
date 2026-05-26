@@ -13,7 +13,6 @@ import (
 
 	"github.com/dashkan/pivox/internal/appkey"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
@@ -39,19 +38,11 @@ func TestHarness_Smoke(t *testing.T) {
 	h := grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
 		require.NoError(t, err)
-		// Caller is required by the constructor but the smoke
-		// test only exercises CreateOrganization which resolves
-		// the caller via ReadUID, not the Caller resolver.
-		// Wire a real CallerIdentityResolver from the harness
-		// queries to satisfy the required-field check.
-		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
 		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
 			Pool:       h.Pool,
 			Queries:    h.Queries,
 			Auth:       h.Auth,
 			Codec:      codec,
-			ReadUID:    server.AuthenticatedUID,
-			Caller:     callerIdentity,
 			LROManager: h.LROManager,
 			Encryptor:  h.Encryptor,
 		}))

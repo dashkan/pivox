@@ -18,7 +18,6 @@ import (
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/service/spaces"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
@@ -407,7 +406,6 @@ func waitSpaceOp(t *testing.T, h *grpcharness.Harness, op *longrunningpb.Operati
 
 func newSpacesHarness(t *testing.T) *grpcharness.Harness {
 	h := grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
-		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
 		permResolver := permission.NewResolver(h.Queries)
 		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
 		require.NoError(t, err)
@@ -416,9 +414,7 @@ func newSpacesHarness(t *testing.T) *grpcharness.Harness {
 			Queries:    h.Queries,
 			Auth:       h.Auth,
 			Codec:      codec,
-			ReadUID:    server.AuthenticatedUID,
 			Resolver:   permResolver,
-			Caller:     callerIdentity,
 			LROManager: h.LROManager,
 			Encryptor:  h.Encryptor,
 		}))
@@ -427,7 +423,6 @@ func newSpacesHarness(t *testing.T) *grpcharness.Harness {
 			Queries:    h.Queries,
 			Codec:      codec,
 			Resolver:   permResolver,
-			Caller:     callerIdentity,
 			LROManager: h.LROManager,
 		}))
 	}))

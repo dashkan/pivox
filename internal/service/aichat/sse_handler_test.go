@@ -85,8 +85,8 @@ func TestSSE_EmptyMessages_Returns400(t *testing.T) {
 	assert.Contains(t, rr.Body.String(), "messages must not be empty")
 }
 
-// Confirms no compile-time dependency on a server.AuthenticatedUID
-// guard inside this package. If the dead-code AuthenticatedUID check
-// is ever re-introduced, the tests above will start tripping the
-// auth gate before reaching the validation paths they exercise.
+// Confirms no compile-time dependency on a server-side auth guard
+// inside this package. If a redundant per-RPC auth check is ever
+// re-introduced, the tests above will start tripping the gate
+// before reaching the validation paths they exercise.
 var _ = grpc.WaitForReady // keep import for future stream tests

@@ -126,7 +126,7 @@ func ResolvedOrgFromContext(ctx context.Context) (*ResolvedOrg, bool) {
 // resolved the org before they ran; a missing value indicates the
 // handler was reached by a misconfigured chain (no permission
 // interceptor, wrong scope kind in registry) and should never happen
-// at runtime. Mirrors MustAuthenticatedUID.
+// at runtime. Mirrors MustPivoxUserID.
 func MustResolvedOrgFromContext(ctx context.Context) *ResolvedOrg {
 	v, ok := ResolvedOrgFromContext(ctx)
 	if !ok {
@@ -179,7 +179,6 @@ type permissionGate struct {
 	exempt   map[string]bool
 	queries  db.Querier
 	resolver *permission.Resolver
-	identity CallerIdentityResolver
 }
 
 func newPermissionGate(
@@ -187,7 +186,6 @@ func newPermissionGate(
 	exempt map[string]bool,
 	queries db.Querier,
 	resolver *permission.Resolver,
-	identity CallerIdentityResolver,
 ) *permissionGate {
 	for method := range exempt {
 		if _, dup := registry[method]; dup {
@@ -203,7 +201,6 @@ func newPermissionGate(
 		exempt:   exemptCopy,
 		queries:  queries,
 		resolver: resolver,
-		identity: identity,
 	}
 }
 
@@ -223,10 +220,10 @@ func (g *permissionGate) check(ctx context.Context, fullMethod string, req any) 
 		slog.ErrorContext(ctx, "permission interceptor: method has no gate registered", "method", fullMethod)
 		return nil, apierr.Internal("permission gate not configured for this method")
 	}
-	callerID, err := g.identity(ctx)
-	if err != nil {
-		return nil, err
-	}
+	// AuthInterceptor + MembershipRequiredInterceptor have already run
+	// by the time we reach here, so MustPivoxUserID is safe — a missing
+	// claim would have failed Unauthenticated upstream.
+	callerID := MustPivoxUserID(ctx)
 	scope, err := entry.Extract(req)
 	if err != nil {
 		return nil, err
@@ -438,7 +435,8 @@ func (g *permissionGate) checkSpaceScope(
 //     misconfiguration: forgetting to register a new RPC fails closed
 //     and surfaces loudly to operators).
 //  3. The caller's firebase_identity is resolved via the supplied
-//     CallerIdentityResolver. Identity errors propagate verbatim.
+//     MustPivoxUserID from the verified context — by the time the
+//     gate runs, AuthInterceptor has already populated the claim.
 //  4. The registered ScopeExtractor pulls a ScopeRef from the
 //     request. Extractor errors propagate.
 //  5. The slug is resolved to a row. Missing rows surface as
@@ -458,9 +456,8 @@ func PermissionInterceptor(
 	exempt map[string]bool,
 	queries db.Querier,
 	resolver *permission.Resolver,
-	identity CallerIdentityResolver,
 ) grpc.UnaryServerInterceptor {
-	gate := newPermissionGate(registry, exempt, queries, resolver, identity)
+	gate := newPermissionGate(registry, exempt, queries, resolver)
 	return func(
 		ctx context.Context,
 		req any,
@@ -500,9 +497,8 @@ func PermissionStreamInterceptor(
 	exempt map[string]bool,
 	queries db.Querier,
 	resolver *permission.Resolver,
-	identity CallerIdentityResolver,
 ) grpc.StreamServerInterceptor {
-	gate := newPermissionGate(registry, exempt, queries, resolver, identity)
+	gate := newPermissionGate(registry, exempt, queries, resolver)
 	return func(
 		srv any,
 		ss grpc.ServerStream,
@@ -518,11 +514,9 @@ func PermissionStreamInterceptor(
 			return apierr.Internal("permission gate not configured for this method")
 		}
 		// Pre-resolve caller identity so unauth callers fail fast
-		// without waiting for the first message.
-		callerID, err := gate.identity(ss.Context())
-		if err != nil {
-			return err
-		}
+		// without waiting for the first message. AuthStreamInterceptor
+		// has already run by here, so MustPivoxUserID is safe.
+		callerID := MustPivoxUserID(ss.Context())
 		wrapped := &permissionStream{
 			ServerStream: ss,
 			gate:         gate,

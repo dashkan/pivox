@@ -16,10 +16,10 @@ import (
 // bearer token IS the UID — so a Caller is fully described by its
 // (UID, IdentityID).
 type Caller struct {
-	UID                string
-	IdentityID uuid.UUID
-	Email              string
-	DisplayName        string
+	UID         string
+	IdentityID  uuid.UUID
+	Email       string
+	DisplayName string
 }
 
 // SeedIdentityOpts customizes a SeedIdentity call. Zero-value fields
@@ -31,11 +31,24 @@ type SeedIdentityOpts struct {
 	DisplayName string // default: "Test <UID>"
 }
 
-// SeedIdentity inserts a identities row and returns a
-// Caller pointing at it. Use SetCaller(caller) on the harness to
+// SeedIdentity inserts an identities row and returns a Caller
+// pointing at it. Use SetCaller(caller) on the harness to
 // authenticate subsequent RPCs as this identity. Identity-shape
-// fields (email, display name) are stored exactly as passed; the
-// rest of the system reads them via GetIdentityByFirebaseUID.
+// fields (email, display name) are stored exactly as passed.
+//
+// Production auth flow: the Firebase blocking function does an
+// `UpsertIdentity` after Firebase sign-in and writes the resulting
+// `identities.id` UUID into a `pivox_user_id` custom claim on the
+// next ID token. AuthInterceptor extracts that claim and puts the
+// UUID on the gRPC context — handlers read it via
+// `server.MustPivoxUserID(ctx)`, never round-tripping to the DB.
+//
+// The test scaffolding mirrors this: `testAuthService.VerifyToken`
+// in `auth.go` looks up the seeded identities row via
+// `GetIdentityByFirebaseUID(token)` and populates the same claim.
+// That DB lookup is the one place in the codebase that still calls
+// the function on a hot path — it's how the harness simulates the
+// blocking-function half of the flow without standing up Firebase.
 func (h *Harness) SeedIdentity(t *testing.T, opts SeedIdentityOpts) *Caller {
 	t.Helper()
 
@@ -59,9 +72,9 @@ func (h *Harness) SeedIdentity(t *testing.T, opts SeedIdentityOpts) *Caller {
 	require.NoError(t, err)
 
 	return &Caller{
-		UID:                opts.UID,
-		IdentityID: identity.ID,
-		Email:              opts.Email,
-		DisplayName:        opts.DisplayName,
+		UID:         opts.UID,
+		IdentityID:  identity.ID,
+		Email:       opts.Email,
+		DisplayName: opts.DisplayName,
 	}
 }

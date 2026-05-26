@@ -16,7 +16,6 @@ import (
 
 	"github.com/dashkan/pivox/internal/appkey"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 	"github.com/dashkan/pivox/internal/workers"
@@ -283,7 +282,6 @@ func createOrg(t *testing.T, c apiv1.OrganizationsClient, slug, displayName stri
 
 func newDomainsHarness(t *testing.T) *grpcharness.Harness {
 	return grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
-		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
 		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
 		require.NoError(t, err)
 		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
@@ -291,8 +289,6 @@ func newDomainsHarness(t *testing.T) *grpcharness.Harness {
 			Queries:    h.Queries,
 			Auth:       h.Auth,
 			Codec:      codec,
-			ReadUID:    server.AuthenticatedUID,
-			Caller:     callerIdentity,
 			LROManager: h.LROManager,
 			Encryptor:  h.Encryptor,
 		}))

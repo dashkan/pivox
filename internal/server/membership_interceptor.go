@@ -2,10 +2,8 @@ package server
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -18,12 +16,10 @@ import (
 const (
 	errMissingAuthenticatedCaller = "missing authenticated caller"
 
-	// memberlessRecoveryMessage is returned for both "caller has no
-	// firebase_identity row yet" (race with the sync-identity webhook
-	// on a freshly-Firebase-registered user) AND "caller has an
-	// identity but zero memberships". Same code, same message — both
-	// states route the caller through the same recovery path (the
-	// bootstrap allowlist).
+	// memberlessRecoveryMessage is returned when the caller has zero
+	// memberships. Routes the caller through the bootstrap allowlist
+	// (CreateOrganization / AcceptInvitation) so they can acquire
+	// their first membership.
 	memberlessRecoveryMessage = "caller has no organization membership; create or accept an invitation to an organization first"
 )
 
@@ -78,27 +74,27 @@ func requireMembership(ctx context.Context, queries db.Querier, fullMethod strin
 	if membershipExemptMethods[fullMethod] {
 		return nil
 	}
-	uid, ok := AuthenticatedUID(ctx)
+	identityID, ok := PivoxUserID(ctx)
 	if !ok {
+		// AuthInterceptor rejects any token without a `pivox_user_id`
+		// claim before this interceptor runs, so reaching here without
+		// the UUID means the interceptor chain is misconfigured (e.g.,
+		// membership interceptor wired without auth in front of it).
+		// Return Unauthenticated for caller-facing consistency.
 		return apierr.Unauthenticated(errMissingAuthenticatedCaller)
 	}
-	identity, err := queries.GetIdentityByFirebaseUID(ctx, uid)
+	// Membership = at least one org the caller's identity is a direct
+	// member of (post-Phase-7 unification: no per-org `users` row;
+	// membership is `org_members.principal_id` = identities.id).
+	// `ListOrganizationsForIdentity` is the canonical query — same one
+	// ListOrganizations uses, so the gate and the read RPC see the
+	// same set. If the identity row was hard-deleted after the JWT was
+	// minted, the join returns empty and the caller is treated as
+	// memberless — correct semantics, no separate identity lookup
+	// needed.
+	orgs, err := queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(identityID))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return apierr.PermissionDenied(memberlessRecoveryMessage)
-		}
-		slog.ErrorContext(ctx, "membership: lookup firebase identity failed", "uid", uid, "error", err)
-		return apierr.Internal("lookup firebase identity")
-	}
-	// Membership = at least one org the caller's firebase_identity is
-	// a direct member of (post-Phase-7 unification: there's no per-org
-	// `users` row; membership is `org_members.principal_id` =
-	// identities.id). `ListOrganizationsForIdentity`
-	// is the canonical query — same one ListOrganizations uses, so
-	// the gate and the read RPC see the same set.
-	orgs, err := queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(identity.ID))
-	if err != nil {
-		slog.ErrorContext(ctx, "membership: lookup memberships failed", "identity_id", identity.ID, "error", err)
+		slog.ErrorContext(ctx, "membership: lookup memberships failed", "identity_id", identityID, "error", err)
 		return apierr.Internal("lookup memberships")
 	}
 	if len(orgs) == 0 {

@@ -20,7 +20,6 @@ import (
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/iam"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/service/spaces"
@@ -267,7 +266,6 @@ func TestE2E_Permission_SoftDeleteGateBlocksMutations(t *testing.T) {
 
 func newPermissionHarness(t *testing.T) *grpcharness.Harness {
 	h := grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
-		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
 		permResolver := permission.NewResolver(h.Queries)
 		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
 		require.NoError(t, err)
@@ -276,9 +274,7 @@ func newPermissionHarness(t *testing.T) *grpcharness.Harness {
 			Queries:    h.Queries,
 			Auth:       h.Auth,
 			Codec:      codec,
-			ReadUID:    server.AuthenticatedUID,
 			Resolver:   permResolver,
-			Caller:     callerIdentity,
 			LROManager: h.LROManager,
 			Encryptor:  h.Encryptor,
 		}))
@@ -287,14 +283,12 @@ func newPermissionHarness(t *testing.T) *grpcharness.Harness {
 			Queries:    h.Queries,
 			Codec:      codec,
 			Resolver:   permResolver,
-			Caller:     callerIdentity,
 			LROManager: h.LROManager,
 		}))
 		iampb.RegisterIamServer(s, iam.NewIamServer(iam.Config{
 			Pool:       h.Pool,
 			Queries:    h.Queries,
 			Auth:       h.Auth,
-			Caller:     callerIdentity,
 			LROManager: h.LROManager,
 		}))
 	}))

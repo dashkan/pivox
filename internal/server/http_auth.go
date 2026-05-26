@@ -11,8 +11,8 @@ import (
 
 // RequireAuth returns an HTTP middleware that verifies a Firebase
 // bearer token from the Authorization header and augments the request
-// context with the same authContextKey + pivoxUserIDKey claims that
-// the gRPC AuthInterceptor sets. Both transports converge on the same
+// context with the same pivoxUserIDKey claim that the gRPC
+// AuthInterceptor sets. Both transports converge on the same
 // authenticateBearer core in auth_interceptor.go so they cannot drift.
 //
 // On failure: writes 401 with the body "unauthorized" and logs the

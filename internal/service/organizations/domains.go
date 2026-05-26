@@ -103,10 +103,7 @@ func (s *OrganizationsServer) CreateDomain(ctx context.Context, req *apiv1.Creat
 			"must equal lowercase(domain.domain) or be empty"))
 	}
 
-	caller, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	caller := server.MustPivoxUserID(ctx)
 	token, err := generateVerificationToken()
 	if err != nil {
 		slog.ErrorContext(ctx, "create domain: token generation failed", "error", err)

@@ -80,10 +80,7 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 		return nil, err
 	}
 
-	caller, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	caller := server.MustPivoxUserID(ctx)
 
 	// Exactly-one-of validation. The proto's `oneof config` already
 	// enforces at most one, but both unset is a request-shape error

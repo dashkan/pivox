@@ -108,14 +108,11 @@ func TestRequireAuth_ValidToken_AugmentsContext(t *testing.T) {
 	mw := RequireAuth(auth, silentLogger())
 
 	var (
-		gotUID   string
 		gotPivox uuid.UUID
-		gotUIDOK bool
 		gotPivOK bool
 		bodyRan  bool
 	)
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotUID, gotUIDOK = AuthenticatedUID(r.Context())
 		gotPivox, gotPivOK = PivoxUserID(r.Context())
 		bodyRan = true
 		w.WriteHeader(http.StatusOK)
@@ -128,8 +125,6 @@ func TestRequireAuth_ValidToken_AugmentsContext(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	assert.True(t, bodyRan, "downstream handler must run on success")
-	assert.True(t, gotUIDOK, "AuthenticatedUID must be populated for downstream handler")
-	assert.Equal(t, "fb-uid", gotUID)
 	assert.True(t, gotPivOK, "PivoxUserID must be populated for downstream handler")
 	assert.Equal(t, uid, gotPivox)
 }

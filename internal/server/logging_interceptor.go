@@ -13,7 +13,9 @@ import (
 )
 
 // LoggingUnaryInterceptor logs the outcome of every unary RPC: method,
-// status code, latency, and authenticated UID when present. On
+// status code, latency, and the caller's Pivox identity UUID when
+// present (the stable internal `identities.id`, not the Firebase UID).
+// On
 // failure, also logs the underlying error message. Log level is
 // chosen by status code so noisy expected client errors
 // (`NotFound`, `InvalidArgument`, ...) don't drown out real bugs:
@@ -69,8 +71,8 @@ func logRPC(logger *slog.Logger, method string, start time.Time, ctx context.Con
 		"code", code.String(),
 		"latency_ms", time.Since(start).Milliseconds(),
 	}
-	if uid, ok := AuthenticatedUID(ctx); ok && uid != "" {
-		attrs = append(attrs, "uid", uid)
+	if id, ok := PivoxUserID(ctx); ok {
+		attrs = append(attrs, "pivox_user_id", id.String())
 	}
 
 	switch code {

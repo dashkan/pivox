@@ -19,7 +19,6 @@ import (
 	"github.com/dashkan/pivox/internal/convert"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/iam"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
@@ -266,7 +265,6 @@ func TestE2E_DeleteUser_RejectsMeTarget(t *testing.T) {
 
 func newIamHarness(t *testing.T) *grpcharness.Harness {
 	h := grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
-		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
 		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
 		require.NoError(t, err)
 		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
@@ -274,8 +272,6 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 			Queries:    h.Queries,
 			Auth:       h.Auth,
 			Codec:      codec,
-			ReadUID:    server.AuthenticatedUID,
-			Caller:     callerIdentity,
 			LROManager: h.LROManager,
 			Encryptor:  h.Encryptor,
 		}))
@@ -283,7 +279,6 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 			Pool:       h.Pool,
 			Queries:    h.Queries,
 			Auth:       h.Auth,
-			Caller:     callerIdentity,
 			LROManager: h.LROManager,
 		}))
 	}))

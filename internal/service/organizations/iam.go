@@ -11,6 +11,7 @@ import (
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/permission"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 // TestIamPermissions returns the subset of `req.permissions` the
@@ -36,10 +37,7 @@ import (
 // the empty set (and OK) if the caller has no role bindings — UI
 // treats that as "no permissions granted" and greys out everything.
 func (s *OrganizationsServer) TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest) (*iampb.TestIamPermissionsResponse, error) {
-	identity, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	identity := server.MustPivoxUserID(ctx)
 	target, err := parseOrgResourceTarget(req.GetResource())
 	if err != nil {
 		return nil, err

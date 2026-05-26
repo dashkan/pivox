@@ -268,15 +268,14 @@ func serve(cmd *cobra.Command, args []string) error {
 	// → permission, Validate runs last so handlers see only
 	// permission-checked, well-formed requests.
 	permResolver := permission.NewResolver(queries)
-	callerIdentity := server.NewCallerIdentityResolver(queries)
 	auditResolver := audit.NewResolver(audit.Config{Queries: queries})
 	permissionInterceptor := server.PermissionInterceptor(
 		server.GeneratedRegistry, server.GeneratedExempt,
-		queries, permResolver, callerIdentity,
+		queries, permResolver,
 	)
 	permissionStreamInterceptor := server.PermissionStreamInterceptor(
 		server.GeneratedRegistry, server.GeneratedExempt,
-		queries, permResolver, callerIdentity,
+		queries, permResolver,
 	)
 
 	grpcServer := grpc.NewServer(
@@ -304,9 +303,11 @@ func serve(cmd *cobra.Command, args []string) error {
 		),
 	)
 
-	// Register all services. permResolver and callerIdentity were
-	// constructed above for the permission interceptor and are
-	// reused here by service handlers (TestIamPermissions, etc.).
+	// Register all services. permResolver is reused here by service
+	// handlers (TestIamPermissions, etc.). Caller identity comes from
+	// the verified-token `pivox_user_id` claim and is read directly
+	// via server.MustPivoxUserID(ctx) in handlers — no injected
+	// resolver needed.
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(operations.Config{LRO: lroManager}))
 
 	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(spaces.Config{
@@ -314,7 +315,6 @@ func serve(cmd *cobra.Command, args []string) error {
 		Queries:       queries,
 		Codec:         appCodec,
 		Resolver:      permResolver,
-		Caller:        callerIdentity,
 		AuditResolver: auditResolver,
 		LROManager:    lroManager,
 	}))
@@ -323,9 +323,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		Queries:       queries,
 		Auth:          authSvc,
 		Codec:         appCodec,
-		ReadUID:       server.AuthenticatedUID,
 		Resolver:      permResolver,
-		Caller:        callerIdentity,
 		AuditResolver: auditResolver,
 		LROManager:    lroManager,
 		Encryptor:     enc,
@@ -357,7 +355,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// ops (Member CRUD, TransferOwnership, TestIamPermissions) live
 	// on the scope-owning Organizations / Spaces services above.
 	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(iam.Config{
-		Pool: pool, Queries: queries, Auth: authSvc, Caller: callerIdentity,
+		Pool: pool, Queries: queries, Auth: authSvc,
 		LROManager: lroManager, AuditResolver: auditResolver,
 	}))
 

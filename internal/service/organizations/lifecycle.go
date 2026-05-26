@@ -71,10 +71,7 @@ func (s *OrganizationsServer) DeleteOrganization(ctx context.Context, req *apiv1
 			"etag mismatch; refresh the organization and retry")
 	}
 
-	caller, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	caller := server.MustPivoxUserID(ctx)
 
 	orgName := "organizations/" + resolved.Slug
 	force := req.GetForce()

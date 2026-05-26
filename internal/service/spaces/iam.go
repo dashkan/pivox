@@ -11,6 +11,7 @@ import (
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/permission"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 // TestIamPermissions returns the subset of `req.permissions` the
@@ -29,10 +30,7 @@ import (
 // trust any field on the request to identify the caller. Do not
 // remove the s.caller call without auditing the entire control flow.
 func (s *SpacesServer) TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest) (*iampb.TestIamPermissionsResponse, error) {
-	identity, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	identity := server.MustPivoxUserID(ctx)
 	target, err := parseSpaceResourceTarget(req.GetResource())
 	if err != nil {
 		return nil, err

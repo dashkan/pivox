@@ -34,19 +34,17 @@ type SpacesServer struct {
 	filter     *filter.ResourceFilter
 	codec      *appkey.Codec
 	resolver   *permission.Resolver
-	caller     server.CallerIdentityResolver
 	audit      *audit.Resolver
 	lroManager *lro.Manager
 }
 
-// Config is the constructor input for SpacesServer. `resolver` and
-// `caller` are only consumed by the IAM-shaped handlers
-// (TestIamPermissions and space-scope Member CRUD). `Pool` is used
-// both for filter reads (db.DBTX) and tx-wrapped writes (TxBeginner);
-// *pgxpool.Pool satisfies both. Tests that need to mock the tx
-// surface build a SpacesServer literal directly with the local
-// TxBeginner interface, mirroring the OrganizationsServer test
-// pattern.
+// Config is the constructor input for SpacesServer. `Resolver` is
+// only consumed by the IAM-shaped handlers (TestIamPermissions and
+// space-scope Member CRUD). `Pool` is used both for filter reads
+// (db.DBTX) and tx-wrapped writes (TxBeginner); *pgxpool.Pool
+// satisfies both. Tests that need to mock the tx surface build a
+// SpacesServer literal directly with the local TxBeginner interface,
+// mirroring the OrganizationsServer test pattern.
 type Config struct {
 	// Pool is the database pool. Required.
 	Pool *pgxpool.Pool
@@ -58,9 +56,6 @@ type Config struct {
 	// nil is acceptable in unit tests that don't exercise the
 	// permission paths.
 	Resolver *permission.Resolver
-	// Caller resolves the caller identity. Required in production;
-	// unit tests stub via struct literal.
-	Caller server.CallerIdentityResolver
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
 	// Optional; nil leaves Actor fields unset.
 	AuditResolver *audit.Resolver
@@ -83,16 +78,12 @@ func NewSpacesServer(cfg Config) *SpacesServer {
 	if cfg.Codec == nil {
 		panic("spaces: Config.Codec is required")
 	}
-	if cfg.Caller == nil {
-		panic("spaces: Config.Caller is required")
-	}
 	return &SpacesServer{
 		pool:       cfg.Pool,
 		queries:    cfg.Queries,
 		filter:     filter.SpaceFilter(),
 		codec:      cfg.Codec,
 		resolver:   cfg.Resolver,
-		caller:     cfg.Caller,
 		audit:      cfg.AuditResolver,
 		lroManager: cfg.LROManager,
 	}
@@ -255,10 +246,7 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 			"org slug in parent does not match resolved scope"))
 	}
 
-	callerFirebaseID, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	callerID := server.MustPivoxUserID(ctx)
 
 	spaceName := req.GetSpaceId()
 	if spaceName == "" {
@@ -282,10 +270,11 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 	qtx := db.New(tx)
 	// Post-Phase-7 the founder's principal_id IS the caller's
 	// identity_id — no per-org `users` row to resolve.
-	// `callerFirebaseID` is the identities.id (resolved
-	// via s.caller(ctx) which itself reads the verified token).
-	founderID := callerFirebaseID
-	createdBy := convert.PgUUID(callerFirebaseID)
+	// `callerID` is the identities.id (the universal user UUID,
+	// set by AuthInterceptor from the verified token's
+	// `pivox_user_id` claim).
+	founderID := callerID
+	createdBy := convert.PgUUID(callerID)
 
 	result, err := qtx.CreateSpace(ctx, db.CreateSpaceParams{
 		ID:          uuid.New(),
@@ -355,10 +344,7 @@ func (s *SpacesServer) UpdateSpace(ctx context.Context, req *apiv1.UpdateSpaceRe
 	// State guard lives at the gate (enforceSpaceSoftDeleteGate); a
 	// non-ACTIVE space is already rejected before the handler runs.
 
-	caller, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	caller := server.MustPivoxUserID(ctx)
 
 	updateParams := db.UpdateSpaceParams{
 		ID:        resolvedSpace.ID,
@@ -438,10 +424,7 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 			"etag mismatch; refresh the space and retry")
 	}
 
-	caller, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	caller := server.MustPivoxUserID(ctx)
 
 	spaceRsrc := "organizations/" + resolvedOrg.Slug + "/spaces/" + resolvedSpace.Slug
 	force := req.GetForce()
@@ -496,10 +479,7 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 			"etag mismatch; refresh the space and retry")
 	}
 
-	caller, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
+	caller := server.MustPivoxUserID(ctx)
 
 	spaceID := resolvedSpace.ID
 	orgSlug := resolvedOrg.Slug

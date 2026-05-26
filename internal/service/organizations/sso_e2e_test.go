@@ -17,7 +17,6 @@ import (
 	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
@@ -38,9 +37,7 @@ func newSsoHarnessWithMockedFirebase(t *testing.T) (*grpcharness.Harness, *grpch
 				Queries:    h.Queries,
 				Auth:       auth,
 				Codec:      codec,
-				ReadUID:    server.AuthenticatedUID,
 				Resolver:   permission.NewResolver(h.Queries),
-				Caller:     server.NewCallerIdentityResolver(h.Queries),
 				LROManager: h.LROManager,
 				Encryptor:  h.Encryptor,
 			}))

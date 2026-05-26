@@ -64,35 +64,6 @@ func requireAuthn(t *testing.T, err error, substr string) {
 }
 
 // ---------------------------------------------------------------------------
-// AuthenticatedUID / MustAuthenticatedUID
-// ---------------------------------------------------------------------------
-
-func TestAuthenticatedUID_Present(t *testing.T) {
-	ctx := context.WithValue(context.Background(), authContextKey{}, "user-123")
-	uid, ok := AuthenticatedUID(ctx)
-
-	assert.True(t, ok)
-	assert.Equal(t, "user-123", uid)
-}
-
-func TestAuthenticatedUID_Missing(t *testing.T) {
-	uid, ok := AuthenticatedUID(context.Background())
-	assert.False(t, ok)
-	assert.Empty(t, uid)
-}
-
-func TestMustAuthenticatedUID_Present(t *testing.T) {
-	ctx := context.WithValue(context.Background(), authContextKey{}, "user-456")
-	assert.Equal(t, "user-456", MustAuthenticatedUID(ctx))
-}
-
-func TestMustAuthenticatedUID_Panics(t *testing.T) {
-	assert.Panics(t, func() {
-		MustAuthenticatedUID(context.Background())
-	})
-}
-
-// ---------------------------------------------------------------------------
 // Unary AuthInterceptor
 //
 // AgentService no longer participates in the public AuthInterceptor chain —
@@ -112,12 +83,9 @@ func TestAuthInterceptor_ValidToken(t *testing.T) {
 	md := metadata.New(map[string]string{"authorization": "Bearer test-token"})
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
-	var capturedUID string
 	var capturedPivoxUID uuid.UUID
 	handler := func(ctx context.Context, req any) (any, error) {
 		var ok bool
-		capturedUID, ok = AuthenticatedUID(ctx)
-		require.True(t, ok)
 		capturedPivoxUID, ok = PivoxUserID(ctx)
 		require.True(t, ok)
 		return "ok", nil
@@ -129,7 +97,6 @@ func TestAuthInterceptor_ValidToken(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "ok", resp)
-	assert.Equal(t, "user-789", capturedUID)
 	assert.Equal(t, pivoxUID, capturedPivoxUID)
 }
 
@@ -198,12 +165,9 @@ func TestAuthStreamInterceptor_ValidToken(t *testing.T) {
 	md := metadata.New(map[string]string{"authorization": "Bearer stream-token"})
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
-	var capturedUID string
 	var capturedPivoxUID uuid.UUID
 	handler := func(srv any, stream grpc.ServerStream) error {
 		var ok bool
-		capturedUID, ok = AuthenticatedUID(stream.Context())
-		require.True(t, ok)
 		capturedPivoxUID, ok = PivoxUserID(stream.Context())
 		require.True(t, ok)
 		return nil
@@ -214,7 +178,6 @@ func TestAuthStreamInterceptor_ValidToken(t *testing.T) {
 	}, handler)
 
 	require.NoError(t, err)
-	assert.Equal(t, "stream-user", capturedUID)
 	assert.Equal(t, pivoxUID, capturedPivoxUID)
 }
 
