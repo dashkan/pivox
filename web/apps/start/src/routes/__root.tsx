@@ -4,6 +4,7 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
+  useRouter,
 } from '@tanstack/react-router';
 
 import appCss from '../styles.css?url';
@@ -24,6 +25,7 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const router = useRouter();
   return (
     <AuthProvider
       onBeforeSignOut={() => clearSession()}
@@ -34,6 +36,13 @@ function RootComponent() {
       // beyond 14 days falls through to the verify-session interim
       // recovery flow on the next visit.
       onTokenRefresh={(idToken) => createSession({ data: { idToken } })}
+      // Post-sign-out redirect. `_app`'s `beforeLoad` only runs on
+      // navigation events, so without an explicit navigate the user
+      // stays on the current authenticated route with a null user
+      // and the SSR-rendered content still on screen. Electron uses
+      // AuthGateFeature for the same purpose; start uses this hook
+      // since the server-side gate replaces AuthGateFeature.
+      onSignedOut={() => router.navigate({ to: '/auth/login' })}
     >
       <Outlet />
     </AuthProvider>

@@ -68,6 +68,7 @@ export function AuthProvider({
   children,
   onBeforeSignOut,
   onTokenRefresh,
+  onSignedOut,
 }: {
   children: React.ReactNode;
   /**
@@ -103,6 +104,18 @@ export function AuthProvider({
    * this user before.
    */
   onTokenRefresh?: (idToken: string) => Promise<unknown>;
+  /**
+   * Optional hook fired AFTER the Firebase JS SDK sign-out completes.
+   * In the start app this navigates to /auth/login — `_app`'s
+   * `beforeLoad` only runs on navigation events, so without an
+   * explicit redirect the user would stay on the current route with
+   * a null user and the SSR-rendered content still on screen.
+   *
+   * Electron leaves this unset: its `_app.tsx` still wraps with
+   * AuthGateFeature, which catches the null-user state via
+   * `<Navigate />` on the next render.
+   */
+  onSignedOut?: () => void | Promise<void>;
 }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,7 +215,14 @@ export function AuthProvider({
     const { getAuth, signOut: firebaseSignOut } = await import('firebase/auth');
     const auth = getAuth();
     await firebaseSignOut(auth);
-  }, [onBeforeSignOut]);
+    if (onSignedOut) {
+      try {
+        await onSignedOut();
+      } catch (err) {
+        reportError(err, { source: 'AuthProvider.onSignedOut' });
+      }
+    }
+  }, [onBeforeSignOut, onSignedOut]);
 
   return (
     <AuthContext value={{ user, loading, signOut, refreshUser }}>
