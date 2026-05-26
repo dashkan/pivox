@@ -1,4 +1,5 @@
 import { AuthProvider } from '@pivox/features/auth';
+import { TooltipProvider } from '@pivox/primitives/tooltip';
 import {
   HeadContent,
   Outlet,
@@ -27,25 +28,33 @@ export const Route = createRootRoute({
 function RootComponent() {
   const router = useRouter();
   return (
-    <AuthProvider
-      onBeforeSignOut={() => clearSession()}
-      // Proactive cookie refresh — Firebase rotates the ID token
-      // every ~55 min while the app is open; each rotation re-mints
-      // the cookie so the 14-day window slides forward continuously.
-      // An actively-used app never sees cookie expiry; inactivity
-      // beyond 14 days falls through to the verify-session interim
-      // recovery flow on the next visit.
-      onTokenRefresh={(idToken) => createSession({ data: { idToken } })}
-      // Post-sign-out redirect. `_app`'s `beforeLoad` only runs on
-      // navigation events, so without an explicit navigate the user
-      // stays on the current authenticated route with a null user
-      // and the SSR-rendered content still on screen. Electron uses
-      // AuthGateFeature for the same purpose; start uses this hook
-      // since the server-side gate replaces AuthGateFeature.
-      onSignedOut={() => router.navigate({ to: '/auth/login' })}
-    >
-      <Outlet />
-    </AuthProvider>
+    // TooltipProvider at the root so Radix Tooltip consumers
+    // (currently SidebarMenuButton's tooltip prop in @pivox/ui/
+    // app-shell, anywhere else later) find an ancestor context.
+    // delayDuration={0} matches shadcn's recommended sidebar shape —
+    // the icon-collapsed sidebar relies on instant tooltips to be
+    // navigable; the default 700ms feels broken.
+    <TooltipProvider delayDuration={0}>
+      <AuthProvider
+        onBeforeSignOut={() => clearSession()}
+        // Proactive cookie refresh — Firebase rotates the ID token
+        // every ~55 min while the app is open; each rotation re-mints
+        // the cookie so the 14-day window slides forward continuously.
+        // An actively-used app never sees cookie expiry; inactivity
+        // beyond 14 days falls through to the verify-session interim
+        // recovery flow on the next visit.
+        onTokenRefresh={(idToken) => createSession({ data: { idToken } })}
+        // Post-sign-out redirect. `_app`'s `beforeLoad` only runs on
+        // navigation events, so without an explicit navigate the user
+        // stays on the current authenticated route with a null user
+        // and the SSR-rendered content still on screen. Electron uses
+        // AuthGateFeature for the same purpose; start uses this hook
+        // since the server-side gate replaces AuthGateFeature.
+        onSignedOut={() => router.navigate({ to: '/auth/login' })}
+      >
+        <Outlet />
+      </AuthProvider>
+    </TooltipProvider>
   );
 }
 
