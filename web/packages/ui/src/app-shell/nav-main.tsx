@@ -13,22 +13,27 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '@pivox/primitives/sidebar';
+import { Link } from '@tanstack/react-router';
 import { ChevronRightIcon } from 'lucide-react';
 
-export function NavMain({
-  items,
-}: {
-  items: {
-    title: string;
-    url: string;
-    icon?: React.ReactNode;
-    isActive?: boolean;
-    items?: {
-      title: string;
-      url: string;
-    }[];
-  }[];
-}) {
+/**
+ * Top-level nav item with optional subitems. `href` is an absolute
+ * path; the feature hook is responsible for assembling correct route
+ * strings (TanStack Router validates them at navigation time).
+ */
+export interface NavMainItem {
+  title: string;
+  href: string;
+  icon?: React.ReactNode;
+  /**
+   * Whether the parent should render expanded by default. Wired to
+   * the route-active state so the user's current section opens.
+   */
+  isActive?: boolean;
+  items?: { title: string; href: string }[];
+}
+
+export function NavMain({ items }: { items: NavMainItem[] }) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
@@ -53,9 +58,9 @@ export function NavMain({
                   {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
                       <SidebarMenuSubButton asChild>
-                        <a href={subItem.url}>
+                        <Link to={subItem.href}>
                           <span>{subItem.title}</span>
-                        </a>
+                        </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   ))}

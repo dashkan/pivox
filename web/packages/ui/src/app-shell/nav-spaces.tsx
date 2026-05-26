@@ -16,35 +16,54 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@pivox/primitives/sidebar';
+import { Link } from '@tanstack/react-router';
 import {
-  MoreHorizontalIcon,
-  FolderIcon,
   ArrowRightIcon,
+  FolderIcon,
+  MoreHorizontalIcon,
   Trash2Icon,
 } from 'lucide-react';
 
-export function NavProjects({
-  projects,
-}: {
-  projects: {
-    name: string;
-    url: string;
-    icon: React.ReactNode;
-  }[];
-}) {
+/**
+ * Shape a space needs to be listable in the sidebar group. Maps to
+ * the subset of fields the Space proto from `/v1/organizations/
+ * {organization}/spaces` actually carries. `icon` is client-side
+ * derived (icon or initials) — the API doesn't ship one.
+ *
+ * `href` is the absolute path to the space landing page,
+ * constructed by the feature hook (typically `/spaces/<slug>`).
+ */
+export interface NavSpacesSpace {
+  /** Resource name, e.g. "organizations/acme/spaces/dev". */
+  space: string;
+  displayName: string;
+  href: string;
+  icon?: React.ReactNode;
+}
+
+/**
+ * Sidebar group listing the caller's spaces in the active
+ * organization. Hidden when the sidebar is collapsed to icon mode
+ * (spaces don't have meaningful single-icon representations).
+ *
+ * The per-item menu (View / Share / Delete) is intentionally inert
+ * placeholder content for Stage B1 — wiring those actions is a
+ * later iteration once the underlying space operations exist.
+ */
+export function NavSpaces({ spaces }: { spaces: NavSpacesSpace[] }) {
   const { isMobile } = useSidebar();
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Projects</SidebarGroupLabel>
+      <SidebarGroupLabel>Spaces</SidebarGroupLabel>
       <SidebarMenu>
-        {projects.map((item) => (
-          <SidebarMenuItem key={item.name}>
+        {spaces.map((sp) => (
+          <SidebarMenuItem key={sp.space}>
             <SidebarMenuButton asChild>
-              <a href={item.url}>
-                {item.icon}
-                <span>{item.name}</span>
-              </a>
+              <Link to={sp.href}>
+                {sp.icon}
+                <span>{sp.displayName}</span>
+              </Link>
             </SidebarMenuButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -63,16 +82,16 @@ export function NavProjects({
               >
                 <DropdownMenuItem>
                   <FolderIcon className="text-muted-foreground" />
-                  <span>View Project</span>
+                  <span>View Space</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   <ArrowRightIcon className="text-muted-foreground" />
-                  <span>Share Project</span>
+                  <span>Share Space</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <Trash2Icon className="text-muted-foreground" />
-                  <span>Delete Project</span>
+                  <span>Delete Space</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

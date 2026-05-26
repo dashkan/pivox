@@ -1,107 +1,124 @@
+'use client';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@pivox/primitives/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@pivox/primitives/dropdown-menu';
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from '@pivox/primitives/sidebar';
-import {
-  ChevronsUpDownIcon,
-  SparklesIcon,
-  BadgeCheckIcon,
-  CreditCardIcon,
-  BellIcon,
-  LogOutIcon,
-} from 'lucide-react';
+import { SidebarMenuButton, useSidebar } from '@pivox/primitives/sidebar';
+import { ChevronsUpDownIcon, LogOutIcon, UserIcon } from 'lucide-react';
 
+/**
+ * Shape the user needs to be displayable in the menu. Matches the
+ * relevant subset of Firebase's `User` (or our hydrated
+ * `ServerSession`) — name + email + avatar URL.
+ */
+export interface NavUserUser {
+  displayName: string | null;
+  email: string | null;
+  photoURL: string | null;
+}
+
+/**
+ * Sidebar-footer user menu. Reconciles the visual shape of shadcn's
+ * sidebar-07 `nav-user` block with the menu items previously in
+ * `<AppLayoutHeaderAvatar>` — sample "Upgrade to Pro / Billing /
+ * Notifications" items dropped, replaced with the two actions we
+ * actually expose: open the profile dialog and sign out.
+ *
+ * Controlled via callbacks so the consumer owns the side effects —
+ * `onManageAccount` flips the profile-dialog state in the feature
+ * hook; `onSignOut` calls `useAuth().signOut()` which (in start)
+ * routes through the session-cookie clear + Firebase signOut +
+ * post-sign-out redirect chain.
+ */
 export function NavUser({
   user,
+  onManageAccount,
+  onSignOut,
 }: {
-  user: {
-    name: string;
-    email: string;
-    avatar: string;
-  };
+  user: NavUserUser;
+  onManageAccount: () => void;
+  onSignOut: () => void;
 }) {
   const { isMobile } = useSidebar();
+  const initials = (user.displayName ?? user.email ?? 'U')
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-start text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <SidebarMenuButton
+          size="lg"
+          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+        >
+          <Avatar className="h-8 w-8 rounded-lg">
+            {user.photoURL ? (
+              <AvatarImage
+                src={user.photoURL}
+                alt={user.displayName ?? 'User avatar'}
+              />
+            ) : null}
+            <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+          </Avatar>
+          <div className="grid flex-1 text-start text-sm leading-tight">
+            <span className="truncate font-medium">
+              {user.displayName ?? 'User'}
+            </span>
+            {user.email ? (
+              <span className="truncate text-xs">{user.email}</span>
+            ) : null}
+          </div>
+          <ChevronsUpDownIcon className="ms-auto size-4" />
+        </SidebarMenuButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+        side={isMobile ? 'bottom' : 'right'}
+        align="end"
+        sideOffset={4}
+      >
+        <DropdownMenuLabel className="p-0 font-normal">
+          <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
+            <Avatar className="h-8 w-8 rounded-lg">
+              {user.photoURL ? (
+                <AvatarImage
+                  src={user.photoURL}
+                  alt={user.displayName ?? 'User avatar'}
+                />
+              ) : null}
+              <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 text-start text-sm leading-tight">
+              <span className="truncate font-medium">
+                {user.displayName ?? 'User'}
+              </span>
+              {user.email ? (
                 <span className="truncate text-xs">{user.email}</span>
-              </div>
-              <ChevronsUpDownIcon className="ms-auto size-4" />
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-            side={isMobile ? 'bottom' : 'right'}
-            align="end"
-            sideOffset={4}
-          >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-start text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <SparklesIcon />
-                Upgrade to Pro
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheckIcon />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <BellIcon />
-                Notifications
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <LogOutIcon />
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+              ) : null}
+            </div>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onManageAccount}>
+          <UserIcon />
+          Manage Account
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onSignOut}>
+          <LogOutIcon />
+          Sign Out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
