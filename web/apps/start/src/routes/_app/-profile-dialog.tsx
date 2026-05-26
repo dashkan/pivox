@@ -1,11 +1,11 @@
 import { UserProfileFeature } from '@pivox/features/user-profile';
-import { useAppLayoutContext } from '@pivox/ui/app-layout';
+import { useAppShellContext } from '@pivox/ui/app-shell';
 import { UserProfileCard } from '@pivox/ui/user-profile-card';
 
 import { authProviders } from '@/lib/auth-providers';
 
 export default function ProfileDialog() {
-  const { state, actions } = useAppLayoutContext();
+  const { state, actions } = useAppShellContext();
 
   return (
     <UserProfileFeature

@@ -1,25 +1,47 @@
 import { AuthProvider } from '@pivox/features/auth';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
-import { Outlet, createRootRoute } from '@tanstack/react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Outlet, createRootRouteWithContext } from '@tanstack/react-router';
 
-export const Route = createRootRoute({
+/**
+ * Root route declares the router-context shape — the QueryClient
+ * lives here (constructed once in `main.tsx`, per renderer process)
+ * so route loaders can prefetch via `context.queryClient.prefetchQuery`
+ * with the same shape the start app uses. Electron's renderer is
+ * per-window by architecture, so the practical lifetime matches.
+ */
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient;
+}>()({
   component: RootComponent,
 });
 
 function RootComponent() {
+  // `useRouteContext` is the idiomatic typed accessor for context
+  // declared via `createRootRouteWithContext` — preferred over
+  // `useRouter().options.context.queryClient` which mixes a runtime
+  // config bag into the render path.
+  const { queryClient } = Route.useRouteContext();
   return (
+    // QueryClientProvider at the root so $api.useQuery (from
+    // @pivox/client/react-query) works anywhere in the tree —
+    // currently used by AppShellFeature for orgs + spaces. Pulls
+    // the QueryClient from router context for symmetry with start;
+    // see main.tsx for why a module-level singleton is fine in this
+    // renderer-process context but the start app needs per-request.
+    //
     // TooltipProvider at the root so Radix Tooltip consumers
     // (currently SidebarMenuButton's tooltip prop in @pivox/ui/
     // app-shell, anywhere else later) find an ancestor context.
-    // delayDuration={0} matches shadcn's recommended sidebar shape —
-    // the icon-collapsed sidebar relies on instant tooltips to be
-    // navigable; the default 700ms feels broken.
-    <TooltipProvider delayDuration={0}>
-      <AuthProvider>
-        <div className="min-h-screen bg-background font-sans text-foreground antialiased">
-          <Outlet />
-        </div>
-      </AuthProvider>
-    </TooltipProvider>
+    // delayDuration={0} matches shadcn's recommended sidebar shape.
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider delayDuration={0}>
+        <AuthProvider>
+          <div className="min-h-screen bg-background font-sans text-foreground antialiased">
+            <Outlet />
+          </div>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }

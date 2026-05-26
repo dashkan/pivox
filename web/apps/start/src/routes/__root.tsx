@@ -1,10 +1,11 @@
 import { AuthProvider } from '@pivox/features/auth';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
+import { QueryClient } from '@tanstack/react-query';
 import {
   HeadContent,
   Outlet,
   Scripts,
-  createRootRoute,
+  createRootRouteWithContext,
   useRouter,
 } from '@tanstack/react-router';
 
@@ -12,7 +13,19 @@ import appCss from '../styles.css?url';
 
 import { clearSession, createSession } from '@/server/auth-session';
 
-export const Route = createRootRoute({
+/**
+ * Root route declares the router-context shape — the per-request
+ * QueryClient lives here (constructed in `getRouter()` per call) so
+ * route loaders can prefetch via `context.queryClient.prefetchQuery`
+ * without sharing cache across SSR requests.
+ *
+ * `QueryClientProvider` is NOT in this tree — `setupRouterSsrQueryIntegration`
+ * installs it via `router.options.Wrap`, so `useQuery` works anywhere
+ * in the route tree without a manual provider here.
+ */
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient;
+}>()({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },

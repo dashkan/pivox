@@ -1,64 +1,21 @@
+import { AppShellFeature } from '@pivox/features/app-shell';
 import { AuthGateFeature } from '@pivox/features/auth-gate';
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from '@pivox/primitives/sidebar';
-import { AppShell } from '@pivox/ui/app-shell';
+import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
-import { Outlet, createFileRoute } from '@tanstack/react-router';
-import { TerminalSquareIcon } from 'lucide-react';
-
-import type { AppShellContextValue } from '@pivox/ui/app-shell';
+import { UserProfileCard } from '@pivox/ui/user-profile-card';
+import { ElectronUserProfileFeature } from '@renderer/components/electron-user-profile-feature';
+import { $api } from '@renderer/lib/api-client';
+import { authProviders } from '@renderer/lib/auth-providers';
+import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_app')({
   component: AppLayoutRoute,
 });
-
-/**
- * TEMPORARY sample data for AppShell. Replaced by AppShellFeature in
- * Stage B2 — the feature owns real queries (orgs, spaces), user info
- * from useAuth, active-org persistence in localStorage, and the
- * createOrganization / signOut handlers. `git grep SAMPLE_APP_SHELL`
- * finds the two scaffolded places (start + electron).
- */
-const SAMPLE_APP_SHELL: AppShellContextValue = {
-  state: {
-    user: {
-      displayName: 'Sample User',
-      email: '[email protected]',
-      photoURL: null,
-    },
-    orgs: [
-      { organization: 'organizations/acme', displayName: 'Acme Inc' },
-      { organization: 'organizations/example', displayName: 'Example Co' },
-    ],
-    orgsLoading: false,
-    activeOrganization: 'organizations/acme',
-    spaces: [],
-    spacesLoading: false,
-    navMain: [
-      {
-        title: 'Playground',
-        href: '/',
-        icon: <TerminalSquareIcon />,
-        isActive: true,
-        items: [
-          { title: 'History', href: '/' },
-          { title: 'Starred', href: '/' },
-          { title: 'Settings', href: '/' },
-        ],
-      },
-    ],
-    profileOpen: false,
-  },
-  actions: {
-    setActiveOrganization: () => undefined,
-    createOrganization: () => undefined,
-    setProfileOpen: () => undefined,
-    signOut: () => undefined,
-  },
-};
 
 /**
  * Post-auth app shell. shadcn sidebar-07 layout wrapped in
@@ -66,9 +23,15 @@ const SAMPLE_APP_SHELL: AppShellContextValue = {
  * client-side gate redirects unauthed users to /auth/login.
  */
 function AppLayoutRoute() {
+  const router = useRouter();
   return (
     <AuthGateFeature>
-      <AppShell.Provider value={SAMPLE_APP_SHELL}>
+      <AppShellFeature
+        $api={$api}
+        onCreateOrganization={() => {
+          void router.navigate({ to: '/auth/create-org' });
+        }}
+      >
         <SidebarProvider>
           <AppShell.Sidebar />
           <SidebarInset>
@@ -81,7 +44,38 @@ function AppLayoutRoute() {
             <Outlet />
           </SidebarInset>
         </SidebarProvider>
-      </AppShell.Provider>
+        <ProfileDialog />
+      </AppShellFeature>
     </AuthGateFeature>
+  );
+}
+
+/**
+ * Electron-specific profile dialog. Wraps the UserProfileCard
+ * primitives in ElectronUserProfileFeature (which provides the
+ * Electron-specific provider-link UX). Consumes AppShellContext
+ * for the open state + setter — wired in by the AppShell.NavUser's
+ * "Manage Account" menu item via actions.setProfileOpen(true).
+ */
+function ProfileDialog() {
+  const { state, actions } = useAppShellContext();
+
+  return (
+    <ElectronUserProfileFeature
+      onClose={() => {
+        actions.setProfileOpen(false);
+      }}
+      open={state.profileOpen}
+      providers={authProviders}
+    >
+      <UserProfileCard.Root
+        open={state.profileOpen}
+        onOpenChange={actions.setProfileOpen}
+      >
+        <UserProfileCard.Sidebar />
+        <UserProfileCard.AccountPage />
+        <UserProfileCard.SecurityPage />
+      </UserProfileCard.Root>
+    </ElectronUserProfileFeature>
   );
 }

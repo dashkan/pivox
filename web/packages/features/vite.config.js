@@ -62,6 +62,7 @@ export default mergeConfig(
       './src/auth-avatar.ts',
       './src/user-profile.ts',
       './src/app-layout.ts',
+      './src/app-shell.ts',
       './src/image-editor.ts',
     ],
     srcDir: './src',

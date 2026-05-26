@@ -24,6 +24,7 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 
+
 import { useAppShellContext } from './app-shell.context';
 
 /**
@@ -83,16 +84,22 @@ export function AppShellNavSpaces() {
                 side={isMobile ? 'bottom' : 'right'}
                 align={isMobile ? 'end' : 'start'}
               >
-                <DropdownMenuItem>
+                {/*
+                 * Placeholder items: `disabled` until the underlying
+                 * space operations land. Without it, screen readers
+                 * and keyboard users would land on interactive items
+                 * that do nothing — worse than not surfacing them.
+                 */}
+                <DropdownMenuItem disabled>
                   <FolderIcon className="text-muted-foreground" />
                   <span>View Space</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem disabled>
                   <ArrowRightIcon className="text-muted-foreground" />
                   <span>Share Space</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem disabled>
                   <Trash2Icon className="text-muted-foreground" />
                   <span>Delete Space</span>
                 </DropdownMenuItem>
@@ -100,12 +107,12 @@ export function AppShellNavSpaces() {
             </DropdownMenu>
           </SidebarMenuItem>
         ))}
-        <SidebarMenuItem>
-          <SidebarMenuButton className="text-sidebar-foreground/70">
-            <MoreHorizontalIcon className="text-sidebar-foreground/70" />
-            <span>More</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+        {/*
+         * "More" overflow item intentionally omitted while every space
+         * is fully rendered. Reintroduce when we cap the visible count
+         * and need a CTA to a full-list view — gate it on a real
+         * overflow predicate (`spaces.length > VISIBLE_CAP`).
+         */}
       </SidebarMenu>
     </SidebarGroup>
   );
