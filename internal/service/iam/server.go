@@ -112,9 +112,10 @@ func NewIamServer(cfg Config) *IamServer {
 // gating "do I have membership?" on prior membership would be
 // chicken-and-egg.
 //
-// `page_size` / `page_token` on the request are accepted but ignored
-// in v1; the underlying query caps at 1000 rows and a single caller
-// having more memberships than that isn't a realistic case.
+// Intentionally unpaginated. A single caller's membership list is
+// small (1–10 typical, capped at 1000 by the underlying query) —
+// pagination would be ceremony with no realistic benefit. The proto
+// carries AIP-158 disables explaining the deviation.
 func (s *IamServer) ListAccountOrganizations(ctx context.Context, req *iampb.ListAccountOrganizationsRequest) (*iampb.ListAccountOrganizationsResponse, error) {
 	if req.GetParent() != "accounts/me" {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("parent",

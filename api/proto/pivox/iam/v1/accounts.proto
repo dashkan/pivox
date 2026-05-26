@@ -167,6 +167,19 @@ message AccountOrganization {
 }
 
 // Request message for `Iam.ListAccountOrganizations`.
+//
+// Intentionally unpaginated. AIP-158 requires `page_size` /
+// `page_token`; this endpoint omits them because a single account's
+// org-membership list is small (1–10 typical, capped at 1000 by the
+// underlying query). Pagination would be busywork for clients on
+// every cold load and gives no realistic benefit.
+//
+// (-- api-linter: core::0158::request-page-size-field=disabled
+//     aip.dev/not-precedent: caller's org membership is small and
+//     bounded; pagination would be ceremony, not value. --)
+// (-- api-linter: core::0158::request-page-token-field=disabled
+//     aip.dev/not-precedent: see above; we don't paginate this
+//     bootstrap endpoint. --)
 message ListAccountOrganizationsRequest {
   // Required. The parent. Must be `accounts/me`. The caller is
   // implicit from the authentication context.
@@ -175,26 +188,20 @@ message ListAccountOrganizationsRequest {
     (google.api.resource_reference) = {type: "pivox.iam/Account"},
     (buf.validate.field).required = true
   ];
-
-  // Optional. Maximum number of orgs to return. Accepted but ignored
-  // in v1 — the underlying query caps at 1000 and a single caller
-  // having more memberships than that isn't a realistic case.
-  int32 page_size = 2 [(google.api.field_behavior) = OPTIONAL];
-
-  // Optional. Page token from a previous response. Accepted but
-  // ignored in v1; reserved for the day pagination matters.
-  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Response message for `Iam.ListAccountOrganizations`.
+//
+// Intentionally omits `next_page_token` — the request is unpaginated;
+// see `ListAccountOrganizationsRequest` for the rationale.
+//
+// (-- api-linter: core::0158::response-next-page-token-field=disabled
+//     aip.dev/not-precedent: request is unpaginated; no token to
+//     return. --)
 message ListAccountOrganizationsResponse {
   // The active organizations the caller has membership in. Field
   // name matches the lowercase-plural of the message being listed
   // (`AccountOrganization` → `account_organizations`) per AIP-132,
   // even though `AccountOrganization` is not a `google.api.resource`.
   repeated AccountOrganization account_organizations = 1;
-
-  // Token for the next page of results. Always empty in v1
-  // (pagination isn't implemented; the query caps at 1000).
-  string next_page_token = 2;
 }

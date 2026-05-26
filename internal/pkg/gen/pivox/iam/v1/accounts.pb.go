@@ -393,18 +393,27 @@ func (x *AccountOrganization) GetRole() string {
 }
 
 // Request message for `Iam.ListAccountOrganizations`.
+//
+// Intentionally unpaginated. AIP-158 requires `page_size` /
+// `page_token`; this endpoint omits them because a single account's
+// org-membership list is small (1–10 typical, capped at 1000 by the
+// underlying query). Pagination would be busywork for clients on
+// every cold load and gives no realistic benefit.
+//
+// (-- api-linter: core::0158::request-page-size-field=disabled
+//
+//	aip.dev/not-precedent: caller's org membership is small and
+//	bounded; pagination would be ceremony, not value. --)
+//
+// (-- api-linter: core::0158::request-page-token-field=disabled
+//
+//	aip.dev/not-precedent: see above; we don't paginate this
+//	bootstrap endpoint. --)
 type ListAccountOrganizationsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent. Must be `accounts/me`. The caller is
 	// implicit from the authentication context.
-	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
-	// Optional. Maximum number of orgs to return. Accepted but ignored
-	// in v1 — the underlying query caps at 1000 and a single caller
-	// having more memberships than that isn't a realistic case.
-	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// Optional. Page token from a previous response. Accepted but
-	// ignored in v1; reserved for the day pagination matters.
-	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	Parent        string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -446,21 +455,15 @@ func (x *ListAccountOrganizationsRequest) GetParent() string {
 	return ""
 }
 
-func (x *ListAccountOrganizationsRequest) GetPageSize() int32 {
-	if x != nil {
-		return x.PageSize
-	}
-	return 0
-}
-
-func (x *ListAccountOrganizationsRequest) GetPageToken() string {
-	if x != nil {
-		return x.PageToken
-	}
-	return ""
-}
-
 // Response message for `Iam.ListAccountOrganizations`.
+//
+// Intentionally omits `next_page_token` — the request is unpaginated;
+// see `ListAccountOrganizationsRequest` for the rationale.
+//
+// (-- api-linter: core::0158::response-next-page-token-field=disabled
+//
+//	aip.dev/not-precedent: request is unpaginated; no token to
+//	return. --)
 type ListAccountOrganizationsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The active organizations the caller has membership in. Field
@@ -468,11 +471,8 @@ type ListAccountOrganizationsResponse struct {
 	// (`AccountOrganization` → `account_organizations`) per AIP-132,
 	// even though `AccountOrganization` is not a `google.api.resource`.
 	AccountOrganizations []*AccountOrganization `protobuf:"bytes,1,rep,name=account_organizations,json=accountOrganizations,proto3" json:"account_organizations,omitempty"`
-	// Token for the next page of results. Always empty in v1
-	// (pagination isn't implemented; the query caps at 1000).
-	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ListAccountOrganizationsResponse) Reset() {
@@ -512,13 +512,6 @@ func (x *ListAccountOrganizationsResponse) GetAccountOrganizations() []*AccountO
 	return nil
 }
 
-func (x *ListAccountOrganizationsResponse) GetNextPageToken() string {
-	if x != nil {
-		return x.NextPageToken
-	}
-	return ""
-}
-
 var File_pivox_iam_v1_accounts_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_accounts_proto_rawDesc = "" +
@@ -545,16 +538,12 @@ const file_pivox_iam_v1_accounts_proto_rawDesc = "" +
 	"\forganization\x18\x01 \x01(\tB\x1e\xe0A\x03\xfaA\x18\n" +
 	"\x16pivox.api/OrganizationR\forganization\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12\x17\n" +
-	"\x04role\x18\x03 \x01(\tB\x03\xe0A\x03R\x04role\"\xa0\x01\n" +
+	"\x04role\x18\x03 \x01(\tB\x03\xe0A\x03R\x04role\"Z\n" +
 	"\x1fListAccountOrganizationsRequest\x127\n" +
 	"\x06parent\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
-	"\x11pivox.iam/Account\xbaH\x03\xc8\x01\x01R\x06parent\x12 \n" +
-	"\tpage_size\x18\x02 \x01(\x05B\x03\xe0A\x01R\bpageSize\x12\"\n" +
-	"\n" +
-	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\"\xa2\x01\n" +
+	"\x11pivox.iam/Account\xbaH\x03\xc8\x01\x01R\x06parent\"z\n" +
 	" ListAccountOrganizationsResponse\x12V\n" +
-	"\x15account_organizations\x18\x01 \x03(\v2!.pivox.iam.v1.AccountOrganizationR\x14accountOrganizations\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenB\xb1\x01\n" +
+	"\x15account_organizations\x18\x01 \x03(\v2!.pivox.iam.v1.AccountOrganizationR\x14accountOrganizationsB\xb1\x01\n" +
 	"\x10com.pivox.iam.v1B\rAccountsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var (

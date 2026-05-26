@@ -108,22 +108,6 @@ paths:
           in: path
           required: true
           type: string
-        - name: pageSize
-          description: |-
-            Optional. Maximum number of orgs to return. Accepted but ignored
-            in v1 — the underlying query caps at 1000 and a single caller
-            having more memberships than that isn't a realistic case.
-          in: query
-          required: false
-          type: integer
-          format: int32
-        - name: pageToken
-          description: |-
-            Optional. Page token from a previous response. Accepted but
-            ignored in v1; reserved for the day pagination matters.
-          in: query
-          required: false
-          type: string
       tags:
         - Iam
   /v1/keys:lookupKey:
@@ -11575,12 +11559,11 @@ definitions:
           name matches the lowercase-plural of the message being listed
           (`AccountOrganization` → `account_organizations`) per AIP-132,
           even though `AccountOrganization` is not a `google.api.resource`.
-      nextPageToken:
-        type: string
-        description: |-
-          Token for the next page of results. Always empty in v1
-          (pagination isn't implemented; the query caps at 1000).
-    description: Response message for `Iam.ListAccountOrganizations`.
+    description: |
+      Response message for `Iam.ListAccountOrganizations`.
+
+      Intentionally omits `next_page_token` — the request is unpaginated;
+      see `ListAccountOrganizationsRequest` for the rationale.
   v1ListAgentsResponse:
     type: object
     properties:

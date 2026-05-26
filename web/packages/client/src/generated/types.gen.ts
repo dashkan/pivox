@@ -4947,7 +4947,12 @@ export interface components {
          * @enum {string}
          */
         v1LineItemState: "STATE_UNSPECIFIED" | "PENDING" | "IN_PROGRESS" | "DELIVERED" | "APPROVED" | "REVISION_REQUESTED";
-        /** @description Response message for `Iam.ListAccountOrganizations`. */
+        /**
+         * @description Response message for `Iam.ListAccountOrganizations`.
+         *
+         *     Intentionally omits `next_page_token` — the request is unpaginated;
+         *     see `ListAccountOrganizationsRequest` for the rationale.
+         */
         v1ListAccountOrganizationsResponse: {
             /**
              * @description The active organizations the caller has membership in. Field
@@ -4956,11 +4961,6 @@ export interface components {
              *     even though `AccountOrganization` is not a `google.api.resource`.
              */
             accountOrganizations?: components["schemas"]["v1AccountOrganization"][];
-            /**
-             * @description Token for the next page of results. Always empty in v1
-             *     (pagination isn't implemented; the query caps at 1000).
-             */
-            nextPageToken?: string;
         };
         /**
          * @description The response returned from the
@@ -6633,19 +6633,7 @@ export interface operations {
     };
     Iam_ListAccountOrganizations: {
         parameters: {
-            query?: {
-                /**
-                 * @description Optional. Maximum number of orgs to return. Accepted but ignored
-                 *     in v1 — the underlying query caps at 1000 and a single caller
-                 *     having more memberships than that isn't a realistic case.
-                 */
-                pageSize?: number;
-                /**
-                 * @description Optional. Page token from a previous response. Accepted but
-                 *     ignored in v1; reserved for the day pagination matters.
-                 */
-                pageToken?: string;
-            };
+            query?: never;
             header?: never;
             path: {
                 /**
