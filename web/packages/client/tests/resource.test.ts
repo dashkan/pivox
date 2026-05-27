@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  organizationId,
-  parseResourceName,
-  spaceId,
-} from '../src/resource';
+import { organizationId, parseResourceName, spaceId } from '../src/resource';
 
 describe('parseResourceName', () => {
   it('parses a single collection/id pair', () => {

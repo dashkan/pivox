@@ -224,10 +224,7 @@ function LoginCardRememberMe({ className }: { className?: string }) {
       />
       <Label
         htmlFor="remember"
-        className={cn(
-          'text-sm font-normal',
-          disabled && 'opacity-50',
-        )}
+        className={cn('text-sm font-normal', disabled && 'opacity-50')}
       >
         Remember me
       </Label>

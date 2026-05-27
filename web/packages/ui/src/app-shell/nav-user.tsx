@@ -105,7 +105,9 @@ export function AppShellNavUser() {
                   className="aspect-square size-full rounded-lg object-cover"
                 />
               ) : (
-                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                <AvatarFallback className="rounded-lg">
+                  {initials}
+                </AvatarFallback>
               )}
             </Avatar>
             <div className="grid flex-1 text-start text-sm leading-tight">

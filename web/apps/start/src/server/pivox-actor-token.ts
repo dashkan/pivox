@@ -65,9 +65,7 @@ const REFRESH_HEADROOM_MS = 60_000;
  * so even 100k users is ~25 MB. If deployments grow beyond that,
  * wrap in an LRU. Not done now: YAGNI + measurable when we hit it.
  */
-export function createActorTokenSource(
-  mint: ActorTokenMint,
-): ActorTokenSource {
+export function createActorTokenSource(mint: ActorTokenMint): ActorTokenSource {
   const cache = new Map<string, { token: string; expiresAt: number }>();
   const inflight = new Map<string, Promise<string>>();
 

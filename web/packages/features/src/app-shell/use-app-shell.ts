@@ -1,6 +1,7 @@
 'use client';
 
-import { ACTIVE_ORG_COOKIE, organizationId } from '@pivox/client';
+import { organizationId } from '@pivox/client';
+import { ACTIVE_ORG, storage } from '@pivox/storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { ReactQueryApi } from '@pivox/client/react-query';
@@ -12,50 +13,6 @@ import type {
 } from '@pivox/ui/app-shell';
 
 import { useAuth } from '@/auth/use-auth';
-
-/**
- * Legacy localStorage key for the active organization. Phase 6 moved
- * this to a cookie so SSR can read it; this key sticks around only
- * long enough to migrate values on first mount. TODO: remove after
- * 2026-09 (well past 30 days post-deploy for any still-active
- * browser to have mounted at least once and migrated).
- */
-const LEGACY_STORAGE_KEY = 'pivox.app-shell.active-organization';
-
-/**
- * 1-year cookie lifetime. The active-org preference is per-browser
- * UX state, not a security credential — long expiry matches the
- * "remember my last context" feel users expect from sidebar pickers.
- */
-const ACTIVE_ORG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
-
-function readActiveOrgCookie(): string | null {
-  if (typeof document === 'undefined') return null;
-  const prefix = `${ACTIVE_ORG_COOKIE}=`;
-  for (const part of document.cookie.split('; ')) {
-    if (part.startsWith(prefix)) {
-      const value = part.slice(prefix.length);
-      return value || null;
-    }
-  }
-  return null;
-}
-
-function writeActiveOrgCookie(value: string): void {
-  if (typeof document === 'undefined') return;
-  // `secure` mirrors the session-cookie convention in
-  // apps/start/src/server/auth-session.ts: on for HTTPS, off for
-  // dev's http://localhost. Using location.protocol rather than an
-  // env var because this code runs client-side where process.env
-  // isn't reliably the same shape across bundlers.
-  const secure = typeof location !== 'undefined' && location.protocol === 'https:';
-  document.cookie =
-    `${ACTIVE_ORG_COOKIE}=${value};` +
-    ` path=/;` +
-    ` max-age=${String(ACTIVE_ORG_COOKIE_MAX_AGE)};` +
-    ` samesite=lax` +
-    (secure ? `; secure` : '');
-}
 
 /**
  * Builds the AppShell context value from live data: user from
@@ -132,31 +89,11 @@ export function useAppShell(input: {
   // (covers electron + any pure CSR path) > null.
   const [activeOrganization, setActiveOrganizationState] = useState<
     string | null
-  >(() => {
-    if (initialActiveOrganization) return initialActiveOrganization;
-    if (typeof document === 'undefined') return null;
-    return readActiveOrgCookie();
-  });
+  >(() => initialActiveOrganization ?? storage.get(ACTIVE_ORG));
 
   const setActiveOrganization = useCallback((organization: string) => {
     setActiveOrganizationState(organization);
-    writeActiveOrgCookie(organization);
-  }, []);
-
-  // One-shot legacy localStorage → cookie migration. Runs only when
-  // the cookie is genuinely absent; the lazy initializer above
-  // already covers the "cookie has a value" case. Drop this block
-  // once enough time has passed for active users to have migrated
-  // (~30 days post-deploy is fine).
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (readActiveOrgCookie()) return;
-    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (!legacy) return;
-    writeActiveOrgCookie(legacy);
-    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot legacy migration; falls through to validation effect below
-    setActiveOrganizationState(legacy);
+    storage.set(ACTIVE_ORG, organization);
   }, []);
 
   // Orgs query — slim caller-scoped view (used by post-sign-in
@@ -226,7 +163,9 @@ export function useAppShell(input: {
   // literal `organizations/` prefix + a `{organization}` segment.
   // `activeOrganization` is the canonical resource name
   // (`organizations/{slug}`); `organizationId()` extracts the slug.
-  const activeOrgSlug = activeOrganization ? organizationId(activeOrganization) : '';
+  const activeOrgSlug = activeOrganization
+    ? organizationId(activeOrganization)
+    : '';
   const spacesQuery = $api.useQuery(
     'get',
     '/v1/organizations/{organization}/spaces',

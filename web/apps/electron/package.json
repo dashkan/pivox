@@ -30,6 +30,7 @@
     "@pivox/features": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
+    "@pivox/storage": "workspace:*",
     "@pivox/ui": "workspace:*",
     "@tanstack/react-query": "5.100.14",
     "@tanstack/react-router": "1.170.8",

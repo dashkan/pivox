@@ -46,14 +46,16 @@ describe('createPivoxApiClient', () => {
     // Build a recording fetch so we can inspect the outgoing request's
     // Authorization header without making a network call.
     let capturedAuth: string | null = null;
-    const fetchStub = vi.fn(async (input: Request | string) => {
+    const fetchStub = vi.fn((input: Request | string) => {
       if (input instanceof Request) {
         capturedAuth = input.headers.get('Authorization');
       }
-      return new Response('{}', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return Promise.resolve(
+        new Response('{}', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
     });
 
     // openapi-fetch captures `globalThis.fetch` at client
@@ -80,7 +82,7 @@ describe('createPivoxApiClient', () => {
       // Firebase NOW resolves its persisted user. Set currentUser and
       // fire the auth-state-changed callback.
       mockCurrentUser = {
-        getIdToken: async () => 'fresh-id-token',
+        getIdToken: () => Promise.resolve('fresh-id-token'),
       };
       authStateCallback?.(mockCurrentUser);
 
@@ -99,13 +101,13 @@ describe('createPivoxApiClient', () => {
   it('subscribes to onAuthStateChanged exactly once across multiple requests', async () => {
     // Module-level cache means the Promise is built once and reused.
     // Two consecutive requests should not register two listeners.
-    mockCurrentUser = { getIdToken: async () => 't' };
-    const fetchStub = vi.fn(
-      async () => new Response('{}', { status: 200 }),
+    mockCurrentUser = { getIdToken: () => Promise.resolve('t') };
+    const fetchStub = vi.fn(() =>
+      Promise.resolve(new Response('{}', { status: 200 })),
     );
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = fetchStub as typeof fetch;
+    globalThis.fetch = fetchStub;
     const client = createPivoxApiClient({ baseUrl: 'https://api.test' });
 
     try {
@@ -134,14 +136,16 @@ describe('createPivoxApiClient', () => {
     // out unauthenticated. Gateway answers 401 — caller's problem,
     // not the client's.
     let capturedAuth: string | null = 'sentinel';
-    const fetchStub = vi.fn(async (input: Request | string) => {
+    const fetchStub = vi.fn((input: Request | string) => {
       if (input instanceof Request) {
         capturedAuth = input.headers.get('Authorization');
       }
-      return new Response('{}', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return Promise.resolve(
+        new Response('{}', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
     });
 
     const originalFetch = globalThis.fetch;
@@ -149,10 +153,9 @@ describe('createPivoxApiClient', () => {
     const client = createPivoxApiClient({ baseUrl: 'https://api.test' });
 
     try {
-      const requestPromise = client.GET(
-        '/v1/accounts/me/organizations',
-        { params: { path: { parent: 'accounts/me' } } },
-      );
+      const requestPromise = client.GET('/v1/accounts/me/organizations', {
+        params: { path: { parent: 'accounts/me' } },
+      });
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 

@@ -52,6 +52,13 @@ const ignores = {
     // `.shared` infix on vite.config.shared.js too.
     '**/*.config.{js,ts,mjs,cjs}',
     '**/*.config.*.{js,ts,mjs,cjs}',
+    // Static-asset JS served verbatim from a `public/` directory.
+    // These run in the browser before any module loads (e.g.,
+    // electron's pre-React bootstrap), so they're not part of the
+    // TypeScript project and the type-aware lint rules can't analyze
+    // them. Lint-by-eye + the runtime tests we already have are the
+    // signal here.
+    '**/public/**',
   ],
 };
 

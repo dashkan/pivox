@@ -190,7 +190,9 @@ export function AuthProvider({
         });
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const refreshUser = useCallback(async () => {

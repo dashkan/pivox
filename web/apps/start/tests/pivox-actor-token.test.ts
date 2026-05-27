@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from 'vitest';
 
 import {
   createActorTokenSource,
@@ -13,9 +21,7 @@ const HOUR_MS = 60 * 60 * 1000;
  * deterministic token + expiry per uid. Test assertions read
  * `mint.mock.calls.length` for invocation counts.
  */
-function makeMint(
-  opts: { lifetimeMs?: number } = {},
-): Mock<ActorTokenMint> {
+function makeMint(opts: { lifetimeMs?: number } = {}): Mock<ActorTokenMint> {
   return vi.fn<ActorTokenMint>((uid) =>
     Promise.resolve({
       token: `token-for-${uid}`,
@@ -75,7 +81,9 @@ describe('createActorTokenSource', () => {
     // Two simultaneous callers for the same uid during the very
     // first mint should NOT trigger two signJwt round-trips. They
     // share one in-flight Promise.
-    let resolveMint: ((value: { token: string; expiresAt: number }) => void) | undefined;
+    let resolveMint:
+      | ((value: { token: string; expiresAt: number }) => void)
+      | undefined;
     const mint = vi.fn<ActorTokenMint>(
       () =>
         new Promise<{ token: string; expiresAt: number }>((r) => {

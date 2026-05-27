@@ -13,7 +13,7 @@
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
 	test-native-ui \
 	web-build web-build-primitives web-build-image-editor web-build-features \
-	web-build-ui web-build-client web-build-start \
+	web-build-ui web-build-client web-build-storage web-build-start \
 	web-start web-start-preview electron-start
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
@@ -359,16 +359,31 @@ web-build-ui:
 web-build-client:
 	pnpm run --dir web web:build:client --watch
 
-web-build-start:
-	pnpm run --dir web web:build:start --watch
+web-build-storage:
+	pnpm run --dir web web:build:storage --watch
 
-web-start:
+web-build-start:
+	pnpm run --dir web web:build:start
+
+# `web-build` is a Make prerequisite on every target that launches a
+# vite dev server, because the start + electron vite configs import
+# from workspace library packages at config-LOAD time (e.g.,
+# `electron.vite.config.ts` imports `buildBootScript` from
+# `@pivox/storage`). Vite resolves those imports via each package's
+# `exports` map → `dist/esm/index.js`, which doesn't exist on a fresh
+# checkout. Without this prerequisite, the first `make dev` or
+# `make electron-start` after a clone races the watchers and fails
+# with "Cannot find module '@pivox/storage'" before any of the
+# `--watch` jobs in `dev` have produced their initial output.
+# `pnpm run build` filters to `./packages/**` (see web/package.json),
+# so this builds libraries only — apps stay fresh for the watchers.
+web-start: web-build
 	pnpm run --dir web web:start
 
-web-start-preview:
+web-start-preview: web-build
 	pnpm run --dir web web:start:preview
 
-electron-start:
+electron-start: web-build
 	pnpm run --dir web electron:start
 
 # dev runs every component of the local loop in one terminal: the
@@ -377,10 +392,14 @@ electron-start:
 # server. `concurrently` color-codes each prefix and `--kill-others`
 # tears the rest down the moment any one process exits — so a crashed
 # binary or Ctrl-C cleans up cleanly instead of leaving zombies.
-dev:
+#
+# `web-build` prerequisite — see the comment on `web-start` above for
+# why this is non-optional. Watchers handle incremental rebuilds, but
+# the FIRST emit needs to land before the dev server boots.
+dev: web-build
 	pnpx concurrently \
 		--kill-others \
-		--names "cloud,worker,ollama,nginx,ngrok,web-primitives,web-image-editor,web-features,web-ui,web-client,start" \
+		--names "cloud,worker,ollama,nginx,ngrok,web-primitives,web-image-editor,web-features,web-ui,web-client,web-storage,start" \
 		--prefix-colors "yellow,green,red,cyan,magenta,blue,gray,gray,gray,gray,gray,white" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
@@ -392,9 +411,10 @@ dev:
 		"$(MAKE) web-build-features" \
 		"$(MAKE) web-build-ui" \
 		"$(MAKE) web-build-client" \
+		"$(MAKE) web-build-storage" \
 		"$(MAKE) web-start"
 
-dev-preview:
+dev-preview: web-build-start
 	pnpx concurrently \
 		--kill-others \
 		--names "cloud,worker,ollama,nginx,ngrok,build,start" \

@@ -93,6 +93,7 @@
   },
   "dependencies": {
     "@pivox/client": "workspace:*",
+    "@pivox/storage": "workspace:*",
     "@pivox/image-editor": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",

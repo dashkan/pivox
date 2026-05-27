@@ -1,6 +1,7 @@
 'use client';
 
 import { asyncHandler, reportError } from '@pivox/observability';
+import { LAST_EMAIL, storage } from '@pivox/storage';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { useActionState, useEffect, useRef, useState } from 'react';
 
@@ -16,7 +17,6 @@ import type { User } from 'firebase/auth';
 
 import {
   applyRememberMeAfterSignIn,
-  LAST_EMAIL_STORAGE_KEY,
   type SignInMethod,
 } from '@/login/remember-email';
 import { BROKER_PROVIDER, signInViaBroker } from '@/shared/broker-auth';
@@ -65,17 +65,45 @@ export function useLogin(input: {
    */
   onSuccess?: (user: User) => void | Promise<void>;
   onLinkRequired?: (email: string) => void;
+  /**
+   * SSR-resolved auto-fill email from the `pivox.login.last-email`
+   * cookie. Threaded by the route so the email field paints with
+   * the saved value on first render — without this, the field
+   * would flicker from empty → filled when client hydration reads
+   * the cookie/localStorage after mount.
+   *
+   * Optional because non-SSR consumers (electron) don't supply one;
+   * the lazy initializer below falls back to a client-side cookie
+   * read in that case.
+   */
+  initialEmail?: string | null;
 }): LoginContextValue {
-  const { transport, step, onStepChange, onSuccess, onLinkRequired } = input;
+  const {
+    transport,
+    step,
+    onStepChange,
+    onSuccess,
+    onLinkRequired,
+    initialEmail,
+  } = input;
   const emailRef = useRef<HTMLInputElement | null>(null);
-  const [email, setEmail] = useState('');
+  // Initialize email synchronously from the highest-priority source
+  // available at render time:
+  //   1. SSR-resolved value (matches the HTML the server rendered —
+  //      no hydration mismatch)
+  //   2. Client-side storage (electron + any pure-CSR consumer)
+  //   3. Empty string
+  // `storage.get` is SSR-safe (short-circuits when document/window
+  // are undefined).
+  const [email, setEmail] = useState<string>(
+    () => initialEmail ?? storage.get(LAST_EMAIL) ?? '',
+  );
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  // Defaults to true. The auto-fill email is read from localStorage in
-  // a mount effect (NOT a lazy useState initializer) so the hook is
-  // SSR-safe: server render sees the default empty/true state, the
-  // client mounts and hydrates with the matching default, then the
-  // effect populates from localStorage. Avoids hydration mismatch.
+  // Defaults to true. We don't flip `rememberEmail` based on whether
+  // a saved email exists — the user's intent (default-on) shouldn't
+  // change on the basis of "did we have one stored from a prior
+  // session." If they want to opt out, they uncheck.
   const [rememberEmail, setRememberEmail] = useState(true);
   // Broker-flow lifecycle. The controller is recreated per flow (an
   // AbortController is single-use — once aborted, it can't be reset),
@@ -108,43 +136,23 @@ export function useLogin(input: {
   // applies uniformly across both transports for simplicity.
   const brokerCancelledAtRef = useRef(0);
 
-  // Single mount-time effect that BOTH hydrates from localStorage AND
-  // decides whether the URL is an orphaned `?step=password`. Kept as
-  // one effect deliberately: splitting hydration + fallback into two
-  // `[]`-deps effects creates an effect-order race — the fallback
-  // reads `email` from the current render snapshot ('' on first
-  // render), the hydration's setState is batched into the next
-  // render, so a returning user with a stored email + an orphaned
-  // password URL would get bounced to the email step even though we
-  // could have continued the flow on the password step. Reading
-  // `saved` locally here lets the fallback see the about-to-be-set
-  // email and only redirect when there's truly no context.
+  // Orphan-URL recovery: if we landed on `?step=password` without an
+  // email in state (no SSR value, no cookie, no localStorage), bounce
+  // back to the email step — the password step has no meaning
+  // without prior email submission.
   //
-  // The obvious alternative — a lazy `useState(() => localStorage…)`
-  // initializer — would break SSR: the server renders with '' (no
-  // window), the client hydrates with the stored email, and React
-  // throws a hydration mismatch. Effect-based hydration is the
-  // SSR-safe shape, and the synchronous setState is bounded to a
-  // single one-shot read on mount — exactly the case
-  // `set-state-in-effect` is designed to permit but the linter can't
-  // statically prove.
-  //
-  // We don't flip `rememberEmail` based on whether a saved email
-  // exists — the user's intent (default-on) shouldn't change on the
-  // basis of "did we have one stored from a prior session." If they
-  // want to opt out, they uncheck.
+  // Lazy-init for email above means we can read it directly here
+  // rather than the older split-hydration pattern. `replace: true`
+  // because this isn't a user-intended navigation; we shouldn't
+  // push a new history entry the user has to back out of.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const saved = window.localStorage.getItem(LAST_EMAIL_STORAGE_KEY);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot localStorage hydration; lazy initializer is SSR-unsafe
-    if (saved) setEmail(saved);
-    if (step === 'password' && !saved) {
+    if (step === 'password' && !email) {
       onStepChange('email', { replace: true });
     }
-    // Intentionally [] — one-shot mount-time URL reconciliation +
-    // hydration. The forward step transition (email → password) sets
-    // email first inside the same action, so this effect must not
-    // re-fire and bounce us back.
+    // Intentionally [] — one-shot mount-time URL reconciliation. The
+    // forward step transition (email → password) only runs after a
+    // user submits a valid email, so we don't need to re-check.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -328,6 +336,7 @@ export function useLogin(input: {
     updatePassword: setPassword,
     setRememberEmail,
     formAction,
+    // eslint-disable-next-line react-hooks/refs -- The async handler reads `brokerAbortRef.current` via `withBrokerFlow`, but it only runs when the user clicks a social button (post-render), not during render. The lint rule traces the static call graph and can't distinguish "captured for later" from "invoked now."
     socialLogin: asyncHandler(async (provider) => {
       setError(null);
       await withBrokerFlow((signal) =>

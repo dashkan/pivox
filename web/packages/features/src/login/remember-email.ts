@@ -1,24 +1,23 @@
 /**
- * localStorage policy for the login auto-fill email slot.
+ * Policy for the login auto-fill email slot.
  *
- * Extracted from `use-login.ts` so the decision logic is testable in
- * isolation — the hook's React state machinery doesn't need to be in
- * the test loop. Pure function except for the localStorage side
- * effect.
- *
- * Policy summary (see tests/remember-email.test.ts for behavioral
- * spec):
+ * Storage mechanics (cookie + localStorage dual-store, encoding,
+ * SSR-safety) are owned by `@pivox/storage`. This file is JUST the
+ * policy:
  *   - Password sign-in: respect the remember-me checkbox. ON stores
- *     the email, OFF clears it (covers the user explicitly opting
- *     out — wipes any value left from a prior session).
- *   - Social or SSO sign-in: always clear, regardless of the
- *     checkbox. The auto-fill field isn't useful for those flows
- *     (social uses provider buttons, SSO re-enters the email each
- *     time to discover the provider), and a stale value from an
- *     earlier password sign-in would confuse subsequent visits.
+ *     the email; OFF clears it (explicit opt-out wipes the slot).
+ *   - Social or SSO sign-in: always clear, regardless of checkbox.
+ *     The auto-fill field isn't useful for those flows (social uses
+ *     provider buttons, SSO re-enters the email each time to
+ *     discover the provider), and a stale password-era value would
+ *     confuse subsequent sessions.
+ *
+ * Extracted from `use-login.ts` so the decision logic is testable
+ * in isolation — the hook's React state machinery doesn't need to
+ * be in the test loop.
  */
 
-export const LAST_EMAIL_STORAGE_KEY = 'pivox.login.last-email';
+import { LAST_EMAIL, storage } from '@pivox/storage';
 
 export type SignInMethod = 'password' | 'social' | 'sso';
 
@@ -32,17 +31,15 @@ export interface ApplyRememberMeInput {
 }
 
 export function applyRememberMeAfterSignIn(input: ApplyRememberMeInput): void {
-  // Social / SSO: clear unconditionally. Returning here keeps the
-  // remember-me checkbox state irrelevant for non-password methods —
-  // the policy doesn't care what the user picked, the field isn't
-  // useful for them either way.
+  // Social / SSO: clear unconditionally. The remember-me checkbox is
+  // irrelevant for non-password methods.
   if (input.method !== 'password') {
-    window.localStorage.removeItem(LAST_EMAIL_STORAGE_KEY);
+    storage.clear(LAST_EMAIL);
     return;
   }
 
   if (!input.rememberEmail) {
-    window.localStorage.removeItem(LAST_EMAIL_STORAGE_KEY);
+    storage.clear(LAST_EMAIL);
     return;
   }
 
@@ -52,6 +49,6 @@ export function applyRememberMeAfterSignIn(input: ApplyRememberMeInput): void {
   // valid value than wipe it because of a bug at the call site.
   const trimmed = input.email.trim();
   if (trimmed) {
-    window.localStorage.setItem(LAST_EMAIL_STORAGE_KEY, trimmed);
+    storage.set(LAST_EMAIL, trimmed);
   }
 }

@@ -37,6 +37,7 @@ describe('BrowserRedirectTransport runBrokerOAuth — abort', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- vi.spyOn's ReturnType inference doesn't carry MockInstance shape through the let-declaration; the .mockRestore call is safe at runtime
     openSpy.mockRestore();
     vi.restoreAllMocks();
   });
@@ -99,6 +100,7 @@ describe('BrowserRedirectTransport runBrokerOAuth — abort', () => {
   });
 
   it('resolves as popup_blocked when window.open returns null', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- vi.spyOn return type doesn't carry MockInstance shape through the let-declaration
     openSpy.mockImplementation(() => null);
     const transport = new BrowserRedirectTransport();
     const result = await transport.runBrokerOAuth({ provider: 'google' });

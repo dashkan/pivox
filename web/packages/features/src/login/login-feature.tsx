@@ -14,6 +14,7 @@ export function LoginFeature({
   onStepChange,
   onSuccess,
   onLinkRequired,
+  initialEmail,
   children,
 }: {
   transport: RedirectTransport;
@@ -27,6 +28,14 @@ export function LoginFeature({
   onStepChange: (step: LoginStep, opts?: { replace?: boolean }) => void;
   onSuccess?: (user: User) => void | Promise<void>;
   onLinkRequired?: (email: string) => void;
+  /**
+   * SSR-resolved auto-fill email from the `pivox.login.last-email`
+   * cookie. Threaded by the start app's login route so the email
+   * field paints with the saved value on first render (no
+   * empty → filled flicker on hydration). Electron omits this; the
+   * hook falls back to a client-side cookie + localStorage read.
+   */
+  initialEmail?: string | null;
   children: React.ReactNode;
 }) {
   const value = useLogin({
@@ -35,6 +44,7 @@ export function LoginFeature({
     onStepChange,
     onSuccess,
     onLinkRequired,
+    initialEmail,
   });
 
   return <LoginCard.Provider value={value}>{children}</LoginCard.Provider>;

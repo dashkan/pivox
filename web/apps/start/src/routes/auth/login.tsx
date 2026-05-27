@@ -12,6 +12,7 @@ import type { LoginStep } from '@pivox/ui/login-card';
 import { authProviders } from '@/lib/auth-providers';
 import { browserRedirectTransport } from '@/lib/browser-redirect-transport';
 import { createSession } from '@/server/auth-session';
+import { getLastEmailCookie } from '@/server/prefs';
 
 /**
  * Search schema. `step` lives in the URL so the browser back button
@@ -60,6 +61,15 @@ export const Route = createFileRoute('/auth/login')({
     }
     return out;
   },
+  beforeLoad: async () => {
+    // SSR-read the remembered email cookie on the server pass so the
+    // email field paints with the saved value on first render. Skip
+    // on the client: hydration reuses the SSR-rendered HTML, and the
+    // useLogin lazy initializer reads the cookie directly there.
+    if (typeof window !== 'undefined') return { initialEmail: null };
+    const initialEmail = await getLastEmailCookie();
+    return { initialEmail };
+  },
   component: LoginPage,
 });
 
@@ -67,11 +77,13 @@ function LoginPage() {
   const router = useRouter();
   const navigate = useNavigate({ from: '/auth/login' });
   const { step = 'email', return: returnUrl } = Route.useSearch();
+  const { initialEmail } = Route.useRouteContext();
 
   return (
     <LoginFeature
       transport={browserRedirectTransport}
       step={step}
+      initialEmail={initialEmail}
       // `replace: true` is forwarded by the hook for auto-corrections
       // (rollback on email edit, refresh fallback). Forward transitions
       // (email → password) default to push, which is what gives back-

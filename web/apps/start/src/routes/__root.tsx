@@ -1,5 +1,11 @@
 import { AuthProvider } from '@pivox/features/auth';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
+// Importing @pivox/storage at the top of __root.tsx ensures all item
+// definitions in @pivox/storage/items have been evaluated (each
+// `defineItem` self-registers) BEFORE buildBootScript() reads the
+// registry. The route module is the earliest point in the load
+// graph where the bootstrap script gets serialized.
+import { buildBootScript } from '@pivox/storage';
 import { QueryClient } from '@tanstack/react-query';
 import {
   HeadContent,
@@ -72,40 +78,29 @@ function RootComponent() {
 }
 
 /**
- * Pre-hydration theme application. Inline so it runs before the
- * body paints, preventing the flash-of-wrong-theme that would
- * otherwise show light mode for dark-mode users until React hydrates.
+ * Pre-hydration storage-item bootstrap. Inline so it runs before the
+ * body paints. Generic over every registered StorageItem — for each:
+ *   1. Read from the platform's selected backend. On http(s) origins
+ *      (this app) that's the cookie; on file:// (electron) it's
+ *      localStorage. The inline script branches on
+ *      `location.protocol` — same selection logic as @pivox/storage's
+ *      operations.ts. No cross-store promotion: each platform uses
+ *      exactly one backend.
+ *   2. Invoke the item's `onBoot` (if defined) with the parsed
+ *      value, so the item can apply any DOM/runtime state that
+ *      MUST exist before React mounts (e.g., theme's dark class).
  *
- * Reads the `pivox.theme` cookie. If absent (or value is unrecognized),
- * falls back to the legacy `pivox-theme` localStorage entry (which
- * the older client-only implementation wrote) — this keeps existing
- * users' preferences across the migration. The theme-switcher
- * component handles the localStorage → cookie promotion lazily on
- * first read after hydration.
- *
- * Resolves 'system' via prefers-color-scheme so even system-preference
- * users get the right paint on first frame.
- *
- * Wrapped in try/catch because some browsers throw on
- * matchMedia/localStorage access in particular sandboxes; we'd
- * rather paint light-mode than crash the page.
+ * Themes don't get special-cased here — the THEME StorageItem
+ * declares its own onBoot in `@pivox/storage` and the loop below
+ * picks it up. Adding a new pre-mount setting is a matter of
+ * defining its item with an onBoot; no changes here.
  */
-const THEME_INLINE_SCRIPT = `(function(){try{
-var c=document.cookie.match(/(?:^|; )pivox\\.theme=([^;]+)/);
-var t=c&&c[1];
-if(t!=="light"&&t!=="dark"&&t!=="system"){
-  var l=localStorage.getItem("pivox-theme");
-  t=(l==="light"||l==="dark"||l==="system")?l:"system";
-}
-var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches:t==="dark";
-if(d)document.documentElement.classList.add("dark");
-}catch(e){}})()`;
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INLINE_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: buildBootScript() }} />
         <HeadContent />
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">

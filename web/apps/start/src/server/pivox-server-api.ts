@@ -25,7 +25,10 @@
  */
 
 import { createApiClient, type ApiClient } from '@pivox/client';
-import { createReactQueryApi, type ReactQueryApi } from '@pivox/client/react-query';
+import {
+  createReactQueryApi,
+  type ReactQueryApi,
+} from '@pivox/client/react-query';
 
 import {
   createActorTokenSource,

@@ -93,6 +93,9 @@ importers:
       '@pivox/primitives':
         specifier: workspace:*
         version: link:../../packages/primitives
+      '@pivox/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@pivox/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -175,6 +178,9 @@ importers:
       '@pivox/primitives':
         specifier: workspace:*
         version: link:../../packages/primitives
+      '@pivox/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@pivox/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -300,6 +306,9 @@ importers:
       '@pivox/primitives':
         specifier: workspace:*
         version: link:../primitives
+      '@pivox/storage':
+        specifier: workspace:*
+        version: link:../storage
       '@pivox/ui':
         specifier: workspace:*
         version: link:../ui
@@ -474,6 +483,12 @@ importers:
         specifier: 8.0.14
         version: 8.0.14(@types/node@25.9.1)(jiti@2.7.0)
 
+  packages/storage:
+    devDependencies:
+      vite:
+        specifier: 8.0.14
+        version: 8.0.14(@types/node@25.9.1)(jiti@2.7.0)
+
   packages/ui:
     dependencies:
       '@pivox/client':
@@ -488,6 +503,9 @@ importers:
       '@pivox/primitives':
         specifier: workspace:*
         version: link:../primitives
+      '@pivox/storage':
+        specifier: workspace:*
+        version: link:../storage
       lucide-react:
         specifier: 1.16.0
         version: 1.16.0(react@19.2.6)

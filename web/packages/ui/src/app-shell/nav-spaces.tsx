@@ -24,7 +24,6 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 
-
 import { useAppShellContext } from './app-shell.context';
 
 /**
