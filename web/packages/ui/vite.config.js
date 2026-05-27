@@ -56,7 +56,6 @@ export default mergeConfig(
       './src/link-account-card.ts',
       './src/user-avatar.ts',
       './src/user-profile-card.ts',
-      './src/app-layout.ts',
       './src/app-shell.ts',
       './src/theme-switcher.ts',
       './src/image-editor.ts',
