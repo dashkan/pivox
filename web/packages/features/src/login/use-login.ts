@@ -14,15 +14,13 @@ import type {
 } from '@pivox/ui/login-card';
 import type { User } from 'firebase/auth';
 
+import {
+  applyRememberMeAfterSignIn,
+  LAST_EMAIL_STORAGE_KEY,
+  type SignInMethod,
+} from '@/login/remember-email';
 import { BROKER_PROVIDER, signInViaBroker } from '@/shared/broker-auth';
 import { firebaseErrorMessage } from '@/shared/firebase-error';
-
-/**
- * localStorage key for the auto-fill email. Namespaced under `pivox.`
- * so a future broader settings vocabulary doesn't collide. Stored as
- * a plain string — no JSON envelope — because the value IS the slot.
- */
-const LAST_EMAIL_STORAGE_KEY = 'pivox.login.last-email';
 
 /**
  * Login state machine — email-first.
@@ -79,6 +77,36 @@ export function useLogin(input: {
   // client mounts and hydrates with the matching default, then the
   // effect populates from localStorage. Avoids hydration mismatch.
   const [rememberEmail, setRememberEmail] = useState(true);
+  // Broker-flow lifecycle. The controller is recreated per flow (an
+  // AbortController is single-use — once aborted, it can't be reset),
+  // and the boolean drives UI affordances (disabled inputs + Cancel
+  // button). Kept in a ref because we never want the controller's
+  // identity to trigger a re-render — only `brokerInFlight` should.
+  const [brokerInFlight, setBrokerInFlight] = useState(false);
+  const brokerAbortRef = useRef<AbortController | null>(null);
+  // Timestamp of the most recent broker CANCELLATION (popup_closed —
+  // either from explicit Cancel-button or from the
+  // `BrowserRedirectTransport` closed-poll auto-settling on
+  // background popup close). The form action swallows submits that
+  // fire within ~250ms because those are race clicks landing on the
+  // freshly-rendered Submit button as it replaces Cancel. Real
+  // "Continue" clicks land seconds later, well past the window.
+  //
+  // The guard arms ONLY for cancellation resolutions, not success or
+  // unrelated errors. Two reasons:
+  //   1. Success: onSuccess navigates away in normal flows, so the
+  //      guard would be invisible — but a future success path that
+  //      DOESN'T navigate (e.g., pick-an-org step, MFA challenge)
+  //      would leave the form silently dead for 250ms.
+  //   2. Enter-key retry race: a user who reads the cancellation
+  //      error and presses Enter to retry could be inside the window
+  //      with no feedback for the swallowed submit.
+  //
+  // Electron doesn't have the underlying race because there's no
+  // equivalent background-close signal for the OS browser — broker
+  // waits for explicit IPC abort or 5-min timeout. But the same flag
+  // applies uniformly across both transports for simplicity.
+  const brokerCancelledAtRef = useRef(0);
 
   // Single mount-time effect that BOTH hydrates from localStorage AND
   // decides whether the URL is an orphaned `?step=password`. Kept as
@@ -120,55 +148,86 @@ export function useLogin(input: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Apply the user's remember-me preference at sign-in time. Called
-   * from the success branches of password, SSO, and social flows.
-   *
-   *   rememberEmail=true  + email present → write the slot
-   *   rememberEmail=false                  → clear the slot (the user
-   *                                          explicitly opted out; any
-   *                                          previously stored value
-   *                                          is wiped, including from
-   *                                          a different sign-in path)
-   *   rememberEmail=true  + email empty    → no-op (defensive — every
-   *                                          known sign-in path
-   *                                          carries an email today)
-   *
-   * We persist on SUCCESS only — typos, dismissed SSO popups, and
-   * wrong-password attempts shouldn't poison the slot. No `typeof
-   * window` guard needed: this only runs from async sign-in handlers,
-   * which only execute in the browser.
-   */
-  const persistEmailPreference = (signedInEmail: string): void => {
-    const trimmed = signedInEmail.trim();
-    if (rememberEmail) {
-      if (trimmed) {
-        window.localStorage.setItem(LAST_EMAIL_STORAGE_KEY, trimmed);
-      }
-    } else {
-      window.localStorage.removeItem(LAST_EMAIL_STORAGE_KEY);
-    }
-  };
-
-  // onSuccess wrapper that fires the localStorage write before
-  // forwarding to the caller-supplied callback. Both the password and
-  // SSO/social paths route success through here so the persistence
-  // rule lives in one place.
+  // onSuccess wrapper that applies the remember-me policy before
+  // forwarding to the caller-supplied callback. Method-aware so the
+  // policy can differ between password (respect the checkbox) and
+  // social/SSO (always clear) — see `applyRememberMeAfterSignIn` for
+  // the full spec.
   //
   // Intentionally NOT wrapped in `useCallback`: the closure must
   // capture the LATEST `rememberEmail` at success time (the user may
   // toggle the checkbox while an async sign-in is in flight). A
   // stable identity from useCallback would freeze that closure at
-  // mount and lose post-toggle changes.
-  const handleSuccess = async (user: User): Promise<void> => {
-    persistEmailPreference(user.email ?? email);
+  // mount and lose post-toggle changes. We persist on SUCCESS only —
+  // typos, dismissed SSO popups, and wrong-password attempts
+  // shouldn't poison the slot.
+  const handleSuccess = async (
+    user: User,
+    method: SignInMethod,
+  ): Promise<void> => {
+    applyRememberMeAfterSignIn({
+      method,
+      email: user.email ?? email,
+      rememberEmail,
+    });
     await onSuccess?.(user);
+  };
+
+  // Lifecycle bracket for the broker flow. Wrap a broker-driven sign-
+  // in so brokerInFlight + the AbortController are managed in one
+  // place — every entry path sets it true with a fresh controller,
+  // every exit path (success, failure, cancellation, throw) clears
+  // it. Keeping the bracket here means the call sites stay readable
+  // and we can't forget to clean up on the failure branches.
+  const withBrokerFlow = async (
+    fn: (signal: AbortSignal) => Promise<void>,
+  ): Promise<void> => {
+    // Defensive — if a prior flow's controller somehow lingered (e.g.
+    // a hot-reload mid-flow), abort it so we don't end up with two
+    // popups racing.
+    brokerAbortRef.current?.abort();
+    const controller = new AbortController();
+    brokerAbortRef.current = controller;
+    setBrokerInFlight(true);
+    try {
+      await fn(controller.signal);
+    } finally {
+      // Only clear the in-flight flag if THIS controller is still the
+      // active one. If the user clicked Cancel AND then immediately
+      // started another flow, the second `withBrokerFlow` invocation
+      // replaced the ref; we don't want this finally to clobber the
+      // newer flow's state.
+      if (brokerAbortRef.current === controller) {
+        brokerAbortRef.current = null;
+        // Arm the race-guard timestamp only if the resolution was a
+        // cancellation (signal aborted before settlement). Success
+        // paths and unrelated errors don't have the popup-poll race,
+        // so they don't need the guard — and skipping arming for
+        // them keeps the form responsive in non-cancellation flows.
+        if (controller.signal.aborted) {
+          brokerCancelledAtRef.current = Date.now();
+        }
+        setBrokerInFlight(false);
+      }
+    }
+  };
+
+  const cancelBrokerFlow = (): void => {
+    brokerAbortRef.current?.abort();
   };
 
   // useActionState captures `step`/`email`/`password` per render; on
   // submit React invokes the latest closure, so the freshly-set step
   // is visible inside.
   const [, formAction] = useActionState(async () => {
+    // Race guard: a form submit fired within 250ms of a broker
+    // CANCELLATION is almost certainly a click that landed on the
+    // Submit button as it replaced the Cancel button (see
+    // brokerCancelledAtRef above). Real submits arrive seconds
+    // later, well past the window. Swallow silently — the error
+    // message from the broker resolution is still on screen telling
+    // the user what happened.
+    if (Date.now() - brokerCancelledAtRef.current < 250) return;
     setError(null);
     if (step === 'email') {
       const trimmed = email.trim();
@@ -181,10 +240,16 @@ export function useLogin(input: {
         return;
       }
       if (providerId) {
-        await signInViaBroker(
-          transport,
-          { provider: providerId, loginHint: trimmed },
-          { onSuccess: handleSuccess, onLinkRequired, setError },
+        await withBrokerFlow((signal) =>
+          signInViaBroker(
+            transport,
+            { provider: providerId, loginHint: trimmed, signal },
+            {
+              onSuccess: (user) => handleSuccess(user, 'sso'),
+              onLinkRequired,
+              setError,
+            },
+          ),
         );
         return;
       }
@@ -204,7 +269,7 @@ export function useLogin(input: {
         email,
         password,
       );
-      await handleSuccess(credential.user);
+      await handleSuccess(credential.user, 'password');
     } catch (e) {
       setError(firebaseErrorMessage(e));
     }
@@ -224,7 +289,14 @@ export function useLogin(input: {
     }
   };
 
-  const state: LoginState = { email, password, error, step, rememberEmail };
+  const state: LoginState = {
+    email,
+    password,
+    error,
+    step,
+    rememberEmail,
+    brokerInFlight,
+  };
 
   const actions: LoginActions = {
     updateEmail,
@@ -233,12 +305,19 @@ export function useLogin(input: {
     formAction,
     socialLogin: asyncHandler(async (provider) => {
       setError(null);
-      await signInViaBroker(
-        transport,
-        { provider: BROKER_PROVIDER[provider] ?? provider },
-        { onSuccess: handleSuccess, onLinkRequired, setError },
+      await withBrokerFlow((signal) =>
+        signInViaBroker(
+          transport,
+          { provider: BROKER_PROVIDER[provider] ?? provider, signal },
+          {
+            onSuccess: (user) => handleSuccess(user, 'social'),
+            onLinkRequired,
+            setError,
+          },
+        ),
       );
     }),
+    cancelBrokerFlow,
   };
 
   const meta: LoginMeta = { emailRef };
