@@ -338,23 +338,29 @@ ollama-serve:
 # Web watchers + dev server. Each is a thin wrapper around the
 # corresponding pnpm script in web/package.json so callers can run
 # them standalone (e.g. `make web-primitives`) or composed via `make dev`.
-web-primitives:
+web-build-primitives:
 	pnpm run --dir web web:build:primitives --watch
 
-web-image-editor:
+web-build-image-editor:
 	pnpm run --dir web web:build:image-editor --watch
 
-web-features:
+web-build-features:
 	pnpm run --dir web web:build:features --watch
 
-web-ui:
+web-build-ui:
 	pnpm run --dir web web:build:ui --watch
 
-web-client:
+web-build-client:
 	pnpm run --dir web web:build:client --watch
+
+web-build-start:
+	pnpm run --dir web web:build:start --watch
 
 web-start:
 	pnpm run --dir web web:start
+
+web-start-preview:
+	pnpm run --dir web web:start:preview
 
 electron-start:
 	pnpm run --dir web electron:start
@@ -375,9 +381,21 @@ dev:
 		"$(MAKE) ollama-serve" \
 		"$(MAKE) proxy-nginx" \
 		"$(MAKE) proxy-ngrok" \
-		"$(MAKE) web-primitives" \
-		"$(MAKE) web-image-editor" \
-		"$(MAKE) web-features" \
-		"$(MAKE) web-ui" \
-		"$(MAKE) web-client" \
+		"$(MAKE) web-build-primitives" \
+		"$(MAKE) web-build-image-editor" \
+		"$(MAKE) web-build-features" \
+		"$(MAKE) web-build-ui" \
+		"$(MAKE) web-build-client" \
 		"$(MAKE) web-start"
+
+dev-preview:
+	pnpx concurrently \
+		--kill-others \
+		--names "cloud,worker,ollama,nginx,ngrok,build,start" \
+		--prefix-colors "yellow,green,red,cyan,magenta,white" \
+		"$(MAKE) air" \
+		"$(MAKE) air-worker" \
+		"$(MAKE) ollama-serve" \
+		"$(MAKE) proxy-nginx" \
+		"$(MAKE) proxy-ngrok" \
+		"$(MAKE) web-start-preview"

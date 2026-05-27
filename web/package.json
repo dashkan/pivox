@@ -20,6 +20,7 @@
     "web:build:features": "pnpm --filter @pivox/features build",
     "web:build:ui": "pnpm --filter @pivox/ui build",
     "web:build:client": "pnpm --filter @pivox/client build",
+    "web:build:start": "pnpm --filter @pivox/start build",
     "web:clean": "pnpm clean",
     "web:start": "pnpm --filter @pivox/start dev",
     "web:start:preview": "pnpm --filter @pivox/start preview",
