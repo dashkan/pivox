@@ -55,10 +55,17 @@ export interface RedirectTransport {
   /**
    * Opens the broker OAuth flow for `provider` and resolves with the
    * parsed result.
+   *
+   * `signal` lets the caller cancel an in-flight flow — the
+   * implementation tears down its popup / loopback server / scheme
+   * registration and resolves with `{ ok: false, error: 'popup_closed' }`
+   * (the same shape as user-dismissed). Already-settled flows ignore
+   * the abort.
    */
   runBrokerOAuth(input: {
     provider: string;
     loginHint?: string;
+    signal?: AbortSignal;
   }): Promise<BrokerRedirectResult>;
 
   /**

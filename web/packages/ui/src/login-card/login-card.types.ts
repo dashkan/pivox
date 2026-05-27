@@ -27,6 +27,17 @@ export interface LoginState {
    * the email-autofill UX.
    */
   rememberEmail: boolean;
+  /**
+   * True while a social or SSO broker flow is in flight — the popup /
+   * OS browser is open and we're waiting on the credential. UI uses
+   * this to disable form inputs and swap the submit button to "Cancel
+   * sign-in" so the user has an explicit way out without hunting for
+   * the popup window.
+   *
+   * Not used for the password sign-in path; that's already covered by
+   * the form's `useFormStatus().pending`.
+   */
+  brokerInFlight: boolean;
 }
 
 export interface LoginActions {
@@ -42,6 +53,13 @@ export interface LoginActions {
    */
   formAction: (payload: FormData) => void;
   socialLogin: (provider: PivoxAuthProvider) => void;
+  /**
+   * Cancels any in-flight broker flow. The transport tears down its
+   * popup / loopback server / scheme registration; the broker
+   * promise settles as user-cancelled and `brokerInFlight` flips back
+   * to false. No-op if nothing is in flight.
+   */
+  cancelBrokerFlow: () => void;
 }
 
 export interface LoginMeta {

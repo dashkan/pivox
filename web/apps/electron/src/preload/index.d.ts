@@ -6,6 +6,7 @@ interface PivoxAPI {
     provider: string;
     loginHint?: string;
   }) => Promise<BrokerRedirectResult>;
+  abortBrokerLogin: () => Promise<void>;
 }
 
 declare global {

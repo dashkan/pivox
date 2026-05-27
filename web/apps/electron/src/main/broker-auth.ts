@@ -222,6 +222,23 @@ export function startBrokerLogin(input: {
 }
 
 /**
+ * Settles every in-flight broker login as user-cancelled. Called from
+ * the renderer when the user clicks "Cancel sign-in" while a social /
+ * SSO flow is open. Each settled flow runs its cleanup (closes the
+ * loopback server, clears the timeout) before resolving — same shape
+ * as the user dismissing the OS browser window directly.
+ *
+ * No-op when there's nothing in flight. The Map.values() snapshot
+ * via Array.from is safe even though settleFlow mutates the Map (we
+ * iterate the snapshot, not the live view).
+ */
+export function abortAllBrokerLogins(): void {
+  for (const es of Array.from(pendingFlows.keys())) {
+    settleFlow(es, { ok: false, error: 'popup_closed' });
+  }
+}
+
+/**
  * Settles a broker flow from a `pivox://auth-complete` deep link (the
  * `scheme` transport). Returns true if the URL was a broker callback
  * for a live flow, so the caller knows the deep link is consumed.

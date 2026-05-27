@@ -86,6 +86,13 @@ function LoginCardHeader({ className }: { className?: string }) {
 function LoginCardEmailField({ className }: { className?: string }) {
   const { state, actions, meta } = useLoginContext();
   const { pending } = useFormStatus();
+  // Disable while a broker (social/SSO) flow is in flight too. The
+  // user has committed to a provider — typing here while waiting on
+  // a popup creates confusion (does the popup carry the new value?
+  // no, it doesn't) and accepting input we'd then have to reconcile.
+  // Same rule applies to every input on the card; the Cancel button
+  // is the only enabled control during a broker flow.
+  const disabled = pending || state.brokerInFlight;
   return (
     <Field className={cn('px-4', className)}>
       <FieldLabel>Email</FieldLabel>
@@ -100,7 +107,7 @@ function LoginCardEmailField({ className }: { className?: string }) {
         onChange={(e) => {
           actions.updateEmail(e.target.value);
         }}
-        disabled={pending}
+        disabled={disabled}
       />
     </Field>
   );
@@ -121,7 +128,7 @@ function LoginCardPasswordField({ className }: { className?: string }) {
     <LoginCardPasswordInput
       state={state}
       actions={actions}
-      pending={pending}
+      pending={pending || state.brokerInFlight}
       className={className}
     />
   );
@@ -195,11 +202,19 @@ function LoginCardPasswordInput({
 
 function LoginCardRememberMe({ className }: { className?: string }) {
   const { state, actions } = useLoginContext();
+  const { pending } = useFormStatus();
+  // The remember-me preference applies on success — toggling it mid-
+  // broker-flow has no defined semantics (does it apply to the
+  // in-flight flow's outcome? to the next flow?). Locking the
+  // checkbox while a flow is in flight makes the contract obvious:
+  // "your choice was committed when you started the flow."
+  const disabled = pending || state.brokerInFlight;
   return (
     <div className={cn('flex items-center gap-2', className)}>
       <Checkbox
         id="remember"
         checked={state.rememberEmail}
+        disabled={disabled}
         // Radix's CheckedState is `boolean | 'indeterminate'`. We never
         // use the indeterminate tri-state for this control, so collapse
         // anything non-true to false.
@@ -207,7 +222,13 @@ function LoginCardRememberMe({ className }: { className?: string }) {
           actions.setRememberEmail(next === true);
         }}
       />
-      <Label htmlFor="remember" className="text-sm font-normal">
+      <Label
+        htmlFor="remember"
+        className={cn(
+          'text-sm font-normal',
+          disabled && 'opacity-50',
+        )}
+      >
         Remember me
       </Label>
     </div>
@@ -247,8 +268,37 @@ function LoginCardForgotPassword({
 /* ------------------------------------------------------------------ */
 
 function LoginCardSubmitButton({ className }: { className?: string }) {
-  const { state } = useLoginContext();
+  const { state, actions } = useLoginContext();
   const { pending } = useFormStatus();
+
+  // Broker flow in progress: swap the submit button for a Cancel
+  // button so the user has an explicit way out. type="button" so a
+  // form submit doesn't fire (we want cancelBrokerFlow exclusively).
+  // Cancel is always enabled — the user shouldn't be stuck waiting
+  // because some other "disabled" condition would also be true.
+  //
+  // The "Cancel was clicked but the broker had already resolved in
+  // the background and Submit took its place" race is handled at
+  // the form-action level in `useLogin` (250ms swallow window after
+  // broker resolution) so the UI swap stays snappy here.
+  if (state.brokerInFlight) {
+    return (
+      <div className={cn('flex flex-col gap-4 px-4', className)}>
+        {state.error && <FieldError>{state.error}</FieldError>}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            actions.cancelBrokerFlow();
+          }}
+        >
+          Cancel sign-in
+        </Button>
+      </div>
+    );
+  }
+
   // Step 1 (email) needs only an email; step 2 (password) needs both.
   // The disabled mirror keeps the button from firing a no-op submit
   // before the user has filled the required fields for the step.
@@ -303,8 +353,13 @@ function LoginCardSocialButtons({
   providers?: Array<PivoxAuthProvider>;
   className?: string;
 }) {
-  const { actions } = useLoginContext();
+  const { state, actions } = useLoginContext();
   const { pending } = useFormStatus();
+  // Disable while ANY auth path is in flight — form submit, social,
+  // or SSO. Without the brokerInFlight check, a user could start a
+  // Google flow and click GitHub mid-popup, opening two competing
+  // OAuth windows.
+  const disabled = pending || state.brokerInFlight;
 
   return (
     <div className={cn('flex flex-col gap-2 px-4', className)}>
@@ -313,7 +368,7 @@ function LoginCardSocialButtons({
           type="button"
           variant="outline"
           className="w-full"
-          disabled={pending}
+          disabled={disabled}
           onClick={() => {
             actions.socialLogin('google.com');
           }}
@@ -327,7 +382,7 @@ function LoginCardSocialButtons({
           type="button"
           variant="outline"
           className="w-full"
-          disabled={pending}
+          disabled={disabled}
           onClick={() => {
             actions.socialLogin('github.com');
           }}
@@ -341,7 +396,7 @@ function LoginCardSocialButtons({
           type="button"
           variant="outline"
           className="w-full"
-          disabled={pending}
+          disabled={disabled}
           onClick={() => {
             actions.socialLogin('apple.com');
           }}

@@ -76,7 +76,7 @@ export interface BrokerSignInHandlers {
  */
 export async function signInViaBroker(
   transport: RedirectTransport,
-  input: { provider: string; loginHint?: string },
+  input: { provider: string; loginHint?: string; signal?: AbortSignal },
   handlers: BrokerSignInHandlers,
 ): Promise<void> {
   // Guard the await: runBrokerOAuth normally resolves with a typed

@@ -49,7 +49,15 @@ export class BrowserRedirectTransport implements RedirectTransport {
   runBrokerOAuth(input: {
     provider: string;
     loginHint?: string;
+    signal?: AbortSignal;
   }): Promise<BrokerRedirectResult> {
+    // Already-aborted signal: skip the popup open entirely. Without
+    // this guard, we'd open a popup window then immediately close it
+    // in `settle()` — a visible flash in some browsers and an
+    // unnecessary bump to the popup-blocker heuristic in others.
+    if (input.signal?.aborted) {
+      return Promise.resolve({ ok: false, error: 'popup_closed' });
+    }
     const origin = window.location.origin;
     // `es` is round-tripped through the broker (preserved on the
     // return URL) and cross-checked when the callback posts back —
@@ -83,6 +91,9 @@ export class BrowserRedirectTransport implements RedirectTransport {
         window.removeEventListener('message', onMessage);
         window.clearInterval(closedPoll);
         window.clearTimeout(timer);
+        if (input.signal) {
+          input.signal.removeEventListener('abort', onAbort);
+        }
         if (!popup.closed) popup.close();
         resolve(result);
       };
@@ -96,6 +107,14 @@ export class BrowserRedirectTransport implements RedirectTransport {
         settle(parseBrokerRedirect(event.data.fragment));
       };
 
+      // Caller cancellation: close the popup and resolve as
+      // user-dismissed. The closed-poll would catch this too once
+      // popup.close() runs, but settling synchronously here avoids a
+      // ~400ms wait for the poll's next tick.
+      const onAbort = (): void => {
+        settle({ ok: false, error: 'popup_closed' });
+      };
+
       const closedPoll = window.setInterval(() => {
         if (popup.closed) settle({ ok: false, error: 'popup_closed' });
       }, 400);
@@ -105,6 +124,9 @@ export class BrowserRedirectTransport implements RedirectTransport {
       }, FLOW_TIMEOUT_MS);
 
       window.addEventListener('message', onMessage);
+      // Caller can cancel mid-flight; the already-aborted case is
+      // shortcut above so we know the signal is not yet aborted here.
+      input.signal?.addEventListener('abort', onAbort);
     });
   }
 

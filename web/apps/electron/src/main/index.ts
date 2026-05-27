@@ -5,7 +5,11 @@ import { BrowserWindow, app, ipcMain, shell } from 'electron';
 
 import icon from '../../resources/icon.png?asset';
 
-import { handleAuthCompleteDeepLink, startBrokerLogin } from './broker-auth';
+import {
+  abortAllBrokerLogins,
+  handleAuthCompleteDeepLink,
+  startBrokerLogin,
+} from './broker-auth';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -64,6 +68,14 @@ ipcMain.handle(
     return result;
   },
 );
+
+// Renderer-initiated cancellation of an in-flight broker login. Settles
+// every live flow as user-cancelled — same shape as if the user
+// dismissed the OS browser window directly. The renderer's
+// AbortController fires this when the user clicks "Cancel sign-in".
+ipcMain.handle('auth:abort-broker-login', () => {
+  abortAllBrokerLogins();
+});
 
 // --- Window creation ---
 
