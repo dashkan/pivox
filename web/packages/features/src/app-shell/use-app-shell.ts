@@ -1,6 +1,6 @@
 'use client';
 
-import { organizationId } from '@pivox/client';
+import { ACTIVE_ORG_COOKIE, organizationId } from '@pivox/client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { ReactQueryApi } from '@pivox/client/react-query';
@@ -14,12 +14,48 @@ import type {
 import { useAuth } from '@/auth/use-auth';
 
 /**
- * localStorage slot for the user's active organization. Namespaced
- * `pivox.app-shell.*` so a future broader settings vocabulary
- * doesn't collide. Per-browser, not per-account — same caveat as
- * the remember-me email storage in useLogin.
+ * Legacy localStorage key for the active organization. Phase 6 moved
+ * this to a cookie so SSR can read it; this key sticks around only
+ * long enough to migrate values on first mount. TODO: remove after
+ * 2026-09 (well past 30 days post-deploy for any still-active
+ * browser to have mounted at least once and migrated).
  */
-const ACTIVE_ORG_STORAGE_KEY = 'pivox.app-shell.active-organization';
+const LEGACY_STORAGE_KEY = 'pivox.app-shell.active-organization';
+
+/**
+ * 1-year cookie lifetime. The active-org preference is per-browser
+ * UX state, not a security credential — long expiry matches the
+ * "remember my last context" feel users expect from sidebar pickers.
+ */
+const ACTIVE_ORG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
+function readActiveOrgCookie(): string | null {
+  if (typeof document === 'undefined') return null;
+  const prefix = `${ACTIVE_ORG_COOKIE}=`;
+  for (const part of document.cookie.split('; ')) {
+    if (part.startsWith(prefix)) {
+      const value = part.slice(prefix.length);
+      return value || null;
+    }
+  }
+  return null;
+}
+
+function writeActiveOrgCookie(value: string): void {
+  if (typeof document === 'undefined') return;
+  // `secure` mirrors the session-cookie convention in
+  // apps/start/src/server/auth-session.ts: on for HTTPS, off for
+  // dev's http://localhost. Using location.protocol rather than an
+  // env var because this code runs client-side where process.env
+  // isn't reliably the same shape across bundlers.
+  const secure = typeof location !== 'undefined' && location.protocol === 'https:';
+  document.cookie =
+    `${ACTIVE_ORG_COOKIE}=${value};` +
+    ` path=/;` +
+    ` max-age=${String(ACTIVE_ORG_COOKIE_MAX_AGE)};` +
+    ` samesite=lax` +
+    (secure ? `; secure` : '');
+}
 
 /**
  * Builds the AppShell context value from live data: user from
@@ -72,19 +108,29 @@ export function useAppShell(input: {
 
   const setActiveOrganization = useCallback((organization: string) => {
     setActiveOrganizationState(organization);
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, organization);
+    writeActiveOrgCookie(organization);
   }, []);
 
-  // Hydrate active-org from localStorage on mount. SSR-safe: server
-  // renders with null (org picker collapses to nothing); client
-  // hydrates with the persisted value. The validation effect below
-  // catches the case where the persisted org no longer exists in
-  // the user's membership list (deleted, lost access).
+  // Hydrate active-org from the cookie on mount. SSR can also read
+  // it (the server's beforeLoad gates spaces prefetch on the same
+  // value), so changes here stay coherent across page loads.
+  //
+  // One-shot legacy migration: if the user has a value in the
+  // pre-cookie localStorage key, copy it forward and delete the
+  // legacy entry. Drop this block once enough time has passed for
+  // active users to have migrated (~30 days post-deploy is fine).
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const saved = window.localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot localStorage hydration; lazy initializer is SSR-unsafe
+    let saved = readActiveOrgCookie();
+    if (!saved) {
+      const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacy) {
+        saved = legacy;
+        writeActiveOrgCookie(legacy);
+        window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+      }
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot cookie hydration; lazy initializer is SSR-unsafe
     if (saved) setActiveOrganizationState(saved);
   }, []);
 

@@ -16,7 +16,10 @@ import { Suspense, lazy } from 'react';
 
 import { $api } from '@/lib/api-client';
 import { getServerSession } from '@/server/auth-session';
-import { prefetchOrgsForCurrentUser } from '@/server/prefetch';
+import {
+  prefetchOrgsForCurrentUser,
+  prefetchSpacesForActiveOrg,
+} from '@/server/prefetch';
 
 // Lazy-load the profile dialog so it's client-only — it depends on
 // AuthContext (Firebase user) which isn't available during SSR.
@@ -56,11 +59,16 @@ export const Route = createFileRoute('/_app')({
 
     // SSR-only prefetch. typeof window is the standard guard for
     // server-pass detection in TanStack Start. On the client side,
-    // prefetchOrgsForCurrentUser would be an HTTP RPC roundtrip —
+    // the prefetch server-fns would be HTTP RPC roundtrips —
     // wasteful when the client's useQuery is about to fetch the
-    // same data directly.
+    // same data directly. Orgs + spaces fire concurrently because
+    // they're independent; spaces depends on the active-org cookie
+    // (written by the SPA) rather than on orgs query data.
     if (typeof window === 'undefined' && user.pivoxUserId) {
-      const orgs = await prefetchOrgsForCurrentUser();
+      const [orgs, spaces] = await Promise.all([
+        prefetchOrgsForCurrentUser(),
+        prefetchSpacesForActiveOrg(),
+      ]);
       if (orgs) {
         // queryKey from openapi-react-query is deterministic on
         // (method, path, params) — server-built queryOptions
@@ -72,6 +80,16 @@ export const Route = createFileRoute('/_app')({
           { params: { path: { parent: 'accounts/me' } } },
         );
         context.queryClient.setQueryData(queryKey, orgs);
+      }
+      if (spaces) {
+        // Match the client-side query shape in useAppShell:
+        // path param is the org SLUG, not the full resource name.
+        const { queryKey } = $api.queryOptions(
+          'get',
+          '/v1/organizations/{organization}/spaces',
+          { params: { path: { organization: spaces.orgSlug } } },
+        );
+        context.queryClient.setQueryData(queryKey, spaces.spaces);
       }
     }
 

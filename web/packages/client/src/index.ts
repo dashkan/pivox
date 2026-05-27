@@ -6,3 +6,4 @@ export {
   parseResourceName,
   spaceId,
 } from '@/resource';
+export { ACTIVE_ORG_COOKIE } from '@/cookies';
