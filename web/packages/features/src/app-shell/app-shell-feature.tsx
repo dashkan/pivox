@@ -38,12 +38,23 @@ export function AppShellFeature({
   onCreateOrganization,
   navMain,
   initialUser,
+  initialActiveOrganization,
   children,
 }: {
   $api: ReactQueryApi;
   onCreateOrganization: () => void;
   navMain?: NavMainItem[];
   initialUser?: InitialAppShellUser;
+  /**
+   * Server-resolved active org (resource name `organizations/{slug}`)
+   * read from the `pivox.active-organization` cookie during SSR. Used
+   * as the initial state for the picker so SSR and client first-paint
+   * render the same org — no hydration mismatch, no race with the
+   * orgs-loaded validation effect overwriting the user's selection.
+   * Electron (no SSR) omits this; client falls back to reading the
+   * cookie directly.
+   */
+  initialActiveOrganization?: string | null;
   children: React.ReactNode;
 }) {
   const value: AppShellContextValue = useAppShell({
@@ -51,6 +62,7 @@ export function AppShellFeature({
     onCreateOrganization,
     navMain,
     initialUser,
+    initialActiveOrganization,
   });
   return <AppShell.Provider value={value}>{children}</AppShell.Provider>;
 }

@@ -17,6 +17,7 @@ import { Suspense, lazy } from 'react';
 import { $api } from '@/lib/api-client';
 import { getServerSession } from '@/server/auth-session';
 import {
+  getActiveOrgCookie,
   prefetchOrgsForCurrentUser,
   prefetchSpacesForActiveOrg,
 } from '@/server/prefetch';
@@ -64,11 +65,24 @@ export const Route = createFileRoute('/_app')({
     // same data directly. Orgs + spaces fire concurrently because
     // they're independent; spaces depends on the active-org cookie
     // (written by the SPA) rather than on orgs query data.
+    //
+    // initialActiveOrganization carries the cookie value through to
+    // the shell so the client's useAppShell can use it as a
+    // synchronous lazy-state initializer. Without this, the client
+    // would mount with state=null and the validation effect would
+    // race the cookie-read effect — silently overwriting the user's
+    // selection with orgs[0] on every refresh.
+    let initialActiveOrganization: string | null = null;
     if (typeof window === 'undefined' && user.pivoxUserId) {
-      const [orgs, spaces] = await Promise.all([
+      // Fire the cookie read alongside the prefetches — same request,
+      // server-fn dispatch is in-process so this is effectively a
+      // single batch with no extra round-trips.
+      const [activeOrgCookie, orgs, spaces] = await Promise.all([
+        getActiveOrgCookie(),
         prefetchOrgsForCurrentUser(),
         prefetchSpacesForActiveOrg(),
       ]);
+      initialActiveOrganization = activeOrgCookie;
       if (orgs) {
         // queryKey from openapi-react-query is deterministic on
         // (method, path, params) — server-built queryOptions
@@ -93,14 +107,14 @@ export const Route = createFileRoute('/_app')({
       }
     }
 
-    return { user };
+    return { user, initialActiveOrganization };
   },
   component: AppLayoutRoute,
 });
 
 function AppLayoutRoute() {
   const router = useRouter();
-  const { user } = Route.useRouteContext();
+  const { user, initialActiveOrganization } = Route.useRouteContext();
   return (
     <AppShellFeature
       $api={$api}
@@ -113,6 +127,11 @@ function AppLayoutRoute() {
         email: user.email,
         photoURL: user.photoURL,
       }}
+      // SSR-resolved active org from the cookie. Without this, the
+      // hook's lazy-state init would see `null` during SSR (no
+      // document.cookie on the server), producing an HTML payload
+      // that doesn't match the client's first paint.
+      initialActiveOrganization={initialActiveOrganization}
       onCreateOrganization={() => {
         void router.navigate({ to: '/auth/create-org' });
       }}

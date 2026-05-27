@@ -50,6 +50,34 @@ export type ListSpacesResponse =
   components['schemas']['v1ListSpacesResponse'];
 
 /**
+ * getActiveOrgCookie server-fn: returns the SSR-time value of the
+ * active-org cookie, or null if absent / malformed.
+ *
+ * Exposed as a server fn (rather than a direct
+ * `getCookie(ACTIVE_ORG_COOKIE)` call in beforeLoad) because
+ * `_app.tsx` is shared SSR+client code and TanStack Start's
+ * import-protection plugin blocks `@tanstack/react-start/server`
+ * imports from any module the client bundle reaches. Wrapping the
+ * read in a server fn keeps the import isolated to this
+ * server-only file; the client sees only the RPC stub.
+ */
+export const getActiveOrgCookie = createServerFn({ method: 'GET' })
+  .handler(async (): Promise<string | null> => {
+    try {
+      return getCookie(ACTIVE_ORG_COOKIE) ?? null;
+    } catch (err) {
+      // getCookie shouldn't throw under normal h3 flow, but defensive
+      // here matches the surrounding prefetch fns — beforeLoad must
+      // never fail because the active-org cookie read tripped.
+      console.warn(
+        '[ssr-prefetch] active-org cookie read threw',
+        { message: err instanceof Error ? err.message : String(err) },
+      );
+      return null;
+    }
+  });
+
+/**
  * prefetchOrgsForCurrentUser server-fn: fetches the caller's org
  * list using an SSR-minted actor JWT. Returns the response body on
  * success, `null` on any failure (no session, no pivox_user_id
@@ -59,20 +87,47 @@ export type ListSpacesResponse =
 export const prefetchOrgsForCurrentUser = createServerFn({ method: 'GET' })
   .handler(async (): Promise<ListAccountOrganizationsResponse | null> => {
     const session = await getServerSession();
-    if (!session.user?.pivoxUserId) return null;
+    if (!session.user) {
+      // No session → unauthed visit. Auth gate redirects; nothing
+      // to log.
+      return null;
+    }
+    if (!session.user.pivoxUserId) {
+      // Cookie verifies but blocking function hasn't synced the
+      // `pivox_user_id` claim. Client recovers via token refresh.
+      console.warn(
+        '[ssr-prefetch] orgs: session has no pivox_user_id claim ' +
+          '(Firebase blocking function not yet synced); skipping',
+      );
+      return null;
+    }
 
     try {
       const client = createServerApiClient(session.user.pivoxUserId);
-      const { data } = await client.GET(
+      const { data, response } = await client.GET(
         '/v1/accounts/me/organizations',
         { params: { path: { parent: 'accounts/me' } } },
       );
-      return data ?? null;
-    } catch {
-      // Don't fail SSR on prefetch — surfacing the error would
-      // mean a redirect / error page where a brief loading
-      // skeleton would do. The client retries on hydration via
-      // its own useQuery call.
+      if (!data) {
+        // openapi-fetch returns data=undefined on non-2xx — log
+        // the status so misconfigured backends (wrong audience,
+        // SA not allowlisted, etc.) are diagnosable.
+        console.warn(
+          '[ssr-prefetch] orgs: gateway non-2xx or empty body',
+          { status: response.status },
+        );
+        return null;
+      }
+      return data;
+    } catch (err) {
+      // Most likely: env vars missing (PIVOX_API_URL,
+      // PIVOX_SSR_SA_EMAIL, PIVOX_SSR_AUDIENCE) so
+      // createServerApiClient throws. Surface the message so the
+      // operator can see why SSR prefetch is degrading to CSR.
+      console.warn(
+        '[ssr-prefetch] orgs: threw',
+        { message: err instanceof Error ? err.message : String(err) },
+      );
       return null;
     }
   });
@@ -107,29 +162,45 @@ export interface PrefetchedSpaces {
 export const prefetchSpacesForActiveOrg = createServerFn({ method: 'GET' })
   .handler(async (): Promise<PrefetchedSpaces | null> => {
     const session = await getServerSession();
-    if (!session.user?.pivoxUserId) return null;
+    if (!session.user) return null;
+    if (!session.user.pivoxUserId) {
+      console.warn(
+        '[ssr-prefetch] spaces: session has no pivox_user_id claim',
+      );
+      return null;
+    }
 
     const activeOrg = getCookie(ACTIVE_ORG_COOKIE);
     if (!activeOrg) return null;
 
     try {
-      // Cookie value is the canonical resource name
-      // (`organizations/<slug>`). The gateway path uses the slug
-      // only, so split here. `organizationId` throws on malformed
-      // resource names (odd segment counts, etc.) — the try/catch
-      // catches that path too so a hand-edited / corrupted cookie
-      // degrades to a skeleton render rather than a 500.
       const orgSlug = organizationId(activeOrg);
-      if (!orgSlug) return null;
+      if (!orgSlug) {
+        console.warn(
+          '[ssr-prefetch] spaces: active-org cookie parsed empty',
+          { value: activeOrg },
+        );
+        return null;
+      }
 
       const client = createServerApiClient(session.user.pivoxUserId);
-      const { data } = await client.GET(
+      const { data, response } = await client.GET(
         '/v1/organizations/{organization}/spaces',
         { params: { path: { organization: orgSlug } } },
       );
-      if (!data) return null;
+      if (!data) {
+        console.warn(
+          '[ssr-prefetch] spaces: gateway non-2xx or empty body',
+          { status: response.status, orgSlug },
+        );
+        return null;
+      }
       return { orgSlug, spaces: data };
-    } catch {
+    } catch (err) {
+      console.warn(
+        '[ssr-prefetch] spaces: threw',
+        { message: err instanceof Error ? err.message : String(err) },
+      );
       return null;
     }
   });

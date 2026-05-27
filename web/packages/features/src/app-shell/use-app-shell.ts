@@ -93,8 +93,22 @@ export function useAppShell(input: {
     email: string | null;
     photoURL: string | null;
   };
+  /**
+   * Server-resolved active org from the SSR cookie read. Pass this
+   * from the route's beforeLoad/context when SSR has already seen
+   * the cookie — synchronizes initial state across SSR and client
+   * paints, and prevents the validation effect from racing the
+   * cookie-hydration setState. Electron (no SSR) omits this.
+   */
+  initialActiveOrganization?: string | null;
 }): AppShellContextValue {
-  const { $api, onCreateOrganization, navMain = [], initialUser } = input;
+  const {
+    $api,
+    onCreateOrganization,
+    navMain = [],
+    initialUser,
+    initialActiveOrganization,
+  } = input;
   const { user, signOut } = useAuth();
   // Prefer the live Firebase user once useAuth resolves (mutations
   // on the account update displayName/photoURL in IndexedDB before
@@ -102,36 +116,47 @@ export function useAppShell(input: {
   // user when still loading.
   const displayUser = user ?? initialUser ?? null;
   const [profileOpen, setProfileOpen] = useState(false);
+
+  // Initialize active-org synchronously so the validation effect
+  // below sees a non-null value on its first run. The original
+  // shape (`useState(null)` + a `useEffect` that read the cookie)
+  // had a race: both effects ran after the first commit, the
+  // validation effect's closure captured `activeOrganization=null`
+  // (because effect-1's setState hadn't committed yet), and it
+  // overwrote the user's selection with `orgs[0]` — every refresh
+  // silently reverted the picker to the alphabetically-first org
+  // and rewrote the cookie. Lazy initializer eliminates the race.
+  //
+  // Precedence: SSR-resolved value (matches the HTML the server
+  // rendered, no hydration mismatch) > client-side cookie read
+  // (covers electron + any pure CSR path) > null.
   const [activeOrganization, setActiveOrganizationState] = useState<
     string | null
-  >(null);
+  >(() => {
+    if (initialActiveOrganization) return initialActiveOrganization;
+    if (typeof document === 'undefined') return null;
+    return readActiveOrgCookie();
+  });
 
   const setActiveOrganization = useCallback((organization: string) => {
     setActiveOrganizationState(organization);
     writeActiveOrgCookie(organization);
   }, []);
 
-  // Hydrate active-org from the cookie on mount. SSR can also read
-  // it (the server's beforeLoad gates spaces prefetch on the same
-  // value), so changes here stay coherent across page loads.
-  //
-  // One-shot legacy migration: if the user has a value in the
-  // pre-cookie localStorage key, copy it forward and delete the
-  // legacy entry. Drop this block once enough time has passed for
-  // active users to have migrated (~30 days post-deploy is fine).
+  // One-shot legacy localStorage → cookie migration. Runs only when
+  // the cookie is genuinely absent; the lazy initializer above
+  // already covers the "cookie has a value" case. Drop this block
+  // once enough time has passed for active users to have migrated
+  // (~30 days post-deploy is fine).
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    let saved = readActiveOrgCookie();
-    if (!saved) {
-      const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (legacy) {
-        saved = legacy;
-        writeActiveOrgCookie(legacy);
-        window.localStorage.removeItem(LEGACY_STORAGE_KEY);
-      }
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot cookie hydration; lazy initializer is SSR-unsafe
-    if (saved) setActiveOrganizationState(saved);
+    if (readActiveOrgCookie()) return;
+    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacy) return;
+    writeActiveOrgCookie(legacy);
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot legacy migration; falls through to validation effect below
+    setActiveOrganizationState(legacy);
   }, []);
 
   // Orgs query — slim caller-scoped view (used by post-sign-in
