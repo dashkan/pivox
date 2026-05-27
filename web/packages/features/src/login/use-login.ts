@@ -1,6 +1,6 @@
 'use client';
 
-import { asyncHandler } from '@pivox/observability';
+import { asyncHandler, reportError } from '@pivox/observability';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { useActionState, useEffect, useRef, useState } from 'react';
 
@@ -219,59 +219,72 @@ export function useLogin(input: {
   // useActionState captures `step`/`email`/`password` per render; on
   // submit React invokes the latest closure, so the freshly-set step
   // is visible inside.
+  //
+  // The body is wrapped in a try/catch + reportError to match
+  // socialLogin's `asyncHandler` shape. socialLogin uses asyncHandler
+  // directly (canonical onClick pattern: returns void); formAction
+  // can't because useActionState's signature requires a return value,
+  // so we do the equivalent inline. Both paths route unexpected
+  // throws to observability — without this, SSO failures escaping
+  // signInViaBroker / withBrokerFlow would be silently swallowed by
+  // React's transition error boundary.
   const [, formAction] = useActionState(async () => {
-    // Race guard: a form submit fired within 250ms of a broker
-    // CANCELLATION is almost certainly a click that landed on the
-    // Submit button as it replaced the Cancel button (see
-    // brokerCancelledAtRef above). Real submits arrive seconds
-    // later, well past the window. Swallow silently — the error
-    // message from the broker resolution is still on screen telling
-    // the user what happened.
-    if (Date.now() - brokerCancelledAtRef.current < 250) return;
-    setError(null);
-    if (step === 'email') {
-      const trimmed = email.trim();
-      if (!trimmed) return;
-      let providerId: string | null;
-      try {
-        providerId = await transport.resolveSsoProvider(trimmed);
-      } catch {
-        setError("Couldn't reach the sign-in service. Please try again.");
-        return;
-      }
-      if (providerId) {
-        await withBrokerFlow((signal) =>
-          signInViaBroker(
-            transport,
-            { provider: providerId, loginHint: trimmed, signal },
-            {
-              onSuccess: (user) => handleSuccess(user, 'sso'),
-              onLinkRequired,
-              setError,
-            },
-          ),
-        );
-        return;
-      }
-      // No SSO for this domain — reveal the password field. We do NOT
-      // surface "no account exists" here: `:resolveProvider` is a
-      // public endpoint with anti-enumeration shape, and the password
-      // path's invalid-credentials response already covers the
-      // bad-account case with the same non-disclosing message.
-      onStepChange('password');
-      return;
-    }
-    // step === 'password'
-    if (!password) return;
     try {
-      const credential = await signInWithEmailAndPassword(
-        getAuth(),
-        email,
-        password,
-      );
-      await handleSuccess(credential.user, 'password');
-    } catch (e) {
-      setError(firebaseErrorMessage(e));
+      // Race guard: a form submit fired within 250ms of a broker
+      // CANCELLATION is almost certainly a click that landed on the
+      // Submit button as it replaced the Cancel button (see
+      // brokerCancelledAtRef above). Real submits arrive seconds
+      // later, well past the window. Swallow silently — the error
+      // message from the broker resolution is still on screen telling
+      // the user what happened.
+      if (Date.now() - brokerCancelledAtRef.current < 250) return;
+      setError(null);
+      if (step === 'email') {
+        const trimmed = email.trim();
+        if (!trimmed) return;
+        let providerId: string | null;
+        try {
+          providerId = await transport.resolveSsoProvider(trimmed);
+        } catch {
+          setError("Couldn't reach the sign-in service. Please try again.");
+          return;
+        }
+        if (providerId) {
+          await withBrokerFlow((signal) =>
+            signInViaBroker(
+              transport,
+              { provider: providerId, loginHint: trimmed, signal },
+              {
+                onSuccess: (user) => handleSuccess(user, 'sso'),
+                onLinkRequired,
+                setError,
+              },
+            ),
+          );
+          return;
+        }
+        // No SSO for this domain — reveal the password field. We do NOT
+        // surface "no account exists" here: `:resolveProvider` is a
+        // public endpoint with anti-enumeration shape, and the password
+        // path's invalid-credentials response already covers the
+        // bad-account case with the same non-disclosing message.
+        onStepChange('password');
+        return;
+      }
+      // step === 'password'
+      if (!password) return;
+      try {
+        const credential = await signInWithEmailAndPassword(
+          getAuth(),
+          email,
+          password,
+        );
+        await handleSuccess(credential.user, 'password');
+      } catch (e) {
+        setError(firebaseErrorMessage(e));
+      }
+    } catch (err) {
+      reportError(err, { source: 'useLogin.formAction' });
     }
   }, null);
 
