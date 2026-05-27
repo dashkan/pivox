@@ -16,12 +16,12 @@ const HOUR_MS = 60 * 60 * 1000;
 function makeMint(
   opts: { lifetimeMs?: number } = {},
 ): Mock<ActorTokenMint> {
-  return vi.fn<ActorTokenMint>(async (uid) => {
-    return {
+  return vi.fn<ActorTokenMint>((uid) =>
+    Promise.resolve({
       token: `token-for-${uid}`,
       expiresAt: Date.now() + (opts.lifetimeMs ?? HOUR_MS),
-    };
-  });
+    }),
+  );
 }
 
 describe('createActorTokenSource', () => {
@@ -89,7 +89,8 @@ describe('createActorTokenSource', () => {
 
     expect(mint).toHaveBeenCalledTimes(1);
 
-    resolveMint!({ token: 'shared', expiresAt: Date.now() + HOUR_MS });
+    if (!resolveMint) throw new Error('mint never registered its resolver');
+    resolveMint({ token: 'shared', expiresAt: Date.now() + HOUR_MS });
     const [a, b] = await Promise.all([p1, p2]);
 
     expect(a).toBe('shared');
@@ -115,10 +116,13 @@ describe('createActorTokenSource', () => {
     // caller gets a fresh attempt — otherwise a transient signJwt
     // failure would lock that uid out for the process lifetime.
     let attempt = 0;
-    const mint = vi.fn<ActorTokenMint>(async (uid) => {
+    const mint = vi.fn<ActorTokenMint>((uid) => {
       attempt++;
-      if (attempt === 1) throw new Error('transient');
-      return { token: `recovered-${uid}`, expiresAt: Date.now() + HOUR_MS };
+      if (attempt === 1) return Promise.reject(new Error('transient'));
+      return Promise.resolve({
+        token: `recovered-${uid}`,
+        expiresAt: Date.now() + HOUR_MS,
+      });
     });
     const getToken = createActorTokenSource(mint);
 

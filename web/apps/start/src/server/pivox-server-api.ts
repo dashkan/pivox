@@ -24,7 +24,7 @@
  * externals config).
  */
 
-import { createApiClient } from '@pivox/client';
+import { createApiClient, type ApiClient } from '@pivox/client';
 import { createReactQueryApi, type ReactQueryApi } from '@pivox/client/react-query';
 
 import {
@@ -139,18 +139,32 @@ export function _resetServerApiForTests(): void {
  * without a way to mint tokens, and silently degrading would mean
  * every API call fails at the gateway instead of at boot.
  */
-export function createServerApi(pivoxUserId: string): ReactQueryApi {
+/**
+ * createServerApiClient builds the openapi-fetch client used for
+ * direct (non-react-query) server-side calls. Server functions that
+ * fetch on behalf of a user and hand the result to
+ * `queryClient.setQueryData(...)` use this directly — react-query
+ * machinery isn't needed when the caller already has a queryClient
+ * to push results into.
+ *
+ * Same actor-token + base URL as `createServerApi`; just exposes the
+ * lower layer.
+ */
+export function createServerApiClient(pivoxUserId: string): ApiClient {
   if (!pivoxUserId) {
     throw new Error(
-      'createServerApi: pivoxUserId is required. The Firebase blocking ' +
-        'function may not have fired yet — surface as a recoverable error ' +
-        'and refresh the ID token.',
+      'createServerApiClient: pivoxUserId is required. The Firebase ' +
+        'blocking function may not have fired yet — surface as a ' +
+        'recoverable error and refresh the ID token.',
     );
   }
   const cfg = getConfig();
-  const apiClient = createApiClient({
+  return createApiClient({
     baseUrl: cfg.baseUrl,
     getAuthToken: () => cfg.tokenSource(pivoxUserId),
   });
-  return createReactQueryApi(apiClient);
+}
+
+export function createServerApi(pivoxUserId: string): ReactQueryApi {
+  return createReactQueryApi(createServerApiClient(pivoxUserId));
 }

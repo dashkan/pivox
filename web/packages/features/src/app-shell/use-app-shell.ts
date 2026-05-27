@@ -45,9 +45,26 @@ export function useAppShell(input: {
   onCreateOrganization: () => void;
   /** Top-level nav items. Empty placeholder works for the moment. */
   navMain?: NavMainItem[];
+  /**
+   * Server-verified user, threaded by the SSR route when available.
+   * Used as the displayed user until `useAuth()` resolves on
+   * hydration — eliminates the avatar / display-name flash on cold
+   * loads. Electron (no SSR) passes nothing; useAuth() is the
+   * sole source there.
+   */
+  initialUser?: {
+    displayName: string | null;
+    email: string | null;
+    photoURL: string | null;
+  };
 }): AppShellContextValue {
-  const { $api, onCreateOrganization, navMain = [] } = input;
+  const { $api, onCreateOrganization, navMain = [], initialUser } = input;
   const { user, signOut } = useAuth();
+  // Prefer the live Firebase user once useAuth resolves (mutations
+  // on the account update displayName/photoURL in IndexedDB before
+  // they round-trip through Pivox). Fall back to the SSR-seeded
+  // user when still loading.
+  const displayUser = user ?? initialUser ?? null;
   const [profileOpen, setProfileOpen] = useState(false);
   const [activeOrganization, setActiveOrganizationState] = useState<
     string | null
@@ -165,11 +182,11 @@ export function useAppShell(input: {
 
   return {
     state: {
-      user: user
+      user: displayUser
         ? {
-            displayName: user.displayName,
-            email: user.email,
-            photoURL: user.photoURL,
+            displayName: displayUser.displayName,
+            email: displayUser.email,
+            photoURL: displayUser.photoURL,
           }
         : null,
       orgs,

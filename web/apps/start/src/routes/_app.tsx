@@ -16,6 +16,7 @@ import { Suspense, lazy } from 'react';
 
 import { $api } from '@/lib/api-client';
 import { getServerSession } from '@/server/auth-session';
+import { prefetchOrgsForCurrentUser } from '@/server/prefetch';
 
 // Lazy-load the profile dialog so it's client-only — it depends on
 // AuthContext (Firebase user) which isn't available during SSR.
@@ -23,10 +24,10 @@ const ProfileDialog = lazy(() => import('./_app/-profile-dialog'));
 
 export const Route = createFileRoute('/_app')({
   /**
-   * Server-side auth gate. Runs on both SSR and client-side
-   * navigations (the latter does an HTTP round-trip to invoke the
-   * server function). Three outcomes per the cookie-state matrix:
+   * Server-side auth gate + SSR prefetch. Runs on both SSR and
+   * client-side navigations.
    *
+   * Auth: three outcomes per the cookie-state matrix:
    *   1. Valid session     → continue, pass user via route context
    *   2. Invalid cookie    → redirect /auth/verify-session for the
    *      (expired / revoked)  silent-recovery flow (client-side
@@ -34,25 +35,66 @@ export const Route = createFileRoute('/_app')({
    *                           refresh token)
    *   3. No cookie at all  → redirect /auth/login (cold visit — no
    *                          recovery to attempt)
+   *
+   * Prefetch: on the SSR pass only (typeof window === 'undefined'),
+   * fetch the caller's orgs via an SA-signed actor JWT and prime
+   * the route's QueryClient. The client's useQuery hits the cached
+   * entry on hydration — no skeleton flash for the nav picker on
+   * cold loads. Client-side navigations skip this; the client's
+   * own useQuery handles fetching once mounted.
    */
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async ({ context, location }) => {
     const { user, cookiePresent } = await getServerSession();
-    if (user) return { user };
-    // eslint-disable-next-line @typescript-eslint/only-throw-error
-    throw redirect({
-      to: cookiePresent ? '/auth/verify-session' : '/auth/login',
-      search: { return: location.pathname + location.searchStr },
-      replace: true,
-    });
+    if (!user) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw redirect({
+        to: cookiePresent ? '/auth/verify-session' : '/auth/login',
+        search: { return: location.pathname + location.searchStr },
+        replace: true,
+      });
+    }
+
+    // SSR-only prefetch. typeof window is the standard guard for
+    // server-pass detection in TanStack Start. On the client side,
+    // prefetchOrgsForCurrentUser would be an HTTP RPC roundtrip —
+    // wasteful when the client's useQuery is about to fetch the
+    // same data directly.
+    if (typeof window === 'undefined' && user.pivoxUserId) {
+      const orgs = await prefetchOrgsForCurrentUser();
+      if (orgs) {
+        // queryKey from openapi-react-query is deterministic on
+        // (method, path, params) — server-built queryOptions
+        // produces the same key the client's useQuery uses, so
+        // setQueryData primes the entry the client will read.
+        const { queryKey } = $api.queryOptions(
+          'get',
+          '/v1/accounts/me/organizations',
+          { params: { path: { parent: 'accounts/me' } } },
+        );
+        context.queryClient.setQueryData(queryKey, orgs);
+      }
+    }
+
+    return { user };
   },
   component: AppLayoutRoute,
 });
 
 function AppLayoutRoute() {
   const router = useRouter();
+  const { user } = Route.useRouteContext();
   return (
     <AppShellFeature
       $api={$api}
+      // Seed the shell with the server-verified user so the nav-
+      // user menu paints with name + photo on first SSR render,
+      // not a half-rendered avatar that pops in after Firebase JS
+      // resolves on hydration.
+      initialUser={{
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+      }}
       onCreateOrganization={() => {
         void router.navigate({ to: '/auth/create-org' });
       }}
