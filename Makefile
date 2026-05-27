@@ -1,5 +1,7 @@
-.PHONY: build run test test-up test-down tidy lint lint-fix fmt generate \
-	air air-worker mocks dev log-pivox-app-macos run-app-macos build-app-macos \
+.PHONY: build test test-up test-down tidy lint lint-fix fmt generate \
+	run-server run-worker run-agent \
+	air air-worker mocks dev dev-preview \
+	log-pivox-app-macos run-app-macos build-app-macos \
 	configure-app-macos ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin \
@@ -10,8 +12,9 @@
 	ai-native \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
 	test-native-ui \
-	web-primitives web-image-editor web-features web-ui web-client \
-	web-start electron-start
+	web-build web-build-primitives web-build-image-editor web-build-features \
+	web-build-ui web-build-client web-build-start \
+	web-start web-start-preview electron-start
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
@@ -338,6 +341,9 @@ ollama-serve:
 # Web watchers + dev server. Each is a thin wrapper around the
 # corresponding pnpm script in web/package.json so callers can run
 # them standalone (e.g. `make web-primitives`) or composed via `make dev`.
+web-build:
+	pnpm run --dir web web:build
+
 web-build-primitives:
 	pnpm run --dir web web:build:primitives --watch
 
