@@ -36,7 +36,39 @@ installErrorReporters();
  */
 export function getRouter() {
   ensureFirebase();
-  const queryClient = new QueryClient();
+  // Default `staleTime` of 1 minute on every query.
+  //
+  // Per the TanStack Query SSR docs: with SSR, set a default
+  // staleTime above 0 to avoid refetching immediately on the client.
+  // SSR's `setQueryData` records `dataUpdatedAt = Date.now()`, that
+  // timestamp is dehydrated into the SSR payload and rehydrated by
+  // setupRouterSsrQueryIntegration on the client. useQuery on mount
+  // compares `Date.now() - dataUpdatedAt` to `staleTime`: under, no
+  // refetch; over, background refetch (stale-while-revalidate).
+  //
+  // 1 minute keeps SSR-fresh data authoritative for the cold-load
+  // window without blocking long-lived tabs from picking up changes
+  // — for an open tab, focus/reconnect events still revalidate
+  // after the window. Per-query overrides via the `staleTime` option
+  // still win where a specific call has different freshness needs
+  // (e.g., a real-time feed wanting staleTime: 0, or truly immutable
+  // data wanting Infinity).
+  //
+  // Mutations force-refresh the data they touched via explicit
+  // `queryClient.invalidateQueries({ queryKey: ... })` in
+  // `onSettled` — that's the path that keeps the UI in sync after
+  // writes, independent of the time-based revalidation.
+  //
+  // Electron deliberately runs the default `staleTime: 0`. With no
+  // SSR-primed cache there, refetch-on-mount gives users live data
+  // on every screen entry — the right default for a desktop app.
+  // The 60s window only earns its keep when there's a dehydrated
+  // payload to trust.
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { staleTime: 60 * 1000 },
+    },
+  });
   const router = createTanStackRouter({
     routeTree,
     context: { queryClient },
