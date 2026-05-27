@@ -6,7 +6,7 @@ import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import icon from '../../resources/icon.png?asset';
 
 import {
-  abortAllBrokerLogins,
+  abortBrokerLogin,
   handleAuthCompleteDeepLink,
   startBrokerLogin,
 } from './broker-auth';
@@ -62,19 +62,24 @@ app.on('second-instance', (_event, argv) => {
 // decision once it holds the returned credential.
 ipcMain.handle(
   'auth:start-broker-login',
-  async (_event, input: { provider: string; loginHint?: string }) => {
+  async (
+    _event,
+    input: { provider: string; loginHint?: string; flowId?: string },
+  ) => {
     const result = await startBrokerLogin(input);
     mainWindow?.focus();
     return result;
   },
 );
 
-// Renderer-initiated cancellation of an in-flight broker login. Settles
-// every live flow as user-cancelled — same shape as if the user
-// dismissed the OS browser window directly. The renderer's
-// AbortController fires this when the user clicks "Cancel sign-in".
-ipcMain.handle('auth:abort-broker-login', () => {
-  abortAllBrokerLogins();
+// Renderer-initiated cancellation of a specific broker login flow.
+// The renderer-supplied flowId identifies which flow to settle —
+// keyed so a future concurrent-flow scenario can cancel one without
+// touching the others. No-op if the flow has already settled (the
+// renderer's abort listener can fire after the flow's natural
+// resolution; harmless).
+ipcMain.handle('auth:abort-broker-login', (_event, flowId: string) => {
+  abortBrokerLogin(flowId);
 });
 
 // --- Window creation ---

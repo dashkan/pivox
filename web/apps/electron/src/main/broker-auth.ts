@@ -161,12 +161,26 @@ function handleLoopbackRequest(
  * resolves with the parsed result. The renderer's RedirectTransport
  * calls this over IPC; sign-in vs. account-link is the renderer's
  * decision once it holds the credential.
+ *
+ * `flowId` is the renderer-supplied identifier for this flow. It
+ * serves two purposes: (1) it's the CSRF token round-tripped through
+ * the broker (echoed back in the callback URL's `es` param and
+ * cross-checked here), and (2) it's the key the renderer uses to
+ * target an `abortBrokerLogin(flowId)` IPC at this specific flow.
+ * Renderer generates it so the renderer can call abort BEFORE
+ * receiving the start result.
+ *
+ * `flowId` is optional for backward compat — if absent we fall
+ * back to generating one internally, which keeps the loopback /
+ * scheme transports working as before but loses scoped-abort
+ * support. New callers should always pass a flowId.
  */
 export function startBrokerLogin(input: {
   provider: string;
   loginHint?: string;
+  flowId?: string;
 }): Promise<BrokerRedirectResult> {
-  const es = randomUUID();
+  const es = input.flowId ?? randomUUID();
 
   return new Promise<BrokerRedirectResult>((resolve) => {
     const timer = setTimeout(() => {
@@ -222,20 +236,21 @@ export function startBrokerLogin(input: {
 }
 
 /**
- * Settles every in-flight broker login as user-cancelled. Called from
- * the renderer when the user clicks "Cancel sign-in" while a social /
- * SSO flow is open. Each settled flow runs its cleanup (closes the
- * loopback server, clears the timeout) before resolving — same shape
- * as the user dismissing the OS browser window directly.
+ * Settles the broker login identified by `flowId` as user-cancelled.
+ * Called from the renderer when the user clicks "Cancel sign-in"
+ * while a social / SSO flow is open. Runs the flow's cleanup (closes
+ * the loopback server, clears the timeout) before resolving — same
+ * shape as the user dismissing the OS browser window directly.
  *
- * No-op when there's nothing in flight. The Map.values() snapshot
- * via Array.from is safe even though settleFlow mutates the Map (we
- * iterate the snapshot, not the live view).
+ * No-op when the flow isn't in the pending map (already settled, or
+ * the renderer's abort listener fired stale). Returns true if a flow
+ * was actually settled, false otherwise — tests use this; production
+ * callers ignore the return.
  */
-export function abortAllBrokerLogins(): void {
-  for (const es of Array.from(pendingFlows.keys())) {
-    settleFlow(es, { ok: false, error: 'popup_closed' });
-  }
+export function abortBrokerLogin(flowId: string): boolean {
+  if (!pendingFlows.has(flowId)) return false;
+  settleFlow(flowId, { ok: false, error: 'popup_closed' });
+  return true;
 }
 
 /**

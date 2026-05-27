@@ -5,8 +5,9 @@ interface PivoxAPI {
   startBrokerLogin: (input: {
     provider: string;
     loginHint?: string;
+    flowId?: string;
   }) => Promise<BrokerRedirectResult>;
-  abortBrokerLogin: () => Promise<void>;
+  abortBrokerLogin: (flowId: string) => Promise<void>;
 }
 
 declare global {

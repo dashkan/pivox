@@ -28,21 +28,26 @@ export class ElectronRedirectTransport implements RedirectTransport {
     if (input.signal?.aborted) {
       return Promise.resolve({ ok: false, error: 'popup_closed' });
     }
-    // Forward the OS-browser open to main. The signal listener below
-    // hooks an abort to the new abortBrokerLogin IPC; main settles
-    // every in-flight flow as popup_closed, which is what
-    // startBrokerLogin resolves with.
+
+    // Renderer-generated flow id: used both as the CSRF token main
+    // round-trips through the broker AND as the IPC key for
+    // abortBrokerLogin. Generating here means we can call abort
+    // BEFORE startBrokerLogin's promise resolves — the abort IPC
+    // targets the specific flow rather than every pending flow.
+    const flowId = crypto.randomUUID();
+
     const promise = window.api.startBrokerLogin({
       provider: input.provider,
+      flowId,
       ...(input.loginHint ? { loginHint: input.loginHint } : {}),
     });
 
     if (input.signal) {
       const onAbort = (): void => {
-        // Best-effort fire-and-forget — if the main process has
-        // already settled the flow (success arrived a tick before
-        // the user clicked cancel), this is a no-op there.
-        void window.api.abortBrokerLogin();
+        // Best-effort fire-and-forget — if main has already settled
+        // the flow (success arrived a tick before the user clicked
+        // cancel), abortBrokerLogin is a no-op there.
+        void window.api.abortBrokerLogin(flowId);
       };
       input.signal.addEventListener('abort', onAbort);
       // Remove the listener after the flow resolves so a later
