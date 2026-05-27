@@ -56,14 +56,25 @@ describe('createServerApi', () => {
     );
   });
 
-  it('throws when PIVOX_SSR_AUDIENCE is unset', () => {
+  it('throws when neither PIVOX_SSR_AUDIENCE nor PIVOX_AUDIENCE is set', () => {
     process.env.PIVOX_API_URL = 'https://api.pivox.app';
     process.env.PIVOX_SSR_SA_EMAIL = 'ssr@pivox.iam.gserviceaccount.com';
     delete process.env.PIVOX_SSR_AUDIENCE;
+    delete process.env.PIVOX_AUDIENCE;
 
-    expect(() => createServerApi('user-1')).toThrow(
-      /PIVOX_SSR_AUDIENCE not set/,
-    );
+    expect(() => createServerApi('user-1')).toThrow(/PIVOX_SSR_AUDIENCE/);
+  });
+
+  it('inherits PIVOX_AUDIENCE when PIVOX_SSR_AUDIENCE is unset', () => {
+    // The override-then-default pattern mirrors the backend: most
+    // deployments only set PIVOX_AUDIENCE and have both surfaces
+    // share it. Explicit PIVOX_SSR_AUDIENCE wins when set.
+    process.env.PIVOX_API_URL = 'https://api.pivox.app';
+    process.env.PIVOX_SSR_SA_EMAIL = 'ssr@pivox.iam.gserviceaccount.com';
+    delete process.env.PIVOX_SSR_AUDIENCE;
+    process.env.PIVOX_AUDIENCE = 'https://api.pivox.app';
+
+    expect(() => createServerApi('user-1')).not.toThrow();
   });
 
   it('constructs a ReactQueryApi when all env vars are present', () => {

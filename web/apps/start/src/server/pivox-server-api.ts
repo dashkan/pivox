@@ -50,11 +50,13 @@ const ENV_API_URL = 'PIVOX_API_URL';
 const ENV_SA_EMAIL = 'PIVOX_SSR_SA_EMAIL';
 
 /**
- * Audience expected on minted SA-signed JWTs. Mirrors the backend's
- * `PIVOX_SSR_AUDIENCE` (which itself defaults to `PIVOX_AUDIENCE`
- * for deployments that target one backend URL).
+ * Audience expected on minted SA-signed JWTs. Mirrors the backend
+ * shape: `PIVOX_SSR_AUDIENCE` is the override, `PIVOX_AUDIENCE` is
+ * the default. Most deployments target a single backend URL and
+ * only need to set `PIVOX_AUDIENCE`.
  */
-const ENV_AUDIENCE = 'PIVOX_SSR_AUDIENCE';
+const ENV_AUDIENCE_OVERRIDE = 'PIVOX_SSR_AUDIENCE';
+const ENV_AUDIENCE_DEFAULT = 'PIVOX_AUDIENCE';
 
 /**
  * Cached server-API state. Built on first use so module import
@@ -78,7 +80,16 @@ let _cached: CachedConfig | null = null;
 function getConfig(): CachedConfig {
   if (_cached) return _cached;
   const saEmail = process.env[ENV_SA_EMAIL];
-  const audience = process.env[ENV_AUDIENCE];
+  // Override-then-default: PIVOX_SSR_AUDIENCE wins when set;
+  // otherwise inherit from PIVOX_AUDIENCE (which the backend also
+  // uses for its primary audience config). Single-backend
+  // deployments only set PIVOX_AUDIENCE.
+  // `||` (not `??`): an empty-string PIVOX_SSR_AUDIENCE is treated
+  // as 'unset' and falls through to PIVOX_AUDIENCE. Matches how
+  // operators clear a single env var without exporting it as
+  // unset.
+  const audience =
+    process.env[ENV_AUDIENCE_OVERRIDE] || process.env[ENV_AUDIENCE_DEFAULT];
   const baseUrl = process.env[ENV_API_URL];
   if (!baseUrl) {
     throw new Error(
@@ -94,8 +105,9 @@ function getConfig(): CachedConfig {
   }
   if (!audience) {
     throw new Error(
-      `${ENV_AUDIENCE} not set; SSR server cannot mint actor tokens. ` +
-        `Set it to the backend's expected JWT audience (typically the API URL).`,
+      `${ENV_AUDIENCE_OVERRIDE} (or ${ENV_AUDIENCE_DEFAULT}) not set; ` +
+        `SSR server cannot mint actor tokens. Set the expected JWT ` +
+        `audience (typically the API URL).`,
     );
   }
   _cached = {
