@@ -1,6 +1,11 @@
 'use client';
 
 import { reportError } from '@pivox/observability';
+import {
+  getAuth,
+  onIdTokenChanged,
+  signOut as firebaseSignOut,
+} from 'firebase/auth';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 
 import { AuthContext } from './use-auth';
@@ -141,56 +146,54 @@ export function AuthProvider({
   const lastRefreshedUidRef = useRef<string | null>(null);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-
-    import('firebase/auth')
-      .then(({ getAuth, onIdTokenChanged }) => {
-        const auth = getAuth();
-        unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
-          setUser(firebaseUser);
-          setLoading(false);
-          if (!firebaseUser) {
-            // Signed out — clear the seen-uid memo so a subsequent
-            // sign-in starts fresh (route's onSuccess will mint the
-            // first cookie; subsequent rotations will refresh it).
-            lastRefreshedUidRef.current = null;
-            return;
-          }
-          const cb = onTokenRefreshRef.current;
-          if (!cb) return;
-          if (lastRefreshedUidRef.current === null) {
-            // First fire for this user. Either:
-            //   - Sign-in just completed and the route's `onSuccess`
-            //     already minted the cookie, OR
-            //   - Page reload with a persisted user, where the cookie
-            //     is still valid (otherwise we wouldn't have gotten
-            //     past `beforeLoad`).
-            // Both cases mean there's nothing to refresh right now;
-            // mark seen and let subsequent rotations slide the
-            // window forward.
-            lastRefreshedUidRef.current = firebaseUser.uid;
-            return;
-          }
-          // Token rotation while signed in — slide the cookie window.
-          void firebaseUser
-            .getIdToken()
-            .then((idToken) => cb(idToken))
-            .catch((err: unknown) => {
-              reportError(err, {
-                source: 'AuthProvider.onTokenRefresh',
-              });
-            });
+    // firebase/auth is now a static import (was previously dynamic to
+    // try to code-split). The dynamic import was ineffective: every
+    // use-* hook in this package statically imports from firebase/auth,
+    // so the module landed in the main bundle anyway and the dynamic
+    // wrapper just added a microtask + unnecessary error-handling
+    // surface. Code-splitting Firebase out of the main bundle is now
+    // handled at the bundler level via apps/start's manualChunks.
+    const auth = getAuth();
+    const unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      setLoading(false);
+      if (!firebaseUser) {
+        // Signed out — clear the seen-uid memo so a subsequent
+        // sign-in starts fresh (route's onSuccess will mint the
+        // first cookie; subsequent rotations will refresh it).
+        lastRefreshedUidRef.current = null;
+        return;
+      }
+      const cb = onTokenRefreshRef.current;
+      if (!cb) return;
+      if (lastRefreshedUidRef.current === null) {
+        // First fire for this user. Either:
+        //   - Sign-in just completed and the route's `onSuccess`
+        //     already minted the cookie, OR
+        //   - Page reload with a persisted user, where the cookie
+        //     is still valid (otherwise we wouldn't have gotten
+        //     past `beforeLoad`).
+        // Both cases mean there's nothing to refresh right now;
+        // mark seen and let subsequent rotations slide the
+        // window forward.
+        lastRefreshedUidRef.current = firebaseUser.uid;
+        return;
+      }
+      // Token rotation while signed in — slide the cookie window.
+      void firebaseUser
+        .getIdToken()
+        .then((idToken) => cb(idToken))
+        .catch((err: unknown) => {
+          reportError(err, {
+            source: 'AuthProvider.onTokenRefresh',
+          });
         });
-      })
-      .catch((err: unknown) => {
-        reportError(err, { source: 'AuthProvider.import(firebase/auth)' });
-      });
+    });
 
-    return () => unsubscribe?.();
+    return () => unsubscribe();
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const { getAuth } = await import('firebase/auth');
     const auth = getAuth();
     if (auth.currentUser) {
       // reload() fetches fresh user properties (displayName, emailVerified, etc.)
@@ -212,7 +215,6 @@ export function AuthProvider({
         reportError(err, { source: 'AuthProvider.onBeforeSignOut' });
       }
     }
-    const { getAuth, signOut: firebaseSignOut } = await import('firebase/auth');
     const auth = getAuth();
     await firebaseSignOut(auth);
     if (onSignedOut) {

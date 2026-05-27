@@ -15,6 +15,73 @@ const config = defineConfig({
   server: {
     allowedHosts: ['localhost', 'pivox.ngrok.app'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Manual chunk groups for the client bundle. Each long-lived
+        // vendor dep gets its own chunk so it caches independently
+        // of app code — users only re-download what actually
+        // changed on subsequent visits.
+        //
+        // Uses Rolldown's `codeSplitting` object form. This is the
+        // current API; `manualChunks` (function) is ignored when
+        // `codeSplitting: true` is set by other plugins (which
+        // TanStack Start does), and `advancedChunks` is deprecated.
+        //
+        // Empirically:
+        //   - First matching group wins. Order list specific → broad.
+        //   - `priority` field exists but produced inconsistent
+        //     results during testing; order alone is reliable.
+        //   - Multi-package alternations in one regex work fine for
+        //     react/firebase/radix; they DON'T work for TanStack
+        //     (its router plugin claims those modules for per-route
+        //     auto-splitting and codeSplitting groups can't override).
+        //
+        // Heuristic: split anything > ~50KB raw and rarely-changing.
+        // Smaller deps (lucide-react ~13KB, tanstack/history ~10KB)
+        // stay in the main bundle — splitting them costs an HTTP
+        // request without meaningful caching benefit.
+        codeSplitting: {
+          groups: [
+            // Order matters: each module routes to the first
+            // matching group. Specific names before generic.
+            //
+            // What's NOT here, despite being big:
+            // - @tanstack/react-router + @tanstack/react-start: the
+            //   TanStack Router Vite plugin claims its modules for
+            //   per-route auto-splitting (see route chunks below).
+            //   Vendor-extracting them via codeSplitting.groups
+            //   doesn't work — Rolldown ignores the group for those
+            //   modules because the plugin has already routed them
+            //   to route chunks. Verified empirically.
+            // - @tanstack/react-query: imported eagerly from
+            //   router.tsx (the QueryClient constructor) and stays
+            //   inlined in index. Splitting it would require a
+            //   lazy-loaded QueryClient factory, which is a bigger
+            //   refactor for ~50KB of cache savings.
+            {
+              name: 'react',
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/,
+            },
+            // Firebase auth + app SDK. Heaviest vendor at ~190KB,
+            // updated rarely. Loaded eagerly because @pivox/features
+            // hooks statically import from firebase/auth.
+            {
+              name: 'firebase',
+              test: /[\\/]node_modules[\\/](firebase|@firebase)[\\/]/,
+            },
+            // Radix UI primitives + their transitive runtime helpers
+            // (aria-hidden, react-remove-scroll, etc.). ~80KB across
+            // our usage.
+            {
+              name: 'radix',
+              test: /[\\/]node_modules[\\/](@radix-ui|aria-hidden|react-remove-scroll|react-style-singleton|use-callback-ref|use-sidecar|get-nonce)/,
+            },
+          ],
+        },
+      },
+    },
+  },
   resolve: {
     tsconfigPaths: true,
     // Restore Vite's default resolve conditions explicitly. Some
