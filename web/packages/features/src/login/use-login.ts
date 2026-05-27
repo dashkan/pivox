@@ -273,16 +273,28 @@ export function useLogin(input: {
       }
       // step === 'password'
       if (!password) return;
+      // Narrow the firebase-error try/catch to just the
+      // signInWithEmailAndPassword call. handleSuccess sits outside
+      // because its throws are NOT Firebase auth errors —
+      // session-cookie minting failures, server fetch errors, etc.
+      // — and passing them to firebaseErrorMessage would surface a
+      // generic "unknown error" while swallowing the real cause.
+      // Throws from handleSuccess fall through to the outer catch
+      // and reach reportError as the programming-bug surface they
+      // actually are.
+      let credentialUser;
       try {
         const credential = await signInWithEmailAndPassword(
           getAuth(),
           email,
           password,
         );
-        await handleSuccess(credential.user, 'password');
+        credentialUser = credential.user;
       } catch (e) {
         setError(firebaseErrorMessage(e));
+        return;
       }
+      await handleSuccess(credentialUser, 'password');
     } catch (err) {
       reportError(err, { source: 'useLogin.formAction' });
     }

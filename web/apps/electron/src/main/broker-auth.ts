@@ -182,6 +182,18 @@ export function startBrokerLogin(input: {
 }): Promise<BrokerRedirectResult> {
   const es = input.flowId ?? randomUUID();
 
+  // Reject duplicate flowIds. Without this guard, a second
+  // `pendingFlows.set(es, ...)` below would overwrite the first
+  // entry — its resolve/cleanup would be unreachable from the map,
+  // leaving its loopback server bound, its timer armed, and its IPC
+  // promise unresolved forever. Renderer-controlled flowId opens
+  // this window (impossible when main generated the UUID); the
+  // guard closes it. Returning a structured failure lets the
+  // renderer surface a real error instead of hanging.
+  if (pendingFlows.has(es)) {
+    return Promise.resolve({ ok: false, error: 'duplicate_flow_id' });
+  }
+
   return new Promise<BrokerRedirectResult>((resolve) => {
     const timer = setTimeout(() => {
       settleFlow(es, { ok: false, error: 'auth_timeout' });

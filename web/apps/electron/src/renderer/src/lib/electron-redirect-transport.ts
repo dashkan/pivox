@@ -36,6 +36,12 @@ export class ElectronRedirectTransport implements RedirectTransport {
     // targets the specific flow rather than every pending flow.
     const flowId = crypto.randomUUID();
 
+    // Order matters: kick off the IPC FIRST, then attach the abort
+    // listener. If startBrokerLogin throws synchronously (e.g., IPC
+    // bridge unavailable during teardown), control transfers out of
+    // this function before the listener is attached — no leak. The
+    // inverse ordering (listener first, then IPC) would orphan the
+    // listener on a sync throw.
     const promise = window.api.startBrokerLogin({
       provider: input.provider,
       flowId,

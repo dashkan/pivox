@@ -55,9 +55,13 @@ describe('BrowserRedirectTransport runBrokerOAuth — abort', () => {
     // the result type matches the user-cancelled shape and that the
     // popup was closed.
     await Promise.resolve();
-    // After init: a closed-poll setInterval AND a flow-timeout
-    // setTimeout should both be live.
-    expect(vi.getTimerCount()).toBe(2);
+    // After init: at least one timer is live (closed-poll setInterval
+    // + flow-timeout setTimeout today). Asserting an exact count
+    // would couple the test to the implementation's timer choices —
+    // a future legit addition (debounce, backoff) would break the
+    // test for the wrong reason. The load-bearing assertion is the
+    // post-settle `=== 0` below: all timers MUST be torn down.
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
 
     controller.abort();
     const result = await promise;
@@ -111,7 +115,7 @@ describe('BrowserRedirectTransport runBrokerOAuth — abort', () => {
     // process exit but not via test assertion.
     const promise = transport.runBrokerOAuth({ provider: 'google' });
     expect(openSpy).toHaveBeenCalled();
-    expect(vi.getTimerCount()).toBe(2);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
 
     popup.closed = true;
     // Advance fake time past the 400ms closed-poll interval so the

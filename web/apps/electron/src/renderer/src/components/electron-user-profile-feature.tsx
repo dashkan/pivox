@@ -41,6 +41,12 @@ export function ElectronUserProfileFeature({
         if (!user) return;
         value.actions.setLinkingProvider(providerId);
         try {
+          // No flowId passed — link-provider has no Cancel UI, so
+          // there's no need to scope abort. Main generates a UUID
+          // internally; `window.api.abortBrokerLogin(...)` from
+          // this code path would have nothing to target. If a Cancel
+          // affordance is added later, generate a UUID here and
+          // thread it into both startBrokerLogin and abortBrokerLogin.
           const result = await window.api.startBrokerLogin({
             provider: BROKER_PROVIDER[providerId] ?? providerId,
           });
