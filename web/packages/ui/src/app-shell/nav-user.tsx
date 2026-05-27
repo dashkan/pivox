@@ -1,6 +1,6 @@
 'use client';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@pivox/primitives/avatar';
+import { Avatar, AvatarFallback } from '@pivox/primitives/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,12 +61,22 @@ export function AppShellNavUser() {
         >
           <Avatar className="h-8 w-8 rounded-lg">
             {user.photoURL ? (
-              <AvatarImage
+              // Plain <img>, not <AvatarImage>. Radix's AvatarImage
+              // uses useLayoutEffect to verify the URL loads before
+              // rendering the <img>, but useLayoutEffect doesn't run
+              // during SSR — so SSR renders the fallback initials, then
+              // hydration swaps to the image. The flash is jarring and
+              // pointless for our use case: Firebase photoURLs are
+              // reliable OAuth-provider URLs (Google/Apple/GitHub).
+              // Render the image directly so SSR HTML includes it.
+              <img
                 src={user.photoURL}
                 alt={user.displayName ?? 'User avatar'}
+                className="aspect-square size-full rounded-lg object-cover"
               />
-            ) : null}
-            <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+            ) : (
+              <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+            )}
           </Avatar>
           <div className="grid flex-1 text-start text-sm leading-tight">
             <span className="truncate font-medium">
@@ -89,12 +99,14 @@ export function AppShellNavUser() {
           <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
             <Avatar className="h-8 w-8 rounded-lg">
               {user.photoURL ? (
-                <AvatarImage
+                <img
                   src={user.photoURL}
                   alt={user.displayName ?? 'User avatar'}
+                  className="aspect-square size-full rounded-lg object-cover"
                 />
-              ) : null}
-              <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+              ) : (
+                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+              )}
             </Avatar>
             <div className="grid flex-1 text-start text-sm leading-tight">
               <span className="truncate font-medium">
