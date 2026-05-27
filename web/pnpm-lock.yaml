@@ -476,6 +476,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@pivox/client':
+        specifier: workspace:*
+        version: link:../client
       '@pivox/image-editor':
         specifier: workspace:*
         version: link:../image-editor

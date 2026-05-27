@@ -20,3 +20,17 @@
  * could already learn by inspecting the rendered page.
  */
 export const ACTIVE_ORG_COOKIE = 'pivox.active-organization';
+
+/**
+ * User's preferred theme: `'light' | 'dark' | 'system'`.
+ *
+ * Moved off localStorage so SSR can read it. With the value
+ * SSR-threaded into the theme switcher's initial state, the icon
+ * paints with the right glyph on first render — no flicker from the
+ * default-state icon to the user's saved choice on hydration.
+ *
+ * Non-HttpOnly because the inline FOUC-prevention script in
+ * `__root.tsx` reads it from JS to apply the `.dark` class before
+ * React hydrates. Not a credential.
+ */
+export const THEME_COOKIE = 'pivox.theme';

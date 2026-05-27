@@ -1,20 +1,109 @@
 'use client';
 
+import { THEME_COOKIE } from '@pivox/client';
 import { Button } from '@pivox/primitives/button';
 import { cn } from '@pivox/primitives/utils';
 import { useEffect, useSyncExternalStore } from 'react';
 
 type Theme = 'light' | 'system' | 'dark';
 
+/**
+ * localStorage mirror of the theme preference.
+ *
+ * Two-store strategy:
+ *   - Cookie (`pivox.theme`) — readable by SSR (used by the start
+ *     app's `_app` beforeLoad to seed initial state and by the
+ *     pre-hydration inline script in `__root.tsx` to apply the dark
+ *     class before paint).
+ *   - localStorage (`pivox-theme`) — durable fallback. Cookies on
+ *     `file://` origins (electron production) don't persist
+ *     reliably across sessions; localStorage does.
+ *
+ * Both stores are written on every change. Reads consult the cookie
+ * first (fastest + SSR-friendly path), then fall back to localStorage.
+ * On cookie-empty + localStorage-present (cold load on electron OR a
+ * pre-cookie-version user), the value is promoted to the cookie for
+ * next time WITHOUT removing it from localStorage — keeping electron
+ * users' preference intact even if the cookie write evaporates.
+ */
 const STORAGE_KEY = 'pivox-theme';
-// Custom in-tab event for same-tab storage writes — the native `storage`
-// event only fires for OTHER tabs.
+
+// Custom in-tab event for same-tab cookie writes — neither the native
+// `storage` event nor any cookie-change event fires for same-tab writes,
+// so we notify subscribers in the same tab via a synthetic event.
 const THEME_EVENT = 'pivox-theme-change';
 
 const themes: Array<Theme> = ['light', 'system', 'dark'];
 
+const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+function isTheme(v: string | null | undefined): v is Theme {
+  return v === 'light' || v === 'dark' || v === 'system';
+}
+
+function readThemeCookie(): Theme | null {
+  if (typeof document === 'undefined') return null;
+  const prefix = `${THEME_COOKIE}=`;
+  for (const part of document.cookie.split('; ')) {
+    if (part.startsWith(prefix)) {
+      const v = part.slice(prefix.length);
+      return isTheme(v) ? v : null;
+    }
+  }
+  return null;
+}
+
+function writeThemeCookie(value: Theme): void {
+  if (typeof document === 'undefined') return;
+  const secure =
+    typeof location !== 'undefined' && location.protocol === 'https:';
+  document.cookie =
+    `${THEME_COOKIE}=${value};` +
+    ` path=/;` +
+    ` max-age=${String(ONE_YEAR_SECONDS)};` +
+    ` samesite=lax` +
+    (secure ? `; secure` : '');
+}
+
+function readLocalStorageTheme(): Theme | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const v = window.localStorage.getItem(STORAGE_KEY);
+    return isTheme(v) ? v : null;
+  } catch {
+    // localStorage can throw under sandbox / private-mode restrictions.
+    return null;
+  }
+}
+
+function writeLocalStorageTheme(value: Theme): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, value);
+  } catch {
+    // Quota / disabled storage — silent. Cookie still holds the value
+    // for this session.
+  }
+}
+
 function getStoredTheme(): Theme {
-  return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'system';
+  // Cookie first: SSR-readable, also what the pre-hydration inline
+  // script reads, so this matches what's already on the page.
+  const cookie = readThemeCookie();
+  if (cookie) return cookie;
+  // Fall back to localStorage. Two cases land here:
+  //   1. Electron on file://, where the cookie write may have
+  //      silently failed and localStorage is the durable store.
+  //   2. Pre-cookie user on first post-upgrade load.
+  // In both cases, promote the value to the cookie for SSR + faster
+  // future reads — but DON'T remove from localStorage so electron
+  // (and any other cookie-unfriendly origin) keeps a working backup.
+  const local = readLocalStorageTheme();
+  if (local) {
+    writeThemeCookie(local);
+    return local;
+  }
+  return 'system';
 }
 
 function getSystemPreference(): 'light' | 'dark' {
@@ -29,6 +118,10 @@ function applyTheme(theme: Theme) {
 }
 
 function subscribeToTheme(onStoreChange: () => void) {
+  // `storage` event fires for OTHER tabs only — useful for the
+  // legacy-migration transition where one tab might still be on the
+  // old localStorage path. Once that's removed the storage listener
+  // becomes vestigial; leave it for now.
   window.addEventListener('storage', onStoreChange);
   window.addEventListener(THEME_EVENT, onStoreChange);
   return () => {
@@ -37,22 +130,34 @@ function subscribeToTheme(onStoreChange: () => void) {
   };
 }
 
-export function ThemeSwitcher({ className }: { className?: string }) {
-  // useSyncExternalStore avoids both the SSR hydration mismatch *and* the
+export function ThemeSwitcher({
+  className,
+  initialTheme,
+}: {
+  className?: string;
+  /**
+   * SSR-resolved theme from the `pivox.theme` cookie. Threaded by
+   * the route so useSyncExternalStore's server snapshot returns the
+   * user's actual preference, not the default `'system'` — without
+   * this the icon would flicker from `system` to the saved value on
+   * hydration.
+   *
+   * Optional because non-SSR consumers (electron) don't supply one;
+   * `'system'` is the right default for them.
+   */
+  initialTheme?: Theme;
+}) {
+  // useSyncExternalStore avoids both the SSR hydration mismatch AND the
   // setState-in-effect cascade the manual useEffect dance triggers.
-  // The server snapshot returns 'system' to match initial pre-hydration HTML.
-  // Explicit <Theme> generic: without it the server-snapshot arrow
-  // `() => 'system'` infers as `() => string`, which widens the inferred
-  // Snapshot to `string`. Pinning the generic keeps `theme` as `Theme`
-  // without an arg cast (which no-unnecessary-type-assertion would flag).
+  // The server snapshot returns the SSR-resolved cookie value so
+  // first-paint HTML matches what the client will render on hydration.
   const theme = useSyncExternalStore<Theme>(
     subscribeToTheme,
     getStoredTheme,
-    () => 'system',
+    () => initialTheme ?? 'system',
   );
 
-  // Apply theme to the document whenever it changes. Side-effecting on
-  // theme is the legitimate use of useEffect.
+  // Apply theme to the document whenever it changes.
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
@@ -70,9 +175,13 @@ export function ThemeSwitcher({ className }: { className?: string }) {
   }, []);
 
   const setTheme = (next: Theme) => {
-    localStorage.setItem(STORAGE_KEY, next);
-    // `storage` event doesn't fire for same-tab writes — notify our own
-    // subscribers via a synthetic event.
+    // Write both stores. Cookie is the SSR-readable + cross-tab
+    // path; localStorage is the durable fallback that survives
+    // file:// origins (electron production).
+    writeThemeCookie(next);
+    writeLocalStorageTheme(next);
+    // No cookie-change event fires for same-tab writes — notify our own
+    // subscribers via a synthetic event so useSyncExternalStore picks it up.
     window.dispatchEvent(new Event(THEME_EVENT));
   };
 

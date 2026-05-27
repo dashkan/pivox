@@ -21,6 +21,7 @@ import {
   prefetchOrgsForCurrentUser,
   prefetchSpacesForActiveOrg,
 } from '@/server/prefetch';
+import { getThemeCookie, type Theme } from '@/server/prefs';
 
 // Lazy-load the profile dialog so it's client-only — it depends on
 // AuthContext (Firebase user) which isn't available during SSR.
@@ -73,16 +74,19 @@ export const Route = createFileRoute('/_app')({
     // race the cookie-read effect — silently overwriting the user's
     // selection with orgs[0] on every refresh.
     let initialActiveOrganization: string | null = null;
+    let initialTheme: Theme | null = null;
     if (typeof window === 'undefined' && user.pivoxUserId) {
-      // Fire the cookie read alongside the prefetches — same request,
+      // Fire the cookie reads alongside the prefetches — same request,
       // server-fn dispatch is in-process so this is effectively a
       // single batch with no extra round-trips.
-      const [activeOrgCookie, orgs, spaces] = await Promise.all([
+      const [activeOrgCookie, themeCookie, orgs, spaces] = await Promise.all([
         getActiveOrgCookie(),
+        getThemeCookie(),
         prefetchOrgsForCurrentUser(),
         prefetchSpacesForActiveOrg(),
       ]);
       initialActiveOrganization = activeOrgCookie;
+      initialTheme = themeCookie;
       if (orgs) {
         // queryKey from openapi-react-query is deterministic on
         // (method, path, params) — server-built queryOptions
@@ -107,14 +111,15 @@ export const Route = createFileRoute('/_app')({
       }
     }
 
-    return { user, initialActiveOrganization };
+    return { user, initialActiveOrganization, initialTheme };
   },
   component: AppLayoutRoute,
 });
 
 function AppLayoutRoute() {
   const router = useRouter();
-  const { user, initialActiveOrganization } = Route.useRouteContext();
+  const { user, initialActiveOrganization, initialTheme } =
+    Route.useRouteContext();
   return (
     <AppShellFeature
       $api={$api}
@@ -142,7 +147,11 @@ function AppLayoutRoute() {
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
             <div className="ms-auto">
-              <ThemeSwitcher />
+              {/* SSR-resolved theme from the cookie. Without this,
+                  useSyncExternalStore's server snapshot would return
+                  the 'system' default and the icon would flicker to
+                  the user's actual saved theme on hydration. */}
+              <ThemeSwitcher initialTheme={initialTheme ?? undefined} />
             </div>
           </header>
           <Outlet />

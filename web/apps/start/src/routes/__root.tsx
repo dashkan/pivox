@@ -71,15 +71,41 @@ function RootComponent() {
   );
 }
 
+/**
+ * Pre-hydration theme application. Inline so it runs before the
+ * body paints, preventing the flash-of-wrong-theme that would
+ * otherwise show light mode for dark-mode users until React hydrates.
+ *
+ * Reads the `pivox.theme` cookie. If absent (or value is unrecognized),
+ * falls back to the legacy `pivox-theme` localStorage entry (which
+ * the older client-only implementation wrote) — this keeps existing
+ * users' preferences across the migration. The theme-switcher
+ * component handles the localStorage → cookie promotion lazily on
+ * first read after hydration.
+ *
+ * Resolves 'system' via prefers-color-scheme so even system-preference
+ * users get the right paint on first frame.
+ *
+ * Wrapped in try/catch because some browsers throw on
+ * matchMedia/localStorage access in particular sandboxes; we'd
+ * rather paint light-mode than crash the page.
+ */
+const THEME_INLINE_SCRIPT = `(function(){try{
+var c=document.cookie.match(/(?:^|; )pivox\\.theme=([^;]+)/);
+var t=c&&c[1];
+if(t!=="light"&&t!=="dark"&&t!=="system"){
+  var l=localStorage.getItem("pivox-theme");
+  t=(l==="light"||l==="dark"||l==="system")?l:"system";
+}
+var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches:t==="dark";
+if(d)document.documentElement.classList.add("dark");
+}catch(e){}})()`;
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("pivox-theme")||"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme:dark)").matches:t==="dark";if(d)document.documentElement.classList.add("dark")}catch(e){}})()`,
-          }}
-        />
+        <script dangerouslySetInnerHTML={{ __html: THEME_INLINE_SCRIPT }} />
         <HeadContent />
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">

@@ -92,6 +92,7 @@
     "vite": "8.0.14"
   },
   "dependencies": {
+    "@pivox/client": "workspace:*",
     "@pivox/image-editor": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
