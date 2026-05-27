@@ -32,16 +32,19 @@ describe('BrowserRedirectTransport runBrokerOAuth — abort', () => {
     openSpy = vi
       .spyOn(window, 'open')
       .mockImplementation(() => popup as unknown as Window);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     openSpy.mockRestore();
     vi.restoreAllMocks();
   });
 
-  it('resolves as popup_closed when the signal aborts mid-flight', async () => {
+  it('resolves as popup_closed when the signal aborts mid-flight AND clears all timers + listeners', async () => {
     const transport = new BrowserRedirectTransport();
     const controller = new AbortController();
+    const messageListenerSpy = vi.spyOn(window, 'removeEventListener');
     const promise = transport.runBrokerOAuth({
       provider: 'google',
       signal: controller.signal,
@@ -52,11 +55,26 @@ describe('BrowserRedirectTransport runBrokerOAuth — abort', () => {
     // the result type matches the user-cancelled shape and that the
     // popup was closed.
     await Promise.resolve();
-    controller.abort();
+    // After init: a closed-poll setInterval AND a flow-timeout
+    // setTimeout should both be live.
+    expect(vi.getTimerCount()).toBe(2);
 
+    controller.abort();
     const result = await promise;
+
     expect(result).toEqual({ ok: false, error: 'popup_closed' });
     expect(popup.close).toHaveBeenCalled();
+    // Settle is responsible for tearing down EVERY resource. If a
+    // future refactor drops a `clearInterval` / `clearTimeout` from
+    // the abort path, this assertion fails before the leak ships.
+    expect(vi.getTimerCount()).toBe(0);
+    // And the `message` listener is removed via removeEventListener.
+    // Other listener removals also fire (storage, abort) — we only
+    // pin the one we care about.
+    expect(messageListenerSpy).toHaveBeenCalledWith(
+      'message',
+      expect.any(Function),
+    );
   });
 
   it('resolves immediately as popup_closed without opening a popup when given an already-aborted signal', async () => {
@@ -83,16 +101,25 @@ describe('BrowserRedirectTransport runBrokerOAuth — abort', () => {
     expect(result).toEqual({ ok: false, error: 'popup_blocked' });
   });
 
-  it('runs without a signal — backward compatible', async () => {
+  it('runs without a signal — backward compatible — and cleans up timers when popup is dismissed externally', async () => {
     const transport = new BrowserRedirectTransport();
     // No signal — verify the call still opens the popup. Simulate
     // the user dismissing the popup so the closed-poll catches it
-    // and the promise settles. Without this cleanup, vitest's
-    // hanging-process detector reports a leaked setInterval timer.
+    // and the promise settles. The cleanup assertion below pins
+    // that even the no-signal path tears down all timers — without
+    // it, vitest's hanging-process detector would catch leaks via
+    // process exit but not via test assertion.
     const promise = transport.runBrokerOAuth({ provider: 'google' });
     expect(openSpy).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(2);
+
     popup.closed = true;
+    // Advance fake time past the 400ms closed-poll interval so the
+    // poll's tick fires settle().
+    await vi.advanceTimersByTimeAsync(500);
     const result = await promise;
+
     expect(result).toEqual({ ok: false, error: 'popup_closed' });
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
