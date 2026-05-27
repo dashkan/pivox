@@ -32,36 +32,48 @@ const config = defineConfig({
         //   - First matching group wins. Order list specific → broad.
         //   - `priority` field exists but produced inconsistent
         //     results during testing; order alone is reliable.
-        //   - Multi-package alternations in one regex work fine for
-        //     react/firebase/radix; they DON'T work for TanStack
-        //     (its router plugin claims those modules for per-route
-        //     auto-splitting and codeSplitting groups can't override).
+        //   - The TSR router-plugin only claims modules from your
+        //     `routes/` directory (turning route components into
+        //     lazy chunks). It does NOT claim @tanstack/* runtime
+        //     packages — those split into vendor chunks cleanly.
         //
-        // Heuristic: split anything > ~50KB raw and rarely-changing.
-        // Smaller deps (lucide-react ~13KB, tanstack/history ~10KB)
-        // stay in the main bundle — splitting them costs an HTTP
-        // request without meaningful caching benefit.
+        // Heuristic: split anything > ~30KB raw and rarely-changing.
+        // Smaller deps stay in the main bundle — splitting them
+        // costs an HTTP request without meaningful caching benefit.
         codeSplitting: {
           groups: [
             // Order matters: each module routes to the first
             // matching group. Specific names before generic.
             //
-            // What's NOT here, despite being big:
-            // - @tanstack/react-router + @tanstack/react-start: the
-            //   TanStack Router Vite plugin claims its modules for
-            //   per-route auto-splitting (see route chunks below).
-            //   Vendor-extracting them via codeSplitting.groups
-            //   doesn't work — Rolldown ignores the group for those
-            //   modules because the plugin has already routed them
-            //   to route chunks. Verified empirically.
-            // - @tanstack/react-query: imported eagerly from
-            //   router.tsx (the QueryClient constructor) and stays
-            //   inlined in index. Splitting it would require a
-            //   lazy-loaded QueryClient factory, which is a bigger
-            //   refactor for ~50KB of cache savings.
+            // What's NOT here:
+            // - @tanstack/react-start: server-only for our usage
+            //   (createServerFn becomes a client-side RPC stub, all
+            //   real runtime lives in the SSR pass). Tested with an
+            //   explicit group; produced no chunk because nothing in
+            //   the client bundle matches.
+            // - The TSR router-plugin's route-component splits live
+            //   in their own per-route chunks (login, register, etc).
+            //   Those are orthogonal to these vendor groups — route
+            //   chunks emit ES imports that pull React, Radix, etc.
+            //   from the vendor chunks below.
             {
               name: 'react',
               test: /[\\/]node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/,
+            },
+            // TanStack Router core + history + ssr-query bridge.
+            // ~115KB. The library is updated less often than app
+            // code; splitting it gets ~115KB of cache wins on every
+            // visit after the first deploy.
+            {
+              name: 'tanstack-router',
+              test: /[\\/]node_modules[\\/]@tanstack[\\/](react-router|router-core|history|react-router-ssr-query)[\\/]/,
+            },
+            // TanStack Query + openapi-react-query binding. ~40KB.
+            // Separate chunk so router-version churn doesn't
+            // invalidate the query chunk and vice versa.
+            {
+              name: 'tanstack-query',
+              test: /[\\/]node_modules[\\/](@tanstack[\\/](react-query|query-core|query-devtools)|openapi-react-query)[\\/]/,
             },
             // Firebase auth + app SDK. Heaviest vendor at ~190KB,
             // updated rarely. Loaded eagerly because @pivox/features
@@ -71,7 +83,7 @@ const config = defineConfig({
               test: /[\\/]node_modules[\\/](firebase|@firebase)[\\/]/,
             },
             // Radix UI primitives + their transitive runtime helpers
-            // (aria-hidden, react-remove-scroll, etc.). ~80KB across
+            // (aria-hidden, react-remove-scroll, etc.). ~65KB across
             // our usage.
             {
               name: 'radix',
