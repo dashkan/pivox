@@ -13,25 +13,45 @@ const config = defineConfig({
   },
   resolve: {
     tsconfigPaths: true,
-  },
-  ssr: {
-    // SSR-build externals (separate from Nitro's runtime externals).
-    // The `nitro({ rollupConfig: { external } })` block below
-    // governs Nitro's server bundle; Vite's SSR chunks (the
-    // `_ssr/*.mjs` files Rollup emits for SSR rendering) are
-    // controlled HERE. Both lists need the same package when a
-    // module is hostile to bundling in BOTH passes.
+    // Force `tslib` to its proper ESM entry. The package's CJS
+    // build (`tslib.js`) sets `module.exports.__esModule = true`
+    // via createExporter, which confuses Vite/Rollup's `__toESM`
+    // helper into skipping the synthetic `.default` — then the
+    // generated `var { __extends, ... } = __toESM(...).default;`
+    // destructure throws at SSR load (`.default` is undefined).
     //
-    // `tslib` lives here because of a CJS-vs-ESM-interop bug: tslib
-    // sets `__esModule: true` (making Vite's `__toESM` helper skip
-    // the synthetic `.default`), but the generated bundle code
-    // destructures from `.default` anyway. Any chunk that pulls
-    // tslib in (via Radix UI → react-remove-scroll → tslib, etc.)
-    // throws `Cannot destructure property '__extends' of
-    // '__toESM(...).default' as it is undefined` at SSR-module
-    // load. Externalizing leaves the `import 'tslib'` as a runtime
-    // require, which Node resolves via the standard ESM/CJS bridge.
-    external: ['tslib'],
+    // tslib ships an ESM build at `modules/index.js` (advertised
+    // via the package's `exports.import.node` condition) that does
+    // a clean re-export with named bindings. Aliasing the bare
+    // specifier directly to that path bypasses Vite's resolution
+    // (which was picking the CJS entry) and lets the bundler emit
+    // a normal ESM import — no `__toESM`, no broken default
+    // destructure. Affects both client and SSR builds.
+    // Alias `tslib` to its native ESM build (`tslib.es6.mjs`). The
+    // default `tslib.js` is CJS with a factory pattern that sets
+    // `__esModule = true` — Vite/Rollup's `__toESM` helper then
+    // skips the synthetic `.default` while the generated bundle
+    // code destructures from `.default` anyway, throwing
+    // `Cannot destructure property '__extends' of '__toESM(...).default'`
+    // on SSR load. Transitive Radix UI deps (aria-hidden,
+    // react-remove-scroll) all do `import { __assign } from 'tslib'`
+    // and trip the bug. `tslib.es6.mjs` is real ESM with native
+    // named exports — no interop, no destructure bug.
+    //
+    // Pointing at the inner `modules/index.js` doesn't help because
+    // that file is itself an ESM facade that imports the CJS
+    // `tslib.js` as default and re-exports — same interop problem
+    // one indirection deeper.
+    alias: [
+      {
+        find: /^tslib$/,
+        replacement:
+          new URL(
+            '../../node_modules/.pnpm/tslib@2.8.1/node_modules/tslib/tslib.es6.mjs',
+            import.meta.url,
+          ).pathname,
+      },
+    ],
   },
   plugins: [
     devtools(),
