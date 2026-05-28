@@ -248,17 +248,24 @@ type InputMessage struct {
 	// round-trip; not used to key persistence on the server (the
 	// server generates its own message IDs for persisted turns).
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// Required. The role of this message's author.
+	// Required. The role of this message's author. One of:
+	// "user", "assistant", "system", "tool".
 	//
-	// `assistant` and `system` are not valid on input — assistant turns
-	// are server-produced (accepting one would let a caller inject fake
-	// context); system instructions arrive via `system_instruction` on
-	// the request, not as a message. `tool` carries tool-result parts
-	// for the model to continue a tool-loop.
+	// Vercel `useChat` sends the full conversation history on every
+	// turn — including its own prior `assistant` responses, and an
+	// optional `system` opening — so the server must accept all four
+	// roles on input. The historical concern that a caller could
+	// inject a fake assistant turn is addressed via:
+	//   - stateful mode: when `conversation` is set, the server hydrates
+	//     history from the DB and ignores client-claimed assistant turns
+	//     beyond the most recent user message.
+	//   - stateless mode: the caller controls the model context anyway;
+	//     forging assistant context only deceives the caller's own
+	//     model call.
 	//
 	// String (not enum) because Vercel writes lowercase strings on the
 	// wire; `protojson` would round-trip a proto enum as uppercase,
-	// forcing a translator shim. Validated below.
+	// forcing a translator shim.
 	Role string `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
 	// Required. The structured parts of this message.
 	Parts []*MessagePart `protobuf:"bytes,3,rep,name=parts,proto3" json:"parts,omitempty"`
@@ -2599,10 +2606,10 @@ const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\x17GenerateContentResponse\x12.\n" +
 	"\amessage\x18\x01 \x01(\v2\x14.pivox.ai.v1.MessageR\amessage\x12-\n" +
 	"\x05usage\x18\x02 \x01(\v2\x17.pivox.ai.v1.TokenUsageR\x05usage\x12\x14\n" +
-	"\x05model\x18\x03 \x01(\tR\x05model\"\xdd\x03\n" +
+	"\x05model\x18\x03 \x01(\tR\x05model\"\xf0\x03\n" +
 	"\fInputMessage\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x01R\x02id\x12(\n" +
-	"\x04role\x18\x02 \x01(\tB\x14\xe0A\x02\xbaH\x0er\fR\x04userR\x04toolR\x04role\x12;\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x01R\x02id\x12;\n" +
+	"\x04role\x18\x02 \x01(\tB'\xe0A\x02\xbaH!r\x1fR\x04userR\tassistantR\x06systemR\x04toolR\x04role\x12;\n" +
 	"\x05parts\x18\x03 \x03(\v2\x18.pivox.ai.v1.MessagePartB\v\xe0A\x02\xbaH\x05\x92\x01\x02\b\x01R\x05parts\x128\n" +
 	"\bmetadata\x18\x04 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x01R\bmetadata:\x96\x02\xbaH\x92\x02\x1a\x8f\x02\n" +
 	"-input_message.tool_role_must_have_tool_output\x12Utool-role message must include at least one tool-* part with state='output-available'\x1a\x86\x01this.role != 'tool' || this.parts.exists(p, (p.type.startsWith('tool-') || p.type == 'dynamic-tool') && p.state == 'output-available')\"\x81\x01\n" +

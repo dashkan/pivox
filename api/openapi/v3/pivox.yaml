@@ -13337,17 +13337,24 @@ components:
         role:
           type: string
           description: |-
-            Required. The role of this message's author.
+            Required. The role of this message's author. One of:
+            "user", "assistant", "system", "tool".
 
-            `assistant` and `system` are not valid on input — assistant turns
-            are server-produced (accepting one would let a caller inject fake
-            context); system instructions arrive via `system_instruction` on
-            the request, not as a message. `tool` carries tool-result parts
-            for the model to continue a tool-loop.
+            Vercel `useChat` sends the full conversation history on every
+            turn — including its own prior `assistant` responses, and an
+            optional `system` opening — so the server must accept all four
+            roles on input. The historical concern that a caller could
+            inject a fake assistant turn is addressed via:
+              - stateful mode: when `conversation` is set, the server hydrates
+                history from the DB and ignores client-claimed assistant turns
+                beyond the most recent user message.
+              - stateless mode: the caller controls the model context anyway;
+                forging assistant context only deceives the caller's own
+                model call.
 
             String (not enum) because Vercel writes lowercase strings on the
             wire; `protojson` would round-trip a proto enum as uppercase,
-            forcing a translator shim. Validated below.
+            forcing a translator shim.
         parts:
           type: array
           items:

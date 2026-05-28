@@ -385,15 +385,20 @@ func persistMessageOnQtx(ctx context.Context, qtx db.Querier, convID uuid.UUID, 
 }
 
 // dbRoleForInputMessage maps a wire-shaped InputMessage role string
-// to the canonical DB role. InputMessage.role is validated by the
-// proto interceptor (in: ["user", "tool"]) so by the time this runs
-// the only valid inputs are "user", "tool", or "" (treated as user
-// for forward-compat with clients that omit the field).
+// to the canonical DB role.
+//
+// useChat sends `user`, `assistant`, `system`, and `tool` roles on
+// input. Pass them through as-is — the model layer expects all four
+// (model.Message.Role lists them in its comment) and the DB column
+// is a free-form string. Empty / unrecognized values fall back to
+// "user" for forward-compat with clients that omit the field.
 func dbRoleForInputMessage(r string) string {
-	if r == "tool" {
-		return "tool"
+	switch r {
+	case "user", "assistant", "system", "tool":
+		return r
+	default:
+		return "user"
 	}
-	return "user"
 }
 
 // inputMessagesToModel converts a list of proto InputMessages to the
