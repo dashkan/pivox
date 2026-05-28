@@ -12,8 +12,9 @@ import type {
   ChatMeta,
   ChatState,
   GetAuthToken,
+  PivoxStreamChatBody,
+  PivoxUIMessage,
 } from './chat.types';
-import type { UIMessage } from 'ai';
 
 /**
  * Options for `useChatState` — the public configuration the route
@@ -118,7 +119,7 @@ export function useChatState(opts: UseChatStateOptions): ChatContextValue {
     // latest-ref pattern is exactly what useEffect above syncs;
     // disabling the rule here is the documented escape hatch.
     // eslint-disable-next-line react-hooks/refs
-    return new DefaultChatTransport<UIMessage>({
+    return new DefaultChatTransport<PivoxUIMessage>({
       api: `${apiBase}/v1/${parent}:streamGenerateContent`,
       headers: async () => ({
         Authorization: `Bearer ${await getAuthTokenRef.current()}`,
@@ -130,13 +131,19 @@ export function useChatState(opts: UseChatStateOptions): ChatContextValue {
       // (the new user turn, or a tool result). On the very first
       // turn `conversation` is undefined so the full list goes —
       // which is just the one initial user message anyway.
-      prepareSendMessagesRequest: ({ messages }) => ({
-        body: {
+      //
+      // Body is typed from @pivox/client's OpenAPI-generated
+      // AiChatStreamGenerateContentBody (widened to accept
+      // PivoxUIMessage on `messages`), so proto changes that add or
+      // rename body fields surface here as compile errors.
+      prepareSendMessagesRequest: ({ messages }) => {
+        const body: PivoxStreamChatBody = {
           messages: conversation ? messages.slice(-1) : messages,
           conversation,
           systemInstruction,
-        },
-      }),
+        };
+        return { body };
+      },
     });
   }, [baseUrl, parent, conversation, systemInstruction]);
 
@@ -154,15 +161,15 @@ export function useChatState(opts: UseChatStateOptions): ChatContextValue {
     conversationRef.current = conversation;
   });
 
-  const runtime = useChatRuntime({
+  const runtime = useChatRuntime<PivoxUIMessage>({
     transport,
     onFinish: ({ message }) => {
       if (conversationRef.current) return;
-      const meta = message.metadata as
-        | { conversation?: string }
-        | undefined;
-      if (meta?.conversation) {
-        setConversation(meta.conversation);
+      // message.metadata is typed PivoxChatMessageMetadata via the
+      // UIMessage generic — no inline cast needed.
+      const next = message.metadata?.conversation;
+      if (next) {
+        setConversation(next);
       }
     },
   });

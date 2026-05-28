@@ -12,4 +12,7 @@ export type {
   ChatContextValue,
   ChatMeta,
   ChatState,
+  PivoxChatMessageMetadata,
+  PivoxStreamChatBody,
+  PivoxUIMessage,
 } from './chat.types';

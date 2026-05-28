@@ -1,9 +1,18 @@
 /**
  * Public types for the Chat composable. Mirrors the `{state, actions,
  * meta}` interface used by ImageEditor and AppShell.
+ *
+ * Wire-side types are derived from `@pivox/client`'s OpenAPI-generated
+ * `components` so a proto reshape automatically flows through here —
+ * no parallel TypeScript copy of the proto. The few Pivox-specific
+ * Vercel-side types (the chat metadata shape, the UIMessage generic
+ * arg) are declared inline because protojson can't generate them from
+ * a `google.protobuf.Struct`.
  */
 
 import type { AssistantRuntime } from '@assistant-ui/react';
+import type { components } from '@pivox/client';
+import type { UIMessage } from 'ai';
 
 /**
  * Resolves the bearer token forwarded to the gRPC AuthInterceptor on
@@ -83,3 +92,48 @@ export interface ChatContextValue {
   actions: ChatActions;
   meta: ChatMeta;
 }
+
+/**
+ * Pivox-specific metadata carried on UIMessage.metadata. Currently
+ * just the persisted conversation handle the server returns in the
+ * first `start` chunk; future fields go here.
+ *
+ * Not generated from proto because the server-side carrier
+ * (`google.protobuf.Struct`) maps to `Record<string, never>` in the
+ * OpenAPI output — the schema-free Struct can't surface keys to
+ * openapi-typescript.
+ */
+export interface PivoxChatMessageMetadata {
+  /**
+   * Resource name of the persisted conversation:
+   *   `organizations/{organization}/users/{user}/conversations/{conversation}`
+   *
+   * Set by the server in the first `start` chunk for first-turn
+   * (auto-create) calls. Captured by `useChatState`'s `onFinish`
+   * and threaded back via `body.conversation` on subsequent turns.
+   */
+  conversation?: string;
+}
+
+/**
+ * The UIMessage flavor the chat runtime speaks: Vercel UIMessage
+ * parameterized with the Pivox metadata shape so `message.metadata`
+ * reads as `PivoxChatMessageMetadata` instead of `unknown`.
+ */
+export type PivoxUIMessage = UIMessage<PivoxChatMessageMetadata>;
+
+/**
+ * Body the chat transport POSTs to
+ * `/v1/{parent}:streamGenerateContent`. Derived from
+ * `@pivox/client`'s OpenAPI `AiChatStreamGenerateContentBody` so a
+ * proto reshape (new fields, renames) propagates automatically; the
+ * `messages` field is widened from `v1InputMessage[]` to
+ * `PivoxUIMessage[]` because the runtime works in Vercel-shape and
+ * the two are wire-compatible after the MessagePart proto reshape.
+ */
+export type PivoxStreamChatBody = Omit<
+  components['schemas']['AiChatStreamGenerateContentBody'],
+  'messages'
+> & {
+  messages: PivoxUIMessage[];
+};
