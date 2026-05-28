@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -648,11 +649,32 @@ func serve(cmd *cobra.Command, args []string) error {
 	// to AiChat.StreamGenerateContent over the in-process bufconn
 	// dial; the gRPC AuthInterceptor on that call validates the
 	// bearer token forwarded as gRPC metadata. Wrapping with HTTP
-	// auth would double-verify. Registered on httpMux directly (not
-	// gwMux) so the middleware above does not see it. Method routing
-	// uses Go 1.22+ method patterns: GET / etc. fall through to
-	// gatedGwMux, returning 405 for the wrong method on this path.
-	httpMux.HandleFunc("POST /v1/ai:streamGenerateContent", sseHandler.ServeHTTP)
+	// auth would double-verify.
+	//
+	// Path matches the AIP gRPC route — same parent as every other
+	// conversation RPC — so client-side useChat hits
+	// /v1/organizations/{org}/users/{user}:streamGenerateContent
+	// directly. Go 1.22 stdlib mux can't match `{user}:verb` as a
+	// single segment (no mixed literal+wildcard segments), so the
+	// pattern captures the full `<user>:<verb>` as one path value
+	// (`userVerb`). The dispatcher below routes `:streamGenerateContent`
+	// to the SSE handler and forwards every other verb (e.g.
+	// `:generateContent` unary) back through the auth-wrapped
+	// gateway. Without this fallback the parametric pattern would
+	// shadow gateway routes on the same parent.
+	gatewayWithAuth := authMW(gwMux)
+	streamVerbSuffix := ":" + aichat.SSEStreamVerb()
+	httpMux.HandleFunc(
+		"POST /v1/organizations/{org}/users/{userVerb}",
+		func(w http.ResponseWriter, r *http.Request) {
+			userVerb := r.PathValue("userVerb")
+			if !strings.HasSuffix(userVerb, streamVerbSuffix) {
+				gatewayWithAuth.ServeHTTP(w, r)
+				return
+			}
+			sseHandler.ServeHTTP(w, r)
+		},
+	)
 
 	// Request logging — slog-native middleware that emits one structured
 	// log line per HTTP request at completion (method, path, status,

@@ -1,7 +1,9 @@
 package aichat
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +12,7 @@ import (
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // sseRequestBodyMaxBytes caps the size of an incoming SSE request
@@ -18,10 +21,26 @@ import (
 // memory while still leaving room for a long-context resumed thread.
 const sseRequestBodyMaxBytes = 1 << 20
 
-// SSEHandler serves the POST /v1/ai:streamGenerateContent endpoint
-// using Server-Sent Events. It self-dials the local gRPC
+// sseStreamVerb is the suffix this handler claims on the user-scoped
+// AIP path. The dispatcher in main.go uses this constant to decide
+// whether to route to the SSE handler or fall through to the gateway
+// for other custom methods (e.g. `:generateContent`) on the same
+// parent.
+const sseStreamVerb = "streamGenerateContent"
+
+// SSEHandler serves the user-scoped streaming chat endpoint via
+// Server-Sent Events. It self-dials the local gRPC
 // AiChat.StreamGenerateContent method and translates proto
-// ServerEvents to Vercel AI SDK UI message stream format.
+// ServerEvents to Vercel AI SDK UIMessageChunks on the wire.
+//
+// Registered path:
+//
+//	POST /v1/organizations/{org}/users/{userVerb}
+//
+// where `{userVerb}` is `<user>:streamGenerateContent`. The
+// dispatcher in main.go forwards non-stream verbs (e.g.
+// `:generateContent`) to the grpc-gateway so the unary call still
+// works on the same parent.
 type SSEHandler struct {
 	grpcClient aiv1.AiChatClient
 	logger     *slog.Logger
@@ -51,141 +70,169 @@ func NewSSEHandler(cfg SSEHandlerConfig) *SSEHandler {
 	return &SSEHandler{grpcClient: cfg.Client, logger: cfg.Logger}
 }
 
-// sseStreamRequest is the JSON body for POST /v1/ai:streamGenerateContent.
-// Matches the shape of the underlying GenerateContentRequest, with
-// `messages` allowed as either the new InputMessage[] form or the
-// older single-message form for transitional clients.
-type sseStreamRequest struct {
-	Parent            string            `json:"parent"`
-	Conversation      string            `json:"conversation,omitempty"`
-	Messages          []sseInputMessage `json:"messages"`
-	SystemInstruction string            `json:"system_instruction,omitempty"`
-}
+// SSEStreamVerb is the AIP custom-method verb suffix this handler
+// owns on the user-scoped path. Exported for the registration site
+// (cmd/pivox-cloud/main.go) so the dispatcher constant and the
+// SSE handler stay in sync.
+func SSEStreamVerb() string { return sseStreamVerb }
 
-type sseInputMessage struct {
-	Role  string          `json:"role"`
-	Parts json.RawMessage `json:"parts"`
-}
-
-// ServeHTTP is registered on the top-level httpMux directly (not on
-// the auth-wrapped grpc-gateway mux), so the HTTP RequireAuth
-// middleware does not run for this route. The handler is a thin
-// proxy to AiChat.StreamGenerateContent over an in-process bufconn
-// dial; the gRPC AuthInterceptor on that call validates the bearer
-// token forwarded as gRPC metadata below. Wrapping this route with
-// HTTP auth would double-verify the same token without changing the
-// auth boundary. See cmd/pivox-cloud/main.go for the registration
-// site comment that pairs with this one.
+// ServeHTTP serves the SSE stream. The request URL is parsed by the
+// caller (main.go's dispatcher) for the `{org}` and `{userVerb}`
+// path values; the body is a Vercel-shaped UIMessage[] envelope
+// (decoded via protojson) plus optional `conversation` and
+// `systemInstruction` fields. The dispatcher has already verified
+// the verb suffix is `streamGenerateContent` by the time this runs.
+//
+// HTTP auth is deliberately NOT applied to this route. The handler
+// is a thin proxy to AiChat.StreamGenerateContent over an in-process
+// bufconn dial; the gRPC AuthInterceptor validates the bearer token
+// forwarded as gRPC metadata below. Wrapping with HTTP auth would
+// double-verify the same token. See cmd/pivox-cloud/main.go for the
+// registration-site comment that pairs with this one.
 func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, sseRequestBodyMaxBytes)
+	// Parse parent from URL path values.
+	org, user, err := parsePathOrgUser(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	parent := fmt.Sprintf("organizations/%s/users/%s", org, user)
 
-	var req sseStreamRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Decode body as a Vercel-shaped GenerateContentRequest.
+	// DiscardUnknown=true lets useChat's extras (id, trigger,
+	// messageId — Vercel-side fields with no Pivox counterpart)
+	// pass through without rejection.
+	r.Body = http.MaxBytesReader(w, r.Body, sseRequestBodyMaxBytes)
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	if req.Parent == "" {
-		http.Error(w, "parent is required", http.StatusBadRequest)
+	req := &aiv1.GenerateContentRequest{}
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(bodyBytes, req); err != nil {
+		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	// URL is the source of truth for parent. Overwrite any value
+	// the caller put in the body so a misbehaving client can't
+	// smuggle a different parent past the URL-level permission
+	// check downstream.
+	req.Parent = parent
 	if len(req.Messages) == 0 {
 		http.Error(w, "messages must not be empty", http.StatusBadRequest)
 		return
 	}
 
-	// Convert each input message's parts JSON to proto. Role is
-	// passed through as the wire-shaped string ("user"/"tool"); the
-	// gRPC validation interceptor downstream gates on the in-set
-	// validator declared on InputMessage.role.
-	protoMessages := make([]*aiv1.InputMessage, 0, len(req.Messages))
-	for _, m := range req.Messages {
-		if !isAcceptedInputRole(m.Role) {
-			http.Error(w, fmt.Sprintf("invalid role %q", m.Role), http.StatusBadRequest)
-			return
-		}
-		parts, err := unmarshalParts(m.Parts)
-		if err != nil {
-			http.Error(w, "invalid message parts", http.StatusBadRequest)
-			return
-		}
-		protoMessages = append(protoMessages, &aiv1.InputMessage{
-			Role:  m.Role,
-			Parts: parts,
-		})
-	}
-
-	// SSE headers.
+	// SSE headers. `X-Accel-Buffering: no` instructs nginx (and any
+	// other nginx-compat reverse proxy) NOT to buffer the response,
+	// which would otherwise batch the entire stream and break
+	// real-time delivery. The value travels with the response, so
+	// any nginx in the path — dev or prod — respects it.
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
-	// Open server-streaming call, forwarding the auth token.
+	// Open the server-streaming call. Forward the bearer token to
+	// the gRPC AuthInterceptor as the `authorization` metadata
+	// entry. The stream's context derives from the HTTP request's
+	// context, so client disconnect propagates to the upstream
+	// gRPC call as ctx cancellation.
 	authHeader := r.Header.Get("Authorization")
 	ctx := metadata.AppendToOutgoingContext(r.Context(), "authorization", authHeader)
 
-	stream, err := h.grpcClient.StreamGenerateContent(ctx, &aiv1.GenerateContentRequest{
-		Parent:            req.Parent,
-		Conversation:      req.Conversation,
-		Messages:          protoMessages,
-		SystemInstruction: req.SystemInstruction,
-	}, grpc.WaitForReady(true))
+	stream, err := h.grpcClient.StreamGenerateContent(ctx, req, grpc.WaitForReady(true))
 	if err != nil {
-		sseError(w, flusher, err)
+		writeErrorChunk(w, flusher, err)
 		return
 	}
 
-	// Pump ServerEvents → SSE events. The full rewrite of this loop
-	// (per-chunk translator + `[DONE]` sentinel + abort on ctx
-	// cancellation + X-Accel-Buffering header) lands in a follow-up
-	// commit. This implementation is a stub: it calls the new
-	// marshalChunk (which currently returns ErrNotImplemented) and
-	// surfaces any error as a stream-side error frame. Once
-	// marshalChunk is implemented, this loop emits valid Vercel
-	// UIMessageChunk JSON.
+	// Pump ServerEvents → SSE chunks. The terminal `data: [DONE]\n\n`
+	// sentinel is emitted on clean EOF; on error mid-stream an
+	// `error` chunk goes out instead. Client-initiated disconnects
+	// surface here as ctx-cancellation errors from Recv; we don't
+	// try to emit anything to a disconnected client (the chunk
+	// would never arrive), just terminate the loop cleanly.
 	for {
-		ev, err := stream.Recv()
-		if err == io.EOF {
+		ev, recvErr := stream.Recv()
+		if errors.Is(recvErr, io.EOF) {
 			break
 		}
-		if err != nil {
-			sseError(w, flusher, err)
+		if recvErr != nil {
+			if isContextCancelled(r.Context()) {
+				// Client disconnect — nothing to send, just exit.
+				return
+			}
+			writeErrorChunk(w, flusher, recvErr)
 			return
 		}
-		body, mErr := marshalChunk(ev)
+		chunk, mErr := marshalChunk(ev)
 		if mErr != nil {
-			sseError(w, flusher, mErr)
+			h.logger.WarnContext(ctx, "marshal SSE chunk failed", "error", mErr)
+			writeErrorChunk(w, flusher, mErr)
 			return
 		}
-		_, _ = fmt.Fprintf(w, "data: %s\n\n", body)
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", chunk); err != nil {
+			// Write failure means the client has disconnected; the
+			// next Recv will surface that via ctx cancellation.
+			return
+		}
 		flusher.Flush()
 	}
+
+	// Stream completed cleanly — emit the terminator. Vercel's
+	// `parseJsonEventStream` ignores this line, but emitting it
+	// matches the SDK's own backend behavior and keeps the wire
+	// interoperable with any intermediary that looks for the
+	// explicit marker.
+	_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
+	flusher.Flush()
 }
 
-// isAcceptedInputRole reports whether a wire-side role string is an
-// accepted InputMessage role. Empty is treated as "user" for
-// forward-compat with clients that omit the field on the JSON side
-// (the gRPC validator still gates on the in-set rule below). The
-// list mirrors the InputMessage.role buf.validate `in` rule on the
-// proto.
-func isAcceptedInputRole(s string) bool {
-	switch s {
-	case "", "user", "tool":
-		return true
-	default:
-		return false
+// parsePathOrgUser extracts the `{org}` slug and the `{user}` UUID
+// from the request's path-value table populated by the mux pattern.
+// The dispatcher in main.go has already verified the verb suffix.
+func parsePathOrgUser(r *http.Request) (org, user string, err error) {
+	org = r.PathValue("org")
+	if org == "" {
+		return "", "", errors.New("missing org in path")
 	}
+	userVerb := r.PathValue("userVerb")
+	if userVerb == "" {
+		return "", "", errors.New("missing user in path")
+	}
+	// The dispatcher pre-validated the suffix; we just trim it.
+	const suffix = ":" + sseStreamVerb
+	if len(userVerb) <= len(suffix) {
+		return "", "", errors.New("malformed user:verb segment")
+	}
+	user = userVerb[:len(userVerb)-len(suffix)]
+	if user == "" {
+		return "", "", errors.New("missing user in path")
+	}
+	return org, user, nil
 }
 
-func sseError(w http.ResponseWriter, flusher http.Flusher, err error) {
-	errJSON, _ := json.Marshal(map[string]string{
-		"type":  "error",
-		"error": err.Error(),
+// isContextCancelled reports whether ctx has been cancelled. Used to
+// distinguish a Recv error caused by client disconnect from a real
+// upstream failure.
+func isContextCancelled(ctx context.Context) bool {
+	return ctx.Err() != nil
+}
+
+// writeErrorChunk emits a Vercel-shaped `error` chunk and flushes.
+// Best-effort: if the client has hung up the write fails silently,
+// which is the right behavior — there's no recipient.
+func writeErrorChunk(w http.ResponseWriter, flusher http.Flusher, err error) {
+	body, _ := json.Marshal(map[string]string{
+		"type":      "error",
+		"errorText": err.Error(),
 	})
-	_, _ = fmt.Fprintf(w, "data: %s\n\n", errJSON)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", body)
 	flusher.Flush()
 }
