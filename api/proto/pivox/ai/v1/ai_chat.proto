@@ -315,15 +315,14 @@ message GenerateContentResponse {
 // files, reasoning, and text are all represented as `MessagePart`
 // variants — no separate request envelopes for tool flows.
 message InputMessage {
-  // Cross-field constraint: tool-role messages must include at least
-  // one ToolResultPart. Without that, the model has no way to match
-  // the result to its earlier tool call. Encoded as CEL because the
-  // shape is "if role == 'tool', parts must contain a tool_result"
-  // — single-field constraints can't express it.
+  // Cross-field constraint: tool-role messages must include at
+  // least one tool-* part with state=output-available (the Vercel
+  // shape for a tool-result message). Without that, the model has
+  // no way to match the result to its earlier tool call.
   option (buf.validate.message).cel = {
-    id: "input_message.tool_role_must_have_tool_result"
-    message: "tool-role message must include at least one tool_result part"
-    expression: "this.role != 'tool' || this.parts.exists(p, has(p.tool_result))"
+    id: "input_message.tool_role_must_have_tool_output"
+    message: "tool-role message must include at least one tool-* part with state='output-available'"
+    expression: "this.role != 'tool' || this.parts.exists(p, (p.type.startsWith('tool-') || p.type == 'dynamic-tool') && p.state == 'output-available')"
   };
 
   // Optional. The Vercel-side message ID. Carried for audit/replay

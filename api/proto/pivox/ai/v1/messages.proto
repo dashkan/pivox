@@ -19,6 +19,7 @@ package pivox.ai.v1;
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "pivox/ai/v1;aiv1";
@@ -37,8 +38,13 @@ message Message {
   // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
-  // Output only. The role of the message author.
-  Role role = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. The role of the message author. One of:
+  // "user", "assistant", "system", "tool". String (not enum) so the
+  // wire shape matches Vercel UIMessage.role on both the streaming
+  // path and Get/List Message responses — REST-gateway consumers can
+  // deserialize a Message directly into a UIMessage-shaped client
+  // type without a role-string remap.
+  string role = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The structured parts of the message.
   repeated MessagePart parts = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -47,78 +53,125 @@ message Message {
   google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// A single part of a message. Messages can contain multiple parts of
-// different types (text, tool calls, tool results, file references).
+// A single part of a message. Shape-matches the Vercel AI SDK
+// `UIMessagePart` wire format verbatim, so:
+//
+//   - Inbound (POST /v1/...:streamGenerateContent) decodes Vercel-
+//     emitted UIMessage[] directly via protojson, no boundary
+//     translator.
+//   - Outbound (Get/List Message) returns the same shape via
+//     grpc-gateway, so the chat UI and persistence agree on the wire.
+//
+// Variants are discriminated by `type`:
+//
+//   - "text" / "reasoning" — populate `text` (and `state` when known)
+//   - "file" — populate `media_type`, `url`, `filename`
+//   - "source-url" — populate `source_id`, `url`, `title`
+//   - "source-document" — populate `source_id`, `media_type`, `title`,
+//     `filename`
+//   - "step-start" — no fields
+//   - "tool-<name>" — populate `tool_call_id`, the state machine
+//     (`state` = input-streaming|input-available|output-available|
+//     output-error|output-denied|...), and the corresponding payload
+//     (`input` / `output` / `error_text`)
+//   - "dynamic-tool" — same shape as tool-<name>, populate `tool_name`
+//     explicitly (the type alone doesn't carry it)
+//   - "data-<name>" — populate `id` (optional, replace-on-update key)
+//     and `data` (free-form JSON object)
+//
+// `provider_metadata` and `call_provider_metadata` cross every
+// variant for upstream-provider passthrough.
 message MessagePart {
-  oneof part {
-    // A text part.
-    TextPart text = 1;
+  // Cross-field constraints encoded as CEL — fields that fire on
+  // specific `type` values can't be expressed as single-field rules.
+  option (buf.validate.message).cel = {
+    id: "message_part.text_part_has_text"
+    message: "type 'text' or 'reasoning' must include `text`"
+    expression: "(this.type != 'text' && this.type != 'reasoning') || this.text != ''"
+  };
+  option (buf.validate.message).cel = {
+    id: "message_part.file_part_has_url"
+    message: "type 'file' must include `url` and `media_type`"
+    expression: "this.type != 'file' || (this.url != '' && this.media_type != '')"
+  };
+  option (buf.validate.message).cel = {
+    id: "message_part.tool_part_has_call_id"
+    message: "tool-* / dynamic-tool parts must include `tool_call_id`"
+    expression: "(!this.type.startsWith('tool-') && this.type != 'dynamic-tool') || this.tool_call_id != ''"
+  };
 
-    // A reasoning/thinking part.
-    ReasoningPart reasoning = 2;
-
-    // A tool call issued by the assistant.
-    ToolCallPart tool_call = 3;
-
-    // A tool result provided by the executor.
-    ToolResultPart tool_result = 4;
-
-    // A file reference.
-    FilePart file = 5;
-  }
-}
-
-// A text part of a message.
-message TextPart {
-  // Output only. The text content.
-  string text = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// A reasoning/thinking part of a message.
-message ReasoningPart {
-  // Output only. The reasoning text.
-  string text = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// A tool call issued by the assistant.
-message ToolCallPart {
-  // Output only. The unique ID of this tool call.
-  string tool_call_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The tool to call.
-  string tool = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The JSON-encoded input arguments for the tool.
-  string input_json = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// A tool result produced by executing a tool call.
-message ToolResultPart {
-  // The ID of the tool call this result is for. Required on input —
-  // every tool_result must reference an earlier tool_call so the model
-  // can match them. Server populates the field on output.
-  string tool_call_id = 1 [
+  // Discriminator. See the message-level comment for the variant
+  // catalog.
+  string type = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).string.min_len = 1
   ];
 
-  // Output only. The tool that produced this result.
-  string tool = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // ─── text / reasoning ────────────────────────────────────
+  // The text content. Required when `type` is "text" or
+  // "reasoning"; ignored otherwise (CEL enforced above).
+  string text = 2 [(google.api.field_behavior) = OPTIONAL];
 
-  // Output only. The JSON-encoded result.
-  string result_json = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Streaming state. Vercel emits "streaming" while the part is
+  // mid-generation and "done" once closed. Producers can leave it
+  // unset; persistence round-trips whatever was last set.
+  string state = 3 [(google.api.field_behavior) = OPTIONAL];
 
-  // Output only. Whether the tool execution resulted in an error.
-  bool is_error = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
+  // ─── file / source-document ──────────────────────────────
+  string media_type = 4 [(google.api.field_behavior) = OPTIONAL];
+  string url = 5 [(google.api.field_behavior) = OPTIONAL];
+  string filename = 6 [(google.api.field_behavior) = OPTIONAL];
 
-// A file reference within a message.
-message FilePart {
-  // Output only. The MIME type of the file.
-  string mime_type = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // ─── source-url / source-document ────────────────────────
+  string source_id = 7 [(google.api.field_behavior) = OPTIONAL];
+  string title = 8 [(google.api.field_behavior) = OPTIONAL];
 
-  // Output only. The URL or resource name pointing to the file content.
-  string url = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // ─── tool-<name> / dynamic-tool ──────────────────────────
+  // The unique ID of the tool call. Threads the state machine for
+  // a single tool invocation (input → output / error / denied).
+  string tool_call_id = 9 [(google.api.field_behavior) = OPTIONAL];
+
+  // The tool's name. Populated explicitly for "dynamic-tool" (the
+  // type alone doesn't carry it); for "tool-<name>" parts it
+  // duplicates the suffix in `type` and is informational.
+  string tool_name = 10 [(google.api.field_behavior) = OPTIONAL];
+
+  // The fully-parsed tool input arguments. Crosses both wire and
+  // persistence as structured data — no JSON-string double-encode.
+  google.protobuf.Struct input = 11 [(google.api.field_behavior) = OPTIONAL];
+
+  // The tool's result, structured. Populated when `state` is
+  // "output-available".
+  google.protobuf.Struct output = 12 [(google.api.field_behavior) = OPTIONAL];
+
+  // Human-readable error text. Populated when `state` is
+  // "output-error" or "input-error".
+  string error_text = 13 [(google.api.field_behavior) = OPTIONAL];
+
+  // True when the tool ran on the provider side (e.g. Anthropic
+  // web search). False / unset for client-executed tools.
+  bool provider_executed = 14 [(google.api.field_behavior) = OPTIONAL];
+
+  // True when the tool was not statically declared in the
+  // request's `tools` list — i.e. the provider suggested it at
+  // runtime.
+  bool dynamic = 15 [(google.api.field_behavior) = OPTIONAL];
+
+  // ─── data-<name> ─────────────────────────────────────────
+  // Stable replace-on-update key for `data-<name>` parts.
+  string id = 16 [(google.api.field_behavior) = OPTIONAL];
+
+  // Free-form payload for `data-<name>` parts.
+  google.protobuf.Struct data = 17 [(google.api.field_behavior) = OPTIONAL];
+
+  // ─── Cross-variant ───────────────────────────────────────
+  // Provider-specific metadata attached to the part (e.g.
+  // Anthropic prompt-cache stats, OpenAI reasoning summaries).
+  google.protobuf.Struct provider_metadata = 18 [(google.api.field_behavior) = OPTIONAL];
+
+  // Provider metadata captured at the tool-call site, distinct
+  // from provider_metadata which describes the part itself.
+  google.protobuf.Struct call_provider_metadata = 19 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Request message for `GetMessage`.
@@ -171,20 +224,7 @@ message ListMessagesResponse {
   string next_page_token = 2;
 }
 
-// The role of a message author.
-enum Role {
-  // Unspecified role.
-  ROLE_UNSPECIFIED = 0;
-
-  // A message from the user.
-  USER = 1;
-
-  // A message from the AI assistant.
-  ASSISTANT = 2;
-
-  // A system prompt message.
-  SYSTEM = 3;
-
-  // A tool result message.
-  TOOL = 4;
-}
+// Role is no longer a proto enum — Message.role and InputMessage.role
+// both carry the role as a wire-shape string ("user", "assistant",
+// "system", "tool") so the entire chat path agrees with Vercel
+// UIMessage.role without a casing remap.

@@ -275,12 +275,13 @@ func (s *Server) runGenerate(
 		}
 	}
 
-	// Build the assistant message proto.
+	// Build the assistant message proto. Vercel UIMessagePart shape:
+	// `{type: "text", text: "..."}` — flat, discriminated by `type`.
 	assistantParts := []*aiv1.MessagePart{
-		{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: assistantText.String()}}},
+		{Type: "text", Text: assistantText.String(), State: "done"},
 	}
 	assistantMsg := &aiv1.Message{
-		Role:  aiv1.Role_ASSISTANT,
+		Role:  "assistant",
 		Parts: assistantParts,
 	}
 
@@ -397,48 +398,91 @@ func dbRoleForInputMessage(r string) string {
 
 // inputMessagesToModel converts a list of proto InputMessages to the
 // internal model layer's representation, used by the stateless path.
-// Cross-field constraints (TOOL-role must include a tool_result part;
-// every tool_result must carry a tool_call_id) are enforced at the
-// validation interceptor via buf-validate annotations on InputMessage
-// and ToolResultPart, so they don't need to be re-checked here.
+// Cross-field constraints (tool-role must include a tool-* part with
+// state=output-available) are enforced at the validation interceptor
+// via the buf-validate CEL rules on InputMessage and MessagePart.
 func inputMessagesToModel(in []*aiv1.InputMessage) ([]model.Message, error) {
 	out := make([]model.Message, 0, len(in))
 	for _, m := range in {
 		role := dbRoleForInputMessage(m.GetRole())
 		mm := model.Message{Role: role}
 		for _, p := range m.GetParts() {
-			switch {
-			case p.GetText() != nil:
-				mm.Parts = append(mm.Parts, model.MessagePart{
-					Type: "text",
-					Text: p.GetText().GetText(),
-				})
-			case p.GetToolCall() != nil:
-				tc := p.GetToolCall()
-				mm.Parts = append(mm.Parts, model.MessagePart{
-					Type: "tool_call",
-					ToolCall: &model.ToolCall{
-						ID:        tc.GetToolCallId(),
-						Name:      tc.GetTool(),
-						InputJSON: tc.GetInputJson(),
-					},
-				})
-			case p.GetToolResult() != nil:
-				tr := p.GetToolResult()
-				mm.Parts = append(mm.Parts, model.MessagePart{
-					Type: "tool_result",
-					ToolResult: &model.ToolResult{
-						CallID:     tr.GetToolCallId(),
-						Name:       tr.GetTool(),
-						ResultJSON: tr.GetResultJson(),
-						IsError:    tr.GetIsError(),
-					},
-				})
+			if mp, ok := protoPartToModel(p); ok {
+				mm.Parts = append(mm.Parts, mp)
 			}
 		}
 		out = append(out, mm)
 	}
 	return out, nil
+}
+
+// protoPartToModel converts a proto MessagePart (Vercel-shaped flat
+// part with a `type` discriminator) into the model layer's
+// MessagePart (Pivox-internal text/tool_call/tool_result shape).
+//
+// Returns `ok=false` for variants the model layer doesn't yet
+// understand (source-*, file, data-*, step-start, dynamic-tool's
+// `input-streaming` state). Callers should skip those silently —
+// the model still gets the rest of the turn.
+func protoPartToModel(p *aiv1.MessagePart) (model.MessagePart, bool) {
+	switch t := p.GetType(); {
+	case t == "text":
+		return model.MessagePart{Type: "text", Text: p.GetText()}, true
+	case t == "reasoning":
+		// Model layer doesn't (yet) distinguish reasoning from text;
+		// fold into a text part so the content reaches the LLM.
+		return model.MessagePart{Type: "text", Text: p.GetText()}, true
+	case strings.HasPrefix(t, "tool-") || t == "dynamic-tool":
+		toolName := p.GetToolName()
+		if toolName == "" && strings.HasPrefix(t, "tool-") {
+			toolName = strings.TrimPrefix(t, "tool-")
+		}
+		switch p.GetState() {
+		case "input-available":
+			return model.MessagePart{
+				Type: "tool_call",
+				ToolCall: &model.ToolCall{
+					ID:        p.GetToolCallId(),
+					Name:      toolName,
+					InputJSON: structToJSON(p.GetInput()),
+				},
+			}, true
+		case "output-available":
+			return model.MessagePart{
+				Type: "tool_result",
+				ToolResult: &model.ToolResult{
+					CallID:     p.GetToolCallId(),
+					Name:       toolName,
+					ResultJSON: structToJSON(p.GetOutput()),
+				},
+			}, true
+		case "output-error":
+			return model.MessagePart{
+				Type: "tool_result",
+				ToolResult: &model.ToolResult{
+					CallID:     p.GetToolCallId(),
+					Name:       toolName,
+					ResultJSON: p.GetErrorText(),
+					IsError:    true,
+				},
+			}, true
+		}
+	}
+	return model.MessagePart{}, false
+}
+
+// structToJSON renders a structpb.Struct as its JSON string form
+// (matching the model layer's `InputJSON` / `ResultJSON` contract).
+// Nil → empty string, no error path — the model handles either.
+func structToJSON(s *structpb.Struct) string {
+	if s == nil {
+		return ""
+	}
+	b, err := protojson.Marshal(s)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // emitToolCall emits the ToolInputAvailable event and, for server-side
@@ -575,35 +619,9 @@ func dbMessageToModel(row db.AiMessage) model.Message {
 	m := model.Message{Role: row.Role}
 
 	parts, _ := unmarshalParts(row.Parts)
-
 	for _, p := range parts {
-		switch {
-		case p.GetText() != nil:
-			m.Parts = append(m.Parts, model.MessagePart{
-				Type: "text",
-				Text: p.GetText().GetText(),
-			})
-		case p.GetToolCall() != nil:
-			tc := p.GetToolCall()
-			m.Parts = append(m.Parts, model.MessagePart{
-				Type: "tool_call",
-				ToolCall: &model.ToolCall{
-					ID:        tc.GetToolCallId(),
-					Name:      tc.GetTool(),
-					InputJSON: tc.GetInputJson(),
-				},
-			})
-		case p.GetToolResult() != nil:
-			tr := p.GetToolResult()
-			m.Parts = append(m.Parts, model.MessagePart{
-				Type: "tool_result",
-				ToolResult: &model.ToolResult{
-					CallID:     tr.GetToolCallId(),
-					Name:       tr.GetTool(),
-					ResultJSON: tr.GetResultJson(),
-					IsError:    tr.GetIsError(),
-				},
-			})
+		if mp, ok := protoPartToModel(p); ok {
+			m.Parts = append(m.Parts, mp)
 		}
 	}
 
@@ -626,8 +644,8 @@ func (s *Server) defaultSystemPrompt() string {
 func extractText(parts []*aiv1.MessagePart) string {
 	var sb strings.Builder
 	for _, p := range parts {
-		if tp := p.GetText(); tp != nil {
-			sb.WriteString(tp.GetText())
+		if p.GetType() == "text" {
+			sb.WriteString(p.GetText())
 		}
 	}
 	return sb.String()

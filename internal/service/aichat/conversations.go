@@ -248,7 +248,7 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 			{
 				Role: "user",
 				Parts: []*aiv1.MessagePart{
-					{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: transcript}}},
+					{Type: "text", Text: transcript},
 				},
 			},
 		},
@@ -326,8 +326,8 @@ func extractTextFromMessage(m *aiv1.Message) string {
 	}
 	var sb strings.Builder
 	for _, p := range m.GetParts() {
-		if tp := p.GetText(); tp != nil {
-			sb.WriteString(tp.GetText())
+		if p.GetType() == "text" {
+			sb.WriteString(p.GetText())
 		}
 	}
 	return sb.String()

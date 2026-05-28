@@ -131,9 +131,10 @@ func newRequest(t *testing.T, org, userVerb, body string) *http.Request {
 }
 
 // minimalBody is a syntactically-valid request body (one user
-// message with one text part). Used by tests whose subject is the
-// HTTP-layer behavior, not the body itself.
-const minimalBody = `{"messages":[{"role":"user","parts":[{"text":{"text":"hi"}}]}]}`
+// message with one text part) in the Vercel UIMessage wire shape
+// our flat MessagePart accepts directly. Used by tests whose
+// subject is the HTTP-layer behavior, not the body itself.
+const minimalBody = `{"messages":[{"role":"user","parts":[{"type":"text","text":"hi"}]}]}`
 
 // ─── Tests ──────────────────────────────────────────────────
 

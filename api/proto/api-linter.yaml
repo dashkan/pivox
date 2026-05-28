@@ -19,11 +19,13 @@
     - 'core::0215::foreign-type-reference'
 - included_paths:
     - 'api/proto/pivox/ai/v1/ai_chat.proto'
-  # The streaming chunk wire format mirrors the Vercel AI SDK's
-  # UIMessageChunk schema verbatim so the SSE adapter can emit the
-  # exact shape `useChat`'s `uiMessageChunkSchema.parse(...)`
-  # accepts. Several AIP-style rules fight that alignment; we
-  # suppress them ONLY for this file with justifications below.
+    - 'api/proto/pivox/ai/v1/messages.proto'
+  # The streaming chunk wire format AND the persisted message-part
+  # shape both mirror the Vercel AI SDK schemas (UIMessageChunk +
+  # UIMessagePart) verbatim so the SSE adapter and the Get/List
+  # Message responses both emit the exact JSON useChat accepts.
+  # Several AIP-style rules fight that alignment; we suppress them
+  # ONLY for these two files with justifications below.
   disabled_rules:
     # Vercel wire field is `toolName` (camelCase) — our proto field
     # is `tool_name` which protojson emits as `toolName`. AIP-122

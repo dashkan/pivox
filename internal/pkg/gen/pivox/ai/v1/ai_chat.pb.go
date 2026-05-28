@@ -2599,13 +2599,13 @@ const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\x17GenerateContentResponse\x12.\n" +
 	"\amessage\x18\x01 \x01(\v2\x14.pivox.ai.v1.MessageR\amessage\x12-\n" +
 	"\x05usage\x18\x02 \x01(\v2\x17.pivox.ai.v1.TokenUsageR\x05usage\x12\x14\n" +
-	"\x05model\x18\x03 \x01(\tR\x05model\"\xfc\x02\n" +
+	"\x05model\x18\x03 \x01(\tR\x05model\"\xdd\x03\n" +
 	"\fInputMessage\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x01R\x02id\x12(\n" +
 	"\x04role\x18\x02 \x01(\tB\x14\xe0A\x02\xbaH\x0er\fR\x04userR\x04toolR\x04role\x12;\n" +
 	"\x05parts\x18\x03 \x03(\v2\x18.pivox.ai.v1.MessagePartB\v\xe0A\x02\xbaH\x05\x92\x01\x02\b\x01R\x05parts\x128\n" +
-	"\bmetadata\x18\x04 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x01R\bmetadata:\xb5\x01\xbaH\xb1\x01\x1a\xae\x01\n" +
-	"-input_message.tool_role_must_have_tool_result\x12<tool-role message must include at least one tool_result part\x1a?this.role != 'tool' || this.parts.exists(p, has(p.tool_result))\"\x81\x01\n" +
+	"\bmetadata\x18\x04 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x01R\bmetadata:\x96\x02\xbaH\x92\x02\x1a\x8f\x02\n" +
+	"-input_message.tool_role_must_have_tool_output\x12Utool-role message must include at least one tool-* part with state='output-available'\x1a\x86\x01this.role != 'tool' || this.parts.exists(p, (p.type.startsWith('tool-') || p.type == 'dynamic-tool') && p.state == 'output-available')\"\x81\x01\n" +
 	"\x0eToolDefinition\x12\x17\n" +
 	"\x04tool\x18\x01 \x01(\tB\x03\xe0A\x02R\x04tool\x12%\n" +
 	"\vdescription\x18\x02 \x01(\tB\x03\xe0A\x01R\vdescription\x12/\n" +

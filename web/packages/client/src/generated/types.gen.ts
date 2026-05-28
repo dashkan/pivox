@@ -2943,75 +2943,6 @@ export interface components {
             response?: components["schemas"]["protobufAny"];
         };
         /**
-         * @description The role of a message author.
-         *
-         *      - ROLE_UNSPECIFIED: Unspecified role.
-         *      - USER: A message from the user.
-         *      - ASSISTANT: A message from the AI assistant.
-         *      - SYSTEM: A system prompt message.
-         *      - TOOL: A tool result message.
-         * @default ROLE_UNSPECIFIED
-         * @enum {string}
-         */
-        pivoxAiV1Role: "ROLE_UNSPECIFIED" | "USER" | "ASSISTANT" | "SYSTEM" | "TOOL";
-        /**
-         * @description A role within an organization. Roles can be system-defined (owner, admin,
-         *     editor, viewer) or custom. System roles are seeded per-org at creation time.
-         *
-         *     Read-only via `Iam.GetRole` / `Iam.ListRoles` in v1; custom-role CRUD is
-         *     deferred until a real customer use case materializes.
-         */
-        pivoxIamV1Role: {
-            /**
-             * The resource name of the role.
-             *     Format: `organizations/{organization}/roles/{role}`
-             */
-            name?: string;
-            /** @description Required. A human-readable name for the role. */
-            displayName: string;
-            /** @description Optional. A longer description of the role's purpose. */
-            description?: string;
-            /**
-             * @description Output only. The permissions granted by this role, resolved from the
-             *     role_permissions join table.
-             */
-            readonly permissions?: string[];
-            /**
-             * @description Output only. Whether this is a system-defined role (owner, admin, editor,
-             *     viewer). System roles cannot be deleted or have their permissions changed.
-             */
-            readonly system?: boolean;
-            /**
-             * Format: date-time
-             * @description Output only. Timestamp when the role was created.
-             */
-            readonly createTime?: string;
-            /**
-             * Format: date-time
-             * @description Output only. Timestamp when the role was last modified.
-             */
-            readonly updateTime?: string;
-            /**
-             * Format: date-time
-             * @description Output only. Timestamp when the role was soft-deleted.
-             */
-            readonly deleteTime?: string;
-            /**
-             * Format: date-time
-             * @description Output only. Timestamp when the role will be permanently purged.
-             */
-            readonly purgeTime?: string;
-            /**
-             * @description Output only. A checksum computed by the server based on the current value
-             *     of the Role resource.
-             */
-            readonly etag?: string;
-            /** @description Optional. Free-form annotations for the role. */
-            annotations?: {
-                [key: string]: string;
-            };
-        };
-        /**
          * @description `Any` contains an arbitrary serialized protocol buffer message along with a
          *     URL that describes the type of the serialized message.
          *
@@ -4456,13 +4387,6 @@ export interface components {
             mediaType?: string;
             providerMetadata?: Record<string, never>;
         };
-        /** @description A file reference within a message. */
-        v1FilePart: {
-            /** @description Output only. The MIME type of the file. */
-            readonly mimeType?: string;
-            /** @description Output only. The URL or resource name pointing to the file content. */
-            readonly url?: string;
-        };
         /**
          * @description Configuration for a local or network-mounted filesystem endpoint.
          *     The path must be mounted on all agents in the gateway pool before
@@ -5163,7 +5087,7 @@ export interface components {
         /** @description Response message for `Iam.ListRoles`. */
         v1ListRolesResponse: {
             /** @description The roles in the organization. */
-            roles?: components["schemas"]["pivoxIamV1Role"][];
+            roles?: components["schemas"]["v1Role"][];
             /** @description Token for the next page of results. */
             nextPageToken?: string;
         };
@@ -5334,8 +5258,15 @@ export interface components {
              *     Format: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`
              */
             name?: string;
-            /** @description Output only. The role of the message author. */
-            readonly role?: components["schemas"]["pivoxAiV1Role"];
+            /**
+             * @description Output only. The role of the message author. One of:
+             *     "user", "assistant", "system", "tool". String (not enum) so the
+             *     wire shape matches Vercel UIMessage.role on both the streaming
+             *     path and Get/List Message responses — REST-gateway consumers can
+             *     deserialize a Message directly into a UIMessage-shaped client
+             *     type without a role-string remap.
+             */
+            readonly role?: string;
             /** @description Output only. The structured parts of the message. */
             readonly parts?: components["schemas"]["v1MessagePart"][];
             /**
@@ -5353,20 +5284,115 @@ export interface components {
             messageMetadata?: Record<string, never>;
         };
         /**
-         * @description A single part of a message. Messages can contain multiple parts of
-         *     different types (text, tool calls, tool results, file references).
+         * A single part of a message. Shape-matches the Vercel AI SDK
+         *     `UIMessagePart` wire format verbatim, so:
+         * @description - Inbound (POST /v1/...:streamGenerateContent) decodes Vercel-
+         *         emitted UIMessage[] directly via protojson, no boundary
+         *         translator.
+         *       - Outbound (Get/List Message) returns the same shape via
+         *         grpc-gateway, so the chat UI and persistence agree on the wire.
+         *
+         *     Variants are discriminated by `type`:
+         *
+         *       - "text" / "reasoning" — populate `text` (and `state` when known)
+         *       - "file" — populate `media_type`, `url`, `filename`
+         *       - "source-url" — populate `source_id`, `url`, `title`
+         *       - "source-document" — populate `source_id`, `media_type`, `title`,
+         *         `filename`
+         *       - "step-start" — no fields
+         *       - "tool-<name>" — populate `tool_call_id`, the state machine
+         *         (`state` = input-streaming|input-available|output-available|
+         *         output-error|output-denied|...), and the corresponding payload
+         *         (`input` / `output` / `error_text`)
+         *       - "dynamic-tool" — same shape as tool-<name>, populate `tool_name`
+         *         explicitly (the type alone doesn't carry it)
+         *       - "data-<name>" — populate `id` (optional, replace-on-update key)
+         *         and `data` (free-form JSON object)
+         *
+         *     `provider_metadata` and `call_provider_metadata` cross every
+         *     variant for upstream-provider passthrough.
          */
         v1MessagePart: {
-            /** @description A text part. */
-            text?: components["schemas"]["v1TextPart"];
-            /** @description A reasoning/thinking part. */
-            reasoning?: components["schemas"]["v1ReasoningPart"];
-            /** @description A tool call issued by the assistant. */
-            toolCall?: components["schemas"]["v1ToolCallPart"];
-            /** @description A tool result provided by the executor. */
-            toolResult?: components["schemas"]["v1ToolResultPart"];
-            /** @description A file reference. */
-            file?: components["schemas"]["v1FilePart"];
+            /**
+             * @description Discriminator. See the message-level comment for the variant
+             *     catalog.
+             */
+            type: string;
+            /**
+             * @description ─── text / reasoning ────────────────────────────────────
+             *     The text content. Required when `type` is "text" or
+             *     "reasoning"; ignored otherwise (CEL enforced above).
+             */
+            text?: string;
+            /**
+             * @description Streaming state. Vercel emits "streaming" while the part is
+             *     mid-generation and "done" once closed. Producers can leave it
+             *     unset; persistence round-trips whatever was last set.
+             */
+            state?: string;
+            /** ─── file / source-document ────────────────────────────── */
+            mediaType?: string;
+            url?: string;
+            filename?: string;
+            /** ─── source-url / source-document ──────────────────────── */
+            sourceId?: string;
+            title?: string;
+            /**
+             * @description ─── tool-<name> / dynamic-tool ──────────────────────────
+             *     The unique ID of the tool call. Threads the state machine for
+             *     a single tool invocation (input → output / error / denied).
+             */
+            toolCallId?: string;
+            /**
+             * @description The tool's name. Populated explicitly for "dynamic-tool" (the
+             *     type alone doesn't carry it); for "tool-<name>" parts it
+             *     duplicates the suffix in `type` and is informational.
+             */
+            toolName?: string;
+            /**
+             * @description The fully-parsed tool input arguments. Crosses both wire and
+             *     persistence as structured data — no JSON-string double-encode.
+             */
+            input?: Record<string, never>;
+            /**
+             * @description The tool's result, structured. Populated when `state` is
+             *     "output-available".
+             */
+            output?: Record<string, never>;
+            /**
+             * @description Human-readable error text. Populated when `state` is
+             *     "output-error" or "input-error".
+             */
+            errorText?: string;
+            /**
+             * @description True when the tool ran on the provider side (e.g. Anthropic
+             *     web search). False / unset for client-executed tools.
+             */
+            providerExecuted?: boolean;
+            /**
+             * @description True when the tool was not statically declared in the
+             *     request's `tools` list — i.e. the provider suggested it at
+             *     runtime.
+             */
+            dynamic?: boolean;
+            /**
+             * @description ─── data-<name> ─────────────────────────────────────────
+             *     Stable replace-on-update key for `data-<name>` parts.
+             */
+            id?: string;
+            /** @description Free-form payload for `data-<name>` parts. */
+            data?: Record<string, never>;
+            /**
+             * @description ─── Cross-variant ───────────────────────────────────────
+             *     Provider-specific metadata attached to the part (e.g.
+             *     Anthropic prompt-cache stats, OpenAI reasoning summaries).
+             */
+            providerMetadata?: Record<string, never>;
+            /**
+             * @description Provider metadata captured at the tool-call site, distinct
+             *     from provider_metadata which describes the part itself.
+             */
+            callProviderMetadata?: Record<string, never>;
         };
         /**
          * @description OIDC provider configuration. Maps onto Firebase Admin SDK's
@@ -5544,11 +5570,6 @@ export interface components {
         v1ReasoningEnd: {
             id?: string;
             providerMetadata?: Record<string, never>;
-        };
-        /** @description A reasoning/thinking part of a message. */
-        v1ReasoningPart: {
-            /** @description Output only. The reasoning text. */
-            readonly text?: string;
         };
         v1ReasoningStart: {
             id?: string;
@@ -5751,6 +5772,63 @@ export interface components {
              *     specified, all targets are allowed.
              */
             apiTargets?: components["schemas"]["v1ApiTarget"][];
+        };
+        /**
+         * @description A role within an organization. Roles can be system-defined (owner, admin,
+         *     editor, viewer) or custom. System roles are seeded per-org at creation time.
+         *
+         *     Read-only via `Iam.GetRole` / `Iam.ListRoles` in v1; custom-role CRUD is
+         *     deferred until a real customer use case materializes.
+         */
+        v1Role: {
+            /**
+             * The resource name of the role.
+             *     Format: `organizations/{organization}/roles/{role}`
+             */
+            name?: string;
+            /** @description Required. A human-readable name for the role. */
+            displayName: string;
+            /** @description Optional. A longer description of the role's purpose. */
+            description?: string;
+            /**
+             * @description Output only. The permissions granted by this role, resolved from the
+             *     role_permissions join table.
+             */
+            readonly permissions?: string[];
+            /**
+             * @description Output only. Whether this is a system-defined role (owner, admin, editor,
+             *     viewer). System roles cannot be deleted or have their permissions changed.
+             */
+            readonly system?: boolean;
+            /**
+             * Format: date-time
+             * @description Output only. Timestamp when the role was created.
+             */
+            readonly createTime?: string;
+            /**
+             * Format: date-time
+             * @description Output only. Timestamp when the role was last modified.
+             */
+            readonly updateTime?: string;
+            /**
+             * Format: date-time
+             * @description Output only. Timestamp when the role was soft-deleted.
+             */
+            readonly deleteTime?: string;
+            /**
+             * Format: date-time
+             * @description Output only. Timestamp when the role will be permanently purged.
+             */
+            readonly purgeTime?: string;
+            /**
+             * @description Output only. A checksum computed by the server based on the current value
+             *     of the Role resource.
+             */
+            readonly etag?: string;
+            /** @description Optional. Free-form annotations for the role. */
+            annotations?: {
+                [key: string]: string;
+            };
         };
         /**
          * @description RowAction describes an action exposed on each row of a
@@ -6399,11 +6477,6 @@ export interface components {
             /** @description Optional. Provider-specific metadata. */
             providerMetadata?: Record<string, never>;
         };
-        /** @description A text part of a message. */
-        v1TextPart: {
-            /** @description Output only. The text content. */
-            readonly text?: string;
-        };
         v1TextStart: {
             /**
              * @description Block ID. Wire chunk's `id` field; pairs the start/delta/end
@@ -6500,15 +6573,6 @@ export interface components {
             approvalId?: string;
             /** @description The tool call awaiting approval. */
             toolCallId?: string;
-        };
-        /** @description A tool call issued by the assistant. */
-        v1ToolCallPart: {
-            /** @description Output only. The unique ID of this tool call. */
-            readonly toolCallId?: string;
-            /** @description Output only. The tool to call. */
-            readonly tool?: string;
-            /** @description Output only. The JSON-encoded input arguments for the tool. */
-            readonly inputJson?: string;
         };
         /**
          * @description A tool the model may invoke during generation. Schemas are
@@ -6625,21 +6689,6 @@ export interface components {
             dynamic?: boolean;
             providerMetadata?: Record<string, never>;
             toolMetadata?: Record<string, never>;
-        };
-        /** @description A tool result produced by executing a tool call. */
-        v1ToolResultPart: {
-            /**
-             * @description The ID of the tool call this result is for. Required on input —
-             *     every tool_result must reference an earlier tool_call so the model
-             *     can match them. Server populates the field on output.
-             */
-            toolCallId: string;
-            /** @description Output only. The tool that produced this result. */
-            readonly tool?: string;
-            /** @description Output only. The JSON-encoded result. */
-            readonly resultJson?: string;
-            /** @description Output only. Whether the tool execution resulted in an error. */
-            readonly isError?: boolean;
         };
         /**
          * @description Response message for `Organizations.TransferOwnership`. Returns the
@@ -8780,7 +8829,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["pivoxIamV1Role"];
+                    "application/json": components["schemas"]["v1Role"];
                 };
             };
             /** @description An unexpected error response. */

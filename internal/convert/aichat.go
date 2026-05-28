@@ -50,7 +50,7 @@ func ConversationToProto(row db.AiConversation, orgName string, actors map[uuid.
 func MessageToProto(row db.AiMessage, convName string) (*aiv1.Message, error) {
 	pb := &aiv1.Message{
 		Name:       fmt.Sprintf("%s/messages/%s", convName, row.Name),
-		Role:       roleToProto(row.Role),
+		Role:       row.Role,
 		CreateTime: timestamppb.New(row.CreateTime),
 	}
 
@@ -118,33 +118,7 @@ func ArtifactVersionToProtoAi(row db.AiArtifactVersion, artName string, actors m
 	return pb
 }
 
-func roleToProto(role string) aiv1.Role {
-	switch role {
-	case "user":
-		return aiv1.Role_USER
-	case "assistant":
-		return aiv1.Role_ASSISTANT
-	case "system":
-		return aiv1.Role_SYSTEM
-	case "tool":
-		return aiv1.Role_TOOL
-	default:
-		return aiv1.Role_ROLE_UNSPECIFIED
-	}
-}
-
-// RoleToString converts a proto role to the DB string representation.
-func RoleToString(role aiv1.Role) string {
-	switch role {
-	case aiv1.Role_USER:
-		return "user"
-	case aiv1.Role_ASSISTANT:
-		return "assistant"
-	case aiv1.Role_SYSTEM:
-		return "system"
-	case aiv1.Role_TOOL:
-		return "tool"
-	default:
-		return ""
-	}
-}
+// Role helpers used to bridge the old proto Role enum to DB strings.
+// The enum was deleted in favor of carrying the role as a wire-shape
+// string everywhere — InputMessage.role, Message.role, and the DB
+// column all agree on the lowercase Vercel form. No mapper needed.

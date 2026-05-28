@@ -25,6 +25,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -38,67 +39,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// The role of a message author.
-type Role int32
-
-const (
-	// Unspecified role.
-	Role_ROLE_UNSPECIFIED Role = 0
-	// A message from the user.
-	Role_USER Role = 1
-	// A message from the AI assistant.
-	Role_ASSISTANT Role = 2
-	// A system prompt message.
-	Role_SYSTEM Role = 3
-	// A tool result message.
-	Role_TOOL Role = 4
-)
-
-// Enum value maps for Role.
-var (
-	Role_name = map[int32]string{
-		0: "ROLE_UNSPECIFIED",
-		1: "USER",
-		2: "ASSISTANT",
-		3: "SYSTEM",
-		4: "TOOL",
-	}
-	Role_value = map[string]int32{
-		"ROLE_UNSPECIFIED": 0,
-		"USER":             1,
-		"ASSISTANT":        2,
-		"SYSTEM":           3,
-		"TOOL":             4,
-	}
-)
-
-func (x Role) Enum() *Role {
-	p := new(Role)
-	*p = x
-	return p
-}
-
-func (x Role) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (Role) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_ai_v1_messages_proto_enumTypes[0].Descriptor()
-}
-
-func (Role) Type() protoreflect.EnumType {
-	return &file_pivox_ai_v1_messages_proto_enumTypes[0]
-}
-
-func (x Role) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use Role.Descriptor instead.
-func (Role) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{0}
-}
-
 // A message within a conversation. Messages are produced by the streaming
 // path and are read-only through this API.
 type Message struct {
@@ -106,8 +46,13 @@ type Message struct {
 	// The resource name of the message.
 	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Output only. The role of the message author.
-	Role Role `protobuf:"varint,2,opt,name=role,proto3,enum=pivox.ai.v1.Role" json:"role,omitempty"`
+	// Output only. The role of the message author. One of:
+	// "user", "assistant", "system", "tool". String (not enum) so the
+	// wire shape matches Vercel UIMessage.role on both the streaming
+	// path and Get/List Message responses — REST-gateway consumers can
+	// deserialize a Message directly into a UIMessage-shaped client
+	// type without a role-string remap.
+	Role string `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
 	// Output only. The structured parts of the message.
 	Parts []*MessagePart `protobuf:"bytes,3,rep,name=parts,proto3" json:"parts,omitempty"`
 	// Output only. When the message was created.
@@ -153,11 +98,11 @@ func (x *Message) GetName() string {
 	return ""
 }
 
-func (x *Message) GetRole() Role {
+func (x *Message) GetRole() string {
 	if x != nil {
 		return x.Role
 	}
-	return Role_ROLE_UNSPECIFIED
+	return ""
 }
 
 func (x *Message) GetParts() []*MessagePart {
@@ -174,20 +119,92 @@ func (x *Message) GetCreateTime() *timestamppb.Timestamp {
 	return nil
 }
 
-// A single part of a message. Messages can contain multiple parts of
-// different types (text, tool calls, tool results, file references).
+// A single part of a message. Shape-matches the Vercel AI SDK
+// `UIMessagePart` wire format verbatim, so:
+//
+//   - Inbound (POST /v1/...:streamGenerateContent) decodes Vercel-
+//     emitted UIMessage[] directly via protojson, no boundary
+//     translator.
+//   - Outbound (Get/List Message) returns the same shape via
+//     grpc-gateway, so the chat UI and persistence agree on the wire.
+//
+// Variants are discriminated by `type`:
+//
+//   - "text" / "reasoning" — populate `text` (and `state` when known)
+//   - "file" — populate `media_type`, `url`, `filename`
+//   - "source-url" — populate `source_id`, `url`, `title`
+//   - "source-document" — populate `source_id`, `media_type`, `title`,
+//     `filename`
+//   - "step-start" — no fields
+//   - "tool-<name>" — populate `tool_call_id`, the state machine
+//     (`state` = input-streaming|input-available|output-available|
+//     output-error|output-denied|...), and the corresponding payload
+//     (`input` / `output` / `error_text`)
+//   - "dynamic-tool" — same shape as tool-<name>, populate `tool_name`
+//     explicitly (the type alone doesn't carry it)
+//   - "data-<name>" — populate `id` (optional, replace-on-update key)
+//     and `data` (free-form JSON object)
+//
+// `provider_metadata` and `call_provider_metadata` cross every
+// variant for upstream-provider passthrough.
 type MessagePart struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Part:
-	//
-	//	*MessagePart_Text
-	//	*MessagePart_Reasoning
-	//	*MessagePart_ToolCall
-	//	*MessagePart_ToolResult
-	//	*MessagePart_File
-	Part          isMessagePart_Part `protobuf_oneof:"part"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Discriminator. See the message-level comment for the variant
+	// catalog.
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	// ─── text / reasoning ────────────────────────────────────
+	// The text content. Required when `type` is "text" or
+	// "reasoning"; ignored otherwise (CEL enforced above).
+	Text string `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	// Streaming state. Vercel emits "streaming" while the part is
+	// mid-generation and "done" once closed. Producers can leave it
+	// unset; persistence round-trips whatever was last set.
+	State string `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	// ─── file / source-document ──────────────────────────────
+	MediaType string `protobuf:"bytes,4,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
+	Url       string `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`
+	Filename  string `protobuf:"bytes,6,opt,name=filename,proto3" json:"filename,omitempty"`
+	// ─── source-url / source-document ────────────────────────
+	SourceId string `protobuf:"bytes,7,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	Title    string `protobuf:"bytes,8,opt,name=title,proto3" json:"title,omitempty"`
+	// ─── tool-<name> / dynamic-tool ──────────────────────────
+	// The unique ID of the tool call. Threads the state machine for
+	// a single tool invocation (input → output / error / denied).
+	ToolCallId string `protobuf:"bytes,9,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
+	// The tool's name. Populated explicitly for "dynamic-tool" (the
+	// type alone doesn't carry it); for "tool-<name>" parts it
+	// duplicates the suffix in `type` and is informational.
+	ToolName string `protobuf:"bytes,10,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	// The fully-parsed tool input arguments. Crosses both wire and
+	// persistence as structured data — no JSON-string double-encode.
+	Input *structpb.Struct `protobuf:"bytes,11,opt,name=input,proto3" json:"input,omitempty"`
+	// The tool's result, structured. Populated when `state` is
+	// "output-available".
+	Output *structpb.Struct `protobuf:"bytes,12,opt,name=output,proto3" json:"output,omitempty"`
+	// Human-readable error text. Populated when `state` is
+	// "output-error" or "input-error".
+	ErrorText string `protobuf:"bytes,13,opt,name=error_text,json=errorText,proto3" json:"error_text,omitempty"`
+	// True when the tool ran on the provider side (e.g. Anthropic
+	// web search). False / unset for client-executed tools.
+	ProviderExecuted bool `protobuf:"varint,14,opt,name=provider_executed,json=providerExecuted,proto3" json:"provider_executed,omitempty"`
+	// True when the tool was not statically declared in the
+	// request's `tools` list — i.e. the provider suggested it at
+	// runtime.
+	Dynamic bool `protobuf:"varint,15,opt,name=dynamic,proto3" json:"dynamic,omitempty"`
+	// ─── data-<name> ─────────────────────────────────────────
+	// Stable replace-on-update key for `data-<name>` parts.
+	Id string `protobuf:"bytes,16,opt,name=id,proto3" json:"id,omitempty"`
+	// Free-form payload for `data-<name>` parts.
+	Data *structpb.Struct `protobuf:"bytes,17,opt,name=data,proto3" json:"data,omitempty"`
+	// ─── Cross-variant ───────────────────────────────────────
+	// Provider-specific metadata attached to the part (e.g.
+	// Anthropic prompt-cache stats, OpenAI reasoning summaries).
+	ProviderMetadata *structpb.Struct `protobuf:"bytes,18,opt,name=provider_metadata,json=providerMetadata,proto3" json:"provider_metadata,omitempty"`
+	// Provider metadata captured at the tool-call site, distinct
+	// from provider_metadata which describes the part itself.
+	CallProviderMetadata *structpb.Struct `protobuf:"bytes,19,opt,name=call_provider_metadata,json=callProviderMetadata,proto3" json:"call_provider_metadata,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *MessagePart) Reset() {
@@ -220,381 +237,137 @@ func (*MessagePart) Descriptor() ([]byte, []int) {
 	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *MessagePart) GetPart() isMessagePart_Part {
+func (x *MessagePart) GetType() string {
 	if x != nil {
-		return x.Part
+		return x.Type
 	}
-	return nil
+	return ""
 }
 
-func (x *MessagePart) GetText() *TextPart {
-	if x != nil {
-		if x, ok := x.Part.(*MessagePart_Text); ok {
-			return x.Text
-		}
-	}
-	return nil
-}
-
-func (x *MessagePart) GetReasoning() *ReasoningPart {
-	if x != nil {
-		if x, ok := x.Part.(*MessagePart_Reasoning); ok {
-			return x.Reasoning
-		}
-	}
-	return nil
-}
-
-func (x *MessagePart) GetToolCall() *ToolCallPart {
-	if x != nil {
-		if x, ok := x.Part.(*MessagePart_ToolCall); ok {
-			return x.ToolCall
-		}
-	}
-	return nil
-}
-
-func (x *MessagePart) GetToolResult() *ToolResultPart {
-	if x != nil {
-		if x, ok := x.Part.(*MessagePart_ToolResult); ok {
-			return x.ToolResult
-		}
-	}
-	return nil
-}
-
-func (x *MessagePart) GetFile() *FilePart {
-	if x != nil {
-		if x, ok := x.Part.(*MessagePart_File); ok {
-			return x.File
-		}
-	}
-	return nil
-}
-
-type isMessagePart_Part interface {
-	isMessagePart_Part()
-}
-
-type MessagePart_Text struct {
-	// A text part.
-	Text *TextPart `protobuf:"bytes,1,opt,name=text,proto3,oneof"`
-}
-
-type MessagePart_Reasoning struct {
-	// A reasoning/thinking part.
-	Reasoning *ReasoningPart `protobuf:"bytes,2,opt,name=reasoning,proto3,oneof"`
-}
-
-type MessagePart_ToolCall struct {
-	// A tool call issued by the assistant.
-	ToolCall *ToolCallPart `protobuf:"bytes,3,opt,name=tool_call,json=toolCall,proto3,oneof"`
-}
-
-type MessagePart_ToolResult struct {
-	// A tool result provided by the executor.
-	ToolResult *ToolResultPart `protobuf:"bytes,4,opt,name=tool_result,json=toolResult,proto3,oneof"`
-}
-
-type MessagePart_File struct {
-	// A file reference.
-	File *FilePart `protobuf:"bytes,5,opt,name=file,proto3,oneof"`
-}
-
-func (*MessagePart_Text) isMessagePart_Part() {}
-
-func (*MessagePart_Reasoning) isMessagePart_Part() {}
-
-func (*MessagePart_ToolCall) isMessagePart_Part() {}
-
-func (*MessagePart_ToolResult) isMessagePart_Part() {}
-
-func (*MessagePart_File) isMessagePart_Part() {}
-
-// A text part of a message.
-type TextPart struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Output only. The text content.
-	Text          string `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TextPart) Reset() {
-	*x = TextPart{}
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TextPart) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TextPart) ProtoMessage() {}
-
-func (x *TextPart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TextPart.ProtoReflect.Descriptor instead.
-func (*TextPart) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *TextPart) GetText() string {
+func (x *MessagePart) GetText() string {
 	if x != nil {
 		return x.Text
 	}
 	return ""
 }
 
-// A reasoning/thinking part of a message.
-type ReasoningPart struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Output only. The reasoning text.
-	Text          string `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ReasoningPart) Reset() {
-	*x = ReasoningPart{}
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ReasoningPart) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ReasoningPart) ProtoMessage() {}
-
-func (x *ReasoningPart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[3]
+func (x *MessagePart) GetState() string {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ReasoningPart.ProtoReflect.Descriptor instead.
-func (*ReasoningPart) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *ReasoningPart) GetText() string {
-	if x != nil {
-		return x.Text
+		return x.State
 	}
 	return ""
 }
 
-// A tool call issued by the assistant.
-type ToolCallPart struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Output only. The unique ID of this tool call.
-	ToolCallId string `protobuf:"bytes,1,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
-	// Output only. The tool to call.
-	Tool string `protobuf:"bytes,2,opt,name=tool,proto3" json:"tool,omitempty"`
-	// Output only. The JSON-encoded input arguments for the tool.
-	InputJson     string `protobuf:"bytes,3,opt,name=input_json,json=inputJson,proto3" json:"input_json,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ToolCallPart) Reset() {
-	*x = ToolCallPart{}
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ToolCallPart) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ToolCallPart) ProtoMessage() {}
-
-func (x *ToolCallPart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[4]
+func (x *MessagePart) GetMediaType() string {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ToolCallPart.ProtoReflect.Descriptor instead.
-func (*ToolCallPart) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ToolCallPart) GetToolCallId() string {
-	if x != nil {
-		return x.ToolCallId
+		return x.MediaType
 	}
 	return ""
 }
 
-func (x *ToolCallPart) GetTool() string {
-	if x != nil {
-		return x.Tool
-	}
-	return ""
-}
-
-func (x *ToolCallPart) GetInputJson() string {
-	if x != nil {
-		return x.InputJson
-	}
-	return ""
-}
-
-// A tool result produced by executing a tool call.
-type ToolResultPart struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The ID of the tool call this result is for. Required on input —
-	// every tool_result must reference an earlier tool_call so the model
-	// can match them. Server populates the field on output.
-	ToolCallId string `protobuf:"bytes,1,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
-	// Output only. The tool that produced this result.
-	Tool string `protobuf:"bytes,2,opt,name=tool,proto3" json:"tool,omitempty"`
-	// Output only. The JSON-encoded result.
-	ResultJson string `protobuf:"bytes,3,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"`
-	// Output only. Whether the tool execution resulted in an error.
-	IsError       bool `protobuf:"varint,4,opt,name=is_error,json=isError,proto3" json:"is_error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ToolResultPart) Reset() {
-	*x = ToolResultPart{}
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ToolResultPart) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ToolResultPart) ProtoMessage() {}
-
-func (x *ToolResultPart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ToolResultPart.ProtoReflect.Descriptor instead.
-func (*ToolResultPart) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *ToolResultPart) GetToolCallId() string {
-	if x != nil {
-		return x.ToolCallId
-	}
-	return ""
-}
-
-func (x *ToolResultPart) GetTool() string {
-	if x != nil {
-		return x.Tool
-	}
-	return ""
-}
-
-func (x *ToolResultPart) GetResultJson() string {
-	if x != nil {
-		return x.ResultJson
-	}
-	return ""
-}
-
-func (x *ToolResultPart) GetIsError() bool {
-	if x != nil {
-		return x.IsError
-	}
-	return false
-}
-
-// A file reference within a message.
-type FilePart struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Output only. The MIME type of the file.
-	MimeType string `protobuf:"bytes,1,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
-	// Output only. The URL or resource name pointing to the file content.
-	Url           string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *FilePart) Reset() {
-	*x = FilePart{}
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *FilePart) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*FilePart) ProtoMessage() {}
-
-func (x *FilePart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use FilePart.ProtoReflect.Descriptor instead.
-func (*FilePart) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *FilePart) GetMimeType() string {
-	if x != nil {
-		return x.MimeType
-	}
-	return ""
-}
-
-func (x *FilePart) GetUrl() string {
+func (x *MessagePart) GetUrl() string {
 	if x != nil {
 		return x.Url
 	}
 	return ""
+}
+
+func (x *MessagePart) GetFilename() string {
+	if x != nil {
+		return x.Filename
+	}
+	return ""
+}
+
+func (x *MessagePart) GetSourceId() string {
+	if x != nil {
+		return x.SourceId
+	}
+	return ""
+}
+
+func (x *MessagePart) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *MessagePart) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
+func (x *MessagePart) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *MessagePart) GetInput() *structpb.Struct {
+	if x != nil {
+		return x.Input
+	}
+	return nil
+}
+
+func (x *MessagePart) GetOutput() *structpb.Struct {
+	if x != nil {
+		return x.Output
+	}
+	return nil
+}
+
+func (x *MessagePart) GetErrorText() string {
+	if x != nil {
+		return x.ErrorText
+	}
+	return ""
+}
+
+func (x *MessagePart) GetProviderExecuted() bool {
+	if x != nil {
+		return x.ProviderExecuted
+	}
+	return false
+}
+
+func (x *MessagePart) GetDynamic() bool {
+	if x != nil {
+		return x.Dynamic
+	}
+	return false
+}
+
+func (x *MessagePart) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *MessagePart) GetData() *structpb.Struct {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *MessagePart) GetProviderMetadata() *structpb.Struct {
+	if x != nil {
+		return x.ProviderMetadata
+	}
+	return nil
+}
+
+func (x *MessagePart) GetCallProviderMetadata() *structpb.Struct {
+	if x != nil {
+		return x.CallProviderMetadata
+	}
+	return nil
 }
 
 // Request message for `GetMessage`.
@@ -609,7 +382,7 @@ type GetMessageRequest struct {
 
 func (x *GetMessageRequest) Reset() {
 	*x = GetMessageRequest{}
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[7]
+	mi := &file_pivox_ai_v1_messages_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -621,7 +394,7 @@ func (x *GetMessageRequest) String() string {
 func (*GetMessageRequest) ProtoMessage() {}
 
 func (x *GetMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[7]
+	mi := &file_pivox_ai_v1_messages_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -634,7 +407,7 @@ func (x *GetMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMessageRequest.ProtoReflect.Descriptor instead.
 func (*GetMessageRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{7}
+	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetMessageRequest) GetName() string {
@@ -665,7 +438,7 @@ type ListMessagesRequest struct {
 
 func (x *ListMessagesRequest) Reset() {
 	*x = ListMessagesRequest{}
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[8]
+	mi := &file_pivox_ai_v1_messages_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -677,7 +450,7 @@ func (x *ListMessagesRequest) String() string {
 func (*ListMessagesRequest) ProtoMessage() {}
 
 func (x *ListMessagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[8]
+	mi := &file_pivox_ai_v1_messages_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -690,7 +463,7 @@ func (x *ListMessagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMessagesRequest.ProtoReflect.Descriptor instead.
 func (*ListMessagesRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{8}
+	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListMessagesRequest) GetParent() string {
@@ -741,7 +514,7 @@ type ListMessagesResponse struct {
 
 func (x *ListMessagesResponse) Reset() {
 	*x = ListMessagesResponse{}
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[9]
+	mi := &file_pivox_ai_v1_messages_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -753,7 +526,7 @@ func (x *ListMessagesResponse) String() string {
 func (*ListMessagesResponse) ProtoMessage() {}
 
 func (x *ListMessagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_messages_proto_msgTypes[9]
+	mi := &file_pivox_ai_v1_messages_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -766,7 +539,7 @@ func (x *ListMessagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMessagesResponse.ProtoReflect.Descriptor instead.
 func (*ListMessagesResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{9}
+	return file_pivox_ai_v1_messages_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ListMessagesResponse) GetMessages() []*Message {
@@ -787,43 +560,42 @@ var File_pivox_ai_v1_messages_proto protoreflect.FileDescriptor
 
 const file_pivox_ai_v1_messages_proto_rawDesc = "" +
 	"\n" +
-	"\x1apivox/ai/v1/messages.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcc\x02\n" +
+	"\x1apivox/ai/v1/messages.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb9\x02\n" +
 	"\aMessage\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12*\n" +
-	"\x04role\x18\x02 \x01(\x0e2\x11.pivox.ai.v1.RoleB\x03\xe0A\x03R\x04role\x123\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\x17\n" +
+	"\x04role\x18\x02 \x01(\tB\x03\xe0A\x03R\x04role\x123\n" +
 	"\x05parts\x18\x03 \x03(\v2\x18.pivox.ai.v1.MessagePartB\x03\xe0A\x03R\x05parts\x12@\n" +
 	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime:\x84\x01\xeaA\x80\x01\n" +
-	"\x10pivox.ai/Message\x12Yorganizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}*\bmessages2\amessage\"\xa5\x02\n" +
-	"\vMessagePart\x12+\n" +
-	"\x04text\x18\x01 \x01(\v2\x15.pivox.ai.v1.TextPartH\x00R\x04text\x12:\n" +
-	"\treasoning\x18\x02 \x01(\v2\x1a.pivox.ai.v1.ReasoningPartH\x00R\treasoning\x128\n" +
-	"\ttool_call\x18\x03 \x01(\v2\x19.pivox.ai.v1.ToolCallPartH\x00R\btoolCall\x12>\n" +
-	"\vtool_result\x18\x04 \x01(\v2\x1b.pivox.ai.v1.ToolResultPartH\x00R\n" +
-	"toolResult\x12+\n" +
-	"\x04file\x18\x05 \x01(\v2\x15.pivox.ai.v1.FilePartH\x00R\x04fileB\x06\n" +
-	"\x04part\"#\n" +
-	"\bTextPart\x12\x17\n" +
-	"\x04text\x18\x01 \x01(\tB\x03\xe0A\x03R\x04text\"(\n" +
-	"\rReasoningPart\x12\x17\n" +
-	"\x04text\x18\x01 \x01(\tB\x03\xe0A\x03R\x04text\"r\n" +
-	"\fToolCallPart\x12%\n" +
-	"\ftool_call_id\x18\x01 \x01(\tB\x03\xe0A\x03R\n" +
-	"toolCallId\x12\x17\n" +
-	"\x04tool\x18\x02 \x01(\tB\x03\xe0A\x03R\x04tool\x12\"\n" +
+	"\x10pivox.ai/Message\x12Yorganizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}*\bmessages2\amessage\"\xfb\t\n" +
+	"\vMessagePart\x12\x1e\n" +
+	"\x04type\x18\x01 \x01(\tB\n" +
+	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\x04type\x12\x17\n" +
+	"\x04text\x18\x02 \x01(\tB\x03\xe0A\x01R\x04text\x12\x19\n" +
+	"\x05state\x18\x03 \x01(\tB\x03\xe0A\x01R\x05state\x12\"\n" +
 	"\n" +
-	"input_json\x18\x03 \x01(\tB\x03\xe0A\x03R\tinputJson\"\x9d\x01\n" +
-	"\x0eToolResultPart\x12,\n" +
-	"\ftool_call_id\x18\x01 \x01(\tB\n" +
-	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\n" +
-	"toolCallId\x12\x17\n" +
-	"\x04tool\x18\x02 \x01(\tB\x03\xe0A\x03R\x04tool\x12$\n" +
-	"\vresult_json\x18\x03 \x01(\tB\x03\xe0A\x03R\n" +
-	"resultJson\x12\x1e\n" +
-	"\bis_error\x18\x04 \x01(\bB\x03\xe0A\x03R\aisError\"C\n" +
-	"\bFilePart\x12 \n" +
-	"\tmime_type\x18\x01 \x01(\tB\x03\xe0A\x03R\bmimeType\x12\x15\n" +
-	"\x03url\x18\x02 \x01(\tB\x03\xe0A\x03R\x03url\"G\n" +
+	"media_type\x18\x04 \x01(\tB\x03\xe0A\x01R\tmediaType\x12\x15\n" +
+	"\x03url\x18\x05 \x01(\tB\x03\xe0A\x01R\x03url\x12\x1f\n" +
+	"\bfilename\x18\x06 \x01(\tB\x03\xe0A\x01R\bfilename\x12 \n" +
+	"\tsource_id\x18\a \x01(\tB\x03\xe0A\x01R\bsourceId\x12\x19\n" +
+	"\x05title\x18\b \x01(\tB\x03\xe0A\x01R\x05title\x12%\n" +
+	"\ftool_call_id\x18\t \x01(\tB\x03\xe0A\x01R\n" +
+	"toolCallId\x12 \n" +
+	"\ttool_name\x18\n" +
+	" \x01(\tB\x03\xe0A\x01R\btoolName\x122\n" +
+	"\x05input\x18\v \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x01R\x05input\x124\n" +
+	"\x06output\x18\f \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x01R\x06output\x12\"\n" +
+	"\n" +
+	"error_text\x18\r \x01(\tB\x03\xe0A\x01R\terrorText\x120\n" +
+	"\x11provider_executed\x18\x0e \x01(\bB\x03\xe0A\x01R\x10providerExecuted\x12\x1d\n" +
+	"\adynamic\x18\x0f \x01(\bB\x03\xe0A\x01R\adynamic\x12\x13\n" +
+	"\x02id\x18\x10 \x01(\tB\x03\xe0A\x01R\x02id\x120\n" +
+	"\x04data\x18\x11 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x01R\x04data\x12I\n" +
+	"\x11provider_metadata\x18\x12 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x01R\x10providerMetadata\x12R\n" +
+	"\x16call_provider_metadata\x18\x13 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x01R\x14callProviderMetadata:\xf0\x03\xbaH\xec\x03\x1a\x97\x01\n" +
+	"\x1fmessage_part.text_part_has_text\x12.type 'text' or 'reasoning' must include `text`\x1aD(this.type != 'text' && this.type != 'reasoning') || this.text != ''\x1a\x93\x01\n" +
+	"\x1emessage_part.file_part_has_url\x12/type 'file' must include `url` and `media_type`\x1a@this.type != 'file' || (this.url != '' && this.media_type != '')\x1a\xb9\x01\n" +
+	"\"message_part.tool_part_has_call_id\x127tool-* / dynamic-tool parts must include `tool_call_id`\x1aZ(!this.type.startsWith('tool-') && this.type != 'dynamic-tool') || this.tool_call_id != ''\"G\n" +
 	"\x11GetMessageRequest\x122\n" +
 	"\x04name\x18\x01 \x01(\tB\x1e\xe0A\x02\xfaA\x12\n" +
 	"\x10pivox.ai/Message\xbaH\x03\xc8\x01\x01R\x04name\"\xda\x01\n" +
@@ -836,14 +608,7 @@ const file_pivox_ai_v1_messages_proto_rawDesc = "" +
 	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"p\n" +
 	"\x14ListMessagesResponse\x120\n" +
 	"\bmessages\x18\x01 \x03(\v2\x14.pivox.ai.v1.MessageR\bmessages\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*K\n" +
-	"\x04Role\x12\x14\n" +
-	"\x10ROLE_UNSPECIFIED\x10\x00\x12\b\n" +
-	"\x04USER\x10\x01\x12\r\n" +
-	"\tASSISTANT\x10\x02\x12\n" +
-	"\n" +
-	"\x06SYSTEM\x10\x03\x12\b\n" +
-	"\x04TOOL\x10\x04B\xaa\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenB\xaa\x01\n" +
 	"\x0fcom.pivox.ai.v1B\rMessagesProtoP\x01Z:github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1;aiv1\xa2\x02\x03PAX\xaa\x02\vPivox.Ai.V1\xca\x02\vPivox\\Ai\\V1\xe2\x02\x17Pivox\\Ai\\V1\\GPBMetadata\xea\x02\rPivox::Ai::V1b\x06proto3"
 
 var (
@@ -858,37 +623,30 @@ func file_pivox_ai_v1_messages_proto_rawDescGZIP() []byte {
 	return file_pivox_ai_v1_messages_proto_rawDescData
 }
 
-var file_pivox_ai_v1_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pivox_ai_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_pivox_ai_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_pivox_ai_v1_messages_proto_goTypes = []any{
-	(Role)(0),                     // 0: pivox.ai.v1.Role
-	(*Message)(nil),               // 1: pivox.ai.v1.Message
-	(*MessagePart)(nil),           // 2: pivox.ai.v1.MessagePart
-	(*TextPart)(nil),              // 3: pivox.ai.v1.TextPart
-	(*ReasoningPart)(nil),         // 4: pivox.ai.v1.ReasoningPart
-	(*ToolCallPart)(nil),          // 5: pivox.ai.v1.ToolCallPart
-	(*ToolResultPart)(nil),        // 6: pivox.ai.v1.ToolResultPart
-	(*FilePart)(nil),              // 7: pivox.ai.v1.FilePart
-	(*GetMessageRequest)(nil),     // 8: pivox.ai.v1.GetMessageRequest
-	(*ListMessagesRequest)(nil),   // 9: pivox.ai.v1.ListMessagesRequest
-	(*ListMessagesResponse)(nil),  // 10: pivox.ai.v1.ListMessagesResponse
-	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
+	(*Message)(nil),               // 0: pivox.ai.v1.Message
+	(*MessagePart)(nil),           // 1: pivox.ai.v1.MessagePart
+	(*GetMessageRequest)(nil),     // 2: pivox.ai.v1.GetMessageRequest
+	(*ListMessagesRequest)(nil),   // 3: pivox.ai.v1.ListMessagesRequest
+	(*ListMessagesResponse)(nil),  // 4: pivox.ai.v1.ListMessagesResponse
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),       // 6: google.protobuf.Struct
 }
 var file_pivox_ai_v1_messages_proto_depIdxs = []int32{
-	0,  // 0: pivox.ai.v1.Message.role:type_name -> pivox.ai.v1.Role
-	2,  // 1: pivox.ai.v1.Message.parts:type_name -> pivox.ai.v1.MessagePart
-	11, // 2: pivox.ai.v1.Message.create_time:type_name -> google.protobuf.Timestamp
-	3,  // 3: pivox.ai.v1.MessagePart.text:type_name -> pivox.ai.v1.TextPart
-	4,  // 4: pivox.ai.v1.MessagePart.reasoning:type_name -> pivox.ai.v1.ReasoningPart
-	5,  // 5: pivox.ai.v1.MessagePart.tool_call:type_name -> pivox.ai.v1.ToolCallPart
-	6,  // 6: pivox.ai.v1.MessagePart.tool_result:type_name -> pivox.ai.v1.ToolResultPart
-	7,  // 7: pivox.ai.v1.MessagePart.file:type_name -> pivox.ai.v1.FilePart
-	1,  // 8: pivox.ai.v1.ListMessagesResponse.messages:type_name -> pivox.ai.v1.Message
-	9,  // [9:9] is the sub-list for method output_type
-	9,  // [9:9] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	1, // 0: pivox.ai.v1.Message.parts:type_name -> pivox.ai.v1.MessagePart
+	5, // 1: pivox.ai.v1.Message.create_time:type_name -> google.protobuf.Timestamp
+	6, // 2: pivox.ai.v1.MessagePart.input:type_name -> google.protobuf.Struct
+	6, // 3: pivox.ai.v1.MessagePart.output:type_name -> google.protobuf.Struct
+	6, // 4: pivox.ai.v1.MessagePart.data:type_name -> google.protobuf.Struct
+	6, // 5: pivox.ai.v1.MessagePart.provider_metadata:type_name -> google.protobuf.Struct
+	6, // 6: pivox.ai.v1.MessagePart.call_provider_metadata:type_name -> google.protobuf.Struct
+	0, // 7: pivox.ai.v1.ListMessagesResponse.messages:type_name -> pivox.ai.v1.Message
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_pivox_ai_v1_messages_proto_init() }
@@ -896,26 +654,18 @@ func file_pivox_ai_v1_messages_proto_init() {
 	if File_pivox_ai_v1_messages_proto != nil {
 		return
 	}
-	file_pivox_ai_v1_messages_proto_msgTypes[1].OneofWrappers = []any{
-		(*MessagePart_Text)(nil),
-		(*MessagePart_Reasoning)(nil),
-		(*MessagePart_ToolCall)(nil),
-		(*MessagePart_ToolResult)(nil),
-		(*MessagePart_File)(nil),
-	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_ai_v1_messages_proto_rawDesc), len(file_pivox_ai_v1_messages_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   10,
+			NumEnums:      0,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_pivox_ai_v1_messages_proto_goTypes,
 		DependencyIndexes: file_pivox_ai_v1_messages_proto_depIdxs,
-		EnumInfos:         file_pivox_ai_v1_messages_proto_enumTypes,
 		MessageInfos:      file_pivox_ai_v1_messages_proto_msgTypes,
 	}.Build()
 	File_pivox_ai_v1_messages_proto = out.File
