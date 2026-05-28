@@ -22,7 +22,7 @@ import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/empty.proto";
-import "google/rpc/status.proto";
+import "google/protobuf/struct.proto";
 import "pivox/ai/v1/artifacts.proto";
 import "pivox/ai/v1/conversations.proto";
 import "pivox/ai/v1/messages.proto";
@@ -39,6 +39,27 @@ option go_package = "pivox/ai/v1;aiv1";
 // same pattern the Vercel AI SDK uses with `streamText` / `generateText`,
 // and Google's own `models.generateContent` /
 // `models.streamGenerateContent`).
+//
+// Streaming wire format — the proto IS the spec.
+//
+// The `ServerEvent` oneof and every inner message in this file
+// (TextStart, ToolInputAvailable, DataPart, etc.) mirror the
+// Vercel AI SDK `UIMessageChunk` schema field-for-field so the
+// REST/SSE adapter can produce the exact JSON that
+// `uiMessageChunkSchema.parse(...)` accepts in useChat. The
+// canonical field-by-field documentation is the Vercel source at
+// `node_modules/ai/src/ui-message-stream/ui-message-chunks.ts`
+// and `node_modules/ai/docs/04-ai-sdk-ui/50-stream-protocol.mdx`.
+//
+// Inline Pivox comments are added only where:
+//   - the field semantics depart from the Vercel spec, or
+//   - the Pivox-side mapping (e.g. tool input streaming, artifact
+//     accumulation) needs explanation, or
+//   - the field is Pivox-only (no Vercel counterpart).
+//
+// AIP-192 `has-comments` and `only-leading-comments` are suppressed
+// for this file to avoid documentation drift; see
+// `api/proto/api-linter.yaml` for the justification.
 service AiChat {
   option (google.api.default_host) = "api.pivox.io";
 
@@ -150,7 +171,7 @@ service AiChat {
   // SDK and `models.generateContent` in Google's AI APIs.
   rpc GenerateContent(GenerateContentRequest) returns (GenerateContentResponse) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*}:generateContent"
+      post: "/v1/{parent=organizations/*/users/*}:generateContent"
       body: "*"
     };
     option (pivox.permission.v1.required_permission) = "ai.chat.stream";
@@ -159,9 +180,14 @@ service AiChat {
 
   // Server-streaming counterpart to `GenerateContent`. Same request
   // shape; emits the response as a sequence of `ServerEvent`s
-  // (text/reasoning/tool/artifact deltas, lifecycle markers, and a
-  // terminal `done`). Native clients use this directly. Web clients
-  // use the SSE adapter at `POST /v1/ai:streamGenerateContent`.
+  // (lifecycle markers, text/reasoning/tool deltas, source/file
+  // chunks, data parts, and a terminal `finish`).
+  //
+  // Each ServerEvent variant maps 1:1 to a Vercel AI SDK
+  // UIMessageChunk on the wire — the SSE adapter
+  // (POST /v1/{parent}:streamGenerateContent) is a thin translator
+  // that strips the proto oneof wrapper and injects the `"type"`
+  // discriminator. The proto IS the canonical wire format.
   //
   // The request name, response name, and HTTP suffix are
   // intentionally non-AIP — server-streaming custom methods aren't
@@ -177,7 +203,7 @@ service AiChat {
   //     aip.dev/not-precedent: server-streaming variant returns ServerEvent stream, not StreamGenerateContentResponse. --)
   rpc StreamGenerateContent(GenerateContentRequest) returns (stream ServerEvent) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*}:streamGenerateContent"
+      post: "/v1/{parent=organizations/*/users/*}:streamGenerateContent"
       body: "*"
     };
     option (pivox.permission.v1.required_permission) = "ai.chat.stream";
@@ -219,11 +245,16 @@ service AiChat {
 // unset, the call is fully stateless: the caller provides whatever
 // history is needed inline.
 message GenerateContentRequest {
-  // Required. The parent organization that scopes this call.
-  // Format: `organizations/{organization}`
+  // Required. The user-in-org parent that scopes this call.
+  // Format: `organizations/{organization}/users/{user}`
+  //
+  // Conversations and messages live under this parent, so the same
+  // path is used here and on Get/List/Create/Update/Delete
+  // Conversation. Stateless calls (title summarization, intent
+  // classification) still carry a user parent — they're attributed
+  // to the calling user for audit and billing.
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "cloudresourcemanager.googleapis.com/Organization"},
     (buf.validate.field).required = true
   ];
 
@@ -277,40 +308,59 @@ message GenerateContentResponse {
   string model = 3;
 }
 
-// A single conversation turn supplied as input to a generation. The
-// role-and-parts shape mirrors the Vercel AI SDK's `UIMessage` and
-// Google's `Content`: tool calls, tool results, files, reasoning,
-// and text are all represented as `MessagePart` variants — no
-// separate request envelopes for tool flows.
+// A single conversation turn supplied as input to a generation.
+// Shape-matches the Vercel AI SDK `UIMessage` on the wire so the
+// SSE handler can decode a request body into `[]*InputMessage`
+// directly via `protojson.Unmarshal`. Tool calls, tool results,
+// files, reasoning, and text are all represented as `MessagePart`
+// variants — no separate request envelopes for tool flows.
 message InputMessage {
-  // Cross-field constraint: TOOL-role messages must include at least
+  // Cross-field constraint: tool-role messages must include at least
   // one ToolResultPart. Without that, the model has no way to match
   // the result to its earlier tool call. Encoded as CEL because the
-  // shape is "if role is TOOL, then parts must contain a tool_result"
+  // shape is "if role == 'tool', parts must contain a tool_result"
   // — single-field constraints can't express it.
   option (buf.validate.message).cel = {
     id: "input_message.tool_role_must_have_tool_result"
     message: "tool-role message must include at least one tool_result part"
-    expression: "this.role != 4 || this.parts.exists(p, has(p.tool_result))"
+    expression: "this.role != 'tool' || this.parts.exists(p, has(p.tool_result))"
   };
 
+  // Optional. The Vercel-side message ID. Carried for audit/replay
+  // round-trip; not used to key persistence on the server (the
+  // server generates its own message IDs for persisted turns).
+  string id = 1 [(google.api.field_behavior) = OPTIONAL];
+
   // Required. The role of this message's author.
-  // ASSISTANT (2) and SYSTEM (3) are not valid on input — assistant
-  // turns are server-produced (accepting one would let a caller
-  // inject fake context); system instructions arrive via
-  // `system_instruction` on the request, not as a message.
-  // ROLE_UNSPECIFIED (0) is treated as USER for forward-compat.
-  Role role = 1 [
+  //
+  // `assistant` and `system` are not valid on input — assistant turns
+  // are server-produced (accepting one would let a caller inject fake
+  // context); system instructions arrive via `system_instruction` on
+  // the request, not as a message. `tool` carries tool-result parts
+  // for the model to continue a tool-loop.
+  //
+  // String (not enum) because Vercel writes lowercase strings on the
+  // wire; `protojson` would round-trip a proto enum as uppercase,
+  // forcing a translator shim. Validated below.
+  string role = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).enum.not_in = 2,
-    (buf.validate.field).enum.not_in = 3
+    (buf.validate.field).string = {
+      in: [
+        "user",
+        "tool"
+      ]
+    }
   ];
 
   // Required. The structured parts of this message.
-  repeated MessagePart parts = 2 [
+  repeated MessagePart parts = 3 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).repeated.min_items = 1
   ];
+
+  // Optional. Free-form metadata associated with this message.
+  // Round-trips on the wire as Vercel's UIMessage.metadata.
+  google.protobuf.Struct metadata = 4 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // A tool the model may invoke during generation. Schemas are
@@ -353,240 +403,336 @@ message SummarizeConversationRequest {
   ];
 }
 
-// An event sent by the server during a streaming chat session.
+// One emission on the streaming wire. Each variant maps 1:1 to a
+// Vercel AI SDK UIMessageChunk; the SSE translator strips this
+// oneof wrapper and injects the `"type"` discriminator.
+//
+// Field names on the inner messages are chosen so `protojson` emits
+// the exact Vercel JSON without translator field renaming.
+//
+// Variants are grouped (lifecycle 1-7, text 10-12, reasoning 13-15,
+// tool 20-27, source/file 30-32, data 40) with gaps so additions
+// don't churn the field-number namespace.
 message ServerEvent {
   oneof event {
-    // Signals the start of an assistant text response.
-    TextStart text_start = 1;
+    // ─── Lifecycle ──────────────────────────────────────────
+    // The assistant turn has started. Emitted before any text/
+    // tool/reasoning events for the turn.
+    Start start = 1;
 
-    // A chunk of assistant text.
-    TextDelta text_delta = 2;
+    // A multi-step turn just rolled into a new model call.
+    StartStep start_step = 2;
 
-    // Signals the end of the assistant text response.
-    TextEnd text_end = 3;
+    // The step (one model call) is over. Followed by either a
+    // subsequent `start_step` (tool loop continues) or `finish`.
+    FinishStep finish_step = 3;
 
-    // Signals the start of reasoning/thinking output.
-    ReasoningStart reasoning_start = 4;
+    // The assistant turn is complete. Terminal.
+    Finish finish = 4;
 
-    // A chunk of reasoning text.
-    ReasoningDelta reasoning_delta = 5;
+    // The stream was cancelled. Terminal.
+    Abort abort = 5;
 
-    // Signals the end of reasoning output.
-    ReasoningEnd reasoning_end = 6;
+    // A stream-level error. Terminal.
+    Error error = 6;
 
-    // Signals the start of a tool call with partial input.
-    ToolCallStart tool_call_start = 7;
+    // Free-form metadata about the assistant message. Emitted
+    // anytime — typically once at end-of-turn carrying final usage.
+    MessageMetadata message_metadata = 7;
 
-    // A chunk of tool call input JSON.
-    ToolCallDelta tool_call_delta = 8;
+    // ─── Text ───────────────────────────────────────────────
+    TextStart text_start = 10;
+    TextDelta text_delta = 11;
+    TextEnd text_end = 12;
 
-    // The tool call input is complete and ready for execution.
-    ToolInputAvailable tool_input_available = 9;
+    // ─── Reasoning ──────────────────────────────────────────
+    ReasoningStart reasoning_start = 13;
+    ReasoningDelta reasoning_delta = 14;
+    ReasoningEnd reasoning_end = 15;
 
-    // A tool execution result (from a server-side tool).
-    ToolOutputAvailable tool_output_available = 10;
+    // ─── Tool input ─────────────────────────────────────────
+    ToolInputStart tool_input_start = 20;
+    ToolInputDelta tool_input_delta = 21;
+    ToolInputAvailable tool_input_available = 22;
+    ToolInputError tool_input_error = 23;
+    ToolApprovalRequest tool_approval_request = 24;
 
-    // A tool execution error.
-    ToolError tool_error = 11;
+    // ─── Tool output ────────────────────────────────────────
+    ToolOutputAvailable tool_output_available = 25;
+    ToolOutputError tool_output_error = 26;
+    ToolOutputDenied tool_output_denied = 27;
 
-    // A tool requires user approval before execution.
-    ToolApprovalRequested tool_approval_requested = 12;
+    // ─── Sources & files ────────────────────────────────────
+    SourceUrl source_url = 30;
+    SourceDocument source_document = 31;
+    File file = 32;
 
-    // Signals the start of an artifact being produced.
-    ArtifactStart artifact_start = 13;
-
-    // A chunk of artifact content.
-    ArtifactDelta artifact_delta = 14;
-
-    // Signals the end of an artifact, including its persisted version.
-    ArtifactEnd artifact_end = 15;
-
-    // An error during artifact production.
-    ArtifactError artifact_error = 16;
-
-    // Metadata about the assistant message (token counts, model info).
-    MessageMetadata message_metadata = 17;
-
-    // The stream is complete.
-    Done done = 18;
-
-    // A stream-level error.
-    StreamError stream_error = 19;
-
-    // An opaque data part for future extensions (engine status, etc.).
-    DataPart data_part = 20;
+    // ─── Custom data parts ──────────────────────────────────
+    // Emitted as Vercel chunk type `data-<name>`. Repeated events
+    // with the same `name` + `id` REPLACE the prior data on the
+    // client. Used for artifacts (name="artifact"), progress
+    // (name="progress"), and any future custom UI part.
+    DataPart data = 40;
   }
 }
 
-// Signals the start of an assistant text response.
-message TextStart {
-  // The message ID being generated.
+// ─── Lifecycle event messages ───────────────────────────────
+
+message Start {
+  // The server-assigned ID for the assistant message produced by
+  // this turn. The SSE client (Vercel useChat) keys the assistant
+  // message off this; subsequent text/reasoning chunks reference
+  // it via their own `id` field.
   string message_id = 1;
+
+  // Optional. Initial metadata for the assistant message.
+  google.protobuf.Struct message_metadata = 2;
 }
 
-// A chunk of assistant text.
-message TextDelta {
-  // The text content of this chunk.
-  string delta = 1;
+// Marker — emitted before each model call in a multi-step turn.
+message StartStep {}
+
+// Marker — emitted after each model call in a multi-step turn.
+message FinishStep {}
+
+message Finish {
+  // Why the generation stopped. One of: "stop", "length",
+  // "content-filter", "tool-calls", "error", "other".
+  string finish_reason = 1;
+
+  // Optional. Final metadata for the assistant message (typically
+  // input/output token counts, model id, etc.).
+  google.protobuf.Struct message_metadata = 2;
 }
 
-// Signals the end of the assistant text response.
-message TextEnd {}
-
-// Signals the start of reasoning/thinking output.
-message ReasoningStart {
-  // The message ID for the reasoning block.
-  string message_id = 1;
+message Abort {
+  // Optional. Human-readable cancellation reason.
+  string reason = 1;
 }
 
-// A chunk of reasoning text.
-message ReasoningDelta {
-  // The reasoning text content of this chunk.
-  string delta = 1;
+message Error {
+  // The error message surfaced to the client. Should not carry
+  // server-internal detail.
+  string error_text = 1;
 }
 
-// Signals the end of reasoning output.
-message ReasoningEnd {}
-
-// Signals the start of a tool call.
-message ToolCallStart {
-  // The unique ID of this tool call.
-  string tool_call_id = 1;
-
-  // The tool being called.
-  string tool = 2;
-}
-
-// A chunk of tool call input JSON being streamed.
-message ToolCallDelta {
-  // The tool call ID this delta belongs to.
-  string tool_call_id = 1;
-
-  // A chunk of the JSON input.
-  string delta = 2;
-}
-
-// The tool call input is fully available and ready for execution.
-message ToolInputAvailable {
-  // The unique ID of this tool call.
-  string tool_call_id = 1;
-
-  // The tool to execute.
-  string tool = 2;
-
-  // The complete JSON-encoded input arguments.
-  string input_json = 3;
-
-  // Whether this tool is executed server-side (true) or client-side (false).
-  bool server_side = 4;
-}
-
-// A tool execution result from a server-side tool.
-message ToolOutputAvailable {
-  // The tool call ID this output is for.
-  string tool_call_id = 1;
-
-  // The JSON-encoded tool result.
-  string result_json = 2;
-}
-
-// A tool execution error.
-message ToolError {
-  // The tool call ID that errored.
-  string tool_call_id = 1;
-
-  // The error message.
-  string error_message = 2;
-}
-
-// A tool that requires user approval before execution.
-message ToolApprovalRequested {
-  // The unique ID of this tool call.
-  string tool_call_id = 1;
-
-  // The tool requesting approval.
-  string tool = 2;
-
-  // The complete JSON-encoded input arguments for review.
-  string input_json = 3;
-}
-
-// Signals the start of an artifact being produced.
-message ArtifactStart {
-  // The artifact ID being produced.
-  string artifact_id = 1;
-
-  // The type of artifact (e.g. "code", "markdown", "svg").
-  string type = 2;
-
-  // A human-readable title.
-  string title = 3;
-}
-
-// A chunk of artifact content.
-message ArtifactDelta {
-  // The artifact ID this delta belongs to.
-  string artifact_id = 1;
-
-  // A chunk of the content.
-  string delta = 2;
-}
-
-// Signals the end of an artifact, including its persisted version info.
-message ArtifactEnd {
-  // The artifact ID.
-  string artifact_id = 1;
-
-  // The persisted artifact version.
-  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
-  string artifact_version = 2 [(google.api.resource_reference) = {type: "pivox.ai/ArtifactVersion"}];
-
-  // The MIME type of the artifact.
-  string mime_type = 3;
-
-  // The size in bytes of the artifact content.
-  int64 size_bytes = 4;
-}
-
-// An error during artifact production.
-message ArtifactError {
-  // The artifact ID that errored.
-  string artifact_id = 1;
-
-  // The error details.
-  google.rpc.Status status = 2;
-}
-
-// Metadata about the assistant message.
+// Free-form metadata about the assistant message. The wire chunk
+// nests the payload under `messageMetadata`, hence the recursive
+// field name — matches Vercel's UIMessageChunk shape verbatim.
 message MessageMetadata {
-  // The message ID this metadata is for.
-  string message_id = 1;
-
-  // The model that generated the response.
-  string model = 2;
-
-  // Input token count (approximate).
-  int32 input_tokens = 3;
-
-  // Output token count (approximate).
-  int32 output_tokens = 4;
+  google.protobuf.Struct message_metadata = 1;
 }
 
-// The stream is complete. No more events will be sent.
-message Done {}
+// ─── Text event messages ────────────────────────────────────
 
-// A stream-level error.
-message StreamError {
-  // The error details.
-  google.rpc.Status status = 1;
+message TextStart {
+  // Block ID. Wire chunk's `id` field; pairs the start/delta/end
+  // events of the same text block.
+  string id = 1;
+
+  // Optional. Provider-specific metadata (e.g. Anthropic prompt
+  // caching counts, OpenAI reasoning summaries).
+  google.protobuf.Struct provider_metadata = 2;
 }
 
-// An opaque data part for future extensions (engine status, rundown
-// updates, etc.). Follows Vercel AI SDK's DataPart convention.
+message TextDelta {
+  // Block ID matching the corresponding TextStart.
+  string id = 1;
+
+  // The incremental text content for this delta.
+  string delta = 2;
+
+  // Optional. Provider-specific metadata.
+  google.protobuf.Struct provider_metadata = 3;
+}
+
+message TextEnd {
+  // Block ID matching the corresponding TextStart.
+  string id = 1;
+
+  // Optional. Provider-specific metadata.
+  google.protobuf.Struct provider_metadata = 2;
+}
+
+// ─── Reasoning event messages ───────────────────────────────
+
+message ReasoningStart {
+  string id = 1;
+  google.protobuf.Struct provider_metadata = 2;
+}
+
+message ReasoningDelta {
+  string id = 1;
+  string delta = 2;
+  google.protobuf.Struct provider_metadata = 3;
+}
+
+message ReasoningEnd {
+  string id = 1;
+  google.protobuf.Struct provider_metadata = 2;
+}
+
+// ─── Tool input event messages ──────────────────────────────
+
+message ToolInputStart {
+  string tool_call_id = 1;
+  string tool_name = 2;
+
+  // True when the upstream provider executes this tool itself
+  // (e.g. Anthropic web search). When true, the client should not
+  // attempt to run the tool locally.
+  bool provider_executed = 3;
+
+  // True when the tool was not statically declared in the
+  // request's `tools` — i.e. provider-suggested at runtime.
+  bool dynamic = 4;
+
+  // Optional. Display title shown to the user while the tool
+  // input is being streamed.
+  string title = 5;
+
+  google.protobuf.Struct provider_metadata = 6;
+  google.protobuf.Struct tool_metadata = 7;
+}
+
+message ToolInputDelta {
+  string tool_call_id = 1;
+
+  // The raw provider-emitted input text being streamed (typically
+  // JSON characters that will eventually parse into the full
+  // `input` carried by `ToolInputAvailable`).
+  string input_text_delta = 2;
+}
+
+message ToolInputAvailable {
+  string tool_call_id = 1;
+  string tool_name = 2;
+
+  // The fully-parsed tool input. Carries the input as structured
+  // data (not a JSON-encoded string), so consumers don't double-
+  // parse and `protojson` emits a native JSON object on the wire.
+  google.protobuf.Struct input = 3;
+
+  bool provider_executed = 4;
+  bool dynamic = 5;
+  string title = 6;
+
+  google.protobuf.Struct provider_metadata = 7;
+  google.protobuf.Struct tool_metadata = 8;
+}
+
+// Tool input that failed validation (schema mismatch, missing
+// required field, etc.). Distinct from `ToolOutputError`, which
+// is for execution failures after the input was accepted.
+message ToolInputError {
+  string tool_call_id = 1;
+  string tool_name = 2;
+  google.protobuf.Struct input = 3;
+
+  // Human-readable description of the validation failure.
+  string error_text = 4;
+
+  bool provider_executed = 5;
+  bool dynamic = 6;
+  string title = 7;
+
+  google.protobuf.Struct provider_metadata = 8;
+  google.protobuf.Struct tool_metadata = 9;
+}
+
+message ToolApprovalRequest {
+  // Approval session ID; the client returns this on
+  // approve/deny to disambiguate concurrent approvals.
+  string approval_id = 1;
+
+  // The tool call awaiting approval.
+  string tool_call_id = 2;
+}
+
+// ─── Tool output event messages ─────────────────────────────
+
+message ToolOutputAvailable {
+  string tool_call_id = 1;
+
+  // The tool's result, as structured data. Mirrors
+  // ToolInputAvailable.input on the output side.
+  google.protobuf.Struct output = 2;
+
+  bool provider_executed = 3;
+  bool dynamic = 4;
+
+  // True for a partial/in-progress output (the tool will emit a
+  // subsequent non-preliminary output before the call closes).
+  bool preliminary = 5;
+
+  google.protobuf.Struct provider_metadata = 6;
+  google.protobuf.Struct tool_metadata = 7;
+}
+
+message ToolOutputError {
+  string tool_call_id = 1;
+  string error_text = 2;
+
+  bool provider_executed = 3;
+  bool dynamic = 4;
+
+  google.protobuf.Struct provider_metadata = 5;
+  google.protobuf.Struct tool_metadata = 6;
+}
+
+// The user denied the pending approval request for this tool
+// call. Terminal for the call.
+message ToolOutputDenied {
+  string tool_call_id = 1;
+}
+
+// ─── Source & file event messages ───────────────────────────
+
+message SourceUrl {
+  string source_id = 1;
+  string url = 2;
+  string title = 3;
+  google.protobuf.Struct provider_metadata = 4;
+}
+
+message SourceDocument {
+  string source_id = 1;
+  string media_type = 2;
+  string title = 3;
+  string filename = 4;
+  google.protobuf.Struct provider_metadata = 5;
+}
+
+message File {
+  string url = 1;
+  string media_type = 2;
+  google.protobuf.Struct provider_metadata = 3;
+}
+
+// ─── Custom data part ───────────────────────────────────────
+
+// A custom UI part. Emitted on the wire as `data-<name>`. When
+// `id` is set, repeated events with the same `name` + `id`
+// REPLACE the data part on the client — used for streaming
+// artifacts and other in-place updates. When `transient` is true,
+// the client fires its `onData` callback but does NOT persist the
+// chunk to message state.
+//
+// Artifacts use this with `name = "artifact"` and stable per-
+// artifact `id`; the server-side accumulator builds growing
+// snapshots inside `data`.
 message DataPart {
-  // The data type identifier.
-  string type = 1;
+  // The Vercel data type suffix; the SSE translator emits the
+  // wire `type` as `"data-" + name`. Must be non-empty.
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
-  // The JSON-encoded payload.
-  string data_json = 2;
+  // Optional. Stable replace-on-update key.
+  string id = 2;
+
+  // The payload. Carried as structured data so `protojson` emits
+  // a native JSON object on the wire.
+  google.protobuf.Struct data = 3;
+
+  // True to skip persistence on the client (fire `onData` only).
+  bool transient = 4;
 }

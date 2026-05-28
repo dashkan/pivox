@@ -240,13 +240,13 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	}
 
 	genReq := &aiv1.GenerateContentRequest{
-		Parent:            fmt.Sprintf("organizations/%s", orgName),
+		Parent:            fmt.Sprintf("organizations/%s/users/%s", orgName, pathUser),
 		SystemInstruction: summarySystemPrompt,
 		MaxOutputTokens:   32,
 		Temperature:       0.3,
 		Messages: []*aiv1.InputMessage{
 			{
-				Role: aiv1.Role_USER,
+				Role: "user",
 				Parts: []*aiv1.MessagePart{
 					{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: transcript}}},
 				},

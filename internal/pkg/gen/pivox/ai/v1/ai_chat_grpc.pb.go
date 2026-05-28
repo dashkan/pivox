@@ -65,6 +65,27 @@ const (
 // same pattern the Vercel AI SDK uses with `streamText` / `generateText`,
 // and Google's own `models.generateContent` /
 // `models.streamGenerateContent`).
+//
+// Streaming wire format — the proto IS the spec.
+//
+// The `ServerEvent` oneof and every inner message in this file
+// (TextStart, ToolInputAvailable, DataPart, etc.) mirror the
+// Vercel AI SDK `UIMessageChunk` schema field-for-field so the
+// REST/SSE adapter can produce the exact JSON that
+// `uiMessageChunkSchema.parse(...)` accepts in useChat. The
+// canonical field-by-field documentation is the Vercel source at
+// `node_modules/ai/src/ui-message-stream/ui-message-chunks.ts`
+// and `node_modules/ai/docs/04-ai-sdk-ui/50-stream-protocol.mdx`.
+//
+// Inline Pivox comments are added only where:
+//   - the field semantics depart from the Vercel spec, or
+//   - the Pivox-side mapping (e.g. tool input streaming, artifact
+//     accumulation) needs explanation, or
+//   - the field is Pivox-only (no Vercel counterpart).
+//
+// AIP-192 `has-comments` and `only-leading-comments` are suppressed
+// for this file to avoid documentation drift; see
+// `api/proto/api-linter.yaml` for the justification.
 type AiChatClient interface {
 	// Gets a conversation by resource name.
 	GetConversation(ctx context.Context, in *GetConversationRequest, opts ...grpc.CallOption) (*Conversation, error)
@@ -102,9 +123,14 @@ type AiChatClient interface {
 	GenerateContent(ctx context.Context, in *GenerateContentRequest, opts ...grpc.CallOption) (*GenerateContentResponse, error)
 	// Server-streaming counterpart to `GenerateContent`. Same request
 	// shape; emits the response as a sequence of `ServerEvent`s
-	// (text/reasoning/tool/artifact deltas, lifecycle markers, and a
-	// terminal `done`). Native clients use this directly. Web clients
-	// use the SSE adapter at `POST /v1/ai:streamGenerateContent`.
+	// (lifecycle markers, text/reasoning/tool deltas, source/file
+	// chunks, data parts, and a terminal `finish`).
+	//
+	// Each ServerEvent variant maps 1:1 to a Vercel AI SDK
+	// UIMessageChunk on the wire — the SSE adapter
+	// (POST /v1/{parent}:streamGenerateContent) is a thin translator
+	// that strips the proto oneof wrapper and injects the `"type"`
+	// discriminator. The proto IS the canonical wire format.
 	//
 	// The request name, response name, and HTTP suffix are
 	// intentionally non-AIP — server-streaming custom methods aren't
@@ -328,6 +354,27 @@ func (c *aiChatClient) SummarizeConversation(ctx context.Context, in *SummarizeC
 // same pattern the Vercel AI SDK uses with `streamText` / `generateText`,
 // and Google's own `models.generateContent` /
 // `models.streamGenerateContent`).
+//
+// Streaming wire format — the proto IS the spec.
+//
+// The `ServerEvent` oneof and every inner message in this file
+// (TextStart, ToolInputAvailable, DataPart, etc.) mirror the
+// Vercel AI SDK `UIMessageChunk` schema field-for-field so the
+// REST/SSE adapter can produce the exact JSON that
+// `uiMessageChunkSchema.parse(...)` accepts in useChat. The
+// canonical field-by-field documentation is the Vercel source at
+// `node_modules/ai/src/ui-message-stream/ui-message-chunks.ts`
+// and `node_modules/ai/docs/04-ai-sdk-ui/50-stream-protocol.mdx`.
+//
+// Inline Pivox comments are added only where:
+//   - the field semantics depart from the Vercel spec, or
+//   - the Pivox-side mapping (e.g. tool input streaming, artifact
+//     accumulation) needs explanation, or
+//   - the field is Pivox-only (no Vercel counterpart).
+//
+// AIP-192 `has-comments` and `only-leading-comments` are suppressed
+// for this file to avoid documentation drift; see
+// `api/proto/api-linter.yaml` for the justification.
 type AiChatServer interface {
 	// Gets a conversation by resource name.
 	GetConversation(context.Context, *GetConversationRequest) (*Conversation, error)
@@ -365,9 +412,14 @@ type AiChatServer interface {
 	GenerateContent(context.Context, *GenerateContentRequest) (*GenerateContentResponse, error)
 	// Server-streaming counterpart to `GenerateContent`. Same request
 	// shape; emits the response as a sequence of `ServerEvent`s
-	// (text/reasoning/tool/artifact deltas, lifecycle markers, and a
-	// terminal `done`). Native clients use this directly. Web clients
-	// use the SSE adapter at `POST /v1/ai:streamGenerateContent`.
+	// (lifecycle markers, text/reasoning/tool deltas, source/file
+	// chunks, data parts, and a terminal `finish`).
+	//
+	// Each ServerEvent variant maps 1:1 to a Vercel AI SDK
+	// UIMessageChunk on the wire — the SSE adapter
+	// (POST /v1/{parent}:streamGenerateContent) is a thin translator
+	// that strips the proto oneof wrapper and injects the `"type"`
+	// discriminator. The proto IS the canonical wire format.
 	//
 	// The request name, response name, and HTTP suffix are
 	// intentionally non-AIP — server-streaming custom methods aren't

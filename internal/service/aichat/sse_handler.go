@@ -93,11 +93,13 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert each input message's parts JSON to proto.
+	// Convert each input message's parts JSON to proto. Role is
+	// passed through as the wire-shaped string ("user"/"tool"); the
+	// gRPC validation interceptor downstream gates on the in-set
+	// validator declared on InputMessage.role.
 	protoMessages := make([]*aiv1.InputMessage, 0, len(req.Messages))
 	for _, m := range req.Messages {
-		role, ok := protoRoleFromString(m.Role)
-		if !ok {
+		if !isAcceptedInputRole(m.Role) {
 			http.Error(w, fmt.Sprintf("invalid role %q", m.Role), http.StatusBadRequest)
 			return
 		}
@@ -107,7 +109,7 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		protoMessages = append(protoMessages, &aiv1.InputMessage{
-			Role:  role,
+			Role:  m.Role,
 			Parts: parts,
 		})
 	}
@@ -137,7 +139,14 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Pump ServerEvents → SSE events.
+	// Pump ServerEvents → SSE events. The full rewrite of this loop
+	// (per-chunk translator + `[DONE]` sentinel + abort on ctx
+	// cancellation + X-Accel-Buffering header) lands in a follow-up
+	// commit. This implementation is a stub: it calls the new
+	// marshalChunk (which currently returns ErrNotImplemented) and
+	// surfaces any error as a stream-side error frame. Once
+	// marshalChunk is implemented, this loop emits valid Vercel
+	// UIMessageChunk JSON.
 	for {
 		ev, err := stream.Recv()
 		if err == io.EOF {
@@ -147,33 +156,28 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			sseError(w, flusher, err)
 			return
 		}
-		sseLine := translateToSSE(ev)
-		// Best-effort write — if the client has hung up the next loop
-		// iteration's emit will surface the disconnect via an
-		// upstream gRPC error.
-		_, _ = fmt.Fprintf(w, "data: %s\n\n", sseLine)
+		body, mErr := marshalChunk(ev)
+		if mErr != nil {
+			sseError(w, flusher, mErr)
+			return
+		}
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", body)
 		flusher.Flush()
 	}
 }
 
-// protoRoleFromString maps the JSON-side role string to the proto
-// Role enum. Unrecognized values fail with `ok=false` so the SSE
-// handler can return 400 — silently coercing to USER would let
-// clients smuggle assistant-tagged turns into the request and have
-// them written as user-role on the wire (which the gRPC layer would
-// also reject, but earlier-validation is friendlier).
-func protoRoleFromString(s string) (aiv1.Role, bool) {
+// isAcceptedInputRole reports whether a wire-side role string is an
+// accepted InputMessage role. Empty is treated as "user" for
+// forward-compat with clients that omit the field on the JSON side
+// (the gRPC validator still gates on the in-set rule below). The
+// list mirrors the InputMessage.role buf.validate `in` rule on the
+// proto.
+func isAcceptedInputRole(s string) bool {
 	switch s {
-	case "user", "":
-		return aiv1.Role_USER, true
-	case "assistant":
-		return aiv1.Role_ASSISTANT, true
-	case "system":
-		return aiv1.Role_SYSTEM, true
-	case "tool":
-		return aiv1.Role_TOOL, true
+	case "", "user", "tool":
+		return true
 	default:
-		return aiv1.Role_ROLE_UNSPECIFIED, false
+		return false
 	}
 }
 

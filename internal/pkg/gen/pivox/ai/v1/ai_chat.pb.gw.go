@@ -1054,7 +1054,7 @@ func RegisterAiChatHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.ai.v1.AiChat/GenerateContent", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*}:generateContent"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.ai.v1.AiChat/GenerateContent", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/users/*}:generateContent"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1360,7 +1360,7 @@ func RegisterAiChatHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.ai.v1.AiChat/GenerateContent", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*}:generateContent"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.ai.v1.AiChat/GenerateContent", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/users/*}:generateContent"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1377,7 +1377,7 @@ func RegisterAiChatHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.ai.v1.AiChat/StreamGenerateContent", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*}:streamGenerateContent"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.ai.v1.AiChat/StreamGenerateContent", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/users/*}:streamGenerateContent"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1424,8 +1424,8 @@ var (
 	pattern_AiChat_GetArtifactVersion_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 2, 5, 1, 0, 4, 10, 5, 6}, []string{"v1", "organizations", "users", "conversations", "artifacts", "versions", "name"}, ""))
 	pattern_AiChat_ListArtifactVersions_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5, 2, 6}, []string{"v1", "organizations", "users", "conversations", "artifacts", "parent", "versions"}, ""))
 	pattern_AiChat_DeleteArtifactVersion_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 2, 5, 1, 0, 4, 10, 5, 6}, []string{"v1", "organizations", "users", "conversations", "artifacts", "versions", "name"}, ""))
-	pattern_AiChat_GenerateContent_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "organizations", "parent"}, "generateContent"))
-	pattern_AiChat_StreamGenerateContent_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2}, []string{"v1", "organizations", "parent"}, "streamGenerateContent"))
+	pattern_AiChat_GenerateContent_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "organizations", "users", "parent"}, "generateContent"))
+	pattern_AiChat_StreamGenerateContent_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "organizations", "users", "parent"}, "streamGenerateContent"))
 	pattern_AiChat_SummarizeConversation_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "users", "conversations", "name"}, "summarize"))
 )
 

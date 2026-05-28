@@ -8,8 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -32,8 +33,12 @@ func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream 
 	if err != nil {
 		return err
 	}
+	// Emit `finish` as the terminal lifecycle event. `finishReason`
+	// is "stop" for the normal-completion path; tool-loop and
+	// length-cap variants will set their own reasons once the upstream
+	// model layer surfaces them.
 	return stream.Send(&aiv1.ServerEvent{
-		Event: &aiv1.ServerEvent_Done{Done: &aiv1.Done{}},
+		Event: &aiv1.ServerEvent_Finish{Finish: &aiv1.Finish{FinishReason: "stop"}},
 	})
 }
 
@@ -187,7 +192,7 @@ func (s *Server) runGenerate(
 	assistantMsgID := uuid.New().String()[:12]
 	if emit != nil {
 		if err := emit(&aiv1.ServerEvent{
-			Event: &aiv1.ServerEvent_TextStart{TextStart: &aiv1.TextStart{MessageId: assistantMsgID}},
+			Event: &aiv1.ServerEvent_TextStart{TextStart: &aiv1.TextStart{Id: assistantMsgID}},
 		}); err != nil {
 			return nil, nil, "", err
 		}
@@ -234,7 +239,10 @@ func (s *Server) runGenerate(
 			assistantText.WriteString(evt.Text)
 			if emit != nil {
 				if err := emit(&aiv1.ServerEvent{
-					Event: &aiv1.ServerEvent_TextDelta{TextDelta: &aiv1.TextDelta{Delta: evt.Text}},
+					Event: &aiv1.ServerEvent_TextDelta{TextDelta: &aiv1.TextDelta{
+						Id:    assistantMsgID,
+						Delta: evt.Text,
+					}},
 				}); err != nil {
 					// emit failures here mean the client stream is
 					// already dead (broken pipe / cancellation) —
@@ -261,7 +269,7 @@ func (s *Server) runGenerate(
 
 	if emit != nil {
 		if err := emit(&aiv1.ServerEvent{
-			Event: &aiv1.ServerEvent_TextEnd{TextEnd: &aiv1.TextEnd{}},
+			Event: &aiv1.ServerEvent_TextEnd{TextEnd: &aiv1.TextEnd{Id: assistantMsgID}},
 		}); err != nil {
 			return nil, nil, "", err
 		}
@@ -375,17 +383,13 @@ func persistMessageOnQtx(ctx context.Context, qtx db.Querier, convID uuid.UUID, 
 	return nil
 }
 
-// dbRoleForInputMessage maps a proto Role to the string the DB layer
-// expects. ASSISTANT and SYSTEM are rejected at the validation
-// interceptor (see `(buf.validate.field).enum.not_in` on
-// InputMessage.role) — they can't reach this handler. ROLE_UNSPECIFIED
-// is treated as USER for forward-compat with older clients that
-// didn't set the field. Unknown values (future enum additions) fall
-// back to USER as well; if a future role needs explicit handling it
-// must be added here AND removed from the InputMessage.role
-// not_in list as appropriate.
-func dbRoleForInputMessage(r aiv1.Role) string {
-	if r == aiv1.Role_TOOL {
+// dbRoleForInputMessage maps a wire-shaped InputMessage role string
+// to the canonical DB role. InputMessage.role is validated by the
+// proto interceptor (in: ["user", "tool"]) so by the time this runs
+// the only valid inputs are "user", "tool", or "" (treated as user
+// for forward-compat with clients that omit the field).
+func dbRoleForInputMessage(r string) string {
+	if r == "tool" {
 		return "tool"
 	}
 	return "user"
@@ -442,17 +446,27 @@ func inputMessagesToModel(in []*aiv1.InputMessage) ([]model.Message, error) {
 // `ctx` so server-side tool execution inherits the call's deadline,
 // cancellation, and authenticated UID — without this the tool would
 // outlive client disconnects (resource leak) and run unauthenticated.
+//
+// The proto carries tool input/output as `google.protobuf.Struct`
+// (structured JSON, not strings) so consumers don't double-parse and
+// the SSE adapter emits a native JSON object on the wire. The
+// upstream model layer hands us JSON-encoded strings, so this
+// helper decodes them once at the proto boundary.
 func (s *Server) emitToolCall(ctx context.Context, emit func(*aiv1.ServerEvent) error, tc *model.ToolCall) error {
 	if tc == nil {
 		return nil
 	}
 	isServer := s.tools.IsServerTool(tc.Name)
+	inputStruct, err := jsonObjectToStruct(tc.InputJSON)
+	if err != nil {
+		return s.sendStreamErrorEmit(emit, err)
+	}
 	if err := emit(&aiv1.ServerEvent{
 		Event: &aiv1.ServerEvent_ToolInputAvailable{ToolInputAvailable: &aiv1.ToolInputAvailable{
-			ToolCallId: tc.ID,
-			Tool:       tc.Name,
-			InputJson:  tc.InputJSON,
-			ServerSide: isServer,
+			ToolCallId:       tc.ID,
+			ToolName:         tc.Name,
+			Input:            inputStruct,
+			ProviderExecuted: isServer,
 		}},
 	}); err != nil {
 		return err
@@ -466,33 +480,59 @@ func (s *Server) emitToolCall(ctx context.Context, emit func(*aiv1.ServerEvent) 
 	result, execErr := tool.Execute(ctx, tc.InputJSON)
 	if execErr != nil {
 		return emit(&aiv1.ServerEvent{
-			Event: &aiv1.ServerEvent_ToolError{ToolError: &aiv1.ToolError{
-				ToolCallId:   tc.ID,
-				ErrorMessage: execErr.Error(),
+			Event: &aiv1.ServerEvent_ToolOutputError{ToolOutputError: &aiv1.ToolOutputError{
+				ToolCallId: tc.ID,
+				ErrorText:  execErr.Error(),
 			}},
 		})
+	}
+	outputStruct, err := jsonObjectToStruct(result)
+	if err != nil {
+		return s.sendStreamErrorEmit(emit, err)
 	}
 	return emit(&aiv1.ServerEvent{
 		Event: &aiv1.ServerEvent_ToolOutputAvailable{ToolOutputAvailable: &aiv1.ToolOutputAvailable{
 			ToolCallId: tc.ID,
-			ResultJson: result,
+			Output:     outputStruct,
 		}},
 	})
 }
 
+// jsonObjectToStruct decodes a JSON-encoded string into a
+// google.protobuf.Struct. Empty input returns nil (the SSE wire will
+// elide the field). Non-object JSON (a bare string, number, or
+// array) is wrapped in a single-key envelope so the value still
+// reaches the client.
+func jsonObjectToStruct(s string) (*structpb.Struct, error) {
+	if s == "" {
+		return nil, nil
+	}
+	out := &structpb.Struct{}
+	if err := protojson.Unmarshal([]byte(s), out); err == nil {
+		return out, nil
+	}
+	// Fallback: parse as a free-form Value and box it under "value".
+	v := &structpb.Value{}
+	if err := protojson.Unmarshal([]byte(s), v); err != nil {
+		return nil, err
+	}
+	return &structpb.Struct{Fields: map[string]*structpb.Value{"value": v}}, nil
+}
+
 func (s *Server) sendStreamErrorEmit(emit func(*aiv1.ServerEvent) error, err error) error {
-	// Building a Status proto for embedding in a StreamError event,
-	// not returning an RPC-level error — so apierr's generic-message
-	// helpers don't apply. The client wants the actual error text to
-	// surface in the streamed event for display; if `err` already
-	// carries a status (e.g. from a downstream RPC), preserve it.
-	st, ok := status.FromError(err)
-	if !ok {
-		st = status.New(codes.Internal, err.Error())
+	// `Error` carries a single error_text field; we surface the
+	// status message when err is a status, otherwise the raw text.
+	// The full Status (code + details) is lost on the wire — that's
+	// intentional, the Vercel chunk schema only carries an error
+	// string. Internal callers that need richer error data should
+	// rely on the gRPC trailer error returned from runGenerate.
+	msg := err.Error()
+	if st, ok := status.FromError(err); ok {
+		msg = st.Message()
 	}
 	return emit(&aiv1.ServerEvent{
-		Event: &aiv1.ServerEvent_StreamError{StreamError: &aiv1.StreamError{
-			Status: st.Proto(),
+		Event: &aiv1.ServerEvent_Error{Error: &aiv1.Error{
+			ErrorText: msg,
 		}},
 	})
 }

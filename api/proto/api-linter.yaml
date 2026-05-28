@@ -18,6 +18,42 @@
     # globally rather than annotating each call site.
     - 'core::0215::foreign-type-reference'
 - included_paths:
+    - 'api/proto/pivox/ai/v1/ai_chat.proto'
+  # The streaming chunk wire format mirrors the Vercel AI SDK's
+  # UIMessageChunk schema verbatim so the SSE adapter can emit the
+  # exact shape `useChat`'s `uiMessageChunkSchema.parse(...)`
+  # accepts. Several AIP-style rules fight that alignment; we
+  # suppress them ONLY for this file with justifications below.
+  disabled_rules:
+    # Vercel wire field is `toolName` (camelCase) — our proto field
+    # is `tool_name` which protojson emits as `toolName`. AIP-122
+    # wants `tool` (no `_name` suffix), which would emit as `tool`
+    # and break wire compatibility with useChat.
+    - 'core::0122::name-suffix'
+    # `transient` is a reserved word in Java but is the literal
+    # wire field name in Vercel's `data-<name>` chunk schema. The
+    # alternative (rename the proto field) forces a translator
+    # shim for a field that's otherwise a 1:1 pass-through.
+    - 'core::0140::reserved-words'
+    # The `File` and `Start` chunk messages are streaming-wire
+    # event payloads, not Pivox resources, so adding a
+    # google.api.resource annotation would be incorrect.
+    - 'core::0123::resource-annotation'
+    # The chunk messages use section banner comments ("─── Text
+    # ───") that AIP-192 reads as the leading comment for the
+    # following entity. We keep the banners — they're the table of
+    # contents for the chunk lineup — and rely on inline docs on
+    # each message for the actual entity documentation.
+    - 'core::0192::only-leading-comments'
+    # The streaming chunk messages mirror the Vercel AI SDK
+    # `UIMessageChunk` schema field-for-field. The canonical
+    # documentation for those fields lives in the SDK
+    # (node_modules/ai/src/ui-message-stream/ui-message-chunks.ts).
+    # Re-stating it field-by-field in proto creates drift; we keep
+    # inline docs where Pivox adds context beyond the spec and rely
+    # on the file-level header for the rest.
+    - 'core::0192::has-comments'
+- included_paths:
     - 'api/proto/pivox/api/v1/watch.proto'
   disabled_rules:
     - 'all'

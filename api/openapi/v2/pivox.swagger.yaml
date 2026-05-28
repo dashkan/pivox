@@ -8199,7 +8199,7 @@ paths:
             $ref: '#/definitions/AiChatSummarizeConversationBody'
       tags:
         - AiChat
-  /v1/organizations/{organization}:generateContent:
+  /v1/organizations/{organization}/users/{user}:generateContent:
     post:
       summary: |-
         Generates assistant content for the given input. Unary: collects
@@ -8223,11 +8223,67 @@ paths:
           in: path
           required: true
           type: string
+        - name: user
+          in: path
+          required: true
+          type: string
         - name: body
           in: body
           required: true
           schema:
             $ref: '#/definitions/AiChatGenerateContentBody'
+      tags:
+        - AiChat
+  /v1/organizations/{organization}/users/{user}:streamGenerateContent:
+    post:
+      summary: |-
+        Server-streaming counterpart to `GenerateContent`. Same request
+        shape; emits the response as a sequence of `ServerEvent`s
+        (lifecycle markers, text/reasoning/tool deltas, source/file
+        chunks, data parts, and a terminal `finish`).
+      description: |-
+        Each ServerEvent variant maps 1:1 to a Vercel AI SDK
+        UIMessageChunk on the wire — the SSE adapter
+        (POST /v1/{parent}:streamGenerateContent) is a thin translator
+        that strips the proto oneof wrapper and injects the `"type"`
+        discriminator. The proto IS the canonical wire format.
+
+        The request name, response name, and HTTP suffix are
+        intentionally non-AIP — server-streaming custom methods aren't
+        covered by AIP-136. The streaming variant deliberately reuses
+        `GenerateContentRequest` so callers can construct the request
+        once and pick streaming vs unary at call time. The unary
+        `GenerateContent` above is AIP-clean.
+      operationId: AiChat_StreamGenerateContent
+      responses:
+        "200":
+          description: A successful response.(streaming responses)
+          schema:
+            type: object
+            properties:
+              result:
+                $ref: '#/definitions/v1ServerEvent'
+              error:
+                $ref: '#/definitions/rpcStatus'
+            title: Stream result of v1ServerEvent
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: user
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/AiChatStreamGenerateContentBody'
       tags:
         - AiChat
   /v1/organizations/{organization}:queryDashboardData:
@@ -8271,49 +8327,6 @@ paths:
             $ref: '#/definitions/DashboardsQueryDashboardDataBody'
       tags:
         - Dashboards
-  /v1/organizations/{organization}:streamGenerateContent:
-    post:
-      summary: |-
-        Server-streaming counterpart to `GenerateContent`. Same request
-        shape; emits the response as a sequence of `ServerEvent`s
-        (text/reasoning/tool/artifact deltas, lifecycle markers, and a
-        terminal `done`). Native clients use this directly. Web clients
-        use the SSE adapter at `POST /v1/ai:streamGenerateContent`.
-      description: |-
-        The request name, response name, and HTTP suffix are
-        intentionally non-AIP — server-streaming custom methods aren't
-        covered by AIP-136. The streaming variant deliberately reuses
-        `GenerateContentRequest` so callers can construct the request
-        once and pick streaming vs unary at call time. The unary
-        `GenerateContent` above is AIP-clean.
-      operationId: AiChat_StreamGenerateContent
-      responses:
-        "200":
-          description: A successful response.(streaming responses)
-          schema:
-            type: object
-            properties:
-              result:
-                $ref: '#/definitions/v1ServerEvent'
-              error:
-                $ref: '#/definitions/rpcStatus'
-            title: Stream result of v1ServerEvent
-        default:
-          description: An unexpected error response.
-          schema:
-            $ref: '#/definitions/rpcStatus'
-      parameters:
-        - name: organization
-          in: path
-          required: true
-          type: string
-        - name: body
-          in: body
-          required: true
-          schema:
-            $ref: '#/definitions/AiChatStreamGenerateContentBody'
-      tags:
-        - AiChat
   /v1/organizations/{organization}:testIamPermissions:
     post:
       summary: |-
@@ -9583,6 +9596,12 @@ definitions:
       results. When the underlying identity is soft-deleted the resolver
       blanks out PII (display_name, email) and sets is_deleted=true while
       preserving the id so that historical references remain stable.
+  v1Abort:
+    type: object
+    properties:
+      reason:
+        type: string
+        description: Optional. Human-readable cancellation reason.
   v1AbsoluteTimeRange:
     type: object
     properties:
@@ -9834,58 +9853,6 @@ definitions:
       An artifact is a structured output produced during a conversation, such
       as a code snippet, markdown document, or SVG graphic. Artifacts are
       versioned — each edit produces a new ArtifactVersion.
-  v1ArtifactDelta:
-    type: object
-    properties:
-      artifactId:
-        type: string
-        description: The artifact ID this delta belongs to.
-      delta:
-        type: string
-        description: A chunk of the content.
-    description: A chunk of artifact content.
-  v1ArtifactEnd:
-    type: object
-    properties:
-      artifactId:
-        type: string
-        description: The artifact ID.
-      artifactVersion:
-        type: string
-        title: |-
-          The persisted artifact version.
-          Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
-      mimeType:
-        type: string
-        description: The MIME type of the artifact.
-      sizeBytes:
-        type: string
-        format: int64
-        description: The size in bytes of the artifact content.
-    description: Signals the end of an artifact, including its persisted version info.
-  v1ArtifactError:
-    type: object
-    properties:
-      artifactId:
-        type: string
-        description: The artifact ID that errored.
-      status:
-        $ref: '#/definitions/rpcStatus'
-        description: The error details.
-    description: An error during artifact production.
-  v1ArtifactStart:
-    type: object
-    properties:
-      artifactId:
-        type: string
-        description: The artifact ID being produced.
-      type:
-        type: string
-        description: The type of artifact (e.g. "code", "markdown", "svg").
-      title:
-        type: string
-        description: A human-readable title.
-    description: Signals the start of an artifact being produced.
   v1ArtifactVersion:
     type: object
     properties:
@@ -10687,15 +10654,33 @@ definitions:
   v1DataPart:
     type: object
     properties:
-      type:
+      name:
         type: string
-        description: The data type identifier.
-      dataJson:
+        description: |-
+          The Vercel data type suffix; the SSE translator emits the
+          wire `type` as `"data-" + name`. Must be non-empty.
+      id:
         type: string
-        description: The JSON-encoded payload.
+        description: Optional. Stable replace-on-update key.
+      data:
+        type: object
+        description: |-
+          The payload. Carried as structured data so `protojson` emits
+          a native JSON object on the wire.
+      transient:
+        type: boolean
+        description: True to skip persistence on the client (fire `onData` only).
     description: |-
-      An opaque data part for future extensions (engine status, rundown
-      updates, etc.). Follows Vercel AI SDK's DataPart convention.
+      A custom UI part. Emitted on the wire as `data-<name>`. When
+      `id` is set, repeated events with the same `name` + `id`
+      REPLACE the data part on the client — used for streaming
+      artifacts and other in-place updates. When `transient` is true,
+      the client fires its `onData` callback but does NOT persist the
+      chunk to message state.
+
+      Artifacts use this with `name = "artifact"` and stable per-
+      artifact `id`; the server-side accumulator builds growing
+      snapshots inside `data`.
   v1DataSource:
     type: object
     properties:
@@ -10800,9 +10785,6 @@ definitions:
       detected after a previous VERIFIED state, or the LRO expired
       without a successful check). Caller can retry via a fresh
       `CreateDomain` cycle (delete + recreate).
-  v1Done:
-    type: object
-    description: The stream is complete. No more events will be sent.
   v1EffectiveTag:
     type: object
     properties:
@@ -10929,6 +10911,23 @@ definitions:
        - ACTIVE: The endpoint is active and serving requests.
        - INACTIVE: The endpoint has been deactivated and is not serving requests.
        - UNREACHABLE: The endpoint's storage backend is unreachable.
+  v1Error:
+    type: object
+    properties:
+      errorText:
+        type: string
+        description: |-
+          The error message surfaced to the client. Should not carry
+          server-internal detail.
+  v1File:
+    type: object
+    properties:
+      url:
+        type: string
+      mediaType:
+        type: string
+      providerMetadata:
+        type: object
   v1FilePart:
     type: object
     properties:
@@ -10963,6 +10962,22 @@ definitions:
       pivox system user's permissions on the mounted filesystem.
     required:
       - path
+  v1Finish:
+    type: object
+    properties:
+      finishReason:
+        type: string
+        description: |-
+          Why the generation stopped. One of: "stop", "length",
+          "content-filter", "tool-calls", "error", "other".
+      messageMetadata:
+        type: object
+        description: |-
+          Optional. Final metadata for the assistant message (typically
+          input/output token counts, model id, etc.).
+  v1FinishStep:
+    type: object
+    description: Marker — emitted after each model call in a multi-step turn.
   v1GenerateContentResponse:
     type: object
     properties:
@@ -11242,27 +11257,44 @@ definitions:
   v1InputMessage:
     type: object
     properties:
+      id:
+        type: string
+        description: |-
+          Optional. The Vercel-side message ID. Carried for audit/replay
+          round-trip; not used to key persistence on the server (the
+          server generates its own message IDs for persisted turns).
       role:
-        $ref: '#/definitions/pivoxAiV1Role'
+        type: string
         description: |-
           Required. The role of this message's author.
-          ASSISTANT (2) and SYSTEM (3) are not valid on input — assistant
-          turns are server-produced (accepting one would let a caller
-          inject fake context); system instructions arrive via
-          `system_instruction` on the request, not as a message.
-          ROLE_UNSPECIFIED (0) is treated as USER for forward-compat.
+
+          `assistant` and `system` are not valid on input — assistant turns
+          are server-produced (accepting one would let a caller inject fake
+          context); system instructions arrive via `system_instruction` on
+          the request, not as a message. `tool` carries tool-result parts
+          for the model to continue a tool-loop.
+
+          String (not enum) because Vercel writes lowercase strings on the
+          wire; `protojson` would round-trip a proto enum as uppercase,
+          forcing a translator shim. Validated below.
       parts:
         type: array
         items:
           type: object
           $ref: '#/definitions/v1MessagePart'
         description: Required. The structured parts of this message.
+      metadata:
+        type: object
+        description: |-
+          Optional. Free-form metadata associated with this message.
+          Round-trips on the wire as Vercel's UIMessage.metadata.
     description: |-
-      A single conversation turn supplied as input to a generation. The
-      role-and-parts shape mirrors the Vercel AI SDK's `UIMessage` and
-      Google's `Content`: tool calls, tool results, files, reasoning,
-      and text are all represented as `MessagePart` variants — no
-      separate request envelopes for tool flows.
+      A single conversation turn supplied as input to a generation.
+      Shape-matches the Vercel AI SDK `UIMessage` on the wire so the
+      SSE handler can decode a request body into `[]*InputMessage`
+      directly via `protojson.Unmarshal`. Tool calls, tool results,
+      files, reasoning, and text are all represented as `MessagePart`
+      variants — no separate request envelopes for tool flows.
     required:
       - role
       - parts
@@ -12088,21 +12120,12 @@ definitions:
   v1MessageMetadata:
     type: object
     properties:
-      messageId:
-        type: string
-        description: The message ID this metadata is for.
-      model:
-        type: string
-        description: The model that generated the response.
-      inputTokens:
-        type: integer
-        format: int32
-        description: Input token count (approximate).
-      outputTokens:
-        type: integer
-        format: int32
-        description: Output token count (approximate).
-    description: Metadata about the assistant message.
+      messageMetadata:
+        type: object
+    description: |-
+      Free-form metadata about the assistant message. The wire chunk
+      nests the payload under `messageMetadata`, hence the recursive
+      field name — matches Vercel's UIMessageChunk shape verbatim.
   v1MessagePart:
     type: object
     properties:
@@ -12332,13 +12355,19 @@ definitions:
   v1ReasoningDelta:
     type: object
     properties:
+      id:
+        type: string
       delta:
         type: string
-        description: The reasoning text content of this chunk.
-    description: A chunk of reasoning text.
+      providerMetadata:
+        type: object
   v1ReasoningEnd:
     type: object
-    description: Signals the end of reasoning output.
+    properties:
+      id:
+        type: string
+      providerMetadata:
+        type: object
   v1ReasoningPart:
     type: object
     properties:
@@ -12350,10 +12379,10 @@ definitions:
   v1ReasoningStart:
     type: object
     properties:
-      messageId:
+      id:
         type: string
-        description: The message ID for the reasoning block.
-    description: Signals the start of reasoning/thinking output.
+      providerMetadata:
+        type: object
   v1RelativeTimeRange:
     type: object
     properties:
@@ -12750,67 +12779,92 @@ definitions:
   v1ServerEvent:
     type: object
     properties:
-      textStart:
-        $ref: '#/definitions/v1TextStart'
-        description: Signals the start of an assistant text response.
-      textDelta:
-        $ref: '#/definitions/v1TextDelta'
-        description: A chunk of assistant text.
-      textEnd:
-        $ref: '#/definitions/v1TextEnd'
-        description: Signals the end of the assistant text response.
-      reasoningStart:
-        $ref: '#/definitions/v1ReasoningStart'
-        description: Signals the start of reasoning/thinking output.
-      reasoningDelta:
-        $ref: '#/definitions/v1ReasoningDelta'
-        description: A chunk of reasoning text.
-      reasoningEnd:
-        $ref: '#/definitions/v1ReasoningEnd'
-        description: Signals the end of reasoning output.
-      toolCallStart:
-        $ref: '#/definitions/v1ToolCallStart'
-        description: Signals the start of a tool call with partial input.
-      toolCallDelta:
-        $ref: '#/definitions/v1ToolCallDelta'
-        description: A chunk of tool call input JSON.
-      toolInputAvailable:
-        $ref: '#/definitions/v1ToolInputAvailable'
-        description: The tool call input is complete and ready for execution.
-      toolOutputAvailable:
-        $ref: '#/definitions/v1ToolOutputAvailable'
-        description: A tool execution result (from a server-side tool).
-      toolError:
-        $ref: '#/definitions/v1ToolError'
-        description: A tool execution error.
-      toolApprovalRequested:
-        $ref: '#/definitions/v1ToolApprovalRequested'
-        description: A tool requires user approval before execution.
-      artifactStart:
-        $ref: '#/definitions/v1ArtifactStart'
-        description: Signals the start of an artifact being produced.
-      artifactDelta:
-        $ref: '#/definitions/v1ArtifactDelta'
-        description: A chunk of artifact content.
-      artifactEnd:
-        $ref: '#/definitions/v1ArtifactEnd'
-        description: Signals the end of an artifact, including its persisted version.
-      artifactError:
-        $ref: '#/definitions/v1ArtifactError'
-        description: An error during artifact production.
+      start:
+        $ref: '#/definitions/v1Start'
+        description: |-
+          ─── Lifecycle ──────────────────────────────────────────
+          The assistant turn has started. Emitted before any text/
+          tool/reasoning events for the turn.
+      startStep:
+        $ref: '#/definitions/v1StartStep'
+        description: A multi-step turn just rolled into a new model call.
+      finishStep:
+        $ref: '#/definitions/v1FinishStep'
+        description: |-
+          The step (one model call) is over. Followed by either a
+          subsequent `start_step` (tool loop continues) or `finish`.
+      finish:
+        $ref: '#/definitions/v1Finish'
+        description: The assistant turn is complete. Terminal.
+      abort:
+        $ref: '#/definitions/v1Abort'
+        description: The stream was cancelled. Terminal.
+      error:
+        $ref: '#/definitions/v1Error'
+        description: A stream-level error. Terminal.
       messageMetadata:
         $ref: '#/definitions/v1MessageMetadata'
-        description: Metadata about the assistant message (token counts, model info).
-      done:
-        $ref: '#/definitions/v1Done'
-        description: The stream is complete.
-      streamError:
-        $ref: '#/definitions/v1StreamError'
-        description: A stream-level error.
-      dataPart:
+        description: |-
+          Free-form metadata about the assistant message. Emitted
+          anytime — typically once at end-of-turn carrying final usage.
+      textStart:
+        $ref: '#/definitions/v1TextStart'
+        title: ─── Text ───────────────────────────────────────────────
+      textDelta:
+        $ref: '#/definitions/v1TextDelta'
+      textEnd:
+        $ref: '#/definitions/v1TextEnd'
+      reasoningStart:
+        $ref: '#/definitions/v1ReasoningStart'
+        title: ─── Reasoning ──────────────────────────────────────────
+      reasoningDelta:
+        $ref: '#/definitions/v1ReasoningDelta'
+      reasoningEnd:
+        $ref: '#/definitions/v1ReasoningEnd'
+      toolInputStart:
+        $ref: '#/definitions/v1ToolInputStart'
+        title: ─── Tool input ─────────────────────────────────────────
+      toolInputDelta:
+        $ref: '#/definitions/v1ToolInputDelta'
+      toolInputAvailable:
+        $ref: '#/definitions/v1ToolInputAvailable'
+      toolInputError:
+        $ref: '#/definitions/v1ToolInputError'
+      toolApprovalRequest:
+        $ref: '#/definitions/v1ToolApprovalRequest'
+      toolOutputAvailable:
+        $ref: '#/definitions/v1ToolOutputAvailable'
+        title: ─── Tool output ────────────────────────────────────────
+      toolOutputError:
+        $ref: '#/definitions/v1ToolOutputError'
+      toolOutputDenied:
+        $ref: '#/definitions/v1ToolOutputDenied'
+      sourceUrl:
+        $ref: '#/definitions/v1SourceUrl'
+        title: ─── Sources & files ────────────────────────────────────
+      sourceDocument:
+        $ref: '#/definitions/v1SourceDocument'
+      file:
+        $ref: '#/definitions/v1File'
+      data:
         $ref: '#/definitions/v1DataPart'
-        description: An opaque data part for future extensions (engine status, etc.).
-    description: An event sent by the server during a streaming chat session.
+        description: |-
+          ─── Custom data parts ──────────────────────────────────
+          Emitted as Vercel chunk type `data-<name>`. Repeated events
+          with the same `name` + `id` REPLACE the prior data on the
+          client. Used for artifacts (name="artifact"), progress
+          (name="progress"), and any future custom UI part.
+    description: |-
+      One emission on the streaming wire. Each variant maps 1:1 to a
+      Vercel AI SDK UIMessageChunk; the SSE translator strips this
+      oneof wrapper and injects the `"type"` discriminator.
+
+      Field names on the inner messages are chosen so `protojson` emits
+      the exact Vercel JSON without translator field renaming.
+
+      Variants are grouped (lifecycle 1-7, text 10-12, reasoning 13-15,
+      tool 20-27, source/file 30-32, data 40) with gaps so additions
+      don't churn the field-number namespace.
   v1ServerKeyRestrictions:
     type: object
     properties:
@@ -12822,6 +12876,30 @@ definitions:
           Optional. A list of the caller IP addresses that are allowed to make API calls
           with this key.
     description: The IP addresses of callers that are allowed to use the key.
+  v1SourceDocument:
+    type: object
+    properties:
+      sourceId:
+        type: string
+      mediaType:
+        type: string
+      title:
+        type: string
+      filename:
+        type: string
+      providerMetadata:
+        type: object
+  v1SourceUrl:
+    type: object
+    properties:
+      sourceId:
+        type: string
+      url:
+        type: string
+      title:
+        type: string
+      providerMetadata:
+        type: object
   v1Space:
     type: object
     properties:
@@ -13026,6 +13104,22 @@ definitions:
       mapping is unambiguous.
     required:
       - displayName
+  v1Start:
+    type: object
+    properties:
+      messageId:
+        type: string
+        description: |-
+          The server-assigned ID for the assistant message produced by
+          this turn. The SSE client (Vercel useChat) keys the assistant
+          message off this; subsequent text/reasoning chunks reference
+          it via their own `id` field.
+      messageMetadata:
+        type: object
+        description: Optional. Initial metadata for the assistant message.
+  v1StartStep:
+    type: object
+    description: Marker — emitted before each model call in a multi-step turn.
   v1StaticData:
     type: object
     properties:
@@ -13178,13 +13272,6 @@ definitions:
        - DEGRADED: The gateway is operating in a degraded state. Some functionality may
       be unavailable.
        - OFFLINE: The gateway is offline and not serving traffic.
-  v1StreamError:
-    type: object
-    properties:
-      status:
-        $ref: '#/definitions/rpcStatus'
-        description: The error details.
-    description: A stream-level error.
   v1TagBinding:
     type: object
     properties:
@@ -13348,13 +13435,24 @@ definitions:
   v1TextDelta:
     type: object
     properties:
+      id:
+        type: string
+        description: Block ID matching the corresponding TextStart.
       delta:
         type: string
-        description: The text content of this chunk.
-    description: A chunk of assistant text.
+        description: The incremental text content for this delta.
+      providerMetadata:
+        type: object
+        description: Optional. Provider-specific metadata.
   v1TextEnd:
     type: object
-    description: Signals the end of the assistant text response.
+    properties:
+      id:
+        type: string
+        description: Block ID matching the corresponding TextStart.
+      providerMetadata:
+        type: object
+        description: Optional. Provider-specific metadata.
   v1TextPart:
     type: object
     properties:
@@ -13366,10 +13464,16 @@ definitions:
   v1TextStart:
     type: object
     properties:
-      messageId:
+      id:
         type: string
-        description: The message ID being generated.
-    description: Signals the start of an assistant text response.
+        description: |-
+          Block ID. Wire chunk's `id` field; pairs the start/delta/end
+          events of the same text block.
+      providerMetadata:
+        type: object
+        description: |-
+          Optional. Provider-specific metadata (e.g. Anthropic prompt
+          caching counts, OpenAI reasoning summaries).
   v1TextWidget:
     type: object
     properties:
@@ -13465,29 +13569,17 @@ definitions:
         format: int32
         description: Approximate output token count (the generated response).
     description: Token usage accounting for a generation.
-  v1ToolApprovalRequested:
+  v1ToolApprovalRequest:
     type: object
     properties:
+      approvalId:
+        type: string
+        description: |-
+          Approval session ID; the client returns this on
+          approve/deny to disambiguate concurrent approvals.
       toolCallId:
         type: string
-        description: The unique ID of this tool call.
-      tool:
-        type: string
-        description: The tool requesting approval.
-      inputJson:
-        type: string
-        description: The complete JSON-encoded input arguments for review.
-    description: A tool that requires user approval before execution.
-  v1ToolCallDelta:
-    type: object
-    properties:
-      toolCallId:
-        type: string
-        description: The tool call ID this delta belongs to.
-      delta:
-        type: string
-        description: A chunk of the JSON input.
-    description: A chunk of tool call input JSON being streamed.
+        description: The tool call awaiting approval.
   v1ToolCallPart:
     type: object
     properties:
@@ -13504,16 +13596,6 @@ definitions:
         description: Output only. The JSON-encoded input arguments for the tool.
         readOnly: true
     description: A tool call issued by the assistant.
-  v1ToolCallStart:
-    type: object
-    properties:
-      toolCallId:
-        type: string
-        description: The unique ID of this tool call.
-      tool:
-        type: string
-        description: The tool being called.
-    description: Signals the start of a tool call.
   v1ToolDefinition:
     type: object
     properties:
@@ -13540,42 +13622,139 @@ definitions:
     required:
       - tool
       - inputSchemaJson
-  v1ToolError:
-    type: object
-    properties:
-      toolCallId:
-        type: string
-        description: The tool call ID that errored.
-      errorMessage:
-        type: string
-        description: The error message.
-    description: A tool execution error.
   v1ToolInputAvailable:
     type: object
     properties:
       toolCallId:
         type: string
-        description: The unique ID of this tool call.
-      tool:
+      toolName:
         type: string
-        description: The tool to execute.
-      inputJson:
-        type: string
-        description: The complete JSON-encoded input arguments.
-      serverSide:
+      input:
+        type: object
+        description: |-
+          The fully-parsed tool input. Carries the input as structured
+          data (not a JSON-encoded string), so consumers don't double-
+          parse and `protojson` emits a native JSON object on the wire.
+      providerExecuted:
         type: boolean
-        description: Whether this tool is executed server-side (true) or client-side (false).
-    description: The tool call input is fully available and ready for execution.
+      dynamic:
+        type: boolean
+      title:
+        type: string
+      providerMetadata:
+        type: object
+      toolMetadata:
+        type: object
+  v1ToolInputDelta:
+    type: object
+    properties:
+      toolCallId:
+        type: string
+      inputTextDelta:
+        type: string
+        description: |-
+          The raw provider-emitted input text being streamed (typically
+          JSON characters that will eventually parse into the full
+          `input` carried by `ToolInputAvailable`).
+  v1ToolInputError:
+    type: object
+    properties:
+      toolCallId:
+        type: string
+      toolName:
+        type: string
+      input:
+        type: object
+      errorText:
+        type: string
+        description: Human-readable description of the validation failure.
+      providerExecuted:
+        type: boolean
+      dynamic:
+        type: boolean
+      title:
+        type: string
+      providerMetadata:
+        type: object
+      toolMetadata:
+        type: object
+    description: |-
+      Tool input that failed validation (schema mismatch, missing
+      required field, etc.). Distinct from `ToolOutputError`, which
+      is for execution failures after the input was accepted.
+  v1ToolInputStart:
+    type: object
+    properties:
+      toolCallId:
+        type: string
+      toolName:
+        type: string
+      providerExecuted:
+        type: boolean
+        description: |-
+          True when the upstream provider executes this tool itself
+          (e.g. Anthropic web search). When true, the client should not
+          attempt to run the tool locally.
+      dynamic:
+        type: boolean
+        description: |-
+          True when the tool was not statically declared in the
+          request's `tools` — i.e. provider-suggested at runtime.
+      title:
+        type: string
+        description: |-
+          Optional. Display title shown to the user while the tool
+          input is being streamed.
+      providerMetadata:
+        type: object
+      toolMetadata:
+        type: object
   v1ToolOutputAvailable:
     type: object
     properties:
       toolCallId:
         type: string
-        description: The tool call ID this output is for.
-      resultJson:
+      output:
+        type: object
+        description: |-
+          The tool's result, as structured data. Mirrors
+          ToolInputAvailable.input on the output side.
+      providerExecuted:
+        type: boolean
+      dynamic:
+        type: boolean
+      preliminary:
+        type: boolean
+        description: |-
+          True for a partial/in-progress output (the tool will emit a
+          subsequent non-preliminary output before the call closes).
+      providerMetadata:
+        type: object
+      toolMetadata:
+        type: object
+  v1ToolOutputDenied:
+    type: object
+    properties:
+      toolCallId:
         type: string
-        description: The JSON-encoded tool result.
-    description: A tool execution result from a server-side tool.
+    description: |-
+      The user denied the pending approval request for this tool
+      call. Terminal for the call.
+  v1ToolOutputError:
+    type: object
+    properties:
+      toolCallId:
+        type: string
+      errorText:
+        type: string
+      providerExecuted:
+        type: boolean
+      dynamic:
+        type: boolean
+      providerMetadata:
+        type: object
+      toolMetadata:
+        type: object
   v1ToolResultPart:
     type: object
     properties:

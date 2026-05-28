@@ -2248,7 +2248,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/organizations/{organization}:generateContent": {
+    "/v1/organizations/{organization}/users/{user}:generateContent": {
         parameters: {
             query?: never;
             header?: never;
@@ -2266,6 +2266,40 @@ export interface paths {
          *     SDK and `models.generateContent` in Google's AI APIs.
          */
         post: operations["AiChat_GenerateContent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/users/{user}:streamGenerateContent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Server-streaming counterpart to `GenerateContent`. Same request
+         *     shape; emits the response as a sequence of `ServerEvent`s
+         *     (lifecycle markers, text/reasoning/tool deltas, source/file
+         *     chunks, data parts, and a terminal `finish`).
+         * @description Each ServerEvent variant maps 1:1 to a Vercel AI SDK
+         *     UIMessageChunk on the wire — the SSE adapter
+         *     (POST /v1/{parent}:streamGenerateContent) is a thin translator
+         *     that strips the proto oneof wrapper and injects the `"type"`
+         *     discriminator. The proto IS the canonical wire format.
+         *
+         *     The request name, response name, and HTTP suffix are
+         *     intentionally non-AIP — server-streaming custom methods aren't
+         *     covered by AIP-136. The streaming variant deliberately reuses
+         *     `GenerateContentRequest` so callers can construct the request
+         *     once and pick streaming vs unary at call time. The unary
+         *     `GenerateContent` above is AIP-clean.
+         */
+        post: operations["AiChat_StreamGenerateContent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2299,35 +2333,6 @@ export interface paths {
          *     granted independently.
          */
         post: operations["Dashboards_QueryDashboardData"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/organizations/{organization}:streamGenerateContent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Server-streaming counterpart to `GenerateContent`. Same request
-         *     shape; emits the response as a sequence of `ServerEvent`s
-         *     (text/reasoning/tool/artifact deltas, lifecycle markers, and a
-         *     terminal `done`). Native clients use this directly. Web clients
-         *     use the SSE adapter at `POST /v1/ai:streamGenerateContent`.
-         * @description The request name, response name, and HTTP suffix are
-         *     intentionally non-AIP — server-streaming custom methods aren't
-         *     covered by AIP-136. The streaming variant deliberately reuses
-         *     `GenerateContentRequest` so callers can construct the request
-         *     once and pick streaming vs unary at call time. The unary
-         *     `GenerateContent` above is AIP-clean.
-         */
-        post: operations["AiChat_StreamGenerateContent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3361,6 +3366,10 @@ export interface components {
              */
             readonly isDeleted?: boolean;
         };
+        v1Abort: {
+            /** @description Optional. Human-readable cancellation reason. */
+            reason?: string;
+        };
         /** @description AbsoluteTimeRange defines an explicit start and end time. */
         v1AbsoluteTimeRange: {
             /**
@@ -3561,46 +3570,6 @@ export interface components {
              * @description Output only. When the artifact was last updated.
              */
             readonly updateTime?: string;
-        };
-        /** @description A chunk of artifact content. */
-        v1ArtifactDelta: {
-            /** @description The artifact ID this delta belongs to. */
-            artifactId?: string;
-            /** @description A chunk of the content. */
-            delta?: string;
-        };
-        /** @description Signals the end of an artifact, including its persisted version info. */
-        v1ArtifactEnd: {
-            /** @description The artifact ID. */
-            artifactId?: string;
-            /**
-             * The persisted artifact version.
-             *     Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
-             */
-            artifactVersion?: string;
-            /** @description The MIME type of the artifact. */
-            mimeType?: string;
-            /**
-             * Format: int64
-             * @description The size in bytes of the artifact content.
-             */
-            sizeBytes?: string;
-        };
-        /** @description An error during artifact production. */
-        v1ArtifactError: {
-            /** @description The artifact ID that errored. */
-            artifactId?: string;
-            /** @description The error details. */
-            status?: components["schemas"]["rpcStatus"];
-        };
-        /** @description Signals the start of an artifact being produced. */
-        v1ArtifactStart: {
-            /** @description The artifact ID being produced. */
-            artifactId?: string;
-            /** @description The type of artifact (e.g. "code", "markdown", "svg"). */
-            type?: string;
-            /** @description A human-readable title. */
-            title?: string;
         };
         /**
          * @description A single version of an artifact. Content is stored either inline (small
@@ -4258,14 +4227,32 @@ export interface components {
             allowedValues?: string[];
         };
         /**
-         * @description An opaque data part for future extensions (engine status, rundown
-         *     updates, etc.). Follows Vercel AI SDK's DataPart convention.
+         * @description A custom UI part. Emitted on the wire as `data-<name>`. When
+         *     `id` is set, repeated events with the same `name` + `id`
+         *     REPLACE the data part on the client — used for streaming
+         *     artifacts and other in-place updates. When `transient` is true,
+         *     the client fires its `onData` callback but does NOT persist the
+         *     chunk to message state.
+         *
+         *     Artifacts use this with `name = "artifact"` and stable per-
+         *     artifact `id`; the server-side accumulator builds growing
+         *     snapshots inside `data`.
          */
         v1DataPart: {
-            /** @description The data type identifier. */
-            type?: string;
-            /** @description The JSON-encoded payload. */
-            dataJson?: string;
+            /**
+             * @description The Vercel data type suffix; the SSE translator emits the
+             *     wire `type` as `"data-" + name`. Must be non-empty.
+             */
+            name?: string;
+            /** @description Optional. Stable replace-on-update key. */
+            id?: string;
+            /**
+             * @description The payload. Carried as structured data so `protojson` emits
+             *     a native JSON object on the wire.
+             */
+            data?: Record<string, never>;
+            /** @description True to skip persistence on the client (fire `onData` only). */
+            transient?: boolean;
         };
         /**
          * @description DataSource defines where a widget gets its data. Extensible via the `source`
@@ -4352,8 +4339,6 @@ export interface components {
          * @enum {string}
          */
         v1DomainState: "STATE_UNSPECIFIED" | "PENDING" | "VERIFIED" | "FAILED";
-        /** @description The stream is complete. No more events will be sent. */
-        v1Done: Record<string, never>;
         /**
          * @description An EffectiveTag represents a tag that applies to a resource during policy
          *     evaluation. Tags can be either directly bound to a resource or inherited from
@@ -4459,6 +4444,18 @@ export interface components {
          * @enum {string}
          */
         v1EndpointState: "STATE_UNSPECIFIED" | "ACTIVE" | "INACTIVE" | "UNREACHABLE";
+        v1Error: {
+            /**
+             * @description The error message surfaced to the client. Should not carry
+             *     server-internal detail.
+             */
+            errorText?: string;
+        };
+        v1File: {
+            url?: string;
+            mediaType?: string;
+            providerMetadata?: Record<string, never>;
+        };
         /** @description A file reference within a message. */
         v1FilePart: {
             /** @description Output only. The MIME type of the file. */
@@ -4486,6 +4483,20 @@ export interface components {
              */
             path: string;
         };
+        v1Finish: {
+            /**
+             * @description Why the generation stopped. One of: "stop", "length",
+             *     "content-filter", "tool-calls", "error", "other".
+             */
+            finishReason?: string;
+            /**
+             * @description Optional. Final metadata for the assistant message (typically
+             *     input/output token counts, model id, etc.).
+             */
+            messageMetadata?: Record<string, never>;
+        };
+        /** @description Marker — emitted after each model call in a multi-step turn. */
+        v1FinishStep: Record<string, never>;
         /**
          * @description Response from the unary `GenerateContent`. The streaming variant
          *     (`StreamGenerateContent`) emits the same content as a sequence of
@@ -4709,24 +4720,41 @@ export interface components {
             sizeBytes?: string;
         };
         /**
-         * @description A single conversation turn supplied as input to a generation. The
-         *     role-and-parts shape mirrors the Vercel AI SDK's `UIMessage` and
-         *     Google's `Content`: tool calls, tool results, files, reasoning,
-         *     and text are all represented as `MessagePart` variants — no
-         *     separate request envelopes for tool flows.
+         * @description A single conversation turn supplied as input to a generation.
+         *     Shape-matches the Vercel AI SDK `UIMessage` on the wire so the
+         *     SSE handler can decode a request body into `[]*InputMessage`
+         *     directly via `protojson.Unmarshal`. Tool calls, tool results,
+         *     files, reasoning, and text are all represented as `MessagePart`
+         *     variants — no separate request envelopes for tool flows.
          */
         v1InputMessage: {
             /**
-             * @description Required. The role of this message's author.
-             *     ASSISTANT (2) and SYSTEM (3) are not valid on input — assistant
-             *     turns are server-produced (accepting one would let a caller
-             *     inject fake context); system instructions arrive via
-             *     `system_instruction` on the request, not as a message.
-             *     ROLE_UNSPECIFIED (0) is treated as USER for forward-compat.
+             * @description Optional. The Vercel-side message ID. Carried for audit/replay
+             *     round-trip; not used to key persistence on the server (the
+             *     server generates its own message IDs for persisted turns).
              */
-            role: components["schemas"]["pivoxAiV1Role"];
+            id?: string;
+            /**
+             * @description Required. The role of this message's author.
+             *
+             *     `assistant` and `system` are not valid on input — assistant turns
+             *     are server-produced (accepting one would let a caller inject fake
+             *     context); system instructions arrive via `system_instruction` on
+             *     the request, not as a message. `tool` carries tool-result parts
+             *     for the model to continue a tool-loop.
+             *
+             *     String (not enum) because Vercel writes lowercase strings on the
+             *     wire; `protojson` would round-trip a proto enum as uppercase,
+             *     forcing a translator shim. Validated below.
+             */
+            role: string;
             /** @description Required. The structured parts of this message. */
             parts: components["schemas"]["v1MessagePart"][];
+            /**
+             * @description Optional. Free-form metadata associated with this message.
+             *     Round-trips on the wire as Vercel's UIMessage.metadata.
+             */
+            metadata?: Record<string, never>;
         };
         /**
          * @description An invitation to join an organization. Invitations are created by org
@@ -5316,22 +5344,13 @@ export interface components {
              */
             readonly createTime?: string;
         };
-        /** @description Metadata about the assistant message. */
+        /**
+         * @description Free-form metadata about the assistant message. The wire chunk
+         *     nests the payload under `messageMetadata`, hence the recursive
+         *     field name — matches Vercel's UIMessageChunk shape verbatim.
+         */
         v1MessageMetadata: {
-            /** @description The message ID this metadata is for. */
-            messageId?: string;
-            /** @description The model that generated the response. */
-            model?: string;
-            /**
-             * Format: int32
-             * @description Input token count (approximate).
-             */
-            inputTokens?: number;
-            /**
-             * Format: int32
-             * @description Output token count (approximate).
-             */
-            outputTokens?: number;
+            messageMetadata?: Record<string, never>;
         };
         /**
          * @description A single part of a message. Messages can contain multiple parts of
@@ -5517,22 +5536,23 @@ export interface components {
              */
             nextPageToken?: string;
         };
-        /** @description A chunk of reasoning text. */
         v1ReasoningDelta: {
-            /** @description The reasoning text content of this chunk. */
+            id?: string;
             delta?: string;
+            providerMetadata?: Record<string, never>;
         };
-        /** @description Signals the end of reasoning output. */
-        v1ReasoningEnd: Record<string, never>;
+        v1ReasoningEnd: {
+            id?: string;
+            providerMetadata?: Record<string, never>;
+        };
         /** @description A reasoning/thinking part of a message. */
         v1ReasoningPart: {
             /** @description Output only. The reasoning text. */
             readonly text?: string;
         };
-        /** @description Signals the start of reasoning/thinking output. */
         v1ReasoningStart: {
-            /** @description The message ID for the reasoning block. */
-            messageId?: string;
+            id?: string;
+            providerMetadata?: Record<string, never>;
         };
         /** @description RelativeTimeRange defines a time window relative to the current time. */
         v1RelativeTimeRange: {
@@ -5834,48 +5854,73 @@ export interface components {
             /** @description Optional. Whether to render a divider line below the header. */
             dividerBelow?: boolean;
         };
-        /** @description An event sent by the server during a streaming chat session. */
+        /**
+         * @description One emission on the streaming wire. Each variant maps 1:1 to a
+         *     Vercel AI SDK UIMessageChunk; the SSE translator strips this
+         *     oneof wrapper and injects the `"type"` discriminator.
+         *
+         *     Field names on the inner messages are chosen so `protojson` emits
+         *     the exact Vercel JSON without translator field renaming.
+         *
+         *     Variants are grouped (lifecycle 1-7, text 10-12, reasoning 13-15,
+         *     tool 20-27, source/file 30-32, data 40) with gaps so additions
+         *     don't churn the field-number namespace.
+         */
         v1ServerEvent: {
-            /** @description Signals the start of an assistant text response. */
-            textStart?: components["schemas"]["v1TextStart"];
-            /** @description A chunk of assistant text. */
-            textDelta?: components["schemas"]["v1TextDelta"];
-            /** @description Signals the end of the assistant text response. */
-            textEnd?: components["schemas"]["v1TextEnd"];
-            /** @description Signals the start of reasoning/thinking output. */
-            reasoningStart?: components["schemas"]["v1ReasoningStart"];
-            /** @description A chunk of reasoning text. */
-            reasoningDelta?: components["schemas"]["v1ReasoningDelta"];
-            /** @description Signals the end of reasoning output. */
-            reasoningEnd?: components["schemas"]["v1ReasoningEnd"];
-            /** @description Signals the start of a tool call with partial input. */
-            toolCallStart?: components["schemas"]["v1ToolCallStart"];
-            /** @description A chunk of tool call input JSON. */
-            toolCallDelta?: components["schemas"]["v1ToolCallDelta"];
-            /** @description The tool call input is complete and ready for execution. */
-            toolInputAvailable?: components["schemas"]["v1ToolInputAvailable"];
-            /** @description A tool execution result (from a server-side tool). */
-            toolOutputAvailable?: components["schemas"]["v1ToolOutputAvailable"];
-            /** @description A tool execution error. */
-            toolError?: components["schemas"]["v1ToolError"];
-            /** @description A tool requires user approval before execution. */
-            toolApprovalRequested?: components["schemas"]["v1ToolApprovalRequested"];
-            /** @description Signals the start of an artifact being produced. */
-            artifactStart?: components["schemas"]["v1ArtifactStart"];
-            /** @description A chunk of artifact content. */
-            artifactDelta?: components["schemas"]["v1ArtifactDelta"];
-            /** @description Signals the end of an artifact, including its persisted version. */
-            artifactEnd?: components["schemas"]["v1ArtifactEnd"];
-            /** @description An error during artifact production. */
-            artifactError?: components["schemas"]["v1ArtifactError"];
-            /** @description Metadata about the assistant message (token counts, model info). */
+            /**
+             * @description ─── Lifecycle ──────────────────────────────────────────
+             *     The assistant turn has started. Emitted before any text/
+             *     tool/reasoning events for the turn.
+             */
+            start?: components["schemas"]["v1Start"];
+            /** @description A multi-step turn just rolled into a new model call. */
+            startStep?: components["schemas"]["v1StartStep"];
+            /**
+             * @description The step (one model call) is over. Followed by either a
+             *     subsequent `start_step` (tool loop continues) or `finish`.
+             */
+            finishStep?: components["schemas"]["v1FinishStep"];
+            /** @description The assistant turn is complete. Terminal. */
+            finish?: components["schemas"]["v1Finish"];
+            /** @description The stream was cancelled. Terminal. */
+            abort?: components["schemas"]["v1Abort"];
+            /** @description A stream-level error. Terminal. */
+            error?: components["schemas"]["v1Error"];
+            /**
+             * @description Free-form metadata about the assistant message. Emitted
+             *     anytime — typically once at end-of-turn carrying final usage.
+             */
             messageMetadata?: components["schemas"]["v1MessageMetadata"];
-            /** @description The stream is complete. */
-            done?: components["schemas"]["v1Done"];
-            /** @description A stream-level error. */
-            streamError?: components["schemas"]["v1StreamError"];
-            /** @description An opaque data part for future extensions (engine status, etc.). */
-            dataPart?: components["schemas"]["v1DataPart"];
+            /** ─── Text ─────────────────────────────────────────────── */
+            textStart?: components["schemas"]["v1TextStart"];
+            textDelta?: components["schemas"]["v1TextDelta"];
+            textEnd?: components["schemas"]["v1TextEnd"];
+            /** ─── Reasoning ────────────────────────────────────────── */
+            reasoningStart?: components["schemas"]["v1ReasoningStart"];
+            reasoningDelta?: components["schemas"]["v1ReasoningDelta"];
+            reasoningEnd?: components["schemas"]["v1ReasoningEnd"];
+            /** ─── Tool input ───────────────────────────────────────── */
+            toolInputStart?: components["schemas"]["v1ToolInputStart"];
+            toolInputDelta?: components["schemas"]["v1ToolInputDelta"];
+            toolInputAvailable?: components["schemas"]["v1ToolInputAvailable"];
+            toolInputError?: components["schemas"]["v1ToolInputError"];
+            toolApprovalRequest?: components["schemas"]["v1ToolApprovalRequest"];
+            /** ─── Tool output ──────────────────────────────────────── */
+            toolOutputAvailable?: components["schemas"]["v1ToolOutputAvailable"];
+            toolOutputError?: components["schemas"]["v1ToolOutputError"];
+            toolOutputDenied?: components["schemas"]["v1ToolOutputDenied"];
+            /** ─── Sources & files ──────────────────────────────────── */
+            sourceUrl?: components["schemas"]["v1SourceUrl"];
+            sourceDocument?: components["schemas"]["v1SourceDocument"];
+            file?: components["schemas"]["v1File"];
+            /**
+             * @description ─── Custom data parts ──────────────────────────────────
+             *     Emitted as Vercel chunk type `data-<name>`. Repeated events
+             *     with the same `name` + `id` REPLACE the prior data on the
+             *     client. Used for artifacts (name="artifact"), progress
+             *     (name="progress"), and any future custom UI part.
+             */
+            data?: components["schemas"]["v1DataPart"];
         };
         /** @description The IP addresses of callers that are allowed to use the key. */
         v1ServerKeyRestrictions: {
@@ -5884,6 +5929,19 @@ export interface components {
              *     with this key.
              */
             allowedIps?: string[];
+        };
+        v1SourceDocument: {
+            sourceId?: string;
+            mediaType?: string;
+            title?: string;
+            filename?: string;
+            providerMetadata?: Record<string, never>;
+        };
+        v1SourceUrl: {
+            sourceId?: string;
+            url?: string;
+            title?: string;
+            providerMetadata?: Record<string, never>;
         };
         /**
          * @description A space is a high-level Pivox entity. It is a
@@ -6063,6 +6121,19 @@ export interface components {
              */
             readonly etag?: string;
         };
+        v1Start: {
+            /**
+             * @description The server-assigned ID for the assistant message produced by
+             *     this turn. The SSE client (Vercel useChat) keys the assistant
+             *     message off this; subsequent text/reasoning chunks reference
+             *     it via their own `id` field.
+             */
+            messageId?: string;
+            /** @description Optional. Initial metadata for the assistant message. */
+            messageMetadata?: Record<string, never>;
+        };
+        /** @description Marker — emitted before each model call in a multi-step turn. */
+        v1StartStep: Record<string, never>;
         /** @description StaticData provides hardcoded data points for a widget. */
         v1StaticData: {
             /** @description Optional. The data points. */
@@ -6172,11 +6243,6 @@ export interface components {
          * @enum {string}
          */
         v1StorageGatewayState: "STATE_UNSPECIFIED" | "PROVISIONING" | "ACTIVE" | "DEGRADED" | "OFFLINE";
-        /** @description A stream-level error. */
-        v1StreamError: {
-            /** @description The error details. */
-            status?: components["schemas"]["rpcStatus"];
-        };
         /**
          * @description A TagBinding represents a connection between a TagValue and a
          *     resource. Once a TagBinding is created, the TagValue is applied to all the
@@ -6319,22 +6385,36 @@ export interface components {
              */
             permissions?: string[];
         };
-        /** @description A chunk of assistant text. */
         v1TextDelta: {
-            /** @description The text content of this chunk. */
+            /** @description Block ID matching the corresponding TextStart. */
+            id?: string;
+            /** @description The incremental text content for this delta. */
             delta?: string;
+            /** @description Optional. Provider-specific metadata. */
+            providerMetadata?: Record<string, never>;
         };
-        /** @description Signals the end of the assistant text response. */
-        v1TextEnd: Record<string, never>;
+        v1TextEnd: {
+            /** @description Block ID matching the corresponding TextStart. */
+            id?: string;
+            /** @description Optional. Provider-specific metadata. */
+            providerMetadata?: Record<string, never>;
+        };
         /** @description A text part of a message. */
         v1TextPart: {
             /** @description Output only. The text content. */
             readonly text?: string;
         };
-        /** @description Signals the start of an assistant text response. */
         v1TextStart: {
-            /** @description The message ID being generated. */
-            messageId?: string;
+            /**
+             * @description Block ID. Wire chunk's `id` field; pairs the start/delta/end
+             *     events of the same text block.
+             */
+            id?: string;
+            /**
+             * @description Optional. Provider-specific metadata (e.g. Anthropic prompt
+             *     caching counts, OpenAI reasoning summaries).
+             */
+            providerMetadata?: Record<string, never>;
         };
         /** @description TextWidget displays rich text or markdown content. */
         v1TextWidget: {
@@ -6412,21 +6492,14 @@ export interface components {
              */
             outputTokens?: number;
         };
-        /** @description A tool that requires user approval before execution. */
-        v1ToolApprovalRequested: {
-            /** @description The unique ID of this tool call. */
+        v1ToolApprovalRequest: {
+            /**
+             * @description Approval session ID; the client returns this on
+             *     approve/deny to disambiguate concurrent approvals.
+             */
+            approvalId?: string;
+            /** @description The tool call awaiting approval. */
             toolCallId?: string;
-            /** @description The tool requesting approval. */
-            tool?: string;
-            /** @description The complete JSON-encoded input arguments for review. */
-            inputJson?: string;
-        };
-        /** @description A chunk of tool call input JSON being streamed. */
-        v1ToolCallDelta: {
-            /** @description The tool call ID this delta belongs to. */
-            toolCallId?: string;
-            /** @description A chunk of the JSON input. */
-            delta?: string;
         };
         /** @description A tool call issued by the assistant. */
         v1ToolCallPart: {
@@ -6436,13 +6509,6 @@ export interface components {
             readonly tool?: string;
             /** @description Output only. The JSON-encoded input arguments for the tool. */
             readonly inputJson?: string;
-        };
-        /** @description Signals the start of a tool call. */
-        v1ToolCallStart: {
-            /** @description The unique ID of this tool call. */
-            toolCallId?: string;
-            /** @description The tool being called. */
-            tool?: string;
         };
         /**
          * @description A tool the model may invoke during generation. Schemas are
@@ -6465,30 +6531,100 @@ export interface components {
              */
             inputSchemaJson: string;
         };
-        /** @description A tool execution error. */
-        v1ToolError: {
-            /** @description The tool call ID that errored. */
-            toolCallId?: string;
-            /** @description The error message. */
-            errorMessage?: string;
-        };
-        /** @description The tool call input is fully available and ready for execution. */
         v1ToolInputAvailable: {
-            /** @description The unique ID of this tool call. */
             toolCallId?: string;
-            /** @description The tool to execute. */
-            tool?: string;
-            /** @description The complete JSON-encoded input arguments. */
-            inputJson?: string;
-            /** @description Whether this tool is executed server-side (true) or client-side (false). */
-            serverSide?: boolean;
+            toolName?: string;
+            /**
+             * @description The fully-parsed tool input. Carries the input as structured
+             *     data (not a JSON-encoded string), so consumers don't double-
+             *     parse and `protojson` emits a native JSON object on the wire.
+             */
+            input?: Record<string, never>;
+            providerExecuted?: boolean;
+            dynamic?: boolean;
+            title?: string;
+            providerMetadata?: Record<string, never>;
+            toolMetadata?: Record<string, never>;
         };
-        /** @description A tool execution result from a server-side tool. */
-        v1ToolOutputAvailable: {
-            /** @description The tool call ID this output is for. */
+        v1ToolInputDelta: {
             toolCallId?: string;
-            /** @description The JSON-encoded tool result. */
-            resultJson?: string;
+            /**
+             * @description The raw provider-emitted input text being streamed (typically
+             *     JSON characters that will eventually parse into the full
+             *     `input` carried by `ToolInputAvailable`).
+             */
+            inputTextDelta?: string;
+        };
+        /**
+         * @description Tool input that failed validation (schema mismatch, missing
+         *     required field, etc.). Distinct from `ToolOutputError`, which
+         *     is for execution failures after the input was accepted.
+         */
+        v1ToolInputError: {
+            toolCallId?: string;
+            toolName?: string;
+            input?: Record<string, never>;
+            /** @description Human-readable description of the validation failure. */
+            errorText?: string;
+            providerExecuted?: boolean;
+            dynamic?: boolean;
+            title?: string;
+            providerMetadata?: Record<string, never>;
+            toolMetadata?: Record<string, never>;
+        };
+        v1ToolInputStart: {
+            toolCallId?: string;
+            toolName?: string;
+            /**
+             * @description True when the upstream provider executes this tool itself
+             *     (e.g. Anthropic web search). When true, the client should not
+             *     attempt to run the tool locally.
+             */
+            providerExecuted?: boolean;
+            /**
+             * @description True when the tool was not statically declared in the
+             *     request's `tools` — i.e. provider-suggested at runtime.
+             */
+            dynamic?: boolean;
+            /**
+             * @description Optional. Display title shown to the user while the tool
+             *     input is being streamed.
+             */
+            title?: string;
+            providerMetadata?: Record<string, never>;
+            toolMetadata?: Record<string, never>;
+        };
+        v1ToolOutputAvailable: {
+            toolCallId?: string;
+            /**
+             * @description The tool's result, as structured data. Mirrors
+             *     ToolInputAvailable.input on the output side.
+             */
+            output?: Record<string, never>;
+            providerExecuted?: boolean;
+            dynamic?: boolean;
+            /**
+             * @description True for a partial/in-progress output (the tool will emit a
+             *     subsequent non-preliminary output before the call closes).
+             */
+            preliminary?: boolean;
+            providerMetadata?: Record<string, never>;
+            toolMetadata?: Record<string, never>;
+        };
+        /**
+         * @description The user denied the pending approval request for this tool
+         *     call. Terminal for the call.
+         */
+        v1ToolOutputDenied: {
+            toolCallId?: string;
+        };
+        v1ToolOutputError: {
+            toolCallId?: string;
+            errorText?: string;
+            providerExecuted?: boolean;
+            dynamic?: boolean;
+            providerMetadata?: Record<string, never>;
+            toolMetadata?: Record<string, never>;
         };
         /** @description A tool result produced by executing a tool call. */
         v1ToolResultPart: {
@@ -14744,6 +14880,7 @@ export interface operations {
             header?: never;
             path: {
                 organization: string;
+                user: string;
             };
             cookie?: never;
         };
@@ -14760,6 +14897,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["v1GenerateContentResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    AiChat_StreamGenerateContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                user: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiChatStreamGenerateContentBody"];
+            };
+        };
+        responses: {
+            /** @description A successful response.(streaming responses) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result?: components["schemas"]["v1ServerEvent"];
+                        error?: components["schemas"]["rpcStatus"];
+                    };
                 };
             };
             /** @description An unexpected error response. */
@@ -14795,44 +14971,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["v1QueryDashboardDataResponse"];
-                };
-            };
-            /** @description An unexpected error response. */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["rpcStatus"];
-                };
-            };
-        };
-    };
-    AiChat_StreamGenerateContent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organization: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AiChatStreamGenerateContentBody"];
-            };
-        };
-        responses: {
-            /** @description A successful response.(streaming responses) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        result?: components["schemas"]["v1ServerEvent"];
-                        error?: components["schemas"]["rpcStatus"];
-                    };
                 };
             };
             /** @description An unexpected error response. */
