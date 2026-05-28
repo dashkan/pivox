@@ -14,7 +14,7 @@
 	test-native-ui \
 	web-build web-build-primitives web-build-image-editor web-build-features \
 	web-build-ui web-build-client web-build-storage web-build-start \
-	web-start web-start-preview electron-start
+	web-clean web-start web-start-preview electron-start
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
@@ -364,6 +364,22 @@ web-build-storage:
 
 web-build-start:
 	pnpm run --dir web web:build:start
+
+# Wipes the start app's build/runtime caches that go stale when
+# workspace deps get rebuilt out of order. Symptom is `make dev`
+# reporting `Cannot find module '@pivox/...'` errors from the
+# web-ui watcher even though the symlinks + dist/ files are
+# present — Nitro's cache (.nitro/, .output/) and Vite's optimized-
+# deps cache (node_modules/.vite/) hold dependency-graph snapshots
+# that don't always invalidate when a workspace package
+# republishes. Run this when `make dev` starts complaining about
+# missing modules; retry `make dev` after. Electron isn't wiped
+# here because we haven't seen the same pattern there yet — add
+# its paths if/when it surfaces.
+web-clean:
+	rm -rf web/apps/start/.output \
+	       web/apps/start/node_modules/.vite \
+	       web/apps/start/node_modules/.nitro
 
 # `web-build` is a Make prerequisite on every target that launches a
 # vite dev server, because the start + electron vite configs import
