@@ -8,21 +8,15 @@ gqlgen is a schema-first, code-generation library. Write SDL, run `go generate`,
 # Bootstrap a new project
 go run github.com/99designs/gqlgen init
 
-# Pin the tool in tools.go so go mod keeps it
+# Pin the tool in go.mod for reproducible generation (Go 1.24+)
+go get -tool github.com/99designs/gqlgen@latest
 ```
 
-```go
-//go:build tools
-// +build tools
-
-package tools
-
-import _ "github.com/99designs/gqlgen"
-```
+For Go <1.24 modules, use the legacy `tools.go` blank-import workaround instead.
 
 ```bash
 # Regenerate after every schema change
-go run github.com/99designs/gqlgen generate
+go tool gqlgen generate
 ```
 
 Never hand-edit generated files (`generated.go`, `models_gen.go`) — `generate` overwrites them.
@@ -42,13 +36,13 @@ model:
   package: model
 
 resolver:
-  layout: follow-schema          # one resolvers file per schema file
+  layout: follow-schema # one resolvers file per schema file
   dir: graph
   package: graph
   filename_template: "{name}.resolvers.go"
 
 autobind:
-  - github.com/me/app/internal/domain  # reuse existing structs
+  - github.com/me/app/internal/domain # reuse existing structs
 
 models:
   # ID: graphql.IntID  # legacy only — use opaque string IDs for new schemas
@@ -56,7 +50,7 @@ models:
     model: github.com/me/app/internal/domain.User
     fields:
       posts:
-        resolver: true  # force a custom resolver (required for DataLoader fields)
+        resolver: true # force a custom resolver (required for DataLoader fields)
 
 omit_slice_element_pointers: true
 struct_fields_always_pointers: false
@@ -245,7 +239,10 @@ Schema:
 
 ```graphql
 extend schema
-  @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@external"])
+  @link(
+    url: "https://specs.apollo.dev/federation/v2.3"
+    import: ["@key", "@shareable", "@external"]
+  )
 
 type User @key(fields: "id") {
   id: ID!
