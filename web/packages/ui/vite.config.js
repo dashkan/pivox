@@ -60,6 +60,7 @@ export default mergeConfig(
       './src/theme-switcher.ts',
       './src/sidebar-provider.ts',
       './src/image-editor.ts',
+      './src/chat.ts',
     ],
     srcDir: './src',
   }),

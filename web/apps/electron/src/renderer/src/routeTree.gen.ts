@@ -18,6 +18,7 @@ import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthLinkAccountRouteImport } from './routes/auth/link-account'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
+import { Route as AppChatRouteImport } from './routes/_app/chat'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -63,9 +64,15 @@ const AuthCreateOrgRoute = AuthCreateOrgRouteImport.update({
   path: '/auth/create-org',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppChatRoute = AppChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/chat': typeof AppChatRoute
   '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/auth/verify-email': typeof AuthVerifyEmailRoute
 }
 export interface FileRoutesByTo {
+  '/chat': typeof AppChatRoute
   '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
@@ -87,6 +95,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/_app/chat': typeof AppChatRoute
   '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/chat'
     | '/auth/create-org'
     | '/auth/forgot-password'
     | '/auth/link-account'
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/auth/verify-email'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/chat'
     | '/auth/create-org'
     | '/auth/forgot-password'
     | '/auth/link-account'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/_app/chat'
     | '/auth/create-org'
     | '/auth/forgot-password'
     | '/auth/link-account'
@@ -206,14 +218,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCreateOrgRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/chat': {
+      id: '/_app/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof AppChatRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppChatRoute: typeof AppChatRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppChatRoute: AppChatRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

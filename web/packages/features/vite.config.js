@@ -62,6 +62,7 @@ export default mergeConfig(
       './src/user-profile.ts',
       './src/app-shell.ts',
       './src/image-editor.ts',
+      './src/chat.ts',
     ],
     srcDir: './src',
   }),
