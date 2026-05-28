@@ -479,6 +479,12 @@ importers:
 
   packages/storage:
     devDependencies:
+      '@types/react':
+        specifier: ^19.2.7
+        version: 19.2.15
+      react:
+        specifier: 19.2.6
+        version: 19.2.6
       vite:
         specifier: 8.0.14
         version: 8.0.14(@types/node@25.9.1)(jiti@2.7.0)

@@ -42,6 +42,26 @@ export interface StorageItem<T> {
    */
   readonly maxAge: number;
   /**
+   * Whether writes to this item broadcast to other browsing contexts
+   * (tabs / windows). Defaults to `false` — most items are per-tab
+   * UI state where cross-tab sync is undesired (sidebar collapsed
+   * here ≠ collapsed everywhere). Set to `true` for items where the
+   * user expects synchronized state across all open contexts (e.g.,
+   * theme: changing dark mode in one tab should reflect everywhere).
+   *
+   * Implementation: when `false`, `notifyChange` still updates the
+   * same-tab in-memory cache + fires the same-window pub-sub, but
+   * skips the `BroadcastChannel.postMessage`. Receiving tabs never
+   * hear about the change. When `true`, the broadcast posts and any
+   * tab subscribed via `useStorageValue` re-renders.
+   *
+   * Note: same-tab consistency is NEVER opt-out — within a single
+   * tab, `storage.set` followed by `storage.get` always reflects
+   * the new value, and any `useStorageValue` consumer in the same
+   * tab re-renders. The flag governs CROSS-TAB only.
+   */
+  readonly broadcast: boolean;
+  /**
    * Optional synchronous side effect, invoked by the pre-hydration
    * inline script with the parsed value (or null if absent in both
    * stores). Runs ONCE on app boot, BEFORE any framework mounts and
@@ -84,6 +104,11 @@ export function defineItem<T>(opts: {
   path?: string;
   parse: (raw: string) => T | null;
   maxAge?: number;
+  /**
+   * Opt-in cross-tab sync. Defaults to `false`. See StorageItem.broadcast
+   * for the rationale on why per-tab is the safer default.
+   */
+  broadcast?: boolean;
   onBoot?: (value: T | null) => void;
 }): StorageItem<T> {
   const item: StorageItem<T> = Object.freeze({
@@ -91,6 +116,7 @@ export function defineItem<T>(opts: {
     path: opts.path ?? '/',
     parse: opts.parse,
     maxAge: opts.maxAge ?? DEFAULT_MAX_AGE_SECONDS,
+    broadcast: opts.broadcast ?? false,
     ...(opts.onBoot ? { onBoot: opts.onBoot } : {}),
   });
   registry.set(opts.name, item as StorageItem<unknown>);

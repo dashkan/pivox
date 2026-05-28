@@ -36,6 +36,10 @@ export type Theme = 'light' | 'dark' | 'system';
 export const THEME = defineItem<Theme>({
   name: 'pivox.theme',
   path: '/',
+  // Cross-tab sync ON: theme is the one preference users expect to
+  // mirror everywhere. Toggling dark mode in one tab should darken
+  // every other open tab. Verified live in browser.
+  broadcast: true,
   parse: (v) => (v === 'light' || v === 'dark' || v === 'system' ? v : null),
   // Applies the `dark` class to <html> before the body paints, so
   // dark-mode users don't see a flash of light-mode content. Runs
@@ -103,6 +107,14 @@ export const ACTIVE_ORG = defineItem<string>({
  * Path `/` because the sidebar lives in the `_app` layout that
  * wraps every authed route — the SSR beforeLoad reads it on every
  * navigation, so the cookie has to ride on those requests.
+ *
+ * `broadcast` left at the default `false` — sidebar state is a
+ * per-tab UI preference. Different tabs are different workflows;
+ * toggling the sidebar in one window should not collapse it in
+ * another. State still persists across reloads in the same tab
+ * (cookie is durable) — cookies are origin-shared, so after reload
+ * any tab reads the most recent write, but within a tab's session
+ * the user's last toggle stays put.
  *
  * Value type is `boolean` — serialized as 'true' / 'false' via
  * `String(value)` on write. parse accepts the same shape on read.

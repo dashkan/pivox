@@ -1,8 +1,9 @@
 'use client';
 
 import { SidebarProvider as ShadcnSidebarProvider } from '@pivox/primitives/sidebar';
-import { SIDEBAR_OPEN, storage, subscribeToChanges } from '@pivox/storage';
-import { useEffect, useState, type ComponentProps } from 'react';
+import { SIDEBAR_OPEN, storage } from '@pivox/storage';
+import { useStorageValue } from '@pivox/storage/react';
+import { type ComponentProps } from 'react';
 
 // Shadcn doesn't export a props type for SidebarProvider — derive
 // it via ComponentProps so additions in upstream stay covered.
@@ -22,8 +23,15 @@ type ShadcnSidebarProviderProps = ComponentProps<typeof ShadcnSidebarProvider>;
  *     write at line 83 of `sidebar.tsx` does NOT persist on file://,
  *     so without this wrapper electron's sidebar would reset to
  *     `defaultOpen={true}` on every cold launch.
- *   - Cross-tab / cross-window sync via the BroadcastChannel surface
- *     in `@pivox/storage`'s `notify.ts` — same shape as ThemeSwitcher.
+ *
+ * # Per-tab semantics, not cross-tab
+ *
+ * `SIDEBAR_OPEN` ships with `broadcast: false`. Different tabs are
+ * different workflows; toggling the sidebar in one window does NOT
+ * collapse it in another open window. Reload-in-same-tab still
+ * picks up the latest persisted value (cookies are origin-shared,
+ * so the cookie reflects whatever was last written by any tab — but
+ * within a single tab's session, the user's last toggle stays put).
  *
  * # Why a wrapper instead of modifying shadcn
  *
@@ -47,13 +55,14 @@ export type SidebarProviderProps = Omit<
 > & {
   /**
    * SSR-resolved initial value from the `pivox.sidebar-state` cookie.
-   * Threaded by the route's beforeLoad so the lazy useState
-   * initializer matches the server-rendered HTML exactly — no
-   * hydration mismatch on the first paint.
+   * Threaded by the route's beforeLoad so the hook's server snapshot
+   * matches the client snapshot — no hydration mismatch on the
+   * first paint.
    *
-   * Optional. When omitted (electron, pure CSR), the wrapper falls
-   * back to a client-side `storage.get(SIDEBAR_OPEN)` and finally to
-   * shadcn's default of `true`.
+   * Optional. When omitted (electron, pure CSR), the hook's client
+   * snapshot falls back to `storage.get(SIDEBAR_OPEN)`; if that's
+   * null (first launch, no persisted state), we use shadcn's
+   * default of `true`.
    */
   initialOpen?: boolean;
 };
@@ -63,39 +72,21 @@ export function SidebarProvider({
   children,
   ...rest
 }: SidebarProviderProps) {
-  // Lazy initializer mirrors useAppShell's `initialActiveOrganization`
-  // pattern: prefer the SSR-seeded value (matches server HTML exactly),
-  // then fall through to client-side storage, then to the shadcn
-  // default (`true`).
-  //
-  // The order matters on start: SSR passes initialOpen, and the
-  // client's first render MUST use that same value to avoid a
-  // hydration mismatch. `storage.get` on the client would read the
-  // same cookie, but going through the cached @pivox/storage layer
-  // means we trust the value from the same source on both sides.
-  const [open, setOpenState] = useState<boolean>(() => {
-    if (initialOpen !== undefined) return initialOpen;
-    if (typeof window === 'undefined') return true;
-    return storage.get(SIDEBAR_OPEN) ?? true;
-  });
-
-  // Cross-context subscription. BroadcastChannel delivers to OTHER
-  // tabs/windows; the cache inside @pivox/storage is already updated
-  // by the time this handler fires (see notify.ts). storage.get
-  // returns the freshly-broadcast value, NOT the stale cookie.
-  useEffect(() => {
-    const unsubscribe = subscribeToChanges(SIDEBAR_OPEN.name, () => {
-      const fresh = storage.get(SIDEBAR_OPEN);
-      if (fresh !== null) setOpenState(fresh);
-    });
-    return unsubscribe;
-  }, []);
+  // useStorageValue centralizes the read + same-window pub-sub +
+  // (conditional) cross-tab broadcast subscription. Since
+  // SIDEBAR_OPEN has `broadcast: false`, no BroadcastChannel
+  // subscriber is attached — only same-window pub-sub fires, so
+  // toggling in this tab updates this tab's UI but does NOT touch
+  // other tabs' sidebar state. Per-tab semantics by design.
+  const stored = useStorageValue(SIDEBAR_OPEN, initialOpen);
+  // Null means "not yet persisted" — first session in this tab/
+  // browser. Default to open (shadcn's default).
+  const open = stored ?? true;
 
   const handleOpenChange = (next: boolean) => {
-    setOpenState(next);
-    // storage.set: writes to the cookie (start) or localStorage
-    // (electron), primes the local cache, AND posts a broadcast for
-    // other tabs/windows. See @pivox/storage/operations.ts.
+    // storage.set fires the same-window pub-sub → useStorageValue
+    // re-reads → React re-renders with the new value. No manual
+    // setState needed.
     storage.set(SIDEBAR_OPEN, next);
   };
 

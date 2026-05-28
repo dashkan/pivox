@@ -2,19 +2,11 @@
 
 import { Button } from '@pivox/primitives/button';
 import { cn } from '@pivox/primitives/utils';
-import { storage, subscribeToChanges, THEME, type Theme } from '@pivox/storage';
-import { useEffect, useSyncExternalStore } from 'react';
-
-// Custom in-tab event so same-window theme writes notify subscribers
-// in the SAME window — BroadcastChannel only delivers to OTHER
-// browsing contexts, never to the poster.
-const THEME_EVENT = 'pivox-theme-change';
+import { storage, THEME, type Theme } from '@pivox/storage';
+import { useStorageValue } from '@pivox/storage/react';
+import { useEffect } from 'react';
 
 const themes: Array<Theme> = ['light', 'system', 'dark'];
-
-function getStoredTheme(): Theme {
-  return storage.get(THEME) ?? 'system';
-}
 
 function getSystemPreference(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -27,37 +19,6 @@ function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle('dark', resolved === 'dark');
 }
 
-function subscribeToTheme(onStoreChange: () => void) {
-  // Three subscription paths, each covering a different update channel:
-  //
-  //   - `BroadcastChannel` (via `subscribeToChanges`): fires when
-  //     ANOTHER browsing context (tab, window) writes the THEME item.
-  //     Works on BOTH backends — cookies have no native change-event
-  //     surface, so this is the only cross-tab signal on the start
-  //     app. On electron it covers cross-window changes the same way
-  //     the native `storage` event would, but uniformly.
-  //
-  //   - `storage` event: fires when ANOTHER window writes
-  //     localStorage. Redundant with BroadcastChannel on electron (we
-  //     get both for the same write), but the listener is cheap and
-  //     gives us a fallback if BroadcastChannel is ever blocked by a
-  //     future CSP / sandbox change. Dead on the start app (cookie
-  //     backend never writes localStorage).
-  //
-  //   - `THEME_EVENT` (custom): fires for SAME-window writes so the
-  //     icon updates instantly when the user clicks the switcher.
-  //     Required because neither BroadcastChannel nor `storage` events
-  //     deliver to the writer's own window.
-  const unsubscribeBroadcast = subscribeToChanges(THEME.name, onStoreChange);
-  window.addEventListener('storage', onStoreChange);
-  window.addEventListener(THEME_EVENT, onStoreChange);
-  return () => {
-    unsubscribeBroadcast();
-    window.removeEventListener('storage', onStoreChange);
-    window.removeEventListener(THEME_EVENT, onStoreChange);
-  };
-}
-
 export function ThemeSwitcher({
   className,
   initialTheme,
@@ -65,9 +26,9 @@ export function ThemeSwitcher({
   className?: string;
   /**
    * SSR-resolved theme from the `pivox.theme` cookie. Threaded by
-   * the route so useSyncExternalStore's server snapshot returns the
-   * user's actual preference, not the default `'system'` — without
-   * this the icon would flicker from `system` to the saved value on
+   * the route so the hook's server snapshot returns the user's
+   * actual preference, not the default `'system'` — without this
+   * the icon would flicker from `system` to the saved value on
    * hydration.
    *
    * Optional because non-SSR consumers (electron) don't supply one;
@@ -75,15 +36,14 @@ export function ThemeSwitcher({
    */
   initialTheme?: Theme;
 }) {
-  // useSyncExternalStore avoids both the SSR hydration mismatch AND the
-  // setState-in-effect cascade the manual useEffect dance triggers.
-  // The server snapshot returns the SSR-resolved cookie value so
-  // first-paint HTML matches what the client will render on hydration.
-  const theme = useSyncExternalStore<Theme>(
-    subscribeToTheme,
-    getStoredTheme,
-    () => initialTheme ?? 'system',
-  );
+  // useStorageValue handles three notification channels internally:
+  //   - same-window pub-sub (so the icon updates on this tab's own click)
+  //   - BroadcastChannel (so OTHER tabs sync — THEME has `broadcast: true`)
+  //   - native `storage` event (electron multi-window localStorage backend)
+  // No custom event, no useSyncExternalStore boilerplate. The SSR
+  // server snapshot uses `initialTheme` so the first paint matches
+  // server-rendered HTML.
+  const theme = useStorageValue(THEME, initialTheme) ?? 'system';
 
   // Apply theme to the document whenever it changes.
   useEffect(() => {
@@ -94,7 +54,7 @@ export function ThemeSwitcher({
   useEffect(() => {
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = () => {
-      if (getStoredTheme() === 'system') applyTheme('system');
+      if ((storage.get(THEME) ?? 'system') === 'system') applyTheme('system');
     };
     mql.addEventListener('change', handler);
     return () => {
@@ -104,9 +64,9 @@ export function ThemeSwitcher({
 
   const setTheme = (next: Theme) => {
     storage.set(THEME, next);
-    // No cookie-change event fires for same-tab writes — notify our own
-    // subscribers via a synthetic event so useSyncExternalStore picks it up.
-    window.dispatchEvent(new Event(THEME_EVENT));
+    // No custom event needed — storage.set fires the same-window pub-sub
+    // inside @pivox/storage's notify.ts, which wakes useStorageValue
+    // in this tab.
   };
 
   const cycle = () => {

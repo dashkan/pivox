@@ -224,15 +224,11 @@ export function set<T>(item: StorageItem<T>, value: T): void {
   } else {
     writeLocalStorageRaw(item.name, raw);
   }
-  // Cross-context notification + same-tab cache prime. The cookie /
-  // localStorage write may not be immediately reflected in
-  // `document.cookie` / `localStorage.getItem` (cross-process
-  // propagation, especially under Chrome site isolation), so
-  // notifyChange writes the raw value into the in-memory cache that
-  // readCookieRaw / readLocalStorageRaw check first. The broadcast
-  // carries the same value so receiving tabs prime their caches too
-  // and avoid the race.
-  notifyChange(item.name, raw);
+  // Same-tab cache prime + same-window pub-sub + (optional) cross-tab
+  // broadcast. The item's `broadcast` flag governs only the cross-tab
+  // post — same-tab consistency (cache, pub-sub) always fires so
+  // consumers in this tab re-render.
+  notifyChange(item.name, raw, item.broadcast);
 }
 
 /**
@@ -245,11 +241,10 @@ export function clear<T>(item: StorageItem<T>): void {
   } else {
     clearLocalStorageRaw(item.name);
   }
-  // null payload signals a clear — both same-tab cache and receiving
-  // tabs' caches store null (not "absent"), so subsequent get()
-  // returns null without consulting the cookie (which may still
-  // hold the stale value mid-deletion-propagation).
-  notifyChange(item.name, null);
+  // null payload signals a clear — same-tab cache stores null
+  // (not "absent"), so subsequent get() returns null without
+  // consulting the cookie. Cross-tab broadcast follows item.broadcast.
+  notifyChange(item.name, null, item.broadcast);
 }
 
 /**

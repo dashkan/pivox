@@ -24,7 +24,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clear, defineItem, get, set } from '../src';
-import { notifyChange, subscribeToChanges } from '../src/notify';
+import {
+  notifyChange,
+  subscribeLocal,
+  subscribeToChanges,
+} from '../src/notify';
 import {
   __resetChannelForTests,
   __resetRegistryForTests,
@@ -54,7 +58,7 @@ describe('notifyChange + subscribeToChanges', () => {
       },
     );
 
-    notifyChange('pivox.test.item', 'fresh');
+    notifyChange('pivox.test.item', 'fresh', true);
 
     // BroadcastChannel delivery is microtask-async; await a tick so
     // the message lands before assertion.
@@ -98,7 +102,7 @@ describe('notifyChange + subscribeToChanges', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('set() emits a notification carrying the new value', async () => {
+  it('set() on a broadcast:true item emits a notification carrying the new value', async () => {
     const received: Array<{ name: string; value: string | null }> = [];
     otherTab.addEventListener(
       'message',
@@ -109,6 +113,7 @@ describe('notifyChange + subscribeToChanges', () => {
 
     const item = defineItem<string>({
       name: 'pivox.test.set-notify',
+      broadcast: true,
       parse: (v) => v || null,
     });
     set(item, 'hi');
@@ -117,7 +122,29 @@ describe('notifyChange + subscribeToChanges', () => {
     expect(received).toEqual([{ name: 'pivox.test.set-notify', value: 'hi' }]);
   });
 
-  it('clear() emits a notification with value=null', async () => {
+  it('set() on a broadcast:false item does NOT post to BroadcastChannel', async () => {
+    const received: Array<{ name: string; value: string | null }> = [];
+    otherTab.addEventListener(
+      'message',
+      (ev: MessageEvent<{ name: string; value: string | null }>) => {
+        received.push(ev.data);
+      },
+    );
+
+    // Default (broadcast omitted) = false — no opt-in for cross-tab.
+    const item = defineItem<string>({
+      name: 'pivox.test.no-broadcast',
+      parse: (v) => v || null,
+    });
+    set(item, 'hi');
+    await new Promise((r) => setTimeout(r, 0));
+
+    // BroadcastChannel got nothing because notifyChange skipped the
+    // post for a non-broadcasting item.
+    expect(received).toEqual([]);
+  });
+
+  it('clear() on a broadcast:true item emits a notification with value=null', async () => {
     const received: Array<{ name: string; value: string | null }> = [];
     otherTab.addEventListener(
       'message',
@@ -128,6 +155,7 @@ describe('notifyChange + subscribeToChanges', () => {
 
     const item = defineItem<string>({
       name: 'pivox.test.clear-notify',
+      broadcast: true,
       parse: (v) => v || null,
     });
     clear(item);
@@ -145,11 +173,121 @@ describe('notifyChange + subscribeToChanges', () => {
     // notifyChange posts on the SINGLETON; the singleton is what
     // subscribeToChanges listens on. BroadcastChannel never delivers
     // to the same instance — so the handler must not fire.
-    notifyChange('pivox.test.self', 'any');
+    notifyChange('pivox.test.self', 'any', true);
     await new Promise((r) => setTimeout(r, 0));
 
     expect(handler).not.toHaveBeenCalled();
     unsubscribe();
+  });
+
+  // -------------------------------------------------------------
+  // Same-window pub-sub (subscribeLocal) — fires on EVERY local
+  // write regardless of the item's broadcast flag. This is the
+  // channel useStorageValue uses for same-tab consistency.
+  // -------------------------------------------------------------
+
+  it('subscribeLocal fires when storage.set() is called in the same tab', () => {
+    const events: string[] = [];
+    const unsubscribe = subscribeLocal((name) => {
+      events.push(name);
+    });
+
+    const item = defineItem<string>({
+      name: 'pivox.test.local-set',
+      // broadcast: false (default) — proves the same-window pub-sub
+      // fires INDEPENDENT of the cross-tab flag.
+      parse: (v) => v || null,
+    });
+    set(item, 'value');
+    // Same-window pub-sub is synchronous; no need to await.
+
+    expect(events).toEqual(['pivox.test.local-set']);
+    unsubscribe();
+  });
+
+  it('subscribeLocal fires for broadcast:true items too', () => {
+    const events: string[] = [];
+    const unsubscribe = subscribeLocal((name) => {
+      events.push(name);
+    });
+
+    const item = defineItem<string>({
+      name: 'pivox.test.local-broadcast',
+      broadcast: true,
+      parse: (v) => v || null,
+    });
+    set(item, 'value');
+
+    // Same-window pub-sub is always on — broadcast flag governs
+    // cross-tab only, not same-tab.
+    expect(events).toEqual(['pivox.test.local-broadcast']);
+    unsubscribe();
+  });
+
+  it('subscribeLocal fires on clear() too', () => {
+    const events: string[] = [];
+    const unsubscribe = subscribeLocal((name) => {
+      events.push(name);
+    });
+
+    const item = defineItem<string>({
+      name: 'pivox.test.local-clear',
+      parse: (v) => v || null,
+    });
+    set(item, 'value');
+    clear(item);
+
+    expect(events).toEqual([
+      'pivox.test.local-clear',
+      'pivox.test.local-clear',
+    ]);
+    unsubscribe();
+  });
+
+  it('subscribeLocal unsubscribe detaches the listener', () => {
+    const events: string[] = [];
+    const unsubscribe = subscribeLocal((name) => {
+      events.push(name);
+    });
+    unsubscribe();
+
+    const item = defineItem<string>({
+      name: 'pivox.test.local-unsub',
+      parse: (v) => v || null,
+    });
+    set(item, 'value');
+
+    expect(events).toEqual([]);
+  });
+
+  it('subscribeLocal listeners are isolated from each other (a throwing one does not stop the rest)', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const events: string[] = [];
+
+    const unsubThrower = subscribeLocal(() => {
+      throw new Error('boom');
+    });
+    const unsubLater = subscribeLocal((name) => {
+      events.push(name);
+    });
+
+    const item = defineItem<string>({
+      name: 'pivox.test.local-isolated',
+      parse: (v) => v || null,
+    });
+    try {
+      set(item, 'value');
+    } finally {
+       
+      errSpy.mockRestore();
+    }
+
+    // Even though the first listener threw, the second still got
+    // the event. notify.ts iterates a snapshot + per-listener
+    // try/catch.
+    expect(events).toEqual(['pivox.test.local-isolated']);
+    unsubThrower();
+    unsubLater();
   });
 
   /**

@@ -107,6 +107,56 @@ type ChangePayload = {
 const valueCache = new Map<string, string | null>();
 
 /**
+ * Same-window listeners — fires on EVERY local write regardless of
+ * the item's `broadcast` flag.
+ *
+ * Same-tab consistency is non-negotiable: a React component that calls
+ * `storage.set(item, value)` must re-render with the new value on the
+ * next tick. The cross-tab `broadcast` flag is a separate concern (it
+ * controls whether OTHER tabs see the change); within this tab, every
+ * subscriber sees every write.
+ *
+ * BroadcastChannel doesn't deliver to the posting context, and the
+ * native `storage` event only fires for cross-window writes — so
+ * without this pub-sub, every consumer would need a custom in-tab
+ * notification (e.g., `THEME_EVENT` in the old theme-switcher code).
+ * Centralizing here removes that boilerplate at every call site.
+ */
+const localListeners = new Set<(name: string) => void>();
+
+/**
+ * Subscribe to same-window writes. Handler receives the name of the
+ * item that changed. Returns an unsubscribe function.
+ *
+ * Primary consumer is `useStorageValue` in `react.ts` — every hook
+ * registers one listener and filters by item name.
+ */
+export function subscribeLocal(handler: (name: string) => void): () => void {
+  localListeners.add(handler);
+  return () => {
+    localListeners.delete(handler);
+  };
+}
+
+function fireLocal(name: string): void {
+  // Snapshot the set so a handler that mutates the set during
+  // iteration (e.g., unsubscribes itself) doesn't skip later
+  // handlers or trip the Set's "modified during iteration" semantics.
+  for (const listener of [...localListeners]) {
+    try {
+      listener(name);
+    } catch (err) {
+      // A throwing listener must not stop the others. Log with the
+      // item name so the offending consumer is identifiable.
+      console.error(
+        `[@pivox/storage] same-window listener threw for '${name}':`,
+        err,
+      );
+    }
+  }
+}
+
+/**
  * Returns the cache entry for `name`. Distinguishes three states:
  *   - `undefined` — not in cache; caller should fall through to the
  *     durable backend.
@@ -172,25 +222,38 @@ function writeCache(name: string, value: string | null): void {
 }
 
 /**
- * Notify other browsing contexts that `name`'s value changed AND
- * prime this tab's cache so same-tab readers see the new value
- * immediately (without re-reading the cookie). Called from `set()`
- * and `clear()` after the underlying write completes.
+ * Notify subscribers that `name`'s value changed:
+ *   1. Update the in-tab cache so same-tab reads see the new value
+ *      without re-reading the cookie / localStorage.
+ *   2. Fire the same-window pub-sub so consumers in THIS tab (e.g.,
+ *      `useStorageValue` hooks) re-render.
+ *   3. Post to BroadcastChannel IF `broadcast` is true — receiving
+ *      tabs see the change via their own subscribers.
+ *
+ * `broadcast` mirrors `StorageItem.broadcast`. When false, the
+ * BroadcastChannel post is skipped entirely; same-tab consistency
+ * (steps 1 + 2) is unaffected because that's a separate guarantee
+ * that consumers in this tab MUST get regardless of cross-tab opt-in.
  *
  * `value` is the new raw value (the same string that was written to
  * the cookie / localStorage), or `null` for a clear. Carried in the
- * broadcast payload so receiving tabs can populate their own caches
- * without the cross-process cookie-propagation race.
- *
- * Silently no-ops the broadcast portion when BroadcastChannel is
- * unavailable, but the local cache write still happens.
+ * broadcast payload so receiving tabs prime their own caches without
+ * the cross-process cookie-propagation race.
  */
-export function notifyChange(name: string, value: string | null): void {
-  // Always update the local cache, even when broadcast is
-  // unavailable. The cache is the read-side accelerator for THIS
-  // tab too — operations.ts relies on it to make same-tab reads
-  // consistent with the most recent write.
+export function notifyChange(
+  name: string,
+  value: string | null,
+  broadcast: boolean,
+): void {
+  // Always: update the local cache. The cache is the read-side
+  // accelerator for THIS tab — operations.ts relies on it to make
+  // same-tab reads consistent with the most recent write.
   writeCache(name, value);
+  // Always: fire same-window pub-sub. Consumers in this tab (the one
+  // that just wrote) need to re-render; broadcast doesn't gate that.
+  fireLocal(name);
+  // Optional: cross-tab broadcast.
+  if (!broadcast) return;
   const ch = getChannel();
   if (!ch) return;
   try {
@@ -251,4 +314,5 @@ export function __resetChannelForTests(): void {
   }
   channel = undefined;
   valueCache.clear();
+  localListeners.clear();
 }

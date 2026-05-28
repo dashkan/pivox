@@ -41,10 +41,16 @@ const config = defineConfig({
 export default mergeConfig(
   config,
   pivoxViteConfig({
-    // Two entries: the public root API + a `test-utils` subpath that
-    // mounts `__resetRegistryForTests` outside the production bundle
-    // surface. Matches the `exports` map in package.json.
-    entry: ['./src/index.ts', './src/test-utils.ts'],
+    // Three entries:
+    //   - root API (`@pivox/storage`)
+    //   - React hooks (`@pivox/storage/react`) — kept off the root
+    //     so non-React consumers (SSR `prefs.ts`) don't pull React
+    //     transitively
+    //   - test-utils (`@pivox/storage/test-utils`) — keeps
+    //     `__resetRegistryForTests` / `__resetChannelForTests`
+    //     out of the production bundle surface
+    // Matches the `exports` map in package.json.
+    entry: ['./src/index.ts', './src/react.ts', './src/test-utils.ts'],
     srcDir: './src',
   }),
 );

@@ -15,6 +15,10 @@
       "types": "./dist/esm/index.d.ts",
       "import": "./dist/esm/index.js"
     },
+    "./react": {
+      "types": "./dist/esm/react.d.ts",
+      "import": "./dist/esm/react.js"
+    },
     "./test-utils": {
       "types": "./dist/esm/test-utils.d.ts",
       "import": "./dist/esm/test-utils.js"
@@ -32,7 +36,13 @@
     "test:lib:dev": "pnpm test:lib --watch",
     "test:types": "tsc"
   },
+  "peerDependencies": {
+    "@types/react": "19.2.15",
+    "react": "19.2.6"
+  },
   "devDependencies": {
+    "@types/react": "19.2.15",
+    "react": "19.2.6",
     "vite": "8.0.14"
   }
 }
