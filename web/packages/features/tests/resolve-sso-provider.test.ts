@@ -37,18 +37,38 @@ describe('resolveSsoProvider', () => {
     );
   });
 
-  it('returns null on a 404 (no SSO configured for the domain)', async () => {
-    vi.stubGlobal('fetch', mockFetch(404));
+  it('returns null when a 200 response has an empty body (no SSO for the domain)', async () => {
+    // The server returns 200 + `{}` for the no-provider case
+    // (response shape uniformity across "unknown domain",
+    // "unverified domain", "SsoConfig disabled" — see backend
+    // resolveProvider doc comment).
+    vi.stubGlobal('fetch', mockFetch(200, {}));
     expect(
       await resolveSsoProvider('user@nowhere.com', 'https://pivox.test'),
     ).toBeNull();
   });
 
-  it('returns null when a 200 response carries no provider id', async () => {
-    vi.stubGlobal('fetch', mockFetch(200, {}));
+  it('returns null when a 200 response omits provider_id explicitly', async () => {
+    // Belt-and-suspenders: any 200 without provider_id resolves to
+    // null. Covers a hypothetical future server shape that sends
+    // `{provider_id: ""}` or other absent-equivalent.
+    vi.stubGlobal('fetch', mockFetch(200, { other_field: 'noise' }));
     expect(
       await resolveSsoProvider('user@acme.com', 'https://pivox.test'),
     ).toBeNull();
+  });
+
+  it('throws on a 404 (treated as a real server error now)', async () => {
+    // Post-change: 404 is NOT the no-SSO signal anymore — the no-SSO
+    // signal is 200 + `{}`. A 404 means the endpoint genuinely
+    // wasn't found (server misconfiguration, ngrok tunnel down,
+    // wrong path). Surface it as an error so the caller can show
+    // "couldn't reach the sign-in service" rather than silently
+    // falling through to password.
+    vi.stubGlobal('fetch', mockFetch(404));
+    await expect(
+      resolveSsoProvider('user@nowhere.com', 'https://pivox.test'),
+    ).rejects.toThrow();
   });
 
   it('throws on a server error', async () => {

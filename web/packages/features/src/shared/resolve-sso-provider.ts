@@ -4,13 +4,15 @@
  * sign-in flow.
  *
  * Returns the Firebase OIDC provider id (e.g. `oidc.acme`) when the
- * domain has a verified, enabled SsoConfig, or `null` when it does not.
- * The broker collapses {domain unknown, domain unverified, SsoConfig
- * disabled} into a single 404 (anti-enumeration), so `null` here simply
- * means "no SSO for this domain — fall back to password".
+ * domain has a verified, enabled SsoConfig, or `null` when it does
+ * not. The broker collapses {domain unknown, domain unverified,
+ * SsoConfig disabled} into a single 200 response with an empty body
+ * (anti-enumeration via response-shape uniformity), so `null` here
+ * simply means "no SSO for this domain — fall back to password".
  *
- * Any other outcome — a non-404 error status, a non-JSON body, or a
- * `fetch` network failure — rejects; the caller decides retry/fallback.
+ * Any error response (non-200) — including 404, which previously
+ * carried the "no SSO" semantics but now signals a genuine missing
+ * endpoint — rejects; the caller decides retry/fallback.
  *
  * `baseUrl` is the Cloud Controller origin: same-origin (often empty)
  * for the web app, the absolute origin for Electron.
@@ -26,9 +28,6 @@ export async function resolveSsoProvider(
     body: JSON.stringify({ email }),
   });
 
-  if (response.status === 404) {
-    return null;
-  }
   if (!response.ok) {
     throw new Error(`resolveProvider failed with status ${response.status}`);
   }

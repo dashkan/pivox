@@ -43,7 +43,8 @@ abuse defenses live in:
 - Auth on every endpoint that can be authenticated
 - Response-shape uniformity on pre-auth endpoints (e.g.,
   `:resolveProvider` collapses "domain not configured", "domain not
-  verified", and "SsoConfig disabled" into the same 404)
+  verified", and "SsoConfig disabled" into the same `200 + {}`
+  response — empty body is indistinguishable across all three causes)
 - The HMAC-signed OAuth state token + (pending) PKCE on the broker
 
 If pivox-cloud is ever deployed without an edge proxy (small

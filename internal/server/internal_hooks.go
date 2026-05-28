@@ -444,39 +444,53 @@ func (h *InternalHooks) pollDelegatedAuthSession(w http.ResponseWriter, r *http.
 }
 
 // resolveProviderRequest is the payload for
-// POST /internal/v1/auth:resolveProvider. The Firebase pre-sign-in
-// hook calls this with the user's email to look up the right
-// SAML/OIDC provider id.
+// POST /internal/v1/auth:resolveProvider. Called by the start app's
+// login flow (web/packages/features/src/shared/resolve-sso-provider.ts)
+// before completing a sign-in, to decide whether to drive the SSO
+// broker handshake or fall back to password.
 type resolveProviderRequest struct {
 	Email string `json:"email"`
 }
 
 type resolveProviderResponse struct {
 	// ProviderID is the firebase_provider_id of the SsoConfig that
-	// matches the email's domain. Empty when no provider applies
-	// (response is 404 in that case).
-	ProviderID string `json:"provider_id"`
+	// matches the email's domain. Omitted from the JSON response
+	// when no provider applies — `omitempty` collapses the empty
+	// string to "field absent," which the client interprets as
+	// "no SSO for this domain, fall back to password."
+	ProviderID string `json:"provider_id,omitempty"`
 }
 
 // resolveProvider maps an email's domain → verified Domain row →
-// enabled SsoConfig → firebase_provider_id. The Firebase
-// pre-sign-in blocking function calls this synchronously before
-// completing a federated sign-in; a NOT_FOUND tells Firebase to
-// fall back to password (or whatever else the project allows).
+// enabled SsoConfig → firebase_provider_id.
 //
 // Returns:
 //
 //	200 + JSON `{provider_id: "oidc.<slug>"}` when a match exists.
-//	404 when the email's domain isn't claimed, isn't verified, or
-//	    its SsoConfig is disabled. The error body is intentionally
-//	    generic — we don't disclose whether the domain is unknown
-//	    vs. unconfigured to avoid enumeration attacks.
+//	200 + JSON `{}` (empty body via `omitempty`) when the email's
+//	    domain isn't claimed, isn't verified, or its SsoConfig is
+//	    disabled. The body shape is intentionally indistinguishable
+//	    across those three cases — we don't disclose which cause
+//	    triggered the no-provider response, to avoid enumeration.
 //	400 on malformed input (missing/invalid email).
 //
-// Authentication: this endpoint is called by Firebase blocking
-// functions over an internal channel. Same auth posture as the
-// other internal hooks (rate-limited; in production guarded by the
-// reverse proxy / VPC).
+// # Why 200 instead of 404 for the no-provider case
+//
+// `:resolveProvider` is an RPC, not a REST resource lookup. The
+// "no SSO configured for this domain" outcome is a normal data
+// response on the success path — every email without SSO hits it.
+// Returning 404 polluted the client's network tab and console with
+// what looked like error traffic for what is the happy fallback
+// path, and forced callers to wrap fetch in try/catch / status
+// checks. Anti-enumeration is preserved by the identical body
+// shape across all "no match" causes.
+//
+// # Authentication
+//
+// Unauthenticated by design — called pre-sign-in to determine
+// auth path. Anti-enumeration via response-shape uniformity is
+// the defense (no per-IP rate limiting at app level; that's the
+// edge proxy's job — see root CLAUDE.md "Rate limiting").
 func (h *InternalHooks) resolveProvider(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	var req resolveProviderRequest
@@ -490,22 +504,26 @@ func (h *InternalHooks) resolveProvider(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "email is required and must contain a domain", http.StatusBadRequest)
 		return
 	}
+	var resp resolveProviderResponse
 	row, err := h.queries.ResolveProviderByDomain(r.Context(), domain)
 	if err != nil {
 		// pgx.ErrNoRows is the common case (no provider applies):
 		// domain not claimed, not VERIFIED, or SsoConfig disabled.
-		// Generic 404 to avoid enumeration leaks.
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "no provider configured for this domain", http.StatusNotFound)
+		// Return 200 with an empty body — see the func comment for
+		// the rationale on choosing 200 + indistinguishable body
+		// over 404 + indistinguishable body.
+		if !errors.Is(err, pgx.ErrNoRows) {
+			h.logger.Error("resolveProvider: lookup failed", "domain", domain, "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		h.logger.Error("resolveProvider: lookup failed", "domain", domain, "error", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		// resp.ProviderID stays empty; omitempty emits `{}`.
+	} else {
+		resp.ProviderID = row.FirebaseProviderID
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(resolveProviderResponse{ProviderID: row.FirebaseProviderID}); err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		h.logger.Warn("resolveProvider: write response failed", "error", err)
 	}
 }

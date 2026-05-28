@@ -410,7 +410,6 @@ describe('notifyChange + subscribeToChanges', () => {
       otherTab.postMessage(null);
       await new Promise((r) => setTimeout(r, 0));
     } finally {
-       
       errSpy.mockRestore();
     }
 
@@ -431,7 +430,6 @@ describe('notifyChange + subscribeToChanges', () => {
       otherTab.postMessage({ value: 'orphan' });
       await new Promise((r) => setTimeout(r, 0));
     } finally {
-       
       errSpy.mockRestore();
     }
 

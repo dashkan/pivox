@@ -232,7 +232,7 @@ function getChannel(): BroadcastChannel | null {
         data === null ||
         typeof data !== 'object' ||
         !('name' in data) ||
-        typeof (data).name !== 'string'
+        typeof data.name !== 'string'
       ) {
         return;
       }
@@ -330,7 +330,7 @@ export function subscribeToChanges(
       data === null ||
       typeof data !== 'object' ||
       !('name' in data) ||
-      typeof (data).name !== 'string'
+      typeof data.name !== 'string'
     ) {
       return;
     }
