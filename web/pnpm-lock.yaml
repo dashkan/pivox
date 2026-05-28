@@ -163,6 +163,9 @@ importers:
 
   apps/start:
     dependencies:
+      '@fontsource-variable/roboto':
+        specifier: 5.2.10
+        version: 5.2.10
       '@pivox/client':
         specifier: workspace:*
         version: link:../../packages/client

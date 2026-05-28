@@ -1,3 +1,4 @@
+import robotoLatin from '@fontsource-variable/roboto/files/roboto-latin-wght-normal.woff2?url';
 import { AuthProvider } from '@pivox/features/auth';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
 // Importing @pivox/storage at the top of __root.tsx ensures all item
@@ -38,7 +39,16 @@ export const Route = createRootRouteWithContext<{
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'Pivox' },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      {
+        rel: 'preload',
+        href: robotoLatin,
+        as: 'font',
+        type: 'font/woff2',
+        crossorigin: 'anonymous',
+      },
+    ],
   }),
   component: RootComponent,
   shellComponent: RootDocument,

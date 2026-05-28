@@ -15,6 +15,7 @@
     "test:types": "tsc"
   },
   "dependencies": {
+    "@fontsource-variable/roboto": "5.2.10",
     "@pivox/client": "workspace:*",
     "@pivox/features": "workspace:*",
     "@pivox/observability": "workspace:*",
