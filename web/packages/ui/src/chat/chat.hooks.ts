@@ -123,9 +123,16 @@ export function useChatState(opts: UseChatStateOptions): ChatContextValue {
       headers: async () => ({
         Authorization: `Bearer ${await getAuthTokenRef.current()}`,
       }),
+      // When `conversation` is set, the server has the full prior
+      // history in its DB — re-sending it from the client wastes
+      // bandwidth, blows up tokens, and re-opens the "client claims
+      // assistant context" trust hole. Send only the latest message
+      // (the new user turn, or a tool result). On the very first
+      // turn `conversation` is undefined so the full list goes —
+      // which is just the one initial user message anyway.
       prepareSendMessagesRequest: ({ messages }) => ({
         body: {
-          messages,
+          messages: conversation ? messages.slice(-1) : messages,
           conversation,
           systemInstruction,
         },
@@ -133,7 +140,32 @@ export function useChatState(opts: UseChatStateOptions): ChatContextValue {
     });
   }, [baseUrl, parent, conversation, systemInstruction]);
 
-  const runtime = useChatRuntime({ transport });
+  // onFinish captures the server-emitted conversation resource name
+  // on the FIRST turn (where the client supplied no conversation, so
+  // the server auto-created one). After that, subsequent turns route
+  // to the same conversation via `body.conversation` above.
+  //
+  // Latest-ref on conversation so the comparison inside onFinish
+  // always reads the current value — without it, the closure would
+  // capture the initial `conversation` value forever and the guard
+  // would re-set state every turn.
+  const conversationRef = useRef(conversation);
+  useEffect(() => {
+    conversationRef.current = conversation;
+  });
+
+  const runtime = useChatRuntime({
+    transport,
+    onFinish: ({ message }) => {
+      if (conversationRef.current) return;
+      const meta = message.metadata as
+        | { conversation?: string }
+        | undefined;
+      if (meta?.conversation) {
+        setConversation(meta.conversation);
+      }
+    },
+  });
 
   // Stable action identities — useState setters are React-stable
   // already, so this object only re-creates if React itself swaps

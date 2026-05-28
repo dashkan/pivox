@@ -2,6 +2,7 @@ package aichat
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
+	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/aichat/model"
 )
 
@@ -23,10 +25,27 @@ const defaultMaxHistoryRows = 500
 
 // StreamGenerateContent is the server-streaming variant of
 // `GenerateContent`. Same request shape; emits the response as a
-// sequence of `ServerEvent`s. The unary `GenerateContent` below
-// shares the same core via `runGenerate`.
+// sequence of `ServerEvent`s.
+//
+// Stateful by default: if the caller doesn't supply a `conversation`,
+// the server creates one and emits its resource name in the first
+// `Start` chunk's `messageMetadata.conversation`. The client captures
+// the name and threads it through subsequent turns so the server
+// loads history from its own DB instead of trusting client-supplied
+// history. Stateless one-shots (title summarization, intent
+// classification) go through unary GenerateContent instead, which
+// preserves the explicit `conversation`-empty contract.
 func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream grpc.ServerStreamingServer[aiv1.ServerEvent]) error {
 	ctx := stream.Context()
+
+	if req.GetConversation() == "" {
+		convName, err := s.ensureConversationForStream(ctx, req.GetParent())
+		if err != nil {
+			return err
+		}
+		req.Conversation = convName
+	}
+
 	_, _, _, err := s.runGenerate(ctx, req, func(ev *aiv1.ServerEvent) error {
 		return stream.Send(ev)
 	})
@@ -40,6 +59,35 @@ func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream 
 	return stream.Send(&aiv1.ServerEvent{
 		Event: &aiv1.ServerEvent_Finish{Finish: &aiv1.Finish{FinishReason: "stop"}},
 	})
+}
+
+// ensureConversationForStream creates a fresh Conversation row under
+// the caller's user-in-org parent and returns its resource name. The
+// permission interceptor has already gated on `ai.chat.stream` against
+// the parent, so by the time this runs the caller is authorized to
+// create conversations under this user.
+func (s *Server) ensureConversationForStream(ctx context.Context, parent string) (string, error) {
+	orgName, pathUser, err := parseConversationParent(parent)
+	if err != nil {
+		return "", apierr.InvalidArgument(apierr.FieldViolation("parent", err.Error()))
+	}
+	callerUserID := server.MustPivoxUserID(ctx)
+	if pathUser != callerUserID {
+		return "", apierr.PermissionDenied("conversations may only be created under the caller's own user-uuid")
+	}
+	orgID, err := s.resolveOrg(ctx, orgName)
+	if err != nil {
+		return "", err
+	}
+	row, err := s.queries.CreateConversation(ctx, db.CreateConversationParams{
+		OrgID:     orgID,
+		Name:      uuid.New().String()[:12],
+		CreatedBy: callerUserID,
+	})
+	if err != nil {
+		return "", apierr.HandleResourceError(err, "Conversation", "")
+	}
+	return fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, pathUser, row.Name), nil
 }
 
 // GenerateContent is the unary counterpart to `StreamGenerateContent`.
@@ -140,21 +188,31 @@ func (s *Server) runGenerate(
 		// rows the client has no name to retry against. Lock the
 		// conversation row once at the start so concurrent persists
 		// (e.g. another tool round-trip racing this one) queue.
+		// Persist only the LAST inbound message. useChat sends the
+		// entire UI conversation history on every turn (its default
+		// transport behavior); the server already has every turn
+		// before the last via prior calls' persistence. Looping over
+		// all inbound messages here would re-insert duplicates of
+		// the prior turns and explode the conversation by N every
+		// round. Clients that strip the history client-side (the
+		// Pivox transport does this once `conversation` is set) end
+		// up with len(inbound)==1 anyway, so this branch is just
+		// defense in depth.
 		if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 			if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
 				slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
 				return apierr.Internal("lock conversation")
 			}
-			for _, m := range req.GetMessages() {
-				params, err := buildInputMessageParams(conv.ID, m)
-				if err != nil {
-					return err
-				}
-				if err := persistMessageOnQtx(ctx, qtx, conv.ID, params); err != nil {
-					return err
-				}
+			inbound := req.GetMessages()
+			if len(inbound) == 0 {
+				return nil
 			}
-			return nil
+			last := inbound[len(inbound)-1]
+			params, err := buildInputMessageParams(conv.ID, last)
+			if err != nil {
+				return err
+			}
+			return persistMessageOnQtx(ctx, qtx, conv.ID, params)
 		}); err != nil {
 			return nil, nil, "", err
 		}
@@ -187,10 +245,33 @@ func (s *Server) runGenerate(
 		systemPrompt = s.defaultSystemPrompt()
 	}
 
-	// Emit TextStart up front so streaming clients can show a
-	// placeholder bubble immediately, before the first delta lands.
+	// Emit `start` carrying the conversation resource name in
+	// `messageMetadata` so the client can persist the handle for
+	// follow-up turns (and skip re-sending the entire history every
+	// time). Only emitted when stateful; the unary GenerateContent
+	// path passes nil for `emit` so this is naturally skipped for
+	// non-streaming consumers, and stateless one-shots that don't
+	// set up a conv have nothing useful to emit here.
 	assistantMsgID := uuid.New().String()[:12]
 	if emit != nil {
+		startEvent := &aiv1.Start{MessageId: assistantMsgID}
+		if conv != nil {
+			meta, err := structpb.NewStruct(map[string]any{
+				"conversation": fmt.Sprintf(
+					"organizations/%s/users/%s/conversations/%s",
+					orgName, convPathUser, conv.Name,
+				),
+			})
+			if err != nil {
+				return nil, nil, "", apierr.Internal("build start metadata")
+			}
+			startEvent.MessageMetadata = meta
+		}
+		if err := emit(&aiv1.ServerEvent{
+			Event: &aiv1.ServerEvent_Start{Start: startEvent},
+		}); err != nil {
+			return nil, nil, "", err
+		}
 		if err := emit(&aiv1.ServerEvent{
 			Event: &aiv1.ServerEvent_TextStart{TextStart: &aiv1.TextStart{Id: assistantMsgID}},
 		}); err != nil {
