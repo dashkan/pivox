@@ -2,7 +2,7 @@
  * React bindings for `@pivox/storage`.
  *
  * Centralizes the "read + subscribe + re-render on change" pattern
- * that consumers used to hand-roll. Three notification channels are
+ * that consumers used to hand-roll. Two notification channels are
  * combined inside the hook so consumers don't have to know about
  * them:
  *
@@ -11,16 +11,29 @@
  *      the item's `broadcast` flag. This is the channel that makes
  *      same-tab `set()`-then-re-render work; without it, the
  *      component that just wrote wouldn't know to re-render
- *      (BroadcastChannel never delivers to the posting context, and
- *      the native `storage` event doesn't fire for same-window writes
- *      either).
+ *      (BroadcastChannel never delivers to the posting context).
  *   2. CROSS-TAB BroadcastChannel (`subscribeToChanges`) — fires
- *      when ANOTHER tab writes. Subscribed only when
+ *      when ANOTHER tab/window writes. Subscribed only when
  *      `item.broadcast === true`; for per-tab items the channel
- *      isn't even attached (saves a listener slot).
- *   3. NATIVE `storage` EVENT — fires when ANOTHER window writes
- *      localStorage. Mostly relevant on electron multi-window;
- *      cheap, attached unconditionally.
+ *      isn't even attached (saves a listener slot AND preserves the
+ *      documented per-tab semantics).
+ *
+ * # Why the native `storage` event isn't a third channel
+ *
+ * Earlier versions attached `window.addEventListener('storage', ...)`
+ * as a third channel. It's removed because in Pivox today it never
+ * fires usefully:
+ *   - On the cookie backend (start app), the `storage` event NEVER
+ *     fires for our writes — cookies don't emit it.
+ *   - On the localStorage backend, the event only fires for writes
+ *     in OTHER same-origin windows of this app. Pivox's electron
+ *     app runs single-instance, so there's no other window to fire
+ *     from.
+ *
+ * If a future Pivox feature opens additional BrowserWindows on
+ * electron, revisit this — but gate any reintroduced listener on
+ * `item.broadcast` so it doesn't silently defeat the per-tab opt-out
+ * we configured for SIDEBAR_OPEN, ACTIVE_ORG, etc.
  *
  * SSR-safe via the third arg of `useSyncExternalStore` (server
  * snapshot): pass `initialValue` from the SSR cookie read; client
@@ -75,22 +88,23 @@ export function useStorageValue<T>(
         unsubs.push(subscribeToChanges(item.name, onChange));
       }
 
-      // NATIVE STORAGE EVENT — covers cross-window localStorage
-      // writes (electron multi-window). Doesn't fire for cookie
-      // writes on the start app, doesn't fire same-window — so it's
-      // a complement to the other two channels, not a replacement.
-      if (typeof window !== 'undefined') {
-        const handleStorage = (ev: StorageEvent) => {
-          if (ev.key === item.name) onChange();
-        };
-        window.addEventListener('storage', handleStorage);
-        unsubs.push(() => {
-          window.removeEventListener('storage', handleStorage);
-        });
-      }
-
       return () => {
-        for (const u of unsubs) u();
+        // Per-unsub try/catch — if one teardown throws (e.g.,
+        // BroadcastChannel.removeEventListener against a channel
+        // closed by __resetChannelForTests mid-test, or any browser
+        // quirk on teardown), the remaining unsubs MUST still run or
+        // we leak listener slots across mount/unmount cycles. Mirrors
+        // the per-listener defense in fireLocal (notify.ts).
+        for (const u of unsubs) {
+          try {
+            u();
+          } catch (err) {
+            console.error(
+              `[@pivox/storage/react] unsubscribe threw for '${item.name}':`,
+              err,
+            );
+          }
+        }
       };
     },
     [item],

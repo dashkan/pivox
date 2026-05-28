@@ -209,8 +209,42 @@ function getChannel(): BroadcastChannel | null {
   // Channel-level cache-update listener. MUST be added before any
   // subscribeToChanges registration so it fires first and the cache
   // is populated by the time per-subscriber handlers run.
-  channel.addEventListener('message', (ev: MessageEvent<ChangePayload>) => {
-    writeCache(ev.data.name, ev.data.value);
+  //
+  // Guarded against malformed payloads — a future schema bump,
+  // cross-version tab during a deploy, or third-party code that
+  // posts to the same channel name with a non-conforming payload
+  // shouldn't throw inside the addEventListener callback. The
+  // browser would surface that as an unhandled rejection AND the
+  // cache wouldn't get primed for the message; per-subscriber
+  // handlers downstream might also fail to fire correctly. Better
+  // to log and move on.
+  // Annotated as MessageEvent<unknown> rather than
+  // MessageEvent<ChangePayload> because what arrives is whatever
+  // anyone posted to the same channel name — including stale
+  // cross-deploy tabs and (in dev) third-party code. The shape
+  // check below is the runtime narrowing back to ChangePayload.
+  channel.addEventListener('message', (ev: MessageEvent<unknown>) => {
+    try {
+      const data = ev.data;
+      // Defensive: validate the payload shape before destructuring.
+      // The `name` field is required; `value` may be string or null.
+      if (
+        data === null ||
+        typeof data !== 'object' ||
+        !('name' in data) ||
+        typeof (data).name !== 'string'
+      ) {
+        return;
+      }
+      const payload = data as ChangePayload;
+      writeCache(payload.name, payload.value ?? null);
+    } catch (err) {
+      console.error(
+        '[@pivox/storage] channel-level cache update failed for payload:',
+        ev.data,
+        err,
+      );
+    }
   });
   return channel;
 }
@@ -286,8 +320,21 @@ export function subscribeToChanges(
 ): () => void {
   const ch = getChannel();
   if (!ch) return () => {};
-  const listener = (ev: MessageEvent<ChangePayload>) => {
-    if (ev.data.name === itemName) handler();
+  const listener = (ev: MessageEvent<unknown>) => {
+    // Same defensive shape check as the channel-level listener in
+    // `getChannel`. A malformed payload from a cross-version tab or
+    // third-party code on the same channel name shouldn't crash the
+    // per-subscriber handler.
+    const data = ev.data;
+    if (
+      data === null ||
+      typeof data !== 'object' ||
+      !('name' in data) ||
+      typeof (data).name !== 'string'
+    ) {
+      return;
+    }
+    if ((data as ChangePayload).name === itemName) handler();
   };
   ch.addEventListener('message', listener);
   return () => {

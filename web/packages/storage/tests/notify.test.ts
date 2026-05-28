@@ -278,7 +278,6 @@ describe('notifyChange + subscribeToChanges', () => {
     try {
       set(item, 'value');
     } finally {
-       
       errSpy.mockRestore();
     }
 
@@ -385,5 +384,78 @@ describe('notifyChange + subscribeToChanges', () => {
     });
     set(item, 'just-written');
     expect(get(item)).toBe('just-written');
+  });
+
+  // -------------------------------------------------------------
+  // Malformed broadcast payload defense — the channel-level
+  // listener + subscribeToChanges' per-subscriber listener should
+  // not throw on unexpected shapes (cross-version tabs during a
+  // deploy, third-party code on the same channel name).
+  // -------------------------------------------------------------
+
+  it('channel-level cache listener ignores a null payload without throwing', async () => {
+    // Get the singleton constructed so its channel-level listener is
+    // wired up. Then post a payload with null `data`.
+    const item = defineItem<string>({
+      name: 'pivox.test.malformed-null',
+      parse: (v) => v || null,
+    });
+    // Trigger lazy singleton construction.
+    get(item);
+
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // postMessage doesn't accept undefined; null is the closest
+      // "explicitly absent payload" we can simulate.
+      otherTab.postMessage(null);
+      await new Promise((r) => setTimeout(r, 0));
+    } finally {
+       
+      errSpy.mockRestore();
+    }
+
+    // No throw escaping the listener (test would fail with an
+    // unhandled rejection otherwise). Cache stays empty.
+    expect(get(item)).toBeNull();
+  });
+
+  it('channel-level cache listener ignores a payload without a `name` field', async () => {
+    const item = defineItem<string>({
+      name: 'pivox.test.malformed-no-name',
+      parse: (v) => v || null,
+    });
+    get(item); // construct singleton
+
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      otherTab.postMessage({ value: 'orphan' });
+      await new Promise((r) => setTimeout(r, 0));
+    } finally {
+       
+      errSpy.mockRestore();
+    }
+
+    expect(get(item)).toBeNull();
+  });
+
+  it('subscribeToChanges ignores malformed payloads without firing the handler', async () => {
+    const handler = vi.fn();
+    const unsubscribe = subscribeToChanges('pivox.test.malformed-sub', handler);
+
+    otherTab.postMessage(null);
+    otherTab.postMessage({ value: 'no name here' });
+    otherTab.postMessage({ name: 42, value: 'wrong type' }); // name not string
+    await new Promise((r) => setTimeout(r, 0));
+
+    // None of the malformed shapes should trip the per-subscriber
+    // handler. A subsequent well-formed payload still fires it —
+    // proves the listener is still attached.
+    expect(handler).not.toHaveBeenCalled();
+
+    otherTab.postMessage({ name: 'pivox.test.malformed-sub', value: 'ok' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
   });
 });
