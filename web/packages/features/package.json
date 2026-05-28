@@ -98,9 +98,9 @@
   },
   "dependencies": {
     "@pivox/client": "workspace:*",
-    "@pivox/storage": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
+    "@pivox/storage": "workspace:*",
     "@pivox/ui": "workspace:*",
     "firebase": "12.13.0"
   }
