@@ -256,16 +256,12 @@ func (s *Server) runGenerate(
 	if emit != nil {
 		startEvent := &aiv1.Start{MessageId: assistantMsgID}
 		if conv != nil {
-			meta, err := structpb.NewStruct(map[string]any{
-				"conversation": fmt.Sprintf(
+			startEvent.MessageMetadata = &aiv1.ChatMessageMetadata{
+				Conversation: fmt.Sprintf(
 					"organizations/%s/users/%s/conversations/%s",
 					orgName, convPathUser, conv.Name,
 				),
-			})
-			if err != nil {
-				return nil, nil, "", apierr.Internal("build start metadata")
 			}
-			startEvent.MessageMetadata = meta
 		}
 		if err := emit(&aiv1.ServerEvent{
 			Event: &aiv1.ServerEvent_Start{Start: startEvent},

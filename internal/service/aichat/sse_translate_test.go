@@ -47,10 +47,12 @@ func TestMarshalChunk(t *testing.T) {
 		{
 			name: "start_with_metadata",
 			ev: &aiv1.ServerEvent{Event: &aiv1.ServerEvent_Start{Start: &aiv1.Start{
-				MessageId:       "msg_1",
-				MessageMetadata: mustStruct(t, map[string]any{"createdAt": "2026-05-28T00:00:00Z"}),
+				MessageId: "msg_1",
+				MessageMetadata: &aiv1.ChatMessageMetadata{
+					Conversation: "organizations/acme/users/alice/conversations/abc",
+				},
 			}}},
-			want: `{"type":"start","messageId":"msg_1","messageMetadata":{"createdAt":"2026-05-28T00:00:00Z"}}`,
+			want: `{"type":"start","messageId":"msg_1","messageMetadata":{"conversation":"organizations/acme/users/alice/conversations/abc"}}`,
 		},
 		{
 			name: "start_step",
@@ -76,10 +78,13 @@ func TestMarshalChunk(t *testing.T) {
 		{
 			name: "finish_with_reason_and_metadata",
 			ev: &aiv1.ServerEvent{Event: &aiv1.ServerEvent_Finish{Finish: &aiv1.Finish{
-				FinishReason:    "stop",
-				MessageMetadata: mustStruct(t, map[string]any{"inputTokens": float64(42), "outputTokens": float64(128)}),
+				FinishReason: "stop",
+				MessageMetadata: &aiv1.ChatMessageMetadata{
+					Model: "claude-sonnet-4-5",
+					Usage: &aiv1.TokenUsage{InputTokens: 42, OutputTokens: 128},
+				},
 			}}},
-			want: `{"type":"finish","finishReason":"stop","messageMetadata":{"inputTokens":42,"outputTokens":128}}`,
+			want: `{"type":"finish","finishReason":"stop","messageMetadata":{"model":"claude-sonnet-4-5","usage":{"inputTokens":42,"outputTokens":128}}}`,
 		},
 		{
 			name: "abort_bare",
@@ -106,14 +111,13 @@ func TestMarshalChunk(t *testing.T) {
 			name: "message_metadata",
 			ev: &aiv1.ServerEvent{Event: &aiv1.ServerEvent_MessageMetadata{
 				MessageMetadata: &aiv1.MessageMetadata{
-					MessageMetadata: mustStruct(t, map[string]any{
-						"model":        "claude-sonnet-4-5",
-						"inputTokens":  float64(100),
-						"outputTokens": float64(250),
-					}),
+					MessageMetadata: &aiv1.ChatMessageMetadata{
+						Model: "claude-sonnet-4-5",
+						Usage: &aiv1.TokenUsage{InputTokens: 100, OutputTokens: 250},
+					},
 				},
 			}},
-			want: `{"type":"message-metadata","messageMetadata":{"model":"claude-sonnet-4-5","inputTokens":100,"outputTokens":250}}`,
+			want: `{"type":"message-metadata","messageMetadata":{"model":"claude-sonnet-4-5","usage":{"inputTokens":100,"outputTokens":250}}}`,
 		},
 
 		// ─── Text ───────────────────────────────────────────────

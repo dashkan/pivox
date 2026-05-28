@@ -996,8 +996,10 @@ type Start struct {
 	// message off this; subsequent text/reasoning chunks reference
 	// it via their own `id` field.
 	MessageId string `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	// Optional. Initial metadata for the assistant message.
-	MessageMetadata *structpb.Struct `protobuf:"bytes,2,opt,name=message_metadata,json=messageMetadata,proto3" json:"message_metadata,omitempty"`
+	// Optional. Initial metadata for the assistant message — typically
+	// carries the persisted conversation handle when the server
+	// auto-created one for this turn.
+	MessageMetadata *ChatMessageMetadata `protobuf:"bytes,2,opt,name=message_metadata,json=messageMetadata,proto3" json:"message_metadata,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1039,7 +1041,7 @@ func (x *Start) GetMessageId() string {
 	return ""
 }
 
-func (x *Start) GetMessageMetadata() *structpb.Struct {
+func (x *Start) GetMessageMetadata() *ChatMessageMetadata {
 	if x != nil {
 		return x.MessageMetadata
 	}
@@ -1125,9 +1127,9 @@ type Finish struct {
 	// Why the generation stopped. One of: "stop", "length",
 	// "content-filter", "tool-calls", "error", "other".
 	FinishReason string `protobuf:"bytes,1,opt,name=finish_reason,json=finishReason,proto3" json:"finish_reason,omitempty"`
-	// Optional. Final metadata for the assistant message (typically
-	// input/output token counts, model id, etc.).
-	MessageMetadata *structpb.Struct `protobuf:"bytes,2,opt,name=message_metadata,json=messageMetadata,proto3" json:"message_metadata,omitempty"`
+	// Optional. Final metadata for the assistant message — typically
+	// token counts + model id surfaced from the upstream provider.
+	MessageMetadata *ChatMessageMetadata `protobuf:"bytes,2,opt,name=message_metadata,json=messageMetadata,proto3" json:"message_metadata,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1169,7 +1171,7 @@ func (x *Finish) GetFinishReason() string {
 	return ""
 }
 
-func (x *Finish) GetMessageMetadata() *structpb.Struct {
+func (x *Finish) GetMessageMetadata() *ChatMessageMetadata {
 	if x != nil {
 		return x.MessageMetadata
 	}
@@ -1267,12 +1269,12 @@ func (x *Error) GetErrorText() string {
 	return ""
 }
 
-// Free-form metadata about the assistant message. The wire chunk
-// nests the payload under `messageMetadata`, hence the recursive
-// field name — matches Vercel's UIMessageChunk shape verbatim.
+// Mid-stream metadata update chunk. The wire chunk nests the payload
+// under `messageMetadata`, hence the recursive field name — matches
+// Vercel's UIMessageChunk shape verbatim.
 type MessageMetadata struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	MessageMetadata *structpb.Struct       `protobuf:"bytes,1,opt,name=message_metadata,json=messageMetadata,proto3" json:"message_metadata,omitempty"`
+	MessageMetadata *ChatMessageMetadata   `protobuf:"bytes,1,opt,name=message_metadata,json=messageMetadata,proto3" json:"message_metadata,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1307,9 +1309,96 @@ func (*MessageMetadata) Descriptor() ([]byte, []int) {
 	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *MessageMetadata) GetMessageMetadata() *structpb.Struct {
+func (x *MessageMetadata) GetMessageMetadata() *ChatMessageMetadata {
 	if x != nil {
 		return x.MessageMetadata
+	}
+	return nil
+}
+
+// ChatMessageMetadata is the Pivox-owned, typed payload that rides
+// inside `start.messageMetadata`, `finish.messageMetadata`, and the
+// standalone `message-metadata` chunk's `messageMetadata` field.
+//
+// Why typed (not google.protobuf.Struct): these fields are entirely
+// Pivox-defined — the conversation resource name, the model, token
+// counts. Carrying them as Struct made the OpenAPI-generated
+// TypeScript map to `Record<string, never>` (the keys are invisible
+// to openapi-typescript when the carrier is Struct), forcing a
+// parallel hand-written TS interface. Typing them in proto lets
+// `types.gen.ts` surface the real schema and the chat UI consume it
+// without a duplicate declaration.
+//
+// Freeform provider/tool/data metadata stays Struct — the schema is
+// upstream-defined (Anthropic, OpenAI, user-supplied `data-<name>`)
+// and we genuinely don't know its shape at proto-design time.
+type ChatMessageMetadata struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Resource name of the persisted conversation:
+	//
+	//	`organizations/{organization}/users/{user}/conversations/{conversation}`
+	//
+	// Populated on the first `start` chunk of an auto-created stream so
+	// the client can thread it through on subsequent turns.
+	Conversation string `protobuf:"bytes,1,opt,name=conversation,proto3" json:"conversation,omitempty"`
+	// The model identifier that produced the response (e.g.
+	// "claude-sonnet-4-5", "gpt-5-turbo"). Populated on `finish`.
+	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+	// Token accounting for billing/observability. Populated on
+	// `finish` and on any mid-stream `message-metadata` chunks the
+	// model layer surfaces.
+	Usage         *TokenUsage `protobuf:"bytes,3,opt,name=usage,proto3" json:"usage,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatMessageMetadata) Reset() {
+	*x = ChatMessageMetadata{}
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatMessageMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatMessageMetadata) ProtoMessage() {}
+
+func (x *ChatMessageMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatMessageMetadata.ProtoReflect.Descriptor instead.
+func (*ChatMessageMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ChatMessageMetadata) GetConversation() string {
+	if x != nil {
+		return x.Conversation
+	}
+	return ""
+}
+
+func (x *ChatMessageMetadata) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *ChatMessageMetadata) GetUsage() *TokenUsage {
+	if x != nil {
+		return x.Usage
 	}
 	return nil
 }
@@ -1328,7 +1417,7 @@ type TextStart struct {
 
 func (x *TextStart) Reset() {
 	*x = TextStart{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[14]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1340,7 +1429,7 @@ func (x *TextStart) String() string {
 func (*TextStart) ProtoMessage() {}
 
 func (x *TextStart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[14]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1353,7 +1442,7 @@ func (x *TextStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextStart.ProtoReflect.Descriptor instead.
 func (*TextStart) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{14}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *TextStart) GetId() string {
@@ -1384,7 +1473,7 @@ type TextDelta struct {
 
 func (x *TextDelta) Reset() {
 	*x = TextDelta{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[15]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1396,7 +1485,7 @@ func (x *TextDelta) String() string {
 func (*TextDelta) ProtoMessage() {}
 
 func (x *TextDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[15]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1409,7 +1498,7 @@ func (x *TextDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextDelta.ProtoReflect.Descriptor instead.
 func (*TextDelta) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{15}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *TextDelta) GetId() string {
@@ -1445,7 +1534,7 @@ type TextEnd struct {
 
 func (x *TextEnd) Reset() {
 	*x = TextEnd{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[16]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1457,7 +1546,7 @@ func (x *TextEnd) String() string {
 func (*TextEnd) ProtoMessage() {}
 
 func (x *TextEnd) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[16]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1470,7 +1559,7 @@ func (x *TextEnd) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextEnd.ProtoReflect.Descriptor instead.
 func (*TextEnd) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{16}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *TextEnd) GetId() string {
@@ -1497,7 +1586,7 @@ type ReasoningStart struct {
 
 func (x *ReasoningStart) Reset() {
 	*x = ReasoningStart{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[17]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1509,7 +1598,7 @@ func (x *ReasoningStart) String() string {
 func (*ReasoningStart) ProtoMessage() {}
 
 func (x *ReasoningStart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[17]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1522,7 +1611,7 @@ func (x *ReasoningStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReasoningStart.ProtoReflect.Descriptor instead.
 func (*ReasoningStart) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{17}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ReasoningStart) GetId() string {
@@ -1550,7 +1639,7 @@ type ReasoningDelta struct {
 
 func (x *ReasoningDelta) Reset() {
 	*x = ReasoningDelta{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[18]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1562,7 +1651,7 @@ func (x *ReasoningDelta) String() string {
 func (*ReasoningDelta) ProtoMessage() {}
 
 func (x *ReasoningDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[18]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1575,7 +1664,7 @@ func (x *ReasoningDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReasoningDelta.ProtoReflect.Descriptor instead.
 func (*ReasoningDelta) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{18}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ReasoningDelta) GetId() string {
@@ -1609,7 +1698,7 @@ type ReasoningEnd struct {
 
 func (x *ReasoningEnd) Reset() {
 	*x = ReasoningEnd{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[19]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1621,7 +1710,7 @@ func (x *ReasoningEnd) String() string {
 func (*ReasoningEnd) ProtoMessage() {}
 
 func (x *ReasoningEnd) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[19]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1634,7 +1723,7 @@ func (x *ReasoningEnd) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReasoningEnd.ProtoReflect.Descriptor instead.
 func (*ReasoningEnd) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{19}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ReasoningEnd) GetId() string {
@@ -1673,7 +1762,7 @@ type ToolInputStart struct {
 
 func (x *ToolInputStart) Reset() {
 	*x = ToolInputStart{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[20]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1685,7 +1774,7 @@ func (x *ToolInputStart) String() string {
 func (*ToolInputStart) ProtoMessage() {}
 
 func (x *ToolInputStart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[20]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1698,7 +1787,7 @@ func (x *ToolInputStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolInputStart.ProtoReflect.Descriptor instead.
 func (*ToolInputStart) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{20}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ToolInputStart) GetToolCallId() string {
@@ -1763,7 +1852,7 @@ type ToolInputDelta struct {
 
 func (x *ToolInputDelta) Reset() {
 	*x = ToolInputDelta{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[21]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1775,7 +1864,7 @@ func (x *ToolInputDelta) String() string {
 func (*ToolInputDelta) ProtoMessage() {}
 
 func (x *ToolInputDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[21]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1788,7 +1877,7 @@ func (x *ToolInputDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolInputDelta.ProtoReflect.Descriptor instead.
 func (*ToolInputDelta) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{21}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ToolInputDelta) GetToolCallId() string {
@@ -1824,7 +1913,7 @@ type ToolInputAvailable struct {
 
 func (x *ToolInputAvailable) Reset() {
 	*x = ToolInputAvailable{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[22]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1836,7 +1925,7 @@ func (x *ToolInputAvailable) String() string {
 func (*ToolInputAvailable) ProtoMessage() {}
 
 func (x *ToolInputAvailable) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[22]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1849,7 +1938,7 @@ func (x *ToolInputAvailable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolInputAvailable.ProtoReflect.Descriptor instead.
 func (*ToolInputAvailable) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{22}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ToolInputAvailable) GetToolCallId() string {
@@ -1929,7 +2018,7 @@ type ToolInputError struct {
 
 func (x *ToolInputError) Reset() {
 	*x = ToolInputError{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[23]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1941,7 +2030,7 @@ func (x *ToolInputError) String() string {
 func (*ToolInputError) ProtoMessage() {}
 
 func (x *ToolInputError) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[23]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1954,7 +2043,7 @@ func (x *ToolInputError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolInputError.ProtoReflect.Descriptor instead.
 func (*ToolInputError) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{23}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ToolInputError) GetToolCallId() string {
@@ -2033,7 +2122,7 @@ type ToolApprovalRequest struct {
 
 func (x *ToolApprovalRequest) Reset() {
 	*x = ToolApprovalRequest{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[24]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2045,7 +2134,7 @@ func (x *ToolApprovalRequest) String() string {
 func (*ToolApprovalRequest) ProtoMessage() {}
 
 func (x *ToolApprovalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[24]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2058,7 +2147,7 @@ func (x *ToolApprovalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolApprovalRequest.ProtoReflect.Descriptor instead.
 func (*ToolApprovalRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{24}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ToolApprovalRequest) GetApprovalId() string {
@@ -2094,7 +2183,7 @@ type ToolOutputAvailable struct {
 
 func (x *ToolOutputAvailable) Reset() {
 	*x = ToolOutputAvailable{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[25]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2106,7 +2195,7 @@ func (x *ToolOutputAvailable) String() string {
 func (*ToolOutputAvailable) ProtoMessage() {}
 
 func (x *ToolOutputAvailable) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[25]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2119,7 +2208,7 @@ func (x *ToolOutputAvailable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolOutputAvailable.ProtoReflect.Descriptor instead.
 func (*ToolOutputAvailable) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{25}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ToolOutputAvailable) GetToolCallId() string {
@@ -2185,7 +2274,7 @@ type ToolOutputError struct {
 
 func (x *ToolOutputError) Reset() {
 	*x = ToolOutputError{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[26]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2197,7 +2286,7 @@ func (x *ToolOutputError) String() string {
 func (*ToolOutputError) ProtoMessage() {}
 
 func (x *ToolOutputError) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[26]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2210,7 +2299,7 @@ func (x *ToolOutputError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolOutputError.ProtoReflect.Descriptor instead.
 func (*ToolOutputError) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{26}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ToolOutputError) GetToolCallId() string {
@@ -2266,7 +2355,7 @@ type ToolOutputDenied struct {
 
 func (x *ToolOutputDenied) Reset() {
 	*x = ToolOutputDenied{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[27]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2278,7 +2367,7 @@ func (x *ToolOutputDenied) String() string {
 func (*ToolOutputDenied) ProtoMessage() {}
 
 func (x *ToolOutputDenied) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[27]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2291,7 +2380,7 @@ func (x *ToolOutputDenied) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolOutputDenied.ProtoReflect.Descriptor instead.
 func (*ToolOutputDenied) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{27}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ToolOutputDenied) GetToolCallId() string {
@@ -2313,7 +2402,7 @@ type SourceUrl struct {
 
 func (x *SourceUrl) Reset() {
 	*x = SourceUrl{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[28]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2325,7 +2414,7 @@ func (x *SourceUrl) String() string {
 func (*SourceUrl) ProtoMessage() {}
 
 func (x *SourceUrl) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[28]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2338,7 +2427,7 @@ func (x *SourceUrl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SourceUrl.ProtoReflect.Descriptor instead.
 func (*SourceUrl) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{28}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *SourceUrl) GetSourceId() string {
@@ -2382,7 +2471,7 @@ type SourceDocument struct {
 
 func (x *SourceDocument) Reset() {
 	*x = SourceDocument{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[29]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2394,7 +2483,7 @@ func (x *SourceDocument) String() string {
 func (*SourceDocument) ProtoMessage() {}
 
 func (x *SourceDocument) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[29]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2407,7 +2496,7 @@ func (x *SourceDocument) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SourceDocument.ProtoReflect.Descriptor instead.
 func (*SourceDocument) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{29}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *SourceDocument) GetSourceId() string {
@@ -2456,7 +2545,7 @@ type File struct {
 
 func (x *File) Reset() {
 	*x = File{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[30]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2468,7 +2557,7 @@ func (x *File) String() string {
 func (*File) ProtoMessage() {}
 
 func (x *File) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[30]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2481,7 +2570,7 @@ func (x *File) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use File.ProtoReflect.Descriptor instead.
 func (*File) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{30}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *File) GetUrl() string {
@@ -2533,7 +2622,7 @@ type DataPart struct {
 
 func (x *DataPart) Reset() {
 	*x = DataPart{}
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[31]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2545,7 +2634,7 @@ func (x *DataPart) String() string {
 func (*DataPart) ProtoMessage() {}
 
 func (x *DataPart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[31]
+	mi := &file_pivox_ai_v1_ai_chat_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2558,7 +2647,7 @@ func (x *DataPart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataPart.ProtoReflect.Descriptor instead.
 func (*DataPart) Descriptor() ([]byte, []int) {
-	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{31}
+	return file_pivox_ai_v1_ai_chat_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DataPart) GetName() string {
@@ -2656,24 +2745,28 @@ const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\x0fsource_document\x18\x1f \x01(\v2\x1b.pivox.ai.v1.SourceDocumentH\x00R\x0esourceDocument\x12'\n" +
 	"\x04file\x18  \x01(\v2\x11.pivox.ai.v1.FileH\x00R\x04file\x12+\n" +
 	"\x04data\x18( \x01(\v2\x15.pivox.ai.v1.DataPartH\x00R\x04dataB\a\n" +
-	"\x05event\"j\n" +
+	"\x05event\"s\n" +
 	"\x05Start\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x01 \x01(\tR\tmessageId\x12B\n" +
-	"\x10message_metadata\x18\x02 \x01(\v2\x17.google.protobuf.StructR\x0fmessageMetadata\"\v\n" +
+	"message_id\x18\x01 \x01(\tR\tmessageId\x12K\n" +
+	"\x10message_metadata\x18\x02 \x01(\v2 .pivox.ai.v1.ChatMessageMetadataR\x0fmessageMetadata\"\v\n" +
 	"\tStartStep\"\f\n" +
 	"\n" +
-	"FinishStep\"q\n" +
+	"FinishStep\"z\n" +
 	"\x06Finish\x12#\n" +
-	"\rfinish_reason\x18\x01 \x01(\tR\ffinishReason\x12B\n" +
-	"\x10message_metadata\x18\x02 \x01(\v2\x17.google.protobuf.StructR\x0fmessageMetadata\"\x1f\n" +
+	"\rfinish_reason\x18\x01 \x01(\tR\ffinishReason\x12K\n" +
+	"\x10message_metadata\x18\x02 \x01(\v2 .pivox.ai.v1.ChatMessageMetadataR\x0fmessageMetadata\"\x1f\n" +
 	"\x05Abort\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\"&\n" +
 	"\x05Error\x12\x1d\n" +
 	"\n" +
-	"error_text\x18\x01 \x01(\tR\terrorText\"U\n" +
-	"\x0fMessageMetadata\x12B\n" +
-	"\x10message_metadata\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x0fmessageMetadata\"a\n" +
+	"error_text\x18\x01 \x01(\tR\terrorText\"^\n" +
+	"\x0fMessageMetadata\x12K\n" +
+	"\x10message_metadata\x18\x01 \x01(\v2 .pivox.ai.v1.ChatMessageMetadataR\x0fmessageMetadata\"~\n" +
+	"\x13ChatMessageMetadata\x12\"\n" +
+	"\fconversation\x18\x01 \x01(\tR\fconversation\x12\x14\n" +
+	"\x05model\x18\x02 \x01(\tR\x05model\x12-\n" +
+	"\x05usage\x18\x03 \x01(\v2\x17.pivox.ai.v1.TokenUsageR\x05usage\"a\n" +
 	"\tTextStart\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12D\n" +
 	"\x11provider_metadata\x18\x02 \x01(\v2\x17.google.protobuf.StructR\x10providerMetadata\"w\n" +
@@ -2809,7 +2902,7 @@ func file_pivox_ai_v1_ai_chat_proto_rawDescGZIP() []byte {
 	return file_pivox_ai_v1_ai_chat_proto_rawDescData
 }
 
-var file_pivox_ai_v1_ai_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_pivox_ai_v1_ai_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_pivox_ai_v1_ai_chat_proto_goTypes = []any{
 	(*GenerateContentRequest)(nil),       // 0: pivox.ai.v1.GenerateContentRequest
 	(*GenerateContentResponse)(nil),      // 1: pivox.ai.v1.GenerateContentResponse
@@ -2825,56 +2918,57 @@ var file_pivox_ai_v1_ai_chat_proto_goTypes = []any{
 	(*Abort)(nil),                        // 11: pivox.ai.v1.Abort
 	(*Error)(nil),                        // 12: pivox.ai.v1.Error
 	(*MessageMetadata)(nil),              // 13: pivox.ai.v1.MessageMetadata
-	(*TextStart)(nil),                    // 14: pivox.ai.v1.TextStart
-	(*TextDelta)(nil),                    // 15: pivox.ai.v1.TextDelta
-	(*TextEnd)(nil),                      // 16: pivox.ai.v1.TextEnd
-	(*ReasoningStart)(nil),               // 17: pivox.ai.v1.ReasoningStart
-	(*ReasoningDelta)(nil),               // 18: pivox.ai.v1.ReasoningDelta
-	(*ReasoningEnd)(nil),                 // 19: pivox.ai.v1.ReasoningEnd
-	(*ToolInputStart)(nil),               // 20: pivox.ai.v1.ToolInputStart
-	(*ToolInputDelta)(nil),               // 21: pivox.ai.v1.ToolInputDelta
-	(*ToolInputAvailable)(nil),           // 22: pivox.ai.v1.ToolInputAvailable
-	(*ToolInputError)(nil),               // 23: pivox.ai.v1.ToolInputError
-	(*ToolApprovalRequest)(nil),          // 24: pivox.ai.v1.ToolApprovalRequest
-	(*ToolOutputAvailable)(nil),          // 25: pivox.ai.v1.ToolOutputAvailable
-	(*ToolOutputError)(nil),              // 26: pivox.ai.v1.ToolOutputError
-	(*ToolOutputDenied)(nil),             // 27: pivox.ai.v1.ToolOutputDenied
-	(*SourceUrl)(nil),                    // 28: pivox.ai.v1.SourceUrl
-	(*SourceDocument)(nil),               // 29: pivox.ai.v1.SourceDocument
-	(*File)(nil),                         // 30: pivox.ai.v1.File
-	(*DataPart)(nil),                     // 31: pivox.ai.v1.DataPart
-	(*Message)(nil),                      // 32: pivox.ai.v1.Message
-	(*MessagePart)(nil),                  // 33: pivox.ai.v1.MessagePart
-	(*structpb.Struct)(nil),              // 34: google.protobuf.Struct
-	(*GetConversationRequest)(nil),       // 35: pivox.ai.v1.GetConversationRequest
-	(*ListConversationsRequest)(nil),     // 36: pivox.ai.v1.ListConversationsRequest
-	(*CreateConversationRequest)(nil),    // 37: pivox.ai.v1.CreateConversationRequest
-	(*UpdateConversationRequest)(nil),    // 38: pivox.ai.v1.UpdateConversationRequest
-	(*DeleteConversationRequest)(nil),    // 39: pivox.ai.v1.DeleteConversationRequest
-	(*GetMessageRequest)(nil),            // 40: pivox.ai.v1.GetMessageRequest
-	(*ListMessagesRequest)(nil),          // 41: pivox.ai.v1.ListMessagesRequest
-	(*GetArtifactRequest)(nil),           // 42: pivox.ai.v1.GetArtifactRequest
-	(*ListArtifactsRequest)(nil),         // 43: pivox.ai.v1.ListArtifactsRequest
-	(*DeleteArtifactRequest)(nil),        // 44: pivox.ai.v1.DeleteArtifactRequest
-	(*GetArtifactVersionRequest)(nil),    // 45: pivox.ai.v1.GetArtifactVersionRequest
-	(*ListArtifactVersionsRequest)(nil),  // 46: pivox.ai.v1.ListArtifactVersionsRequest
-	(*DeleteArtifactVersionRequest)(nil), // 47: pivox.ai.v1.DeleteArtifactVersionRequest
-	(*Conversation)(nil),                 // 48: pivox.ai.v1.Conversation
-	(*ListConversationsResponse)(nil),    // 49: pivox.ai.v1.ListConversationsResponse
-	(*emptypb.Empty)(nil),                // 50: google.protobuf.Empty
-	(*ListMessagesResponse)(nil),         // 51: pivox.ai.v1.ListMessagesResponse
-	(*Artifact)(nil),                     // 52: pivox.ai.v1.Artifact
-	(*ListArtifactsResponse)(nil),        // 53: pivox.ai.v1.ListArtifactsResponse
-	(*ArtifactVersion)(nil),              // 54: pivox.ai.v1.ArtifactVersion
-	(*ListArtifactVersionsResponse)(nil), // 55: pivox.ai.v1.ListArtifactVersionsResponse
+	(*ChatMessageMetadata)(nil),          // 14: pivox.ai.v1.ChatMessageMetadata
+	(*TextStart)(nil),                    // 15: pivox.ai.v1.TextStart
+	(*TextDelta)(nil),                    // 16: pivox.ai.v1.TextDelta
+	(*TextEnd)(nil),                      // 17: pivox.ai.v1.TextEnd
+	(*ReasoningStart)(nil),               // 18: pivox.ai.v1.ReasoningStart
+	(*ReasoningDelta)(nil),               // 19: pivox.ai.v1.ReasoningDelta
+	(*ReasoningEnd)(nil),                 // 20: pivox.ai.v1.ReasoningEnd
+	(*ToolInputStart)(nil),               // 21: pivox.ai.v1.ToolInputStart
+	(*ToolInputDelta)(nil),               // 22: pivox.ai.v1.ToolInputDelta
+	(*ToolInputAvailable)(nil),           // 23: pivox.ai.v1.ToolInputAvailable
+	(*ToolInputError)(nil),               // 24: pivox.ai.v1.ToolInputError
+	(*ToolApprovalRequest)(nil),          // 25: pivox.ai.v1.ToolApprovalRequest
+	(*ToolOutputAvailable)(nil),          // 26: pivox.ai.v1.ToolOutputAvailable
+	(*ToolOutputError)(nil),              // 27: pivox.ai.v1.ToolOutputError
+	(*ToolOutputDenied)(nil),             // 28: pivox.ai.v1.ToolOutputDenied
+	(*SourceUrl)(nil),                    // 29: pivox.ai.v1.SourceUrl
+	(*SourceDocument)(nil),               // 30: pivox.ai.v1.SourceDocument
+	(*File)(nil),                         // 31: pivox.ai.v1.File
+	(*DataPart)(nil),                     // 32: pivox.ai.v1.DataPart
+	(*Message)(nil),                      // 33: pivox.ai.v1.Message
+	(*MessagePart)(nil),                  // 34: pivox.ai.v1.MessagePart
+	(*structpb.Struct)(nil),              // 35: google.protobuf.Struct
+	(*GetConversationRequest)(nil),       // 36: pivox.ai.v1.GetConversationRequest
+	(*ListConversationsRequest)(nil),     // 37: pivox.ai.v1.ListConversationsRequest
+	(*CreateConversationRequest)(nil),    // 38: pivox.ai.v1.CreateConversationRequest
+	(*UpdateConversationRequest)(nil),    // 39: pivox.ai.v1.UpdateConversationRequest
+	(*DeleteConversationRequest)(nil),    // 40: pivox.ai.v1.DeleteConversationRequest
+	(*GetMessageRequest)(nil),            // 41: pivox.ai.v1.GetMessageRequest
+	(*ListMessagesRequest)(nil),          // 42: pivox.ai.v1.ListMessagesRequest
+	(*GetArtifactRequest)(nil),           // 43: pivox.ai.v1.GetArtifactRequest
+	(*ListArtifactsRequest)(nil),         // 44: pivox.ai.v1.ListArtifactsRequest
+	(*DeleteArtifactRequest)(nil),        // 45: pivox.ai.v1.DeleteArtifactRequest
+	(*GetArtifactVersionRequest)(nil),    // 46: pivox.ai.v1.GetArtifactVersionRequest
+	(*ListArtifactVersionsRequest)(nil),  // 47: pivox.ai.v1.ListArtifactVersionsRequest
+	(*DeleteArtifactVersionRequest)(nil), // 48: pivox.ai.v1.DeleteArtifactVersionRequest
+	(*Conversation)(nil),                 // 49: pivox.ai.v1.Conversation
+	(*ListConversationsResponse)(nil),    // 50: pivox.ai.v1.ListConversationsResponse
+	(*emptypb.Empty)(nil),                // 51: google.protobuf.Empty
+	(*ListMessagesResponse)(nil),         // 52: pivox.ai.v1.ListMessagesResponse
+	(*Artifact)(nil),                     // 53: pivox.ai.v1.Artifact
+	(*ListArtifactsResponse)(nil),        // 54: pivox.ai.v1.ListArtifactsResponse
+	(*ArtifactVersion)(nil),              // 55: pivox.ai.v1.ArtifactVersion
+	(*ListArtifactVersionsResponse)(nil), // 56: pivox.ai.v1.ListArtifactVersionsResponse
 }
 var file_pivox_ai_v1_ai_chat_proto_depIdxs = []int32{
 	2,  // 0: pivox.ai.v1.GenerateContentRequest.messages:type_name -> pivox.ai.v1.InputMessage
 	3,  // 1: pivox.ai.v1.GenerateContentRequest.tools:type_name -> pivox.ai.v1.ToolDefinition
-	32, // 2: pivox.ai.v1.GenerateContentResponse.message:type_name -> pivox.ai.v1.Message
+	33, // 2: pivox.ai.v1.GenerateContentResponse.message:type_name -> pivox.ai.v1.Message
 	4,  // 3: pivox.ai.v1.GenerateContentResponse.usage:type_name -> pivox.ai.v1.TokenUsage
-	33, // 4: pivox.ai.v1.InputMessage.parts:type_name -> pivox.ai.v1.MessagePart
-	34, // 5: pivox.ai.v1.InputMessage.metadata:type_name -> google.protobuf.Struct
+	34, // 4: pivox.ai.v1.InputMessage.parts:type_name -> pivox.ai.v1.MessagePart
+	35, // 5: pivox.ai.v1.InputMessage.metadata:type_name -> google.protobuf.Struct
 	7,  // 6: pivox.ai.v1.ServerEvent.start:type_name -> pivox.ai.v1.Start
 	8,  // 7: pivox.ai.v1.ServerEvent.start_step:type_name -> pivox.ai.v1.StartStep
 	9,  // 8: pivox.ai.v1.ServerEvent.finish_step:type_name -> pivox.ai.v1.FinishStep
@@ -2882,87 +2976,88 @@ var file_pivox_ai_v1_ai_chat_proto_depIdxs = []int32{
 	11, // 10: pivox.ai.v1.ServerEvent.abort:type_name -> pivox.ai.v1.Abort
 	12, // 11: pivox.ai.v1.ServerEvent.error:type_name -> pivox.ai.v1.Error
 	13, // 12: pivox.ai.v1.ServerEvent.message_metadata:type_name -> pivox.ai.v1.MessageMetadata
-	14, // 13: pivox.ai.v1.ServerEvent.text_start:type_name -> pivox.ai.v1.TextStart
-	15, // 14: pivox.ai.v1.ServerEvent.text_delta:type_name -> pivox.ai.v1.TextDelta
-	16, // 15: pivox.ai.v1.ServerEvent.text_end:type_name -> pivox.ai.v1.TextEnd
-	17, // 16: pivox.ai.v1.ServerEvent.reasoning_start:type_name -> pivox.ai.v1.ReasoningStart
-	18, // 17: pivox.ai.v1.ServerEvent.reasoning_delta:type_name -> pivox.ai.v1.ReasoningDelta
-	19, // 18: pivox.ai.v1.ServerEvent.reasoning_end:type_name -> pivox.ai.v1.ReasoningEnd
-	20, // 19: pivox.ai.v1.ServerEvent.tool_input_start:type_name -> pivox.ai.v1.ToolInputStart
-	21, // 20: pivox.ai.v1.ServerEvent.tool_input_delta:type_name -> pivox.ai.v1.ToolInputDelta
-	22, // 21: pivox.ai.v1.ServerEvent.tool_input_available:type_name -> pivox.ai.v1.ToolInputAvailable
-	23, // 22: pivox.ai.v1.ServerEvent.tool_input_error:type_name -> pivox.ai.v1.ToolInputError
-	24, // 23: pivox.ai.v1.ServerEvent.tool_approval_request:type_name -> pivox.ai.v1.ToolApprovalRequest
-	25, // 24: pivox.ai.v1.ServerEvent.tool_output_available:type_name -> pivox.ai.v1.ToolOutputAvailable
-	26, // 25: pivox.ai.v1.ServerEvent.tool_output_error:type_name -> pivox.ai.v1.ToolOutputError
-	27, // 26: pivox.ai.v1.ServerEvent.tool_output_denied:type_name -> pivox.ai.v1.ToolOutputDenied
-	28, // 27: pivox.ai.v1.ServerEvent.source_url:type_name -> pivox.ai.v1.SourceUrl
-	29, // 28: pivox.ai.v1.ServerEvent.source_document:type_name -> pivox.ai.v1.SourceDocument
-	30, // 29: pivox.ai.v1.ServerEvent.file:type_name -> pivox.ai.v1.File
-	31, // 30: pivox.ai.v1.ServerEvent.data:type_name -> pivox.ai.v1.DataPart
-	34, // 31: pivox.ai.v1.Start.message_metadata:type_name -> google.protobuf.Struct
-	34, // 32: pivox.ai.v1.Finish.message_metadata:type_name -> google.protobuf.Struct
-	34, // 33: pivox.ai.v1.MessageMetadata.message_metadata:type_name -> google.protobuf.Struct
-	34, // 34: pivox.ai.v1.TextStart.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 35: pivox.ai.v1.TextDelta.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 36: pivox.ai.v1.TextEnd.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 37: pivox.ai.v1.ReasoningStart.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 38: pivox.ai.v1.ReasoningDelta.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 39: pivox.ai.v1.ReasoningEnd.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 40: pivox.ai.v1.ToolInputStart.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 41: pivox.ai.v1.ToolInputStart.tool_metadata:type_name -> google.protobuf.Struct
-	34, // 42: pivox.ai.v1.ToolInputAvailable.input:type_name -> google.protobuf.Struct
-	34, // 43: pivox.ai.v1.ToolInputAvailable.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 44: pivox.ai.v1.ToolInputAvailable.tool_metadata:type_name -> google.protobuf.Struct
-	34, // 45: pivox.ai.v1.ToolInputError.input:type_name -> google.protobuf.Struct
-	34, // 46: pivox.ai.v1.ToolInputError.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 47: pivox.ai.v1.ToolInputError.tool_metadata:type_name -> google.protobuf.Struct
-	34, // 48: pivox.ai.v1.ToolOutputAvailable.output:type_name -> google.protobuf.Struct
-	34, // 49: pivox.ai.v1.ToolOutputAvailable.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 50: pivox.ai.v1.ToolOutputAvailable.tool_metadata:type_name -> google.protobuf.Struct
-	34, // 51: pivox.ai.v1.ToolOutputError.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 52: pivox.ai.v1.ToolOutputError.tool_metadata:type_name -> google.protobuf.Struct
-	34, // 53: pivox.ai.v1.SourceUrl.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 54: pivox.ai.v1.SourceDocument.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 55: pivox.ai.v1.File.provider_metadata:type_name -> google.protobuf.Struct
-	34, // 56: pivox.ai.v1.DataPart.data:type_name -> google.protobuf.Struct
-	35, // 57: pivox.ai.v1.AiChat.GetConversation:input_type -> pivox.ai.v1.GetConversationRequest
-	36, // 58: pivox.ai.v1.AiChat.ListConversations:input_type -> pivox.ai.v1.ListConversationsRequest
-	37, // 59: pivox.ai.v1.AiChat.CreateConversation:input_type -> pivox.ai.v1.CreateConversationRequest
-	38, // 60: pivox.ai.v1.AiChat.UpdateConversation:input_type -> pivox.ai.v1.UpdateConversationRequest
-	39, // 61: pivox.ai.v1.AiChat.DeleteConversation:input_type -> pivox.ai.v1.DeleteConversationRequest
-	40, // 62: pivox.ai.v1.AiChat.GetMessage:input_type -> pivox.ai.v1.GetMessageRequest
-	41, // 63: pivox.ai.v1.AiChat.ListMessages:input_type -> pivox.ai.v1.ListMessagesRequest
-	42, // 64: pivox.ai.v1.AiChat.GetArtifact:input_type -> pivox.ai.v1.GetArtifactRequest
-	43, // 65: pivox.ai.v1.AiChat.ListArtifacts:input_type -> pivox.ai.v1.ListArtifactsRequest
-	44, // 66: pivox.ai.v1.AiChat.DeleteArtifact:input_type -> pivox.ai.v1.DeleteArtifactRequest
-	45, // 67: pivox.ai.v1.AiChat.GetArtifactVersion:input_type -> pivox.ai.v1.GetArtifactVersionRequest
-	46, // 68: pivox.ai.v1.AiChat.ListArtifactVersions:input_type -> pivox.ai.v1.ListArtifactVersionsRequest
-	47, // 69: pivox.ai.v1.AiChat.DeleteArtifactVersion:input_type -> pivox.ai.v1.DeleteArtifactVersionRequest
-	0,  // 70: pivox.ai.v1.AiChat.GenerateContent:input_type -> pivox.ai.v1.GenerateContentRequest
-	0,  // 71: pivox.ai.v1.AiChat.StreamGenerateContent:input_type -> pivox.ai.v1.GenerateContentRequest
-	5,  // 72: pivox.ai.v1.AiChat.SummarizeConversation:input_type -> pivox.ai.v1.SummarizeConversationRequest
-	48, // 73: pivox.ai.v1.AiChat.GetConversation:output_type -> pivox.ai.v1.Conversation
-	49, // 74: pivox.ai.v1.AiChat.ListConversations:output_type -> pivox.ai.v1.ListConversationsResponse
-	48, // 75: pivox.ai.v1.AiChat.CreateConversation:output_type -> pivox.ai.v1.Conversation
-	48, // 76: pivox.ai.v1.AiChat.UpdateConversation:output_type -> pivox.ai.v1.Conversation
-	50, // 77: pivox.ai.v1.AiChat.DeleteConversation:output_type -> google.protobuf.Empty
-	32, // 78: pivox.ai.v1.AiChat.GetMessage:output_type -> pivox.ai.v1.Message
-	51, // 79: pivox.ai.v1.AiChat.ListMessages:output_type -> pivox.ai.v1.ListMessagesResponse
-	52, // 80: pivox.ai.v1.AiChat.GetArtifact:output_type -> pivox.ai.v1.Artifact
-	53, // 81: pivox.ai.v1.AiChat.ListArtifacts:output_type -> pivox.ai.v1.ListArtifactsResponse
-	50, // 82: pivox.ai.v1.AiChat.DeleteArtifact:output_type -> google.protobuf.Empty
-	54, // 83: pivox.ai.v1.AiChat.GetArtifactVersion:output_type -> pivox.ai.v1.ArtifactVersion
-	55, // 84: pivox.ai.v1.AiChat.ListArtifactVersions:output_type -> pivox.ai.v1.ListArtifactVersionsResponse
-	50, // 85: pivox.ai.v1.AiChat.DeleteArtifactVersion:output_type -> google.protobuf.Empty
-	1,  // 86: pivox.ai.v1.AiChat.GenerateContent:output_type -> pivox.ai.v1.GenerateContentResponse
-	6,  // 87: pivox.ai.v1.AiChat.StreamGenerateContent:output_type -> pivox.ai.v1.ServerEvent
-	48, // 88: pivox.ai.v1.AiChat.SummarizeConversation:output_type -> pivox.ai.v1.Conversation
-	73, // [73:89] is the sub-list for method output_type
-	57, // [57:73] is the sub-list for method input_type
-	57, // [57:57] is the sub-list for extension type_name
-	57, // [57:57] is the sub-list for extension extendee
-	0,  // [0:57] is the sub-list for field type_name
+	15, // 13: pivox.ai.v1.ServerEvent.text_start:type_name -> pivox.ai.v1.TextStart
+	16, // 14: pivox.ai.v1.ServerEvent.text_delta:type_name -> pivox.ai.v1.TextDelta
+	17, // 15: pivox.ai.v1.ServerEvent.text_end:type_name -> pivox.ai.v1.TextEnd
+	18, // 16: pivox.ai.v1.ServerEvent.reasoning_start:type_name -> pivox.ai.v1.ReasoningStart
+	19, // 17: pivox.ai.v1.ServerEvent.reasoning_delta:type_name -> pivox.ai.v1.ReasoningDelta
+	20, // 18: pivox.ai.v1.ServerEvent.reasoning_end:type_name -> pivox.ai.v1.ReasoningEnd
+	21, // 19: pivox.ai.v1.ServerEvent.tool_input_start:type_name -> pivox.ai.v1.ToolInputStart
+	22, // 20: pivox.ai.v1.ServerEvent.tool_input_delta:type_name -> pivox.ai.v1.ToolInputDelta
+	23, // 21: pivox.ai.v1.ServerEvent.tool_input_available:type_name -> pivox.ai.v1.ToolInputAvailable
+	24, // 22: pivox.ai.v1.ServerEvent.tool_input_error:type_name -> pivox.ai.v1.ToolInputError
+	25, // 23: pivox.ai.v1.ServerEvent.tool_approval_request:type_name -> pivox.ai.v1.ToolApprovalRequest
+	26, // 24: pivox.ai.v1.ServerEvent.tool_output_available:type_name -> pivox.ai.v1.ToolOutputAvailable
+	27, // 25: pivox.ai.v1.ServerEvent.tool_output_error:type_name -> pivox.ai.v1.ToolOutputError
+	28, // 26: pivox.ai.v1.ServerEvent.tool_output_denied:type_name -> pivox.ai.v1.ToolOutputDenied
+	29, // 27: pivox.ai.v1.ServerEvent.source_url:type_name -> pivox.ai.v1.SourceUrl
+	30, // 28: pivox.ai.v1.ServerEvent.source_document:type_name -> pivox.ai.v1.SourceDocument
+	31, // 29: pivox.ai.v1.ServerEvent.file:type_name -> pivox.ai.v1.File
+	32, // 30: pivox.ai.v1.ServerEvent.data:type_name -> pivox.ai.v1.DataPart
+	14, // 31: pivox.ai.v1.Start.message_metadata:type_name -> pivox.ai.v1.ChatMessageMetadata
+	14, // 32: pivox.ai.v1.Finish.message_metadata:type_name -> pivox.ai.v1.ChatMessageMetadata
+	14, // 33: pivox.ai.v1.MessageMetadata.message_metadata:type_name -> pivox.ai.v1.ChatMessageMetadata
+	4,  // 34: pivox.ai.v1.ChatMessageMetadata.usage:type_name -> pivox.ai.v1.TokenUsage
+	35, // 35: pivox.ai.v1.TextStart.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 36: pivox.ai.v1.TextDelta.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 37: pivox.ai.v1.TextEnd.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 38: pivox.ai.v1.ReasoningStart.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 39: pivox.ai.v1.ReasoningDelta.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 40: pivox.ai.v1.ReasoningEnd.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 41: pivox.ai.v1.ToolInputStart.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 42: pivox.ai.v1.ToolInputStart.tool_metadata:type_name -> google.protobuf.Struct
+	35, // 43: pivox.ai.v1.ToolInputAvailable.input:type_name -> google.protobuf.Struct
+	35, // 44: pivox.ai.v1.ToolInputAvailable.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 45: pivox.ai.v1.ToolInputAvailable.tool_metadata:type_name -> google.protobuf.Struct
+	35, // 46: pivox.ai.v1.ToolInputError.input:type_name -> google.protobuf.Struct
+	35, // 47: pivox.ai.v1.ToolInputError.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 48: pivox.ai.v1.ToolInputError.tool_metadata:type_name -> google.protobuf.Struct
+	35, // 49: pivox.ai.v1.ToolOutputAvailable.output:type_name -> google.protobuf.Struct
+	35, // 50: pivox.ai.v1.ToolOutputAvailable.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 51: pivox.ai.v1.ToolOutputAvailable.tool_metadata:type_name -> google.protobuf.Struct
+	35, // 52: pivox.ai.v1.ToolOutputError.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 53: pivox.ai.v1.ToolOutputError.tool_metadata:type_name -> google.protobuf.Struct
+	35, // 54: pivox.ai.v1.SourceUrl.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 55: pivox.ai.v1.SourceDocument.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 56: pivox.ai.v1.File.provider_metadata:type_name -> google.protobuf.Struct
+	35, // 57: pivox.ai.v1.DataPart.data:type_name -> google.protobuf.Struct
+	36, // 58: pivox.ai.v1.AiChat.GetConversation:input_type -> pivox.ai.v1.GetConversationRequest
+	37, // 59: pivox.ai.v1.AiChat.ListConversations:input_type -> pivox.ai.v1.ListConversationsRequest
+	38, // 60: pivox.ai.v1.AiChat.CreateConversation:input_type -> pivox.ai.v1.CreateConversationRequest
+	39, // 61: pivox.ai.v1.AiChat.UpdateConversation:input_type -> pivox.ai.v1.UpdateConversationRequest
+	40, // 62: pivox.ai.v1.AiChat.DeleteConversation:input_type -> pivox.ai.v1.DeleteConversationRequest
+	41, // 63: pivox.ai.v1.AiChat.GetMessage:input_type -> pivox.ai.v1.GetMessageRequest
+	42, // 64: pivox.ai.v1.AiChat.ListMessages:input_type -> pivox.ai.v1.ListMessagesRequest
+	43, // 65: pivox.ai.v1.AiChat.GetArtifact:input_type -> pivox.ai.v1.GetArtifactRequest
+	44, // 66: pivox.ai.v1.AiChat.ListArtifacts:input_type -> pivox.ai.v1.ListArtifactsRequest
+	45, // 67: pivox.ai.v1.AiChat.DeleteArtifact:input_type -> pivox.ai.v1.DeleteArtifactRequest
+	46, // 68: pivox.ai.v1.AiChat.GetArtifactVersion:input_type -> pivox.ai.v1.GetArtifactVersionRequest
+	47, // 69: pivox.ai.v1.AiChat.ListArtifactVersions:input_type -> pivox.ai.v1.ListArtifactVersionsRequest
+	48, // 70: pivox.ai.v1.AiChat.DeleteArtifactVersion:input_type -> pivox.ai.v1.DeleteArtifactVersionRequest
+	0,  // 71: pivox.ai.v1.AiChat.GenerateContent:input_type -> pivox.ai.v1.GenerateContentRequest
+	0,  // 72: pivox.ai.v1.AiChat.StreamGenerateContent:input_type -> pivox.ai.v1.GenerateContentRequest
+	5,  // 73: pivox.ai.v1.AiChat.SummarizeConversation:input_type -> pivox.ai.v1.SummarizeConversationRequest
+	49, // 74: pivox.ai.v1.AiChat.GetConversation:output_type -> pivox.ai.v1.Conversation
+	50, // 75: pivox.ai.v1.AiChat.ListConversations:output_type -> pivox.ai.v1.ListConversationsResponse
+	49, // 76: pivox.ai.v1.AiChat.CreateConversation:output_type -> pivox.ai.v1.Conversation
+	49, // 77: pivox.ai.v1.AiChat.UpdateConversation:output_type -> pivox.ai.v1.Conversation
+	51, // 78: pivox.ai.v1.AiChat.DeleteConversation:output_type -> google.protobuf.Empty
+	33, // 79: pivox.ai.v1.AiChat.GetMessage:output_type -> pivox.ai.v1.Message
+	52, // 80: pivox.ai.v1.AiChat.ListMessages:output_type -> pivox.ai.v1.ListMessagesResponse
+	53, // 81: pivox.ai.v1.AiChat.GetArtifact:output_type -> pivox.ai.v1.Artifact
+	54, // 82: pivox.ai.v1.AiChat.ListArtifacts:output_type -> pivox.ai.v1.ListArtifactsResponse
+	51, // 83: pivox.ai.v1.AiChat.DeleteArtifact:output_type -> google.protobuf.Empty
+	55, // 84: pivox.ai.v1.AiChat.GetArtifactVersion:output_type -> pivox.ai.v1.ArtifactVersion
+	56, // 85: pivox.ai.v1.AiChat.ListArtifactVersions:output_type -> pivox.ai.v1.ListArtifactVersionsResponse
+	51, // 86: pivox.ai.v1.AiChat.DeleteArtifactVersion:output_type -> google.protobuf.Empty
+	1,  // 87: pivox.ai.v1.AiChat.GenerateContent:output_type -> pivox.ai.v1.GenerateContentResponse
+	6,  // 88: pivox.ai.v1.AiChat.StreamGenerateContent:output_type -> pivox.ai.v1.ServerEvent
+	49, // 89: pivox.ai.v1.AiChat.SummarizeConversation:output_type -> pivox.ai.v1.Conversation
+	74, // [74:90] is the sub-list for method output_type
+	58, // [58:74] is the sub-list for method input_type
+	58, // [58:58] is the sub-list for extension type_name
+	58, // [58:58] is the sub-list for extension extendee
+	0,  // [0:58] is the sub-list for field type_name
 }
 
 func init() { file_pivox_ai_v1_ai_chat_proto_init() }
@@ -3006,7 +3101,7 @@ func file_pivox_ai_v1_ai_chat_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_ai_v1_ai_chat_proto_rawDesc), len(file_pivox_ai_v1_ai_chat_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   32,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

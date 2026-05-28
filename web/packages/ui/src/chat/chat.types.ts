@@ -94,26 +94,21 @@ export interface ChatContextValue {
 }
 
 /**
- * Pivox-specific metadata carried on UIMessage.metadata. Currently
- * just the persisted conversation handle the server returns in the
- * first `start` chunk; future fields go here.
+ * Pivox-specific metadata carried on UIMessage.metadata. Derived
+ * from the OpenAPI-generated `v1ChatMessageMetadata` schema so the
+ * proto definition is the single source of truth — adding a field
+ * in `ai_chat.proto` (e.g. `usage`, `model`, future fields) flows
+ * through `make proto-generate` to this type automatically.
  *
- * Not generated from proto because the server-side carrier
- * (`google.protobuf.Struct`) maps to `Record<string, never>` in the
- * OpenAPI output — the schema-free Struct can't surface keys to
- * openapi-typescript.
+ * Populated:
+ *   - `conversation` on the first `start` chunk for auto-created
+ *     stream sessions; captured by `useChatState`'s `onFinish` and
+ *     threaded back via `body.conversation` on subsequent turns.
+ *   - `model` and `usage` on `finish` (and any mid-stream
+ *     `message-metadata` chunks).
  */
-export interface PivoxChatMessageMetadata {
-  /**
-   * Resource name of the persisted conversation:
-   *   `organizations/{organization}/users/{user}/conversations/{conversation}`
-   *
-   * Set by the server in the first `start` chunk for first-turn
-   * (auto-create) calls. Captured by `useChatState`'s `onFinish`
-   * and threaded back via `body.conversation` on subsequent turns.
-   */
-  conversation?: string;
-}
+export type PivoxChatMessageMetadata =
+  components['schemas']['v1ChatMessageMetadata'];
 
 /**
  * The UIMessage flavor the chat runtime speaks: Vercel UIMessage

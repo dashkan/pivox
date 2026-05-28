@@ -3868,6 +3868,44 @@ export interface components {
             thresholds?: components["schemas"]["v1Threshold"][];
         };
         /**
+         * @description ChatMessageMetadata is the Pivox-owned, typed payload that rides
+         *     inside `start.messageMetadata`, `finish.messageMetadata`, and the
+         *     standalone `message-metadata` chunk's `messageMetadata` field.
+         *
+         *     Why typed (not google.protobuf.Struct): these fields are entirely
+         *     Pivox-defined — the conversation resource name, the model, token
+         *     counts. Carrying them as Struct made the OpenAPI-generated
+         *     TypeScript map to `Record<string, never>` (the keys are invisible
+         *     to openapi-typescript when the carrier is Struct), forcing a
+         *     parallel hand-written TS interface. Typing them in proto lets
+         *     `types.gen.ts` surface the real schema and the chat UI consume it
+         *     without a duplicate declaration.
+         *
+         *     Freeform provider/tool/data metadata stays Struct — the schema is
+         *     upstream-defined (Anthropic, OpenAI, user-supplied `data-<name>`)
+         *     and we genuinely don't know its shape at proto-design time.
+         */
+        v1ChatMessageMetadata: {
+            /**
+             * @description Resource name of the persisted conversation:
+             *       `organizations/{organization}/users/{user}/conversations/{conversation}`
+             *     Populated on the first `start` chunk of an auto-created stream so
+             *     the client can thread it through on subsequent turns.
+             */
+            conversation?: string;
+            /**
+             * @description The model identifier that produced the response (e.g.
+             *     "claude-sonnet-4-5", "gpt-5-turbo"). Populated on `finish`.
+             */
+            model?: string;
+            /**
+             * @description Token accounting for billing/observability. Populated on
+             *     `finish` and on any mid-stream `message-metadata` chunks the
+             *     model layer surfaces.
+             */
+            usage?: components["schemas"]["v1TokenUsage"];
+        };
+        /**
          * @description CollectionWidget displays a collection of rows in one of several
          *     display modes (table, card grid). The same data source feeds every
          *     mode; switching modes is a presentation concern handled by the
@@ -4414,10 +4452,10 @@ export interface components {
              */
             finishReason?: string;
             /**
-             * @description Optional. Final metadata for the assistant message (typically
-             *     input/output token counts, model id, etc.).
+             * @description Optional. Final metadata for the assistant message — typically
+             *     token counts + model id surfaced from the upstream provider.
              */
-            messageMetadata?: Record<string, never>;
+            messageMetadata?: components["schemas"]["v1ChatMessageMetadata"];
         };
         /** @description Marker — emitted after each model call in a multi-step turn. */
         v1FinishStep: Record<string, never>;
@@ -5283,12 +5321,12 @@ export interface components {
             readonly createTime?: string;
         };
         /**
-         * @description Free-form metadata about the assistant message. The wire chunk
-         *     nests the payload under `messageMetadata`, hence the recursive
-         *     field name — matches Vercel's UIMessageChunk shape verbatim.
+         * @description Mid-stream metadata update chunk. The wire chunk nests the payload
+         *     under `messageMetadata`, hence the recursive field name — matches
+         *     Vercel's UIMessageChunk shape verbatim.
          */
         v1MessageMetadata: {
-            messageMetadata?: Record<string, never>;
+            messageMetadata?: components["schemas"]["v1ChatMessageMetadata"];
         };
         /**
          * A single part of a message. Shape-matches the Vercel AI SDK
@@ -6214,8 +6252,12 @@ export interface components {
              *     it via their own `id` field.
              */
             messageId?: string;
-            /** @description Optional. Initial metadata for the assistant message. */
-            messageMetadata?: Record<string, never>;
+            /**
+             * @description Optional. Initial metadata for the assistant message — typically
+             *     carries the persisted conversation handle when the server
+             *     auto-created one for this turn.
+             */
+            messageMetadata?: components["schemas"]["v1ChatMessageMetadata"];
         };
         /** @description Marker — emitted before each model call in a multi-step turn. */
         v1StartStep: Record<string, never>;

@@ -12350,6 +12350,45 @@ components:
       description: ChartWidget displays time series or categorical data as an XY chart.
       required:
         - dataSets
+    v1ChatMessageMetadata:
+      type: object
+      properties:
+        conversation:
+          type: string
+          description: >-
+            Resource name of the persisted conversation:
+              `organizations/{organization}/users/{user}/conversations/{conversation}`
+            Populated on the first `start` chunk of an auto-created stream so
+
+            the client can thread it through on subsequent turns.
+        model:
+          type: string
+          description: |-
+            The model identifier that produced the response (e.g.
+            "claude-sonnet-4-5", "gpt-5-turbo"). Populated on `finish`.
+        usage:
+          $ref: "#/components/schemas/v1TokenUsage"
+          description: |-
+            Token accounting for billing/observability. Populated on
+            `finish` and on any mid-stream `message-metadata` chunks the
+            model layer surfaces.
+      description: |-
+        ChatMessageMetadata is the Pivox-owned, typed payload that rides
+        inside `start.messageMetadata`, `finish.messageMetadata`, and the
+        standalone `message-metadata` chunk's `messageMetadata` field.
+
+        Why typed (not google.protobuf.Struct): these fields are entirely
+        Pivox-defined — the conversation resource name, the model, token
+        counts. Carrying them as Struct made the OpenAPI-generated
+        TypeScript map to `Record<string, never>` (the keys are invisible
+        to openapi-typescript when the carrier is Struct), forcing a
+        parallel hand-written TS interface. Typing them in proto lets
+        `types.gen.ts` surface the real schema and the chat UI consume it
+        without a duplicate declaration.
+
+        Freeform provider/tool/data metadata stays Struct — the schema is
+        upstream-defined (Anthropic, OpenAI, user-supplied `data-<name>`)
+        and we genuinely don't know its shape at proto-design time.
     v1CollectionWidget:
       type: object
       properties:
@@ -13025,10 +13064,10 @@ components:
             Why the generation stopped. One of: "stop", "length",
             "content-filter", "tool-calls", "error", "other".
         messageMetadata:
-          type: object
+          $ref: "#/components/schemas/v1ChatMessageMetadata"
           description: |-
-            Optional. Final metadata for the assistant message (typically
-            input/output token counts, model id, etc.).
+            Optional. Final metadata for the assistant message — typically
+            token counts + model id surfaced from the upstream provider.
     v1FinishStep:
       type: object
       description: Marker — emitted after each model call in a multi-step turn.
@@ -14280,11 +14319,11 @@ components:
       type: object
       properties:
         messageMetadata:
-          type: object
+          $ref: "#/components/schemas/v1ChatMessageMetadata"
       description: |-
-        Free-form metadata about the assistant message. The wire chunk
-        nests the payload under `messageMetadata`, hence the recursive
-        field name — matches Vercel's UIMessageChunk shape verbatim.
+        Mid-stream metadata update chunk. The wire chunk nests the payload
+        under `messageMetadata`, hence the recursive field name — matches
+        Vercel's UIMessageChunk shape verbatim.
     v1MessagePart:
       type: object
       properties:
@@ -15489,8 +15528,11 @@ components:
             message off this; subsequent text/reasoning chunks reference
             it via their own `id` field.
         messageMetadata:
-          type: object
-          description: Optional. Initial metadata for the assistant message.
+          $ref: "#/components/schemas/v1ChatMessageMetadata"
+          description: |-
+            Optional. Initial metadata for the assistant message — typically
+            carries the persisted conversation handle when the server
+            auto-created one for this turn.
     v1StartStep:
       type: object
       description: Marker — emitted before each model call in a multi-step turn.

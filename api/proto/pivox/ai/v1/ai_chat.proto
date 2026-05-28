@@ -493,8 +493,10 @@ message Start {
   // it via their own `id` field.
   string message_id = 1;
 
-  // Optional. Initial metadata for the assistant message.
-  google.protobuf.Struct message_metadata = 2;
+  // Optional. Initial metadata for the assistant message — typically
+  // carries the persisted conversation handle when the server
+  // auto-created one for this turn.
+  ChatMessageMetadata message_metadata = 2;
 }
 
 // Marker — emitted before each model call in a multi-step turn.
@@ -508,9 +510,9 @@ message Finish {
   // "content-filter", "tool-calls", "error", "other".
   string finish_reason = 1;
 
-  // Optional. Final metadata for the assistant message (typically
-  // input/output token counts, model id, etc.).
-  google.protobuf.Struct message_metadata = 2;
+  // Optional. Final metadata for the assistant message — typically
+  // token counts + model id surfaced from the upstream provider.
+  ChatMessageMetadata message_metadata = 2;
 }
 
 message Abort {
@@ -524,11 +526,44 @@ message Error {
   string error_text = 1;
 }
 
-// Free-form metadata about the assistant message. The wire chunk
-// nests the payload under `messageMetadata`, hence the recursive
-// field name — matches Vercel's UIMessageChunk shape verbatim.
+// Mid-stream metadata update chunk. The wire chunk nests the payload
+// under `messageMetadata`, hence the recursive field name — matches
+// Vercel's UIMessageChunk shape verbatim.
 message MessageMetadata {
-  google.protobuf.Struct message_metadata = 1;
+  ChatMessageMetadata message_metadata = 1;
+}
+
+// ChatMessageMetadata is the Pivox-owned, typed payload that rides
+// inside `start.messageMetadata`, `finish.messageMetadata`, and the
+// standalone `message-metadata` chunk's `messageMetadata` field.
+//
+// Why typed (not google.protobuf.Struct): these fields are entirely
+// Pivox-defined — the conversation resource name, the model, token
+// counts. Carrying them as Struct made the OpenAPI-generated
+// TypeScript map to `Record<string, never>` (the keys are invisible
+// to openapi-typescript when the carrier is Struct), forcing a
+// parallel hand-written TS interface. Typing them in proto lets
+// `types.gen.ts` surface the real schema and the chat UI consume it
+// without a duplicate declaration.
+//
+// Freeform provider/tool/data metadata stays Struct — the schema is
+// upstream-defined (Anthropic, OpenAI, user-supplied `data-<name>`)
+// and we genuinely don't know its shape at proto-design time.
+message ChatMessageMetadata {
+  // Resource name of the persisted conversation:
+  //   `organizations/{organization}/users/{user}/conversations/{conversation}`
+  // Populated on the first `start` chunk of an auto-created stream so
+  // the client can thread it through on subsequent turns.
+  string conversation = 1;
+
+  // The model identifier that produced the response (e.g.
+  // "claude-sonnet-4-5", "gpt-5-turbo"). Populated on `finish`.
+  string model = 2;
+
+  // Token accounting for billing/observability. Populated on
+  // `finish` and on any mid-stream `message-metadata` chunks the
+  // model layer surfaces.
+  TokenUsage usage = 3;
 }
 
 // ─── Text event messages ────────────────────────────────────
