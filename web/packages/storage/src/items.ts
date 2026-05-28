@@ -47,13 +47,22 @@ export const THEME = defineItem<Theme>({
   // (no closures, only globals). Resolves 'system' → light/dark via
   // matchMedia at boot time; subsequent OS preference changes are
   // handled by the ThemeSwitcher component's media-query listener.
+  //
+  // `value` is null on first visit (no cookie yet) and after a
+  // cookie clear. Default to 'system' to match the React-level
+  // default in theme-switcher.tsx (`useStorageValue(THEME) ?? 'system'`).
+  // Without this default, a first-visit user with dark system
+  // preference paints LIGHT, then React mounts and the useEffect
+  // adds the dark class → visible flicker. Safari and Firefox showed
+  // it; Chrome happened to mask it under some conditions.
   onBoot: (value) => {
+    const effective = value ?? 'system';
     const resolved =
-      value === 'system'
+      effective === 'system'
         ? matchMedia('(prefers-color-scheme: dark)').matches
           ? 'dark'
           : 'light'
-        : value;
+        : effective;
     if (resolved === 'dark') document.documentElement.classList.add('dark');
   },
 });
