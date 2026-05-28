@@ -14,7 +14,7 @@
  * the client uses, so server reads + client writes can't drift.
  */
 
-import { LAST_EMAIL, THEME, type Theme } from '@pivox/storage';
+import { LAST_EMAIL, SIDEBAR_OPEN, THEME, type Theme } from '@pivox/storage';
 import { createServerFn } from '@tanstack/react-start';
 import { getCookie } from '@tanstack/react-start/server';
 
@@ -59,6 +59,28 @@ export const getLastEmailCookie = createServerFn({ method: 'GET' }).handler(
     try {
       const v = getCookie(LAST_EMAIL.name);
       return v ? LAST_EMAIL.parse(v) : null;
+    } catch {
+      return null;
+    }
+  },
+);
+
+/**
+ * getSidebarOpenCookie server-fn: returns the SSR-time value of the
+ * persisted sidebar open/closed state, or null if absent / malformed.
+ *
+ * Used by `_app.tsx`'s beforeLoad to thread initialSidebarOpen into
+ * the Pivox `<SidebarProvider>` wrapper (which is a controlled-mode
+ * shim over shadcn). Without this, the sidebar would always cold-
+ * boot with shadcn's `defaultOpen={true}` regardless of the user's
+ * last toggle — and we'd see a layout shift on hydration if the
+ * persisted value was `false`.
+ */
+export const getSidebarOpenCookie = createServerFn({ method: 'GET' }).handler(
+  (): boolean | null => {
+    try {
+      const v = getCookie(SIDEBAR_OPEN.name);
+      return v ? SIDEBAR_OPEN.parse(v) : null;
     } catch {
       return null;
     }

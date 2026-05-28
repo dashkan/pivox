@@ -1,11 +1,8 @@
 import { AppShellFeature } from '@pivox/features/app-shell';
 import { AuthGateFeature } from '@pivox/features/auth-gate';
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from '@pivox/primitives/sidebar';
+import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
 import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
+import { SidebarProvider } from '@pivox/ui/sidebar-provider';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
 import { UserProfileCard } from '@pivox/ui/user-profile-card';
 import { ElectronUserProfileFeature } from '@renderer/components/electron-user-profile-feature';

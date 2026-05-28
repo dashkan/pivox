@@ -26,5 +26,11 @@
 export { defineItem, allItems, type StorageItem } from './define';
 export { storage, get, set, clear } from './operations';
 export { subscribeToChanges } from './notify';
-export { THEME, LAST_EMAIL, ACTIVE_ORG, type Theme } from './items';
+export {
+  THEME,
+  LAST_EMAIL,
+  ACTIVE_ORG,
+  SIDEBAR_OPEN,
+  type Theme,
+} from './items';
 export { buildBootScript } from './boot-script';

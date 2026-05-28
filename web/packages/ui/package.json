@@ -55,6 +55,10 @@
       "types": "./dist/esm/theme-switcher.d.ts",
       "import": "./dist/esm/theme-switcher.js"
     },
+    "./sidebar-provider": {
+      "types": "./dist/esm/sidebar-provider.d.ts",
+      "import": "./dist/esm/sidebar-provider.js"
+    },
     "./image-editor": {
       "types": "./dist/esm/image-editor.d.ts",
       "import": "./dist/esm/image-editor.js"

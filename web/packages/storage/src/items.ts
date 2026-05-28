@@ -85,3 +85,30 @@ export const ACTIVE_ORG = defineItem<string>({
   path: '/',
   parse: (v) => (v.length > 0 ? v : null),
 });
+
+/**
+ * SIDEBAR_OPEN — persisted state of the app-shell sidebar
+ * (expanded vs collapsed).
+ *
+ * Written + read by `@pivox/ui/sidebar-provider`'s
+ * `SidebarProvider` wrapper, which routes shadcn's `<SidebarProvider>`
+ * through controlled mode so persistence lives in `@pivox/storage`
+ * (cookie on web, localStorage on electron) — NOT in the dead
+ * `sidebar_state` cookie that shadcn writes internally and never
+ * reads back. Cookie name follows Pivox convention rather than
+ * shadcn's underscore-style; the dead `sidebar_state` cookie from
+ * shadcn line 83 remains as harmless write-only noise (not modifying
+ * vendored shadcn code is the explicit tradeoff).
+ *
+ * Path `/` because the sidebar lives in the `_app` layout that
+ * wraps every authed route — the SSR beforeLoad reads it on every
+ * navigation, so the cookie has to ride on those requests.
+ *
+ * Value type is `boolean` — serialized as 'true' / 'false' via
+ * `String(value)` on write. parse accepts the same shape on read.
+ */
+export const SIDEBAR_OPEN = defineItem<boolean>({
+  name: 'pivox.sidebar-state',
+  path: '/',
+  parse: (v) => (v === 'true' ? true : v === 'false' ? false : null),
+});

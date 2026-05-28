@@ -1,10 +1,7 @@
 import { AppShellFeature } from '@pivox/features/app-shell';
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from '@pivox/primitives/sidebar';
+import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
 import { AppShell } from '@pivox/ui/app-shell';
+import { SidebarProvider } from '@pivox/ui/sidebar-provider';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
 import {
   Outlet,
@@ -21,7 +18,11 @@ import {
   prefetchOrgsForCurrentUser,
   prefetchSpacesForActiveOrg,
 } from '@/server/prefetch';
-import { getThemeCookie, type Theme } from '@/server/prefs';
+import {
+  getSidebarOpenCookie,
+  getThemeCookie,
+  type Theme,
+} from '@/server/prefs';
 
 // Lazy-load the profile dialog so it's client-only — it depends on
 // AuthContext (Firebase user) which isn't available during SSR.
@@ -75,18 +76,22 @@ export const Route = createFileRoute('/_app')({
     // selection with orgs[0] on every refresh.
     let initialActiveOrganization: string | null = null;
     let initialTheme: Theme | null = null;
+    let initialSidebarOpen: boolean | null = null;
     if (typeof window === 'undefined' && user.pivoxUserId) {
       // Fire the cookie reads alongside the prefetches — same request,
       // server-fn dispatch is in-process so this is effectively a
       // single batch with no extra round-trips.
-      const [activeOrgCookie, themeCookie, orgs, spaces] = await Promise.all([
-        getActiveOrgCookie(),
-        getThemeCookie(),
-        prefetchOrgsForCurrentUser(),
-        prefetchSpacesForActiveOrg(),
-      ]);
+      const [activeOrgCookie, themeCookie, sidebarOpenCookie, orgs, spaces] =
+        await Promise.all([
+          getActiveOrgCookie(),
+          getThemeCookie(),
+          getSidebarOpenCookie(),
+          prefetchOrgsForCurrentUser(),
+          prefetchSpacesForActiveOrg(),
+        ]);
       initialActiveOrganization = activeOrgCookie;
       initialTheme = themeCookie;
+      initialSidebarOpen = sidebarOpenCookie;
       if (orgs) {
         // queryKey from openapi-react-query is deterministic on
         // (method, path, params) — server-built queryOptions
@@ -111,14 +116,19 @@ export const Route = createFileRoute('/_app')({
       }
     }
 
-    return { user, initialActiveOrganization, initialTheme };
+    return {
+      user,
+      initialActiveOrganization,
+      initialTheme,
+      initialSidebarOpen,
+    };
   },
   component: AppLayoutRoute,
 });
 
 function AppLayoutRoute() {
   const router = useRouter();
-  const { user, initialActiveOrganization, initialTheme } =
+  const { user, initialActiveOrganization, initialTheme, initialSidebarOpen } =
     Route.useRouteContext();
   return (
     <AppShellFeature
@@ -141,7 +151,12 @@ function AppLayoutRoute() {
         void router.navigate({ to: '/auth/create-org' });
       }}
     >
-      <SidebarProvider>
+      {/* SSR-resolved sidebar open state from the cookie. Without
+          this, the wrapper's useState lazy initializer would see
+          `null` during SSR and use the default `true`, producing
+          HTML that doesn't match the client's first paint when the
+          user had previously collapsed the sidebar. */}
+      <SidebarProvider initialOpen={initialSidebarOpen ?? undefined}>
         <AppShell.Sidebar />
         <SidebarInset>
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
