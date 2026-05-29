@@ -12,10 +12,44 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const acquireConversationLease = `-- name: AcquireConversationLease :one
+UPDATE ai_conversations
+SET lock_holder = $2,
+    lock_expires_at = now() + interval '15 seconds'
+WHERE id = $1
+  AND (
+    lock_holder IS NULL
+    OR lock_expires_at < now()
+    OR lock_holder = $2
+  )
+RETURNING id
+`
+
+type AcquireConversationLeaseParams struct {
+	ID         uuid.UUID   `json:"id"`
+	LockHolder pgtype.UUID `json:"lock_holder"`
+}
+
+// AcquireConversationLease tries to take the per-conversation stream
+// lease. Succeeds (returns 1 row) when the lease is unheld, expired,
+// or already held by the same session_uid (idempotent re-acquire on
+// retry). Returns 0 rows when another session holds an unexpired
+// lease — the caller maps this to apierr.Aborted("active stream").
+//
+// TTL is set to 15s here; the heartbeat extends every 5s while the
+// stream is active. 10s slack tolerates one missed heartbeat;
+// consecutive misses lose the lease to the next acquirer.
+func (q *Queries) AcquireConversationLease(ctx context.Context, arg AcquireConversationLeaseParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, acquireConversationLease, arg.ID, arg.LockHolder)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createConversation = `-- name: CreateConversation :one
 INSERT INTO ai_conversations (org_id, name, title, description, created_by)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, lock_holder, lock_expires_at, create_time, update_time
 `
 
 type CreateConversationParams struct {
@@ -53,6 +87,8 @@ func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversation
 		&i.Revision,
 		&i.CreatedBy,
 		&i.UpdatedBy,
+		&i.LockHolder,
+		&i.LockExpiresAt,
 		&i.CreateTime,
 		&i.UpdateTime,
 	)
@@ -69,7 +105,7 @@ func (q *Queries) DeleteConversation(ctx context.Context, id uuid.UUID) error {
 }
 
 const getConversationByID = `-- name: GetConversationByID :one
-SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE id = $1
+SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, lock_holder, lock_expires_at, create_time, update_time FROM ai_conversations WHERE id = $1
 `
 
 func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConversation, error) {
@@ -90,6 +126,8 @@ func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConv
 		&i.Revision,
 		&i.CreatedBy,
 		&i.UpdatedBy,
+		&i.LockHolder,
+		&i.LockExpiresAt,
 		&i.CreateTime,
 		&i.UpdateTime,
 	)
@@ -97,7 +135,7 @@ func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConv
 }
 
 const getConversationByIDForUpdate = `-- name: GetConversationByIDForUpdate :one
-SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE id = $1 FOR UPDATE
+SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, lock_holder, lock_expires_at, create_time, update_time FROM ai_conversations WHERE id = $1 FOR UPDATE
 `
 
 // GetConversationByIDForUpdate is the locking variant used by
@@ -129,6 +167,8 @@ func (q *Queries) GetConversationByIDForUpdate(ctx context.Context, id uuid.UUID
 		&i.Revision,
 		&i.CreatedBy,
 		&i.UpdatedBy,
+		&i.LockHolder,
+		&i.LockExpiresAt,
 		&i.CreateTime,
 		&i.UpdateTime,
 	)
@@ -136,7 +176,7 @@ func (q *Queries) GetConversationByIDForUpdate(ctx context.Context, id uuid.UUID
 }
 
 const getConversationByName = `-- name: GetConversationByName :one
-SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE org_id = $1 AND name = $2
+SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, lock_holder, lock_expires_at, create_time, update_time FROM ai_conversations WHERE org_id = $1 AND name = $2
 `
 
 type GetConversationByNameParams struct {
@@ -168,10 +208,35 @@ func (q *Queries) GetConversationByName(ctx context.Context, arg GetConversation
 		&i.Revision,
 		&i.CreatedBy,
 		&i.UpdatedBy,
+		&i.LockHolder,
+		&i.LockExpiresAt,
 		&i.CreateTime,
 		&i.UpdateTime,
 	)
 	return i, err
+}
+
+const heartbeatConversationLease = `-- name: HeartbeatConversationLease :one
+UPDATE ai_conversations
+SET lock_expires_at = now() + interval '15 seconds'
+WHERE id = $1 AND lock_holder = $2
+RETURNING id
+`
+
+type HeartbeatConversationLeaseParams struct {
+	ID         uuid.UUID   `json:"id"`
+	LockHolder pgtype.UUID `json:"lock_holder"`
+}
+
+// HeartbeatConversationLease extends `lock_expires_at` for an active
+// lease the caller still owns. Returns 0 rows when the lease was
+// lost (taken over after expiry); the caller must treat that as
+// aborted and stop writing to this conversation.
+func (q *Queries) HeartbeatConversationLease(ctx context.Context, arg HeartbeatConversationLeaseParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, heartbeatConversationLease, arg.ID, arg.LockHolder)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const incrementConversationMessageCount = `-- name: IncrementConversationMessageCount :exec
@@ -187,6 +252,43 @@ func (q *Queries) IncrementConversationMessageCount(ctx context.Context, id uuid
 	return err
 }
 
+const isConversationLocked = `-- name: IsConversationLocked :one
+SELECT (lock_holder IS NOT NULL AND lock_expires_at > now())::boolean AS locked
+FROM ai_conversations
+WHERE id = $1
+`
+
+// IsConversationLocked reports whether a conversation currently has
+// an active (non-expired) lease. Used by DeleteConversation and
+// UpdateConversation to reject mid-stream mutations.
+func (q *Queries) IsConversationLocked(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, isConversationLocked, id)
+	var locked bool
+	err := row.Scan(&locked)
+	return locked, err
+}
+
+const releaseConversationLease = `-- name: ReleaseConversationLease :exec
+UPDATE ai_conversations
+SET lock_holder = NULL,
+    lock_expires_at = NULL
+WHERE id = $1 AND lock_holder = $2
+`
+
+type ReleaseConversationLeaseParams struct {
+	ID         uuid.UUID   `json:"id"`
+	LockHolder pgtype.UUID `json:"lock_holder"`
+}
+
+// ReleaseConversationLease drops the lease on stream end. Idempotent
+// and safe to call multiple times (e.g. defer + explicit). 0 rows
+// means the lease was already released or taken over — both are
+// terminal states the caller doesn't need to act on.
+func (q *Queries) ReleaseConversationLease(ctx context.Context, arg ReleaseConversationLeaseParams) error {
+	_, err := q.db.Exec(ctx, releaseConversationLease, arg.ID, arg.LockHolder)
+	return err
+}
+
 const setAutoTitle = `-- name: SetAutoTitle :one
 UPDATE ai_conversations
 SET title = $2,
@@ -194,7 +296,7 @@ SET title = $2,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, lock_holder, lock_expires_at, create_time, update_time
 `
 
 type SetAutoTitleParams struct {
@@ -222,6 +324,8 @@ func (q *Queries) SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiC
 		&i.Revision,
 		&i.CreatedBy,
 		&i.UpdatedBy,
+		&i.LockHolder,
+		&i.LockExpiresAt,
 		&i.CreateTime,
 		&i.UpdateTime,
 	)
@@ -244,7 +348,7 @@ SET title = COALESCE($3, title),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, lock_holder, lock_expires_at, create_time, update_time
 `
 
 type UpdateConversationParams struct {
@@ -288,6 +392,8 @@ func (q *Queries) UpdateConversation(ctx context.Context, arg UpdateConversation
 		&i.Revision,
 		&i.CreatedBy,
 		&i.UpdatedBy,
+		&i.LockHolder,
+		&i.LockExpiresAt,
 		&i.CreateTime,
 		&i.UpdateTime,
 	)

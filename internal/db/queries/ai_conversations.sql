@@ -77,3 +77,56 @@ SET message_count = message_count + 1,
     last_message_time = now(),
     update_time = now()
 WHERE id = $1;
+
+-- AcquireConversationLease tries to take the per-conversation stream
+-- lease. Succeeds (returns 1 row) when the lease is unheld, expired,
+-- or already held by the same session_uid (idempotent re-acquire on
+-- retry). Returns 0 rows when another session holds an unexpired
+-- lease — the caller maps this to apierr.Aborted("active stream").
+--
+-- TTL is set to 15s here; the heartbeat extends every 5s while the
+-- stream is active. 10s slack tolerates one missed heartbeat;
+-- consecutive misses lose the lease to the next acquirer.
+--
+-- name: AcquireConversationLease :one
+UPDATE ai_conversations
+SET lock_holder = $2,
+    lock_expires_at = now() + interval '15 seconds'
+WHERE id = $1
+  AND (
+    lock_holder IS NULL
+    OR lock_expires_at < now()
+    OR lock_holder = $2
+  )
+RETURNING id;
+
+-- HeartbeatConversationLease extends `lock_expires_at` for an active
+-- lease the caller still owns. Returns 0 rows when the lease was
+-- lost (taken over after expiry); the caller must treat that as
+-- aborted and stop writing to this conversation.
+--
+-- name: HeartbeatConversationLease :one
+UPDATE ai_conversations
+SET lock_expires_at = now() + interval '15 seconds'
+WHERE id = $1 AND lock_holder = $2
+RETURNING id;
+
+-- ReleaseConversationLease drops the lease on stream end. Idempotent
+-- and safe to call multiple times (e.g. defer + explicit). 0 rows
+-- means the lease was already released or taken over — both are
+-- terminal states the caller doesn't need to act on.
+--
+-- name: ReleaseConversationLease :exec
+UPDATE ai_conversations
+SET lock_holder = NULL,
+    lock_expires_at = NULL
+WHERE id = $1 AND lock_holder = $2;
+
+-- IsConversationLocked reports whether a conversation currently has
+-- an active (non-expired) lease. Used by DeleteConversation and
+-- UpdateConversation to reject mid-stream mutations.
+--
+-- name: IsConversationLocked :one
+SELECT (lock_holder IS NOT NULL AND lock_expires_at > now())::boolean AS locked
+FROM ai_conversations
+WHERE id = $1;

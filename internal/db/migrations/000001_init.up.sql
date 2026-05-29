@@ -1295,6 +1295,16 @@ CREATE TABLE ai_conversations (
     -- identities means the FK never dangles.
     created_by      UUID NOT NULL REFERENCES identities(id),
     updated_by UUID REFERENCES identities(id),
+    -- stream lease — one active stream per conversation at a time. A
+    -- StreamGenerateContent call sets `lock_holder` to its session
+    -- UUID and `lock_expires_at` to NOW()+15s, then heartbeats every
+    -- 5s to extend the TTL. Concurrent submits get apierr.Aborted;
+    -- concurrent Delete/Update get apierr.FailedPrecondition.
+    -- Lease auto-expires if the server holding it crashes (15s
+    -- ceiling) so the next session can take over by treating an
+    -- expired holder as "free".
+    lock_holder       UUID,
+    lock_expires_at   TIMESTAMPTZ,
     -- timestamps
     create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1312,6 +1322,13 @@ CREATE INDEX idx_ai_conversations_active ON ai_conversations (org_id, created_by
 
 -- Partial index for "pinned first" views.
 CREATE INDEX idx_ai_conversations_pinned ON ai_conversations (org_id, created_by, id DESC) WHERE pinned = TRUE;
+
+-- Partial index covering only rows with an active lease — most
+-- conversations have no lease most of the time. Used by the
+-- expired-lease sweep (future) and avoids touching the main hot
+-- indexes when the acquire query needs to check expiry.
+CREATE INDEX idx_ai_conversations_lock_expires ON ai_conversations (lock_expires_at)
+    WHERE lock_holder IS NOT NULL;
 
 -- ============================================================================
 -- AI chat — ai_messages

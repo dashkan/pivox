@@ -766,6 +766,8 @@ type AiConversation struct {
 	Revision        int32              `json:"revision"`
 	CreatedBy       uuid.UUID          `json:"created_by"`
 	UpdatedBy       pgtype.UUID        `json:"updated_by"`
+	LockHolder      pgtype.UUID        `json:"lock_holder"`
+	LockExpiresAt   pgtype.Timestamptz `json:"lock_expires_at"`
 	CreateTime      time.Time          `json:"create_time"`
 	UpdateTime      time.Time          `json:"update_time"`
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -192,9 +193,25 @@ func (s *Server) UpdateConversation(ctx context.Context, req *aiv1.UpdateConvers
 		}
 	}
 
-	row, err := s.queries.UpdateConversation(ctx, params)
+	// Lease check + update inside a single tx with SELECT FOR UPDATE
+	// so a concurrent stream acquire can't slip between the check and
+	// the update. Same pattern as DeleteConversation.
+	row, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.AiConversation, error) {
+		locked, err := qtx.GetConversationByIDForUpdate(ctx, existing.ID)
+		if err != nil {
+			return db.AiConversation{}, apierr.HandleResourceError(err, "Conversation", conv.GetName())
+		}
+		if isLeaseActive(locked) {
+			return db.AiConversation{}, apierr.FailedPrecondition(fmt.Sprintf("Conversation %q has an active stream; retry after the stream completes", conv.GetName()))
+		}
+		updated, err := qtx.UpdateConversation(ctx, params)
+		if err != nil {
+			return db.AiConversation{}, apierr.HandleResourceError(err, "Conversation", conv.GetName())
+		}
+		return updated, nil
+	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Conversation", conv.GetName())
+		return nil, err
 	}
 	actors, resolveErr := s.resolveConversationActors(ctx, []db.AiConversation{row})
 	if resolveErr != nil {
@@ -424,10 +441,40 @@ func (s *Server) DeleteConversation(ctx context.Context, req *aiv1.DeleteConvers
 	if err != nil {
 		return nil, err
 	}
-	if err := s.queries.DeleteConversation(ctx, existing.ID); err != nil {
-		return nil, apierr.HandleResourceError(err, "Conversation", req.GetName())
+	// Lease check + delete inside a single tx with SELECT FOR UPDATE
+	// so a concurrent stream acquire can't slip between the check and
+	// the delete. The row lock serializes the AcquireConversationLease
+	// UPDATE (which targets the same row) until this tx commits.
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
+		row, err := qtx.GetConversationByIDForUpdate(ctx, existing.ID)
+		if err != nil {
+			return apierr.HandleResourceError(err, "Conversation", req.GetName())
+		}
+		if isLeaseActive(row) {
+			return apierr.FailedPrecondition(fmt.Sprintf("Conversation %q has an active stream; retry after the stream completes", req.GetName()))
+		}
+		if err := qtx.DeleteConversation(ctx, existing.ID); err != nil {
+			return apierr.HandleResourceError(err, "Conversation", req.GetName())
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return &emptypb.Empty{}, nil
+}
+
+// isLeaseActive reports whether the (already FOR-UPDATE-locked)
+// conversation row has an active, non-expired stream lease. Pure
+// over the row state — no DB touch — so safe to call inside a tx
+// closure.
+func isLeaseActive(row db.AiConversation) bool {
+	if !row.LockHolder.Valid {
+		return false
+	}
+	if !row.LockExpiresAt.Valid {
+		return false
+	}
+	return row.LockExpiresAt.Time.After(time.Now())
 }
 
 // resolveConversation loads a conversation, enforcing path-bound

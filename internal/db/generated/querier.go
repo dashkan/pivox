@@ -12,6 +12,17 @@ import (
 )
 
 type Querier interface {
+	// AcquireConversationLease tries to take the per-conversation stream
+	// lease. Succeeds (returns 1 row) when the lease is unheld, expired,
+	// or already held by the same session_uid (idempotent re-acquire on
+	// retry). Returns 0 rows when another session holds an unexpired
+	// lease — the caller maps this to apierr.Aborted("active stream").
+	//
+	// TTL is set to 15s here; the heartbeat extends every 5s while the
+	// stream is active. 10s slack tolerates one missed heartbeat;
+	// consecutive misses lose the lease to the next acquirer.
+	//
+	AcquireConversationLease(ctx context.Context, arg AcquireConversationLeaseParams) (uuid.UUID, error)
 	// CancelDomainOpsForDomain marks running CreateDomain LROs for the
 	// given (org, domain) pair as cancelled. The match is on
 	// metadata->>'domain' (set by runVerifyDomain) AND on the
@@ -480,7 +491,18 @@ type Querier interface {
 	// resolve as is_deleted=true). HardDelete remains for terminal
 	// purges only.
 	HardDeleteIdentity(ctx context.Context, id uuid.UUID) error
+	// HeartbeatConversationLease extends `lock_expires_at` for an active
+	// lease the caller still owns. Returns 0 rows when the lease was
+	// lost (taken over after expiry); the caller must treat that as
+	// aborted and stop writing to this conversation.
+	//
+	HeartbeatConversationLease(ctx context.Context, arg HeartbeatConversationLeaseParams) (uuid.UUID, error)
 	IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error
+	// IsConversationLocked reports whether a conversation currently has
+	// an active (non-expired) lease. Used by DeleteConversation and
+	// UpdateConversation to reject mid-stream mutations.
+	//
+	IsConversationLocked(ctx context.Context, id uuid.UUID) (bool, error)
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
 	// Caller-scoped slim view: (active org, highest-precedence role) for
 	// an identity. Combines direct user bindings and group-mediated
@@ -711,6 +733,12 @@ type Querier interface {
 	// handler read it. Returns the deleted id on success; pgx.ErrNoRows
 	// on etag drift, which the LRO surfaces as FailedPrecondition.
 	PurgeSpace(ctx context.Context, arg PurgeSpaceParams) (uuid.UUID, error)
+	// ReleaseConversationLease drops the lease on stream end. Idempotent
+	// and safe to call multiple times (e.g. defer + explicit). 0 rows
+	// means the lease was already released or taken over — both are
+	// terminal states the caller doesn't need to act on.
+	//
+	ReleaseConversationLease(ctx context.Context, arg ReleaseConversationLeaseParams) error
 	// ResolveProviderByDomain is the query backing the
 	// POST /internal/v1/auth:resolveProvider endpoint. Joins the
 	// email's domain to the SsoConfig via the verified Domain row and

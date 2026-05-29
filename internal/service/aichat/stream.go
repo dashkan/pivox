@@ -2,18 +2,23 @@ package aichat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -22,6 +27,20 @@ import (
 
 const defaultModelContextBudget = 22500
 const defaultMaxHistoryRows = 500
+
+// Conversation-lease parameters. The lease prevents two concurrent
+// streams against the same conversation (cross-tab, cross-session)
+// and stops mid-stream Delete/Update from racing with assistant
+// persistence. See ai_conversations.sql for the acquire/heartbeat/
+// release queries.
+//
+// `leaseHeartbeatInterval` < `leaseTTL` − margin: 5s heartbeat into
+// a 15s TTL means a single failed heartbeat still leaves 5s before
+// expiry — the next attempt catches up and the lease holds.
+const (
+	leaseHeartbeatInterval = 5 * time.Second
+	leaseReleaseTimeout    = 5 * time.Second
+)
 
 // StreamGenerateContent is the server-streaming variant of
 // `GenerateContent`. Same request shape; emits the response as a
@@ -204,6 +223,58 @@ func (s *Server) runGenerate(
 	}
 	conv := &convRow
 
+	// Acquire the conversation lease. Until this call returns
+	// successfully no other stream can submit a turn against this
+	// conversation, and Delete/Update on this conversation will be
+	// rejected with FailedPrecondition. Concurrent acquire from
+	// another tab returns 0 rows (pgx.ErrNoRows) — surface as
+	// Aborted, mapped to "conflict, please retry" on the SSE wire.
+	sessionUID := uuid.New()
+	if _, err := s.queries.AcquireConversationLease(ctx, db.AcquireConversationLeaseParams{
+		ID:         conv.ID,
+		LockHolder: convert.PgUUID(sessionUID),
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, "", apierr.Aborted("Conversation", req.GetConversation(), "ACTIVE_STREAM")
+		}
+		slog.ErrorContext(ctx, "acquire lease failed", "conversation_id", conv.ID, "error", err)
+		return nil, nil, "", apierr.Internal("acquire conversation lease")
+	}
+
+	// Heartbeat goroutine extends the TTL every 5s until hbCtx is
+	// done (stream end: clean finish, client disconnect, upstream
+	// error). Bounded lifetime — no leak: defer hbCancel() pairs
+	// with the goroutine's <-hbCtx.Done() exit.
+	//
+	// Defer ORDER (LIFO):
+	//   1. defer release (registered second; runs LAST)
+	//   2. defer hbCancel (registered first; runs SECOND from last)
+	//
+	// We want hbCancel to fire BEFORE release so the heartbeat
+	// goroutine has stopped issuing UPDATEs against this row by the
+	// time release issues its own UPDATE. Otherwise heartbeat and
+	// release race against each other (correct semantics — they
+	// serialize, neither corrupts state — but wasted UPDATEs + log
+	// noise during teardown). Register release FIRST so it runs
+	// LAST, then register hbCancel.
+	hbCtx, hbCancel := context.WithCancel(ctx)
+	// Release lease on function exit. Detached background context so
+	// a disconnected stream still releases — by the time this runs
+	// the request ctx is typically Done.
+	defer func() {
+		relCtx, relCancel := context.WithTimeout(context.Background(), leaseReleaseTimeout)
+		defer relCancel()
+		if err := s.queries.ReleaseConversationLease(relCtx, db.ReleaseConversationLeaseParams{
+			ID:         conv.ID,
+			LockHolder: convert.PgUUID(sessionUID),
+		}); err != nil {
+			slog.WarnContext(relCtx, "release conversation lease failed; lease will expire via TTL",
+				"conversation_id", conv.ID, "error", err)
+		}
+	}()
+	defer hbCancel()
+	go s.runConversationLeaseHeartbeat(hbCtx, conv.ID, sessionUID)
+
 	// Persist only the LAST inbound message. useChat sends the entire
 	// UI conversation history on every turn (its default transport
 	// behavior); the server already has every prior turn via prior
@@ -213,9 +284,19 @@ func (s *Server) runGenerate(
 	// history client-side once `conversation` is set so len(inbound)==1
 	// in practice; this branch is defense in depth.
 	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
-		if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
+		row, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID)
+		if err != nil {
 			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
 			return apierr.Internal("lock conversation")
+		}
+		// Mirror of Tx B's takeover defense. Acquire happened a
+		// microsecond ago so the holder MUST match here; if it
+		// doesn't, the schema-level lease invariant is broken
+		// (concurrent DB write outside this code path, manual
+		// SQL, replication anomaly) and we abort rather than
+		// persisting against a row we no longer own.
+		if !row.LockHolder.Valid || row.LockHolder.Bytes != sessionUID {
+			return apierr.Aborted("Conversation", req.GetConversation(), "LEASE_TAKEN_OVER")
 		}
 		inbound := req.GetMessages()
 		if len(inbound) == 0 {
@@ -386,9 +467,21 @@ func (s *Server) runGenerate(
 		return nil, nil, "", apierr.Internal("marshal assistant parts")
 	}
 	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
-		if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
+		row, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID)
+		if err != nil {
 			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
 			return apierr.Internal("lock conversation")
+		}
+		// Lease takeover defense: if a different session now holds
+		// the lease (our heartbeat lost a race after a transient DB
+		// hiccup, or our TTL expired), the row we locked is the
+		// other session's row. Aborting prevents persisting the
+		// assistant reply against a conversation the user has
+		// already moved on from in another tab.
+		if !row.LockHolder.Valid || row.LockHolder.Bytes != sessionUID {
+			slog.WarnContext(ctx, "lease taken over before assistant persist; abandoning write",
+				"conversation_id", conv.ID)
+			return apierr.Aborted("Conversation", req.GetConversation(), "LEASE_TAKEN_OVER")
 		}
 		return persistMessageOnQtx(ctx, qtx, conv.ID, db.CreateMessageParams{
 			ConversationID: conv.ID,
@@ -398,6 +491,12 @@ func (s *Server) runGenerate(
 			TokenCount:     int32(estimateTokens(assistantText.String())),
 		})
 	}); err != nil {
+		// Aborted (lease takeover) is the only non-Internal mapping
+		// here — let it propagate verbatim. Everything else collapses
+		// to a generic Internal so we don't leak driver detail.
+		if status.Code(err) == codes.Aborted {
+			return nil, nil, "", err
+		}
 		slog.ErrorContext(ctx, "persist assistant message failed", "conversation_id", conv.ID, "error", err)
 		return nil, nil, "", apierr.Internal("persist assistant message")
 	}
@@ -498,6 +597,54 @@ func dbRoleForInputMessage(r string) (string, error) {
 		return r, nil
 	default:
 		return "", apierr.Internal("unexpected role reached persistence (validator should have rejected)")
+	}
+}
+
+// runConversationLeaseHeartbeat extends the conversation lease's
+// TTL on a fixed interval until ctx is done. Designed to live in a
+// goroutine paired with `defer hbCancel()` at the caller.
+//
+// Two failure modes:
+//
+//   - Transient DB error: log + keep trying. A single missed
+//     heartbeat leaves 5s of slack before the 15s TTL expires; the
+//     next tick will catch up. Multiple consecutive misses
+//     ultimately surface as a lost lease (next case).
+//
+//   - Lease taken over (pgx.ErrNoRows): another session acquired
+//     the lease after our TTL expired. Return immediately. The
+//     stream is still running but the assistant-persist tx will
+//     detect the takeover via lock_holder mismatch and abort the
+//     write.
+//
+// Does NOT propagate errors to the stream — by design. The stream
+// should run to completion on the model side even if the lease is
+// momentarily lost; the persistence guard is the real safety.
+func (s *Server) runConversationLeaseHeartbeat(ctx context.Context, convID, sessionUID uuid.UUID) {
+	ticker := time.NewTicker(leaseHeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			_, err := s.queries.HeartbeatConversationLease(ctx, db.HeartbeatConversationLeaseParams{
+				ID:         convID,
+				LockHolder: convert.PgUUID(sessionUID),
+			})
+			if err == nil {
+				continue
+			}
+			if errors.Is(err, pgx.ErrNoRows) {
+				slog.WarnContext(ctx, "conversation lease taken over; heartbeat stopped",
+					"conversation_id", convID)
+				return
+			}
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return
+			}
+			slog.ErrorContext(ctx, "lease heartbeat failed", "conversation_id", convID, "error", err)
+		}
 	}
 }
 
