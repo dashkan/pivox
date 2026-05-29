@@ -289,9 +289,12 @@ message GenerateContentRequest {
   // when unset.
   float temperature = 6 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. Maximum output tokens. Server caps this if unset or
-  // above its policy limit.
-  int32 max_output_tokens = 7 [(google.api.field_behavior) = OPTIONAL];
+  // Note: `max_output_tokens` (field 7) was removed in this branch.
+  // The field existed since the original proto but was never plumbed
+  // through `runGenerate` → `model.StreamRequest` — a phantom lever.
+  // Re-add it as a typed setting on `model.StreamRequest` AND thread
+  // it through when there's a real need, rather than restoring a
+  // no-op field that lies to callers.
 }
 
 // Response from the unary `GenerateContent`. The streaming variant

@@ -2507,12 +2507,6 @@ export interface components {
              *     when unset.
              */
             temperature?: number;
-            /**
-             * Format: int32
-             * @description Optional. Maximum output tokens. Server caps this if unset or
-             *     above its policy limit.
-             */
-            maxOutputTokens?: number;
         };
         /**
          * @description Input to `GenerateContent` and `StreamGenerateContent`. Mirrors the
@@ -2559,12 +2553,6 @@ export interface components {
              *     when unset.
              */
             temperature?: number;
-            /**
-             * Format: int32
-             * @description Optional. Maximum output tokens. Server caps this if unset or
-             *     above its policy limit.
-             */
-            maxOutputTokens?: number;
         };
         /** @description Request message for `SummarizeConversation`. */
         AiChatSummarizeConversationBody: Record<string, never>;

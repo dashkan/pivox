@@ -83,12 +83,9 @@ type GenerateContentRequest struct {
 	Tools []*ToolDefinition `protobuf:"bytes,5,rep,name=tools,proto3" json:"tools,omitempty"`
 	// Optional. Sampling temperature. Server picks a sensible default
 	// when unset.
-	Temperature float32 `protobuf:"fixed32,6,opt,name=temperature,proto3" json:"temperature,omitempty"`
-	// Optional. Maximum output tokens. Server caps this if unset or
-	// above its policy limit.
-	MaxOutputTokens int32 `protobuf:"varint,7,opt,name=max_output_tokens,json=maxOutputTokens,proto3" json:"max_output_tokens,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	Temperature   float32 `protobuf:"fixed32,6,opt,name=temperature,proto3" json:"temperature,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GenerateContentRequest) Reset() {
@@ -159,13 +156,6 @@ func (x *GenerateContentRequest) GetTools() []*ToolDefinition {
 func (x *GenerateContentRequest) GetTemperature() float32 {
 	if x != nil {
 		return x.Temperature
-	}
-	return 0
-}
-
-func (x *GenerateContentRequest) GetMaxOutputTokens() int32 {
-	if x != nil {
-		return x.MaxOutputTokens
 	}
 	return 0
 }
@@ -2682,7 +2672,7 @@ var File_pivox_ai_v1_ai_chat_proto protoreflect.FileDescriptor
 
 const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x19pivox/ai/v1/ai_chat.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1bpivox/ai/v1/artifacts.proto\x1a\x1fpivox/ai/v1/conversations.proto\x1a\x1apivox/ai/v1/messages.proto\x1a!pivox/permission/v1/options.proto\"\x86\x03\n" +
+	"\x19pivox/ai/v1/ai_chat.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1bpivox/ai/v1/artifacts.proto\x1a\x1fpivox/ai/v1/conversations.proto\x1a\x1apivox/ai/v1/messages.proto\x1a!pivox/permission/v1/options.proto\"\xd5\x02\n" +
 	"\x16GenerateContentRequest\x12!\n" +
 	"\x06parent\x18\x01 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x06parent\x12A\n" +
 	"\fconversation\x18\x02 \x01(\tB\x1d\xe0A\x01\xfaA\x17\n" +
@@ -2690,8 +2680,7 @@ const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\bmessages\x18\x03 \x03(\v2\x19.pivox.ai.v1.InputMessageB\v\xe0A\x02\xbaH\x05\x92\x01\x02\b\x01R\bmessages\x122\n" +
 	"\x12system_instruction\x18\x04 \x01(\tB\x03\xe0A\x01R\x11systemInstruction\x126\n" +
 	"\x05tools\x18\x05 \x03(\v2\x1b.pivox.ai.v1.ToolDefinitionB\x03\xe0A\x01R\x05tools\x12%\n" +
-	"\vtemperature\x18\x06 \x01(\x02B\x03\xe0A\x01R\vtemperature\x12/\n" +
-	"\x11max_output_tokens\x18\a \x01(\x05B\x03\xe0A\x01R\x0fmaxOutputTokens\"\x8e\x01\n" +
+	"\vtemperature\x18\x06 \x01(\x02B\x03\xe0A\x01R\vtemperature\"\x8e\x01\n" +
 	"\x17GenerateContentResponse\x12.\n" +
 	"\amessage\x18\x01 \x01(\v2\x14.pivox.ai.v1.MessageR\amessage\x12-\n" +
 	"\x05usage\x18\x02 \x01(\v2\x17.pivox.ai.v1.TokenUsageR\x05usage\x12\x14\n" +

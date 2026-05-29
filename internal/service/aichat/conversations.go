@@ -2,7 +2,9 @@ package aichat
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 
@@ -239,27 +241,22 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 		return convert.ConversationToProto(row, orgName, actors), nil
 	}
 
-	genReq := &aiv1.GenerateContentRequest{
-		Parent:            fmt.Sprintf("organizations/%s/users/%s", orgName, pathUser),
-		SystemInstruction: summarySystemPrompt,
-		MaxOutputTokens:   32,
-		Temperature:       0.3,
-		Messages: []*aiv1.InputMessage{
-			{
-				Role: "user",
-				Parts: []*aiv1.MessagePart{
-					{Type: "text", Text: transcript},
-				},
-			},
-		},
-	}
-
-	msg, _, _, err := s.runGenerate(ctx, genReq, nil)
+	// SummarizeConversation calls the model layer directly rather than
+	// going through runGenerate. The chat RPCs (GenerateContent,
+	// StreamGenerateContent) always auto-create a conversation when
+	// the caller doesn't supply one — the whole point of the public
+	// API is stateful chat. Summarize is the opposite: a one-shot
+	// internal computation over existing history, with no persistence
+	// of its own. Routing it through runGenerate would either (a)
+	// require a "stateless" branch that pollutes the public API, or
+	// (b) create a junk auto-conversation every time a title gets
+	// generated. Direct model call avoids both.
+	title, err := s.summarizeTranscript(ctx, transcript)
 	if err != nil {
 		slog.ErrorContext(ctx, "summarize failed", "conversation_id", row.ID, "error", err)
 		return nil, apierr.Internal("summarize failed")
 	}
-	title := sanitizeTitle(extractTextFromMessage(msg))
+	title = sanitizeTitle(title)
 	if title == "" {
 		actors, err := s.resolveConversationActors(ctx, []db.AiConversation{row})
 		if err != nil {
@@ -292,6 +289,49 @@ const summarySystemPrompt = "You generate concise conversation titles. " +
 	"other formatting characters. Do not wrap the title in quotes. Do not add " +
 	"a leading label, preface, or trailing punctuation. Plain words only."
 
+// summarizeTranscript runs a one-shot model call over the supplied
+// transcript and returns the accumulated text response (the
+// summary-title before any sanitization).
+//
+// Bypasses runGenerate intentionally — see SummarizeConversation's
+// caller-side comment. The call is read-only with respect to the
+// conversation: history was loaded by the caller, and the title
+// gets persisted by the caller separately (via SetAutoTitle, not
+// as a Message row).
+func (s *Server) summarizeTranscript(ctx context.Context, transcript string) (string, error) {
+	reader, err := s.model.Stream(ctx, model.StreamRequest{
+		SystemPrompt: summarySystemPrompt,
+		Messages: []model.Message{
+			{Role: "user", Parts: []model.MessagePart{{Type: "text", Text: transcript}}},
+		},
+		Temperature: 0.3,
+	})
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		// Same "already closed" tolerance as runGenerate's model-stream
+		// defer — the model client may error on second close after a
+		// natural EOF and the result is not actionable.
+		_ = reader.Close()
+	}()
+
+	var sb strings.Builder
+	for {
+		evt, err := reader.Next(ctx)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		if evt.Kind == "text_delta" {
+			sb.WriteString(evt.Text)
+		}
+	}
+	return sb.String(), nil
+}
+
 func renderTranscriptForSummary(history []model.Message) string {
 	var sb strings.Builder
 	for _, m := range history {
@@ -320,18 +360,9 @@ func renderTranscriptForSummary(history []model.Message) string {
 	return sb.String()
 }
 
-func extractTextFromMessage(m *aiv1.Message) string {
-	if m == nil {
-		return ""
-	}
-	var sb strings.Builder
-	for _, p := range m.GetParts() {
-		if p.GetType() == "text" {
-			sb.WriteString(p.GetText())
-		}
-	}
-	return sb.String()
-}
+// Removed: `extractTextFromMessage`. SummarizeConversation now
+// receives plain text from summarizeTranscript — no Message-shape
+// unwrap needed.
 
 func sanitizeTitle(s string) string {
 	s = strings.TrimSpace(s)

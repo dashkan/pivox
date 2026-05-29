@@ -107,10 +107,23 @@ func (s *Server) ensureConversationForStream(ctx context.Context, parent string)
 
 // GenerateContent is the unary counterpart to `StreamGenerateContent`.
 // Runs the same generation flow but accumulates the response into a
-// single `Message` and returns it. Use this for one-shot completions
-// (title summarization, classification, etc.) and stateful turns
-// where the caller doesn't need streaming.
+// single `Message` and returns it. Always stateful: like
+// `StreamGenerateContent`, an empty `conversation` triggers
+// auto-create so a chat-shaped consumer doesn't have to choreograph
+// a `CreateConversation` + `GenerateContent` pair.
+//
+// Stateless internal one-shots (title summarization, intent
+// classification) should call `s.model.Stream` directly — see
+// `summarizeTranscript` for the pattern — rather than go through
+// this RPC and discard the auto-created row.
 func (s *Server) GenerateContent(ctx context.Context, req *aiv1.GenerateContentRequest) (*aiv1.GenerateContentResponse, error) {
+	if req.GetConversation() == "" {
+		convName, err := s.ensureConversationForStream(ctx, req.GetParent())
+		if err != nil {
+			return nil, err
+		}
+		req.Conversation = convName
+	}
 	msg, usage, modelName, err := s.runGenerate(ctx, req, nil)
 	if err != nil {
 		return nil, err
@@ -171,85 +184,67 @@ func (s *Server) runGenerate(
 		return nil, nil, "", err
 	}
 
-	// Stateful when conversation is set; stateless otherwise.
-	var conv *db.AiConversation
-	var convPathUser uuid.UUID
-	if convRef := req.GetConversation(); convRef != "" {
-		convOrgName, pathUser, convName, err := parseConversationName(convRef)
-		if err != nil {
-			return nil, nil, "", apierr.InvalidArgument(apierr.FieldViolation("conversation", err.Error()))
-		}
-		if convOrgName != orgName {
-			return nil, nil, "", apierr.BadRequest("conversation's organization does not match request parent")
-		}
-		// Generation is creator-only — no `*All` bypass. An admin
-		// auditing another user's chats does not generate new turns
-		// on their behalf.
-		row, err := s.resolveConversation(ctx, convOrgName, pathUser, convName, "")
-		if err != nil {
-			return nil, nil, "", err
-		}
-		conv = &row
-		convPathUser = pathUser
+	// Conversation is always non-empty by the time runGenerate runs —
+	// both GenerateContent and StreamGenerateContent auto-create via
+	// ensureConversationForStream when the caller doesn't supply one.
+	// Stateless one-shots bypass this path entirely (they call
+	// s.model.Stream directly; see summarizeTranscript).
+	convOrgName, convPathUser, convName, err := parseConversationName(req.GetConversation())
+	if err != nil {
+		return nil, nil, "", apierr.InvalidArgument(apierr.FieldViolation("conversation", err.Error()))
+	}
+	if convOrgName != orgName {
+		return nil, nil, "", apierr.BadRequest("conversation's organization does not match request parent")
+	}
+	// Generation is creator-only — no `*All` bypass. An admin auditing
+	// another user's chats does not generate new turns on their behalf.
+	convRow, err := s.resolveConversation(ctx, convOrgName, convPathUser, convName, "")
+	if err != nil {
+		return nil, nil, "", err
+	}
+	conv := &convRow
 
-		// Persist each inbound message in order. The most common
-		// case is a single user turn, but the request shape allows
-		// multiple (e.g. catching up after a tool round trip).
-		//
-		// The whole batch runs in a single tx so a failure mid-loop
-		// rolls back any messages already inserted in this call —
-		// otherwise messages 1..k-1 commit, message k fails, the RPC
-		// returns an error, and the conversation is left with phantom
-		// rows the client has no name to retry against. Lock the
-		// conversation row once at the start so concurrent persists
-		// (e.g. another tool round-trip racing this one) queue.
-		// Persist only the LAST inbound message. useChat sends the
-		// entire UI conversation history on every turn (its default
-		// transport behavior); the server already has every turn
-		// before the last via prior calls' persistence. Looping over
-		// all inbound messages here would re-insert duplicates of
-		// the prior turns and explode the conversation by N every
-		// round. Clients that strip the history client-side (the
-		// Pivox transport does this once `conversation` is set) end
-		// up with len(inbound)==1 anyway, so this branch is just
-		// defense in depth.
-		if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
-			if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
-				slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
-				return apierr.Internal("lock conversation")
-			}
-			inbound := req.GetMessages()
-			if len(inbound) == 0 {
-				return nil
-			}
-			last := inbound[len(inbound)-1]
-			params, err := buildInputMessageParams(conv.ID, last)
-			if err != nil {
-				return err
-			}
-			return persistMessageOnQtx(ctx, qtx, conv.ID, params)
-		}); err != nil {
-			return nil, nil, "", err
+	// Persist only the LAST inbound message. useChat sends the entire
+	// UI conversation history on every turn (its default transport
+	// behavior); the server already has every prior turn via prior
+	// calls' persistence. Looping over all inbound messages would
+	// re-insert duplicates of the prior turns and explode the
+	// conversation by N every round. The Pivox transport strips
+	// history client-side once `conversation` is set so len(inbound)==1
+	// in practice; this branch is defense in depth.
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
+		if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
+			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
+			return apierr.Internal("lock conversation")
 		}
+		inbound := req.GetMessages()
+		if len(inbound) == 0 {
+			// Unreachable under the validator chain (the proto's
+			// `repeated.min_items=1` on GenerateContentRequest.messages
+			// + the unary/stream validation interceptors). If it
+			// fires anyway — interceptor bypassed, internal caller,
+			// validator drift — surface loudly. Silent return-nil
+			// would commit the tx as a no-op and let the assistant
+			// persist alone (a "user said nothing → assistant
+			// replied" row pair).
+			return apierr.Internal("invariant: runGenerate called with no inbound messages")
+		}
+		last := inbound[len(inbound)-1]
+		params, err := buildInputMessageParams(conv.ID, last)
+		if err != nil {
+			return err
+		}
+		return persistMessageOnQtx(ctx, qtx, conv.ID, params)
+	}); err != nil {
+		return nil, nil, "", err
 	}
 
-	// Build the model context. Stateful: load history from DB
-	// (already includes the just-persisted inbound messages).
-	// Stateless: use inbound messages directly.
-	var history []model.Message
-	if conv != nil {
-		h, err := s.loadModelHistory(ctx, conv.ID)
-		if err != nil {
-			slog.ErrorContext(ctx, "load history failed", "conversation_id", conv.ID, "error", err)
-			return nil, nil, "", apierr.Internal("failed to load history")
-		}
-		history = h
-	} else {
-		h, err := inputMessagesToModel(req.GetMessages())
-		if err != nil {
-			return nil, nil, "", err
-		}
-		history = h
+	// History always loads from DB now (state-of-conversation is the
+	// source of truth, not the inbound message list).
+	history, err := s.loadModelHistory(ctx, conv.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "load history failed", "conversation_id", conv.ID, "error", err)
+		return nil, nil, "", apierr.Internal("failed to load history")
 	}
 
 	// Resolve system instruction: per-call override wins; otherwise
@@ -263,20 +258,18 @@ func (s *Server) runGenerate(
 	// Emit `start` carrying the conversation resource name in
 	// `messageMetadata` so the client can persist the handle for
 	// follow-up turns (and skip re-sending the entire history every
-	// time). Only emitted when stateful; the unary GenerateContent
-	// path passes nil for `emit` so this is naturally skipped for
-	// non-streaming consumers, and stateless one-shots that don't
-	// set up a conv have nothing useful to emit here.
+	// time). Only emitted when streaming; unary GenerateContent passes
+	// nil for `emit` so the entire block is skipped.
 	assistantMsgID := uuid.New().String()[:12]
 	if emit != nil {
-		startEvent := &aiv1.Start{MessageId: assistantMsgID}
-		if conv != nil {
-			startEvent.MessageMetadata = &aiv1.ChatMessageMetadata{
+		startEvent := &aiv1.Start{
+			MessageId: assistantMsgID,
+			MessageMetadata: &aiv1.ChatMessageMetadata{
 				Conversation: fmt.Sprintf(
 					"organizations/%s/users/%s/conversations/%s",
 					orgName, convPathUser, conv.Name,
 				),
-			}
+			},
 		}
 		if err := emit(&aiv1.ServerEvent{
 			Event: &aiv1.ServerEvent_Start{Start: startEvent},
@@ -377,10 +370,9 @@ func (s *Server) runGenerate(
 		Parts: assistantParts,
 	}
 
-	// Persist assistant response when stateful. Separate tx from the
-	// inbound batch — model.Stream just ran (potentially seconds-to-
-	// minutes), so we don't want a tx held across that. Lock once,
-	// persist once.
+	// Persist assistant response. Separate tx from the inbound batch —
+	// model.Stream just ran (potentially seconds-to-minutes), so we
+	// don't want a tx held across that. Lock once, persist once.
 	//
 	// marshalParts runs OUTSIDE the tx closure per CLAUDE.md's
 	// "tx closures must be DB-only" rule — marshaling is pure and a
@@ -388,33 +380,30 @@ func (s *Server) runGenerate(
 	// checked before opening the tx; the prior `_ :=` swallow meant
 	// a marshal failure persisted `nil` into the parts column
 	// silently.
-	if conv != nil {
-		assistantPartsJSON, err := marshalParts(assistantParts)
-		if err != nil {
-			slog.ErrorContext(ctx, "marshal assistant parts failed", "conversation_id", conv.ID, "error", err)
-			return nil, nil, "", apierr.Internal("marshal assistant parts")
-		}
-		if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
-			if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
-				slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
-				return apierr.Internal("lock conversation")
-			}
-			return persistMessageOnQtx(ctx, qtx, conv.ID, db.CreateMessageParams{
-				ConversationID: conv.ID,
-				Name:           assistantMsgID,
-				Role:           "assistant",
-				Parts:          assistantPartsJSON,
-				TokenCount:     int32(estimateTokens(assistantText.String())),
-			})
-		}); err != nil {
-			slog.ErrorContext(ctx, "persist assistant message failed", "conversation_id", conv.ID, "error", err)
-			return nil, nil, "", apierr.Internal("persist assistant message")
-		}
-
-		// Full AIP-122 resource name. We have orgName resolved
-		// upstream from `req.GetParent()`.
-		assistantMsg.Name = buildMessageName(orgName, convPathUser, conv.Name, assistantMsgID)
+	assistantPartsJSON, err := marshalParts(assistantParts)
+	if err != nil {
+		slog.ErrorContext(ctx, "marshal assistant parts failed", "conversation_id", conv.ID, "error", err)
+		return nil, nil, "", apierr.Internal("marshal assistant parts")
 	}
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
+		if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
+			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
+			return apierr.Internal("lock conversation")
+		}
+		return persistMessageOnQtx(ctx, qtx, conv.ID, db.CreateMessageParams{
+			ConversationID: conv.ID,
+			Name:           assistantMsgID,
+			Role:           "assistant",
+			Parts:          assistantPartsJSON,
+			TokenCount:     int32(estimateTokens(assistantText.String())),
+		})
+	}); err != nil {
+		slog.ErrorContext(ctx, "persist assistant message failed", "conversation_id", conv.ID, "error", err)
+		return nil, nil, "", apierr.Internal("persist assistant message")
+	}
+
+	// Full AIP-122 resource name.
+	assistantMsg.Name = buildMessageName(orgName, convPathUser, conv.Name, assistantMsgID)
 
 	usage := &aiv1.TokenUsage{
 		InputTokens:  estimateInputTokens(history, systemPrompt),
@@ -512,29 +501,9 @@ func dbRoleForInputMessage(r string) (string, error) {
 	}
 }
 
-// inputMessagesToModel converts a list of proto InputMessages to the
-// internal model layer's representation, used by the stateless path.
-// Cross-field constraints (tool-role must include a tool-* part with
-// state=output-available) are enforced at the validation interceptor
-// via the buf-validate CEL rules on InputMessage and MessagePart.
-func inputMessagesToModel(in []*aiv1.InputMessage) ([]model.Message, error) {
-	out := make([]model.Message, 0, len(in))
-	for _, m := range in {
-		role, err := dbRoleForInputMessage(m.GetRole())
-		if err != nil {
-			slog.Error("unexpected role reached model conversion", "role", m.GetRole(), "error", err)
-			return nil, err
-		}
-		mm := model.Message{Role: role}
-		for _, p := range m.GetParts() {
-			if mp, ok := protoPartToModel(p); ok {
-				mm.Parts = append(mm.Parts, mp)
-			}
-		}
-		out = append(out, mm)
-	}
-	return out, nil
-}
+// Removed: `inputMessagesToModel` and the stateless-branch caller.
+// Reintroducing it would let callers bypass persistence — the
+// stateless RPC path no longer exists.
 
 // protoPartToModel converts a proto MessagePart (Vercel-shaped flat
 // part with a `type` discriminator) into the model layer's

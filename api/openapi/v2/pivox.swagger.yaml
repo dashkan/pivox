@@ -8591,12 +8591,6 @@ definitions:
         description: |-
           Optional. Sampling temperature. Server picks a sensible default
           when unset.
-      maxOutputTokens:
-        type: integer
-        format: int32
-        description: |-
-          Optional. Maximum output tokens. Server caps this if unset or
-          above its policy limit.
     description: |-
       Input to `GenerateContent` and `StreamGenerateContent`. Mirrors the
       shape of the Vercel AI SDK's `streamText` / `generateText` params
@@ -8652,12 +8646,6 @@ definitions:
         description: |-
           Optional. Sampling temperature. Server picks a sensible default
           when unset.
-      maxOutputTokens:
-        type: integer
-        format: int32
-        description: |-
-          Optional. Maximum output tokens. Server caps this if unset or
-          above its policy limit.
     description: |-
       Input to `GenerateContent` and `StreamGenerateContent`. Mirrors the
       shape of the Vercel AI SDK's `streamText` / `generateText` params
