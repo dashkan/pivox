@@ -302,6 +302,110 @@ func SanitizeLogString(s string) string {
 	return r.Replace(s)
 }
 
+// ToSSEErrorText collapses a gRPC status error into a user-safe single string
+// suitable for the `errorText` field of a Vercel AI SDK SSE error chunk
+// (`{type:"error", errorText:string}` per uiMessageChunkSchema). Used by SSE
+// adapters that wrap gRPC streaming RPCs — the error chunk has no structured
+// shape, so this funnels code + message to a single line a user can read.
+//
+// Messages from caller-safe codes (NotFound, PermissionDenied,
+// InvalidArgument, ResourceExhausted, FailedPrecondition, Unauthenticated)
+// surface verbatim — `apierr`'s builders construct caller-safe text by
+// convention. Internal/Unknown collapse to "internal error" because the
+// status message might wrap a raw driver error (pgconn message text, etc.)
+// that's been deliberately sanitized at the gRPC trailer but is still risky
+// to put in a UI string. Generic transport codes get user-friendly
+// equivalents.
+//
+// Non-status errors collapse to "internal error" — they shouldn't reach the
+// SSE adapter (everything in `runGenerate` goes through `apierr`), but the
+// fallback prevents accidental Go-error-string leaks if a future path forgets.
+func ToSSEErrorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		return "internal error"
+	}
+	switch st.Code() {
+	case codes.Internal, codes.Unknown, codes.DataLoss:
+		return "internal error"
+	case codes.Unauthenticated:
+		return "not authenticated"
+	case codes.PermissionDenied, codes.NotFound, codes.InvalidArgument,
+		codes.AlreadyExists, codes.FailedPrecondition, codes.OutOfRange,
+		codes.ResourceExhausted:
+		// These codes have semantically-bounded user-facing meanings
+		// in our codebase — every apierr builder for them constructs
+		// caller-safe text by convention. Linter does not enforce
+		// this; if a future caller uses status.Errorf(codes.X, "...")
+		// directly the message is exposed verbatim. Audit periodically.
+		return st.Message()
+	case codes.Aborted:
+		// Aborted is not user-actionable (transient conflict; clients
+		// should retry rather than display). Collapse to avoid
+		// surfacing internal conflict detail to the UI.
+		return "conflict, please retry"
+	case codes.DeadlineExceeded:
+		return "request timed out"
+	case codes.Unavailable:
+		return "server unavailable, please retry"
+	case codes.Canceled:
+		return "request canceled"
+	case codes.Unimplemented:
+		return "not implemented"
+	default:
+		// Future gRPC code addition. Treat as internal until
+		// explicitly classified.
+		return "internal error"
+	}
+}
+
+// ToHTTPStatus maps a gRPC status code to the HTTP status REST callers should
+// see. Used by HTTP-to-gRPC adapters (the SSE chat endpoint, internal hooks)
+// for the pre-flush error path — once headers are flushed, error reporting
+// switches to in-band SSE error chunks via `ToSSEErrorText`.
+//
+// Mapping follows the standard gRPC → HTTP table from
+// google.golang.org/grpc/codes. Non-status errors default to 500 since
+// they're treated the same as Internal everywhere else in `apierr`.
+func ToHTTPStatus(err error) int {
+	if err == nil {
+		return 200
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		return 500
+	}
+	switch st.Code() {
+	case codes.OK:
+		return 200
+	case codes.Canceled:
+		return 499
+	case codes.InvalidArgument, codes.FailedPrecondition, codes.OutOfRange:
+		return 400
+	case codes.Unauthenticated:
+		return 401
+	case codes.PermissionDenied:
+		return 403
+	case codes.NotFound:
+		return 404
+	case codes.AlreadyExists, codes.Aborted:
+		return 409
+	case codes.ResourceExhausted:
+		return 429
+	case codes.Unimplemented:
+		return 501
+	case codes.Unavailable:
+		return 503
+	case codes.DeadlineExceeded:
+		return 504
+	default: // Internal, Unknown, DataLoss
+		return 500
+	}
+}
+
 func Aborted(resourceType, resourceName, reason string) error {
 	st := status.New(codes.Aborted, "conflict")
 	st, _ = st.WithDetails(

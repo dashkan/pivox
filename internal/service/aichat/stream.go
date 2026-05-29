@@ -63,9 +63,18 @@ func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream 
 
 // ensureConversationForStream creates a fresh Conversation row under
 // the caller's user-in-org parent and returns its resource name. The
-// permission interceptor has already gated on `ai.chat.stream` against
-// the parent, so by the time this runs the caller is authorized to
-// create conversations under this user.
+// permission interceptor (registered via the proto's
+// `pivox.permission.v1.required_permission = "ai.chat.stream"` option;
+// see internal/server/generated_registry.go) has already gated on the
+// parent, so by the time this runs the caller is authorized to create
+// conversations under this user.
+//
+// Org resolution + conversation insert run inside a single transaction
+// per CLAUDE.md's tx rule — both touch `qtx`, and the FK from
+// `ai_conversations.org_id` to `organizations.id` would surface a
+// TOCTOU delete-then-insert as a 23503 mapped to NotFound rather than
+// the typed `apierr.HandleResourceError` for Organization that the
+// closure produces explicitly.
 func (s *Server) ensureConversationForStream(ctx context.Context, parent string) (string, error) {
 	orgName, pathUser, err := parseConversationParent(parent)
 	if err != nil {
@@ -75,19 +84,25 @@ func (s *Server) ensureConversationForStream(ctx context.Context, parent string)
 	if pathUser != callerUserID {
 		return "", apierr.PermissionDenied("conversations may only be created under the caller's own user-uuid")
 	}
-	orgID, err := s.resolveOrg(ctx, orgName)
+	convSlug, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (string, error) {
+		org, err := qtx.GetOrganizationByName(ctx, orgName)
+		if err != nil {
+			return "", apierr.HandleResourceError(err, "Organization", fmt.Sprintf("organizations/%s", orgName))
+		}
+		row, err := qtx.CreateConversation(ctx, db.CreateConversationParams{
+			OrgID:     org.ID,
+			Name:      uuid.New().String()[:12],
+			CreatedBy: callerUserID,
+		})
+		if err != nil {
+			return "", apierr.HandleResourceError(err, "Conversation", "")
+		}
+		return row.Name, nil
+	})
 	if err != nil {
 		return "", err
 	}
-	row, err := s.queries.CreateConversation(ctx, db.CreateConversationParams{
-		OrgID:     orgID,
-		Name:      uuid.New().String()[:12],
-		CreatedBy: callerUserID,
-	})
-	if err != nil {
-		return "", apierr.HandleResourceError(err, "Conversation", "")
-	}
-	return fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, pathUser, row.Name), nil
+	return fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, pathUser, convSlug), nil
 }
 
 // GenerateContent is the unary counterpart to `StreamGenerateContent`.
@@ -366,8 +381,19 @@ func (s *Server) runGenerate(
 	// inbound batch — model.Stream just ran (potentially seconds-to-
 	// minutes), so we don't want a tx held across that. Lock once,
 	// persist once.
+	//
+	// marshalParts runs OUTSIDE the tx closure per CLAUDE.md's
+	// "tx closures must be DB-only" rule — marshaling is pure and a
+	// retry of the closure shouldn't re-marshal. Its error must be
+	// checked before opening the tx; the prior `_ :=` swallow meant
+	// a marshal failure persisted `nil` into the parts column
+	// silently.
 	if conv != nil {
-		assistantPartsJSON, _ := marshalParts(assistantParts)
+		assistantPartsJSON, err := marshalParts(assistantParts)
+		if err != nil {
+			slog.ErrorContext(ctx, "marshal assistant parts failed", "conversation_id", conv.ID, "error", err)
+			return nil, nil, "", apierr.Internal("marshal assistant parts")
+		}
 		if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 			if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
 				slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
@@ -405,7 +431,11 @@ func (s *Server) runGenerate(
 // tool-role has a tool_result part with tool_call_id) by the time
 // this runs.
 func buildInputMessageParams(convID uuid.UUID, in *aiv1.InputMessage) (db.CreateMessageParams, error) {
-	role := dbRoleForInputMessage(in.GetRole())
+	role, err := dbRoleForInputMessage(in.GetRole())
+	if err != nil {
+		slog.Error("unexpected role reached persistence", "role", in.GetRole(), "error", err)
+		return db.CreateMessageParams{}, err
+	}
 	parts := in.GetParts()
 	logText := extractText(parts)
 	partsJSON, err := marshalParts(parts)
@@ -464,17 +494,21 @@ func persistMessageOnQtx(ctx context.Context, qtx db.Querier, convID uuid.UUID, 
 // dbRoleForInputMessage maps a wire-shaped InputMessage role string
 // to the canonical DB role.
 //
-// useChat sends `user`, `assistant`, `system`, and `tool` roles on
-// input. Pass them through as-is — the model layer expects all four
-// (model.Message.Role lists them in its comment) and the DB column
-// is a free-form string. Empty / unrecognized values fall back to
-// "user" for forward-compat with clients that omit the field.
-func dbRoleForInputMessage(r string) string {
+// With the stream validation interceptor in place
+// (internal/server/validate_stream_interceptor.go) the buf-validate
+// `in: ["user", "assistant", "system", "tool"]` rule on
+// InputMessage.role rejects malformed roles at the gRPC boundary.
+// This helper is the last-line internal check: if an unrecognized
+// role reaches here, the validator failed, the proto schema drifted,
+// or a caller bypassed the gRPC stack. Loud Internal failure beats
+// silent coercion-to-"user" (the prior behavior masked client bugs
+// as data corruption — assistant turns persisted as user-role rows).
+func dbRoleForInputMessage(r string) (string, error) {
 	switch r {
 	case "user", "assistant", "system", "tool":
-		return r
+		return r, nil
 	default:
-		return "user"
+		return "", apierr.Internal("unexpected role reached persistence (validator should have rejected)")
 	}
 }
 
@@ -486,7 +520,11 @@ func dbRoleForInputMessage(r string) string {
 func inputMessagesToModel(in []*aiv1.InputMessage) ([]model.Message, error) {
 	out := make([]model.Message, 0, len(in))
 	for _, m := range in {
-		role := dbRoleForInputMessage(m.GetRole())
+		role, err := dbRoleForInputMessage(m.GetRole())
+		if err != nil {
+			slog.Error("unexpected role reached model conversion", "role", m.GetRole(), "error", err)
+			return nil, err
+		}
 		mm := model.Message{Role: role}
 		for _, p := range m.GetParts() {
 			if mp, ok := protoPartToModel(p); ok {

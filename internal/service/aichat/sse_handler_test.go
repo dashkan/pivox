@@ -318,9 +318,15 @@ func TestSSE_UpstreamError(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code, "headers already flushed before error")
 	body := rr.Body.String()
-	assert.Contains(t, body, `"type":"error"`)
-	assert.Contains(t, body, `"errorText"`,
-		`Vercel spec requires `+"`errorText`"+`, not legacy `+"`error`")
+	lines := splitSSEData(body)
+	require.Len(t, lines, 1, "expected exactly one error chunk and no DONE: %s", body)
+
+	// Internal-class errors collapse to a generic string via
+	// apierr.ToSSEErrorText so the raw upstream message ("upstream
+	// broke") doesn't leak to the UI. This assertion also serves as
+	// the Vercel-shape contract test: the chunk must have `type` and
+	// `errorText`, NOT the legacy `error` field.
+	assert.JSONEq(t, `{"type":"error","errorText":"internal error"}`, lines[0])
 	assert.NotContains(t, body, "[DONE]",
 		"error path must NOT emit the clean-completion DONE sentinel")
 }
@@ -348,11 +354,12 @@ func TestSSE_PartialThenError(t *testing.T) {
 
 	body := rr.Body.String()
 	lines := splitSSEData(body)
-	require.GreaterOrEqual(t, len(lines), 2, "expected start chunk + error chunk: %s", body)
+	require.Len(t, lines, 2, "expected start chunk + error chunk: %s", body)
 
 	assert.JSONEq(t, `{"type":"start","messageId":"m1"}`, lines[0])
-	assert.Contains(t, lines[1], `"type":"error"`)
-	assert.Contains(t, lines[1], `"errorText"`)
+	// DeadlineExceeded maps to "request timed out" via ToSSEErrorText
+	// — the upstream raw "timeout" message stays internal.
+	assert.JSONEq(t, `{"type":"error","errorText":"request timed out"}`, lines[1])
 	assert.NotContains(t, body, "[DONE]")
 }
 

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/dashkan/pivox/internal/apierr"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -228,10 +229,16 @@ func isContextCancelled(ctx context.Context) bool {
 // writeErrorChunk emits a Vercel-shaped `error` chunk and flushes.
 // Best-effort: if the client has hung up the write fails silently,
 // which is the right behavior — there's no recipient.
+//
+// Error text passes through `apierr.ToSSEErrorText` so messages from
+// caller-safe codes (PermissionDenied, NotFound, InvalidArgument)
+// surface verbatim while Internal/Unknown collapse to a generic
+// string — no driver errors or wrapped pgx detail leaks past the
+// SSE boundary.
 func writeErrorChunk(w http.ResponseWriter, flusher http.Flusher, err error) {
 	body, _ := json.Marshal(map[string]string{
 		"type":      "error",
-		"errorText": err.Error(),
+		"errorText": apierr.ToSSEErrorText(err),
 	})
 	_, _ = fmt.Fprintf(w, "data: %s\n\n", body)
 	flusher.Flush()

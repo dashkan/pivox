@@ -341,6 +341,17 @@ func serve(cmd *cobra.Command, args []string) error {
 			server.AuthStreamInterceptor(authChainSvc),
 			server.MembershipRequiredStreamInterceptor(queries),
 			permissionStreamInterceptor,
+			// Stream validator parallels the unary chain's
+			// FieldMaskAwareValidationInterceptor so CEL rules and
+			// `string.in`-style constraints on streaming RPC
+			// requests don't silently no-op. Without this,
+			// AiChat.StreamGenerateContent's CEL rules on
+			// MessagePart (text-needs-text, file-needs-url,
+			// tool-needs-id) and InputMessage.role
+			// (in: [user, assistant, system, tool]) fire only on
+			// unary callers and let malformed streaming requests
+			// reach the handler.
+			server.ValidateStreamInterceptor(validator),
 		),
 	)
 
@@ -668,7 +679,13 @@ func serve(cmd *cobra.Command, args []string) error {
 		"POST /v1/organizations/{org}/users/{userVerb}",
 		func(w http.ResponseWriter, r *http.Request) {
 			userVerb := r.PathValue("userVerb")
-			if !strings.HasSuffix(userVerb, streamVerbSuffix) {
+			// `len > len(suffix)` rejects the degenerate case where
+			// `userVerb` is exactly ":streamGenerateContent" (empty
+			// user slug). The SSE handler's parsePathOrgUser also
+			// catches this as a 400, but rejecting at the dispatcher
+			// avoids spinning up the SSE path for input that can
+			// never produce a valid stream.
+			if !strings.HasSuffix(userVerb, streamVerbSuffix) || len(userVerb) <= len(streamVerbSuffix) {
 				gatewayWithAuth.ServeHTTP(w, r)
 				return
 			}
