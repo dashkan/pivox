@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -34,12 +35,33 @@ const defaultMaxHistoryRows = 500
 // persistence. See ai_conversations.sql for the acquire/heartbeat/
 // release queries.
 //
-// `leaseHeartbeatInterval` < `leaseTTL` − margin: 5s heartbeat into
-// a 15s TTL means a single failed heartbeat still leaves 5s before
-// expiry — the next attempt catches up and the lease holds.
+// Progress is measured in BYTES RECEIVED from the upstream model
+// (events arriving from `s.model.Stream`), not SSE-output liveness.
+// A stalled upstream that keeps the TCP socket alive doesn't count
+// as progress; only actual model events do.
+//
+// Cascade:
+//
+//   - `streamStallAbortThreshold` (60s): no upstream event for this
+//     long → heartbeat cancels the stream context and returns. This
+//     is the deterministic "stuck stream" detector. Generous enough
+//     to cover reasoning-model first-token latency and short tool
+//     round-trips.
+//   - `leaseStaleExtensionThreshold` (30s): no upstream event for
+//     this long → heartbeat stops issuing extension UPDATEs. The
+//     lease then expires naturally as defense-in-depth: even if the
+//     active abort logic above somehow doesn't fire, the lease won't
+//     hold the conversation past its TTL.
+//   - `leaseHeartbeatInterval` (10s): how often the heartbeat
+//     evaluates progress. TTL/3 by convention.
+//   - SQL-side TTL (30s in ai_conversations.sql): pure process-crash
+//     recovery SLO. Equal to staleExtensionThreshold so a fully
+//     missed extension cycle expires the lease promptly.
 const (
-	leaseHeartbeatInterval = 5 * time.Second
-	leaseReleaseTimeout    = 5 * time.Second
+	leaseHeartbeatInterval       = 10 * time.Second
+	leaseStaleExtensionThreshold = 30 * time.Second
+	streamStallAbortThreshold    = 60 * time.Second
+	leaseReleaseTimeout          = 5 * time.Second
 )
 
 // StreamGenerateContent is the server-streaming variant of
@@ -248,27 +270,36 @@ func (s *Server) runGenerate(
 		return nil, nil, "", apierr.Internal("acquire conversation lease")
 	}
 
-	// Heartbeat goroutine extends the TTL every 5s until hbCtx is
-	// done (stream end: clean finish, client disconnect, upstream
-	// error). Bounded lifetime — no leak: defer hbCancel() pairs
-	// with the goroutine's <-hbCtx.Done() exit.
-	//
+	// streamCtx is a child of ctx that the heartbeat goroutine can
+	// cancel independently — that's how a stalled upstream (>60s no
+	// bytes) aborts the stream from outside the model.Stream pump.
+	// All subsequent calls into the model layer use streamCtx, not
+	// ctx, so heartbeat-triggered cancellation reaches them.
+	streamCtx, streamCancel := context.WithCancel(ctx)
+	defer streamCancel()
+
+	// lastEventNanos tracks the wall-clock time of the most recent
+	// upstream event from `s.model.Stream` (text deltas, tool calls,
+	// finish events — any event that proves the model is still
+	// producing). Stored as Unix nanos in an atomic so the heartbeat
+	// goroutine and the model-pump goroutine can read/write without a
+	// mutex. Initialized to "now" so the first heartbeat tick (10s
+	// from now) doesn't immediately trip the stall threshold while
+	// the model is still establishing its connection.
+	var lastEventNanos atomic.Int64
+	lastEventNanos.Store(time.Now().UnixNano())
+
 	// Defer ORDER (LIFO):
 	//   1. defer release (registered second; runs LAST)
 	//   2. defer hbCancel (registered first; runs SECOND from last)
 	//
-	// We want hbCancel to fire BEFORE release so the heartbeat
-	// goroutine has stopped issuing UPDATEs against this row by the
-	// time release issues its own UPDATE. Otherwise heartbeat and
-	// release race against each other (correct semantics — they
-	// serialize, neither corrupts state — but wasted UPDATEs + log
-	// noise during teardown). Register release FIRST so it runs
-	// LAST, then register hbCancel.
+	// Heartbeat must stop issuing UPDATEs before release runs; otherwise
+	// they race (correct semantics, wasted UPDATEs + log noise).
 	hbCtx, hbCancel := context.WithCancel(ctx)
-	// Release lease on function exit. Detached background context so
-	// a disconnected stream still releases — by the time this runs
-	// the request ctx is typically Done.
 	defer func() {
+		// Release on detached background ctx: by the time this runs
+		// the request ctx is typically Done (client disconnect, stall
+		// abort), so a ctx-bound query would fail immediately.
 		relCtx, relCancel := context.WithTimeout(context.Background(), leaseReleaseTimeout)
 		defer relCancel()
 		if err := s.queries.ReleaseConversationLease(relCtx, db.ReleaseConversationLeaseParams{
@@ -280,7 +311,7 @@ func (s *Server) runGenerate(
 		}
 	}()
 	defer hbCancel()
-	go s.runConversationLeaseHeartbeat(hbCtx, conv.ID, sessionUID)
+	go s.runConversationLeaseHeartbeat(hbCtx, streamCancel, conv.ID, sessionUID, &lastEventNanos)
 
 	// Persist only the LAST inbound message. useChat sends the entire
 	// UI conversation history on every turn (its default transport
@@ -296,14 +327,23 @@ func (s *Server) runGenerate(
 			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
 			return apierr.Internal("lock conversation")
 		}
-		// Mirror of Tx B's takeover defense. Acquire happened a
-		// microsecond ago so the holder MUST match here; if it
-		// doesn't, the schema-level lease invariant is broken
-		// (concurrent DB write outside this code path, manual
-		// SQL, replication anomaly) and we abort rather than
-		// persisting against a row we no longer own.
+		// Invariant check. Acquire happened microseconds ago so the
+		// holder MUST be us. The model permits exactly one active
+		// lease per conversation at any moment — acquire rejects
+		// overlapping sessions outright (ACTIVE_STREAM Aborted). If
+		// this row doesn't match our sessionUID, something has
+		// violated the schema invariant (heartbeat goroutine died
+		// without aborting the stream, manual SQL, replication
+		// anomaly). Internal, not Aborted: this is a bug to file,
+		// not a retryable race.
 		if !row.LockHolder.Valid || row.LockHolder.Bytes != sessionUID {
-			return apierr.Aborted("Conversation", req.GetConversation(), "LEASE_TAKEN_OVER")
+			slog.ErrorContext(ctx, "INVARIANT: Tx A reached without holding lease",
+				"conversation_id", conv.ID,
+				"session_uid", sessionUID,
+				"row_holder_valid", row.LockHolder.Valid,
+				"row_holder", uuid.UUID(row.LockHolder.Bytes).String(),
+				"row_expires_at", row.LockExpiresAt)
+			return apierr.Internal("lease invariant violation")
 		}
 		inbound := req.GetMessages()
 		if len(inbound) == 0 {
@@ -371,13 +411,14 @@ func (s *Server) runGenerate(
 		}
 	}
 
-	// Call the model.
+	// Call the model. streamCtx (not ctx) so the heartbeat can cancel
+	// a stalled upstream stream via streamCancel().
 	modelReq := model.StreamRequest{
 		Messages:     history,
 		Tools:        s.tools.ToDefinitions(),
 		SystemPrompt: systemPrompt,
 	}
-	reader, err := s.model.Stream(ctx, modelReq)
+	reader, err := s.model.Stream(streamCtx, modelReq)
 	if err != nil {
 		if emit != nil {
 			_ = s.sendStreamErrorEmit(emit, err)
@@ -393,10 +434,13 @@ func (s *Server) runGenerate(
 	}()
 
 	// Pump model events; accumulate text for the unary return path
-	// and for persistence.
+	// and for persistence. Every event received here counts as
+	// upstream progress for the heartbeat's bytes-based liveness
+	// check — record the timestamp before any per-event handling so
+	// a slow downstream emit doesn't undercount upstream activity.
 	var assistantText strings.Builder
 	for {
-		evt, err := reader.Next(ctx)
+		evt, err := reader.Next(streamCtx)
 		if err == io.EOF {
 			break
 		}
@@ -406,6 +450,7 @@ func (s *Server) runGenerate(
 			}
 			return nil, nil, "", err
 		}
+		lastEventNanos.Store(time.Now().UnixNano())
 
 		switch evt.Kind {
 		case "text_delta":
@@ -479,16 +524,21 @@ func (s *Server) runGenerate(
 			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
 			return apierr.Internal("lock conversation")
 		}
-		// Lease takeover defense: if a different session now holds
-		// the lease (our heartbeat lost a race after a transient DB
-		// hiccup, or our TTL expired), the row we locked is the
-		// other session's row. Aborting prevents persisting the
-		// assistant reply against a conversation the user has
-		// already moved on from in another tab.
+		// Invariant check — same shape as Tx A. By the model's
+		// design exactly one lease exists per conversation at a
+		// time; the heartbeat is responsible for canceling the
+		// stream ctx if it ever loses the lease (stall, expired
+		// UPDATE, DB error). Reaching this Tx with a mismatched
+		// holder means heartbeat didn't cancel — i.e. a code bug.
+		// Internal + slog.Error so it surfaces in alerts.
 		if !row.LockHolder.Valid || row.LockHolder.Bytes != sessionUID {
-			slog.WarnContext(ctx, "lease taken over before assistant persist; abandoning write",
-				"conversation_id", conv.ID)
-			return apierr.Aborted("Conversation", req.GetConversation(), "LEASE_TAKEN_OVER")
+			slog.ErrorContext(ctx, "INVARIANT: Tx B reached without holding lease",
+				"conversation_id", conv.ID,
+				"session_uid", sessionUID,
+				"row_holder_valid", row.LockHolder.Valid,
+				"row_holder", uuid.UUID(row.LockHolder.Bytes).String(),
+				"row_expires_at", row.LockExpiresAt)
+			return apierr.Internal("lease invariant violation")
 		}
 		return persistMessageOnQtx(ctx, qtx, conv.ID, db.CreateMessageParams{
 			ConversationID: conv.ID,
@@ -498,12 +548,9 @@ func (s *Server) runGenerate(
 			TokenCount:     int32(estimateTokens(assistantText.String())),
 		})
 	}); err != nil {
-		// Aborted (lease takeover) is the only non-Internal mapping
-		// here — let it propagate verbatim. Everything else collapses
-		// to a generic Internal so we don't leak driver detail.
-		if status.Code(err) == codes.Aborted {
-			return nil, nil, "", err
-		}
+		// Inner sites already slog'd specifics; this is the handler's
+		// failure-path summary. Collapse to a generic Internal so we
+		// don't leak driver detail across the gRPC trailer.
 		slog.ErrorContext(ctx, "persist assistant message failed", "conversation_id", conv.ID, "error", err)
 		return nil, nil, "", apierr.Internal("persist assistant message")
 	}
@@ -607,27 +654,45 @@ func dbRoleForInputMessage(r string) (string, error) {
 	}
 }
 
-// runConversationLeaseHeartbeat extends the conversation lease's
-// TTL on a fixed interval until ctx is done. Designed to live in a
-// goroutine paired with `defer hbCancel()` at the caller.
+// runConversationLeaseHeartbeat is the authoritative liveness
+// monitor for an in-flight stream. Runs as a goroutine; exits on
+// ctx.Done() (caller teardown) or after firing streamCancel().
 //
-// Two failure modes:
+// Three responsibilities, in priority order:
 //
-//   - Transient DB error: log + keep trying. A single missed
-//     heartbeat leaves 5s of slack before the 15s TTL expires; the
-//     next tick will catch up. Multiple consecutive misses
-//     ultimately surface as a lost lease (next case).
+//  1. **Stall detection.** No upstream model event in
+//     `streamStallAbortThreshold` (60s) → call streamCancel() and
+//     exit. This is what makes the lease "bytes-based": a model
+//     that hangs with a live TCP socket still triggers abort.
 //
-//   - Lease taken over (pgx.ErrNoRows): another session acquired
-//     the lease after our TTL expired. Return immediately. The
-//     stream is still running but the assistant-persist tx will
-//     detect the takeover via lock_holder mismatch and abort the
-//     write.
+//  2. **Defense-in-depth lease aging.** No event in
+//     `leaseStaleExtensionThreshold` (30s) → skip the extension
+//     UPDATE for this tick. The lease expires naturally per the
+//     SQL-side TTL even if (1) never fires.
 //
-// Does NOT propagate errors to the stream — by design. The stream
-// should run to completion on the model side even if the lease is
-// momentarily lost; the persistence guard is the real safety.
-func (s *Server) runConversationLeaseHeartbeat(ctx context.Context, convID, sessionUID uuid.UUID) {
+//  3. **Lease-lost detection.** Extension UPDATE returns 0 rows
+//     (someone else holds it, or our own lease passed the SQL
+//     guard's `lock_expires_at > now()` window) → call
+//     streamCancel() and exit.
+func (s *Server) runConversationLeaseHeartbeat(
+	ctx context.Context,
+	streamCancel context.CancelFunc,
+	convID, sessionUID uuid.UUID,
+	lastEventNanos *atomic.Int64,
+) {
+	// Silent goroutine death (panic with no recover) would leave the
+	// stream running without progress monitoring — no abort on stall,
+	// no observable failure mode. Surface the panic loudly via slog so
+	// it shows up in alerts; the stream's normal cleanup path still
+	// runs (caller's defer release on function return).
+	defer func() {
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "heartbeat goroutine panic",
+				"conversation_id", convID,
+				"panic", r,
+				"stack", string(debug.Stack()))
+		}
+	}()
 	ticker := time.NewTicker(leaseHeartbeatInterval)
 	defer ticker.Stop()
 	for {
@@ -635,6 +700,25 @@ func (s *Server) runConversationLeaseHeartbeat(ctx context.Context, convID, sess
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			elapsed := time.Since(time.Unix(0, lastEventNanos.Load()))
+
+			// (1) Stall — abort the stream and exit.
+			if elapsed > streamStallAbortThreshold {
+				slog.WarnContext(ctx, "stream stalled past abort threshold; canceling stream",
+					"conversation_id", convID,
+					"elapsed_seconds", elapsed.Seconds(),
+					"threshold_seconds", streamStallAbortThreshold.Seconds())
+				streamCancel()
+				return
+			}
+
+			// (2) Stale — skip extension; loop continues so we can
+			// re-evaluate after another tick (bytes may resume).
+			if elapsed > leaseStaleExtensionThreshold {
+				continue
+			}
+
+			// (3) Healthy — extend the lease.
 			_, err := s.queries.HeartbeatConversationLease(ctx, db.HeartbeatConversationLeaseParams{
 				ID:         convID,
 				LockHolder: convert.PgUUID(sessionUID),
@@ -642,14 +726,24 @@ func (s *Server) runConversationLeaseHeartbeat(ctx context.Context, convID, sess
 			if err == nil {
 				continue
 			}
-			if errors.Is(err, pgx.ErrNoRows) {
-				slog.WarnContext(ctx, "conversation lease taken over; heartbeat stopped",
-					"conversation_id", convID)
-				return
-			}
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
+			if errors.Is(err, pgx.ErrNoRows) {
+				// SQL guard returns 0 rows when we no longer hold a
+				// non-expired lease. Treat as terminal: cancel the
+				// stream so the persist Tx doesn't run against a
+				// row we don't own.
+				slog.WarnContext(ctx, "lease lost during heartbeat; canceling stream",
+					"conversation_id", convID,
+					"elapsed_seconds", elapsed.Seconds())
+				streamCancel()
+				return
+			}
+			// Transient DB error — log and keep ticking. The next
+			// tick will reattempt; if the failure persists past the
+			// stale threshold we'll fall into (2)/(1) above and
+			// abort cleanly.
 			slog.ErrorContext(ctx, "lease heartbeat failed", "conversation_id", convID, "error", err)
 		}
 	}

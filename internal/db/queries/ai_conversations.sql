@@ -84,14 +84,18 @@ WHERE id = $1;
 -- retry). Returns 0 rows when another session holds an unexpired
 -- lease — the caller maps this to apierr.Aborted("active stream").
 --
--- TTL is set to 15s here; the heartbeat extends every 5s while the
--- stream is active. 10s slack tolerates one missed heartbeat;
--- consecutive misses lose the lease to the next acquirer.
+-- TTL = 30s. The 30s value is the SLO for "after pivox-cloud crashes
+-- holding this lease, how long before another session can acquire?"
+-- During healthy operation the heartbeat refreshes every 10s as long
+-- as the upstream model is still producing bytes; if it stops, the
+-- heartbeat actively aborts the stream so the lease releases via the
+-- normal path. TTL is the backstop for process death, not the primary
+-- expiration mechanism.
 --
 -- name: AcquireConversationLease :one
 UPDATE ai_conversations
 SET lock_holder = $2,
-    lock_expires_at = now() + interval '15 seconds'
+    lock_expires_at = now() + interval '30 seconds'
 WHERE id = $1
   AND (
     lock_holder IS NULL
@@ -101,14 +105,22 @@ WHERE id = $1
 RETURNING id;
 
 -- HeartbeatConversationLease extends `lock_expires_at` for an active
--- lease the caller still owns. Returns 0 rows when the lease was
--- lost (taken over after expiry); the caller must treat that as
--- aborted and stop writing to this conversation.
+-- lease the caller still owns AND that hasn't already expired.
+-- Returns 0 rows in two cases the caller treats identically (cancel
+-- the stream):
+--   1. Lease holder is now someone else — invariant violation
+--      (heartbeat stopped without aborting; should not happen).
+--   2. Lease has expired since the previous heartbeat (e.g. we
+--      skipped extensions during a stall, the row went past
+--      lock_expires_at, and we're now trying to "revive" it).
+-- The `lock_expires_at > now()` guard is what makes case 2 a hard
+-- abort rather than a silent re-extension — once expired, a stalled
+-- stream loses the lease cleanly even if no one else acquires it.
 --
 -- name: HeartbeatConversationLease :one
 UPDATE ai_conversations
-SET lock_expires_at = now() + interval '15 seconds'
-WHERE id = $1 AND lock_holder = $2
+SET lock_expires_at = now() + interval '30 seconds'
+WHERE id = $1 AND lock_holder = $2 AND lock_expires_at > now()
 RETURNING id;
 
 -- ReleaseConversationLease drops the lease on stream end. Idempotent
