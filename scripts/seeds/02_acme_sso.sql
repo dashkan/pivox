@@ -66,53 +66,72 @@ BEGIN;
 
 DO $$
 DECLARE
-    ashkan_id UUID;
-    acme_id   UUID;
-    owner_id  UUID;
     -- Founder's Firebase localId. Must match the live Firebase Auth
     -- user record so the next sign-in's blocking-fn upsert hits ON
     -- CONFLICT (firebase_uid) and preserves the seeded row + owner
     -- binding. Sourced from `firebase auth:export` (see file header).
     _ashkan_firebase_uid CONSTANT TEXT := '2YCxpX5nmQXT5fmjri30SA3ra8t2';
+
+    -- Pinned identity UUID for ashkan@acme.com — matches the value
+    -- the live Firebase ID token's `pivox_user_id` custom claim
+    -- already carries. See 15_dev_user_membership.sql header for
+    -- the full motivation; DO NOT regenerate without forcing every
+    -- dev to sign out + back in.
+    _ashkan_id CONSTANT UUID := '019e7201-8066-73a9-947d-96d1039d99ab';
+
+    -- Tier 0001 org UUID for acme. The dev orgs in
+    -- 01_organizations.sql occupy suffixes 0001..000a; local-corp
+    -- in 11_local_corp.sql owns 000b. Acme takes 000c — first free
+    -- slot.
+    _acme_id CONSTANT UUID := '0192a000-0001-7000-8000-00000000000c';
+
+    -- Tier 0052 role UUIDs for acme (matches the convention used in
+    -- 12_dev_org_roles.sql). Suffix OOOOOOOORRRR: org=000b,
+    -- role index 0001..0004.
+    _acme_owner_id  CONSTANT UUID := '0192a000-0052-7000-8000-0000000c0001';
+    _acme_admin_id  CONSTANT UUID := '0192a000-0052-7000-8000-0000000c0002';
+    _acme_editor_id CONSTANT UUID := '0192a000-0052-7000-8000-0000000c0003';
+    _acme_viewer_id CONSTANT UUID := '0192a000-0052-7000-8000-0000000c0004';
+
+    -- Tier 0054 domain, tier 0055 sso_config, tier 0053 org_members.
+    _acme_domain_id     CONSTANT UUID := '0192a000-0054-7000-8000-0000000c0001';
+    _acme_sso_config_id CONSTANT UUID := '0192a000-0055-7000-8000-0000000c0001';
+    _acme_member_id     CONSTANT UUID := '0192a000-0053-7000-8000-0000000c0002';
+
+    ashkan_id UUID := _ashkan_id;
+    acme_id   UUID := _acme_id;
+    owner_id  UUID := _acme_owner_id;
 BEGIN
-    -- 0) Founder identity. Pre-seeded so the seed is single-pass —
-    --    no need to interactively sign in before owner binding can
-    --    land. ON CONFLICT (firebase_uid) means re-running the seed
-    --    after a real sign-in won't clobber the live email_verified
-    --    / display_name / last_login_time the blocking fn populated.
+    -- 0) Founder identity. Pinned id + ON CONFLICT (firebase_uid)
+    --    means a re-run after a real sign-in preserves the live
+    --    email_verified / display_name / last_login_time that the
+    --    blocking fn populated, without minting a fresh UUID.
     INSERT INTO identities (id, firebase_uid, email, email_verified)
-    VALUES (uuidv7(), _ashkan_firebase_uid, 'ashkan@acme.com', true)
+    VALUES (_ashkan_id, _ashkan_firebase_uid, 'ashkan@acme.com', true)
     ON CONFLICT (firebase_uid) DO NOTHING;
 
-    SELECT id INTO ashkan_id FROM identities
-        WHERE firebase_uid = _ashkan_firebase_uid;
-
-    -- 1) acme organization (idempotent). created_by is NULL on
-    --    pass 1; back-filled on pass 2 once we know the identity.
+    -- 1) acme organization (idempotent). created_by is back-filled
+    --    on conflict so a re-seed after the founder identity exists
+    --    populates it without overwriting a non-NULL value.
     INSERT INTO organizations (id, name, display_name, created_by)
-    VALUES (uuidv7(), 'acme', 'Acme Inc.', ashkan_id)
+    VALUES (_acme_id, 'acme', 'Acme Inc.', ashkan_id)
     ON CONFLICT (name) DO UPDATE SET
         created_by = COALESCE(organizations.created_by, EXCLUDED.created_by);
-
-    SELECT id INTO acme_id FROM organizations WHERE name = 'acme';
 
     -- 2) System roles. UNIQUE(org_id, name) makes ON CONFLICT a safe
     --    no-op when the seed is re-run.
     INSERT INTO roles (id, org_id, name, display_name, description, is_system)
     VALUES
-        (uuidv7(), acme_id, 'owner',  'Owner',  'Full administrative access including destruction-class operations (delete organization, transfer ownership, update SSO, delete users).', true),
-        (uuidv7(), acme_id, 'admin',  'Admin',  'Day-to-day organization management — IAM, domains, SSO read, API keys, storage, invitations, and content.', true),
-        (uuidv7(), acme_id, 'editor', 'Editor', 'Content management — assets, requests, line items, and AI conversations.', true),
-        (uuidv7(), acme_id, 'viewer', 'Viewer', 'Read-only access across the organization.', true)
+        (_acme_owner_id,  acme_id, 'owner',  'Owner',  'Full administrative access including destruction-class operations (delete organization, transfer ownership, update SSO, delete users).', true),
+        (_acme_admin_id,  acme_id, 'admin',  'Admin',  'Day-to-day organization management — IAM, domains, SSO read, API keys, storage, invitations, and content.', true),
+        (_acme_editor_id, acme_id, 'editor', 'Editor', 'Content management — assets, requests, line items, and AI conversations.', true),
+        (_acme_viewer_id, acme_id, 'viewer', 'Viewer', 'Read-only access across the organization.', true)
     ON CONFLICT (org_id, name) DO NOTHING;
-
-    SELECT id INTO owner_id FROM roles
-        WHERE org_id = acme_id AND name = 'owner' AND is_system = true;
 
     -- 3) Verified domain `acme.com`. Globally UNIQUE; CHECK enforces
     --    lowercase. Pre-staged so resolveProvider works on pass 1.
     INSERT INTO domains (id, org_id, domain, verification_token, state, verified_time)
-    VALUES (uuidv7(), acme_id, 'acme.com', 'dev-seed-token', 'VERIFIED', now())
+    VALUES (_acme_domain_id, acme_id, 'acme.com', 'dev-seed-token', 'VERIFIED', now())
     ON CONFLICT (domain) DO NOTHING;
 
     -- 4) SsoConfig pointing at the manually-provisioned `oidc.acme`
@@ -127,7 +146,7 @@ BEGIN
     --    decrypts it on every SSO flow.
     INSERT INTO sso_configs (id, org_id, firebase_provider_id, display_name, enabled, oidc_config, client_secret_ciphertext)
     VALUES (
-        uuidv7(),
+        _acme_sso_config_id,
         acme_id,
         'oidc.acme',
         'Acme SSO (Keycloak)',
@@ -168,7 +187,7 @@ BEGIN
     --    this idempotent — re-running the seed after the row exists
     --    is a no-op rather than a constraint error.
     INSERT INTO org_members (id, org_id, role_id, user_id, created_by)
-    SELECT uuidv7(), acme_id, owner_id, ashkan_id, ashkan_id
+    SELECT _acme_member_id, acme_id, owner_id, ashkan_id, ashkan_id
     WHERE NOT EXISTS (
         SELECT 1 FROM org_members
         WHERE org_id = acme_id

@@ -37,15 +37,46 @@
 
 DO $$
 DECLARE
-    -- Dev orgs that get the four system roles seeded. Mirror with
-    -- _dev_orgs in 15_dev_user_membership.sql. acme intentionally
-    -- absent (SSO-only — see 02_acme_sso.sql).
-    _dev_orgs CONSTANT TEXT[] := ARRAY[
-        'meridian-broad',
-        'pacific-coast-net',
-        'heartland-media',
-        'summit-sports',
-        'starlight-studios'
+    -- (slug, owner_uuid, admin_uuid, editor_uuid, viewer_uuid) per dev org.
+    --
+    -- UUIDs are pinned, tier 0052 in the seed convention
+    -- (`0192a000-TTTT-7000-8000-VVVVVVVVVVVV`). Suffix encodes
+    -- (org_index, role_index): the last 8 hex chars are
+    -- OOOOOOOORRRR where OOOOOOOO mirrors the org's UUID suffix
+    -- from 01_organizations.sql and RRRR is 0001=owner,
+    -- 0002=admin, 0003=editor, 0004=viewer.
+    --
+    -- Pinned (instead of uuidv7()) because reseeding with fresh
+    -- role UUIDs would invalidate cached role-id references in
+    -- any system that snapshots them — and matches the broader
+    -- "reseeds don't break sessions" pattern; see
+    -- 15_dev_user_membership.sql header for motivation.
+    _dev_org_roles CONSTANT TEXT[][] := ARRAY[
+        ['meridian-broad',
+            '0192a000-0052-7000-8000-000000010001',
+            '0192a000-0052-7000-8000-000000010002',
+            '0192a000-0052-7000-8000-000000010003',
+            '0192a000-0052-7000-8000-000000010004'],
+        ['pacific-coast-net',
+            '0192a000-0052-7000-8000-000000020001',
+            '0192a000-0052-7000-8000-000000020002',
+            '0192a000-0052-7000-8000-000000020003',
+            '0192a000-0052-7000-8000-000000020004'],
+        ['heartland-media',
+            '0192a000-0052-7000-8000-000000030001',
+            '0192a000-0052-7000-8000-000000030002',
+            '0192a000-0052-7000-8000-000000030003',
+            '0192a000-0052-7000-8000-000000030004'],
+        ['summit-sports',
+            '0192a000-0052-7000-8000-000000050001',
+            '0192a000-0052-7000-8000-000000050002',
+            '0192a000-0052-7000-8000-000000050003',
+            '0192a000-0052-7000-8000-000000050004'],
+        ['starlight-studios',
+            '0192a000-0052-7000-8000-0000000a0001',
+            '0192a000-0052-7000-8000-0000000a0002',
+            '0192a000-0052-7000-8000-0000000a0003',
+            '0192a000-0052-7000-8000-0000000a0004']
     ];
 
     org_slug    TEXT;
@@ -55,8 +86,9 @@ DECLARE
     skipped     INTEGER := 0;
     new_roles   INTEGER := 0;
 BEGIN
-    FOREACH org_slug IN ARRAY _dev_orgs
-    LOOP
+    FOR i IN 1 .. array_length(_dev_org_roles, 1) LOOP
+        org_slug := _dev_org_roles[i][1];
+
         SELECT id INTO org_id_var FROM organizations WHERE name = org_slug;
         IF org_id_var IS NULL THEN
             RAISE NOTICE 'Skipping roles for org %: not in organizations table.', org_slug;
@@ -65,10 +97,10 @@ BEGIN
         END IF;
 
         INSERT INTO roles (id, org_id, name, display_name, description, is_system) VALUES
-            (uuidv7(), org_id_var, 'owner',  'Owner',  'Full administrative access including destruction-class operations (delete organization, transfer ownership, update SSO, delete users).', true),
-            (uuidv7(), org_id_var, 'admin',  'Admin',  'Day-to-day organization management — IAM, domains, SSO read, API keys, storage, invitations, and content.', true),
-            (uuidv7(), org_id_var, 'editor', 'Editor', 'Content management — assets, requests, line items, and AI conversations.', true),
-            (uuidv7(), org_id_var, 'viewer', 'Viewer', 'Read-only access across the organization.', true)
+            (_dev_org_roles[i][2]::UUID, org_id_var, 'owner',  'Owner',  'Full administrative access including destruction-class operations (delete organization, transfer ownership, update SSO, delete users).', true),
+            (_dev_org_roles[i][3]::UUID, org_id_var, 'admin',  'Admin',  'Day-to-day organization management — IAM, domains, SSO read, API keys, storage, invitations, and content.', true),
+            (_dev_org_roles[i][4]::UUID, org_id_var, 'editor', 'Editor', 'Content management — assets, requests, line items, and AI conversations.', true),
+            (_dev_org_roles[i][5]::UUID, org_id_var, 'viewer', 'Viewer', 'Read-only access across the organization.', true)
         ON CONFLICT (org_id, name) DO NOTHING;
 
         GET DIAGNOSTICS inserted = ROW_COUNT;

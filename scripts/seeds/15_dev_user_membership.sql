@@ -21,12 +21,31 @@
 --     user_id, role_id) constraint so re-running the seed is a
 --     no-op rather than a constraint error.
 --
--- To bind ashkan to an additional dev org: add the org's slug to
--- the ARRAY literal below AND add a roles INSERT block for that
--- org in 12_dev_org_roles.sql. The DO block here resolves the
--- org_id + owner role_id at runtime per slug, so the seed
--- gracefully NOTICEs (instead of failing) if either is missing —
--- helpful when test runs against a partial schema.
+-- UUIDs are PINNED, not uuidv7()-minted:
+--
+--   The Firebase blocking function stamps a `pivox_user_id` custom
+--   claim onto the user's ID token at sign-in, with the value of
+--   `identities.id`. A reseed that re-mints that UUID invalidates
+--   every Firebase ID token cached client-side (Firebase SDK keeps
+--   them in IndexedDB), and token refresh does NOT re-issue
+--   custom claims — only a fresh sign-in does. So a `make db-seed`
+--   silently broke every dev's signed-in session and made spaces
+--   list 403 until they signed out + back in.
+--
+--   Pinning ashkan's identity UUID to the value his current
+--   Firebase ID token already carries makes reseeds non-invalidating.
+--   Membership rows use synthetic deterministic UUIDs derived from
+--   (org_slug, user) so they also survive reseeds.
+--
+-- To bind ashkan to an additional dev org: add a (slug, member_uuid)
+-- pair to `_dev_org_memberships` below AND add a roles INSERT block
+-- for that org in 12_dev_org_roles.sql. Allocate a fresh
+-- `0192a000-0053-7000-8000-OOOOOOOOUUUU` member_uuid where OOOOOOOO
+-- mirrors the org's UUID suffix and UUUU is the user index (0001 =
+-- ashkan.daie). The DO block here resolves the org_id + owner
+-- role_id at runtime per slug, so the seed gracefully NOTICEs
+-- (instead of failing) if either is missing — helpful when test
+-- runs against a partial schema.
 --
 -- To bind additional dev users: copy the DO block, replace
 -- `_ashkan_firebase_uid` + the identity values + the org list.
@@ -43,19 +62,31 @@ DECLARE
     -- blocking-fn-populated fields.
     _ashkan_firebase_uid CONSTANT TEXT := 'ScQytJWi2ycF3jiiBlRazncbfQB3';
 
+    -- Pinned identity UUID — matches the value the live Firebase ID
+    -- token's `pivox_user_id` custom claim already carries (was
+    -- minted by uuidv7() in a previous seed, now frozen here).
+    -- DO NOT regenerate — every change here forces a sign-out + back
+    -- in across every dev environment using this seed.
+    _ashkan_id CONSTANT UUID := '019e7201-8080-7575-8057-8d49db577952';
+
     -- Dev orgs ashkan gets bound to. Mirror the set seeded with
     -- roles in 12_dev_org_roles.sql. acme is intentionally absent
     -- (SSO testing only).
-    _dev_orgs CONSTANT TEXT[] := ARRAY[
-        'meridian-broad',
-        'pacific-coast-net',
-        'heartland-media',
-        'summit-sports',
-        'starlight-studios'
+    --
+    -- (slug, synthetic_member_uuid). The UUIDs are static
+    -- per (org, ashkan) pair; tier 0053 in the seed UUID
+    -- convention (`0192a000-TTTT-7000-8000-VVVVVVVVVVVV`).
+    _dev_org_memberships CONSTANT TEXT[][] := ARRAY[
+        ['meridian-broad',    '0192a000-0053-7000-8000-000000010001'],
+        ['pacific-coast-net', '0192a000-0053-7000-8000-000000020001'],
+        ['heartland-media',   '0192a000-0053-7000-8000-000000030001'],
+        ['summit-sports',     '0192a000-0053-7000-8000-000000050001'],
+        ['starlight-studios', '0192a000-0053-7000-8000-0000000a0001']
     ];
 
-    ashkan_id      UUID;
+    ashkan_id      UUID := _ashkan_id;
     org_slug       TEXT;
+    member_uuid    UUID;
     org_id_var     UUID;
     owner_role_id  UUID;
     inserted       INTEGER;
@@ -66,24 +97,23 @@ DECLARE
     bound          INTEGER := 0;
     skipped        INTEGER := 0;
 BEGIN
-    -- 1) Identity. ON CONFLICT (firebase_uid) lets a real sign-in
-    --    overwrite the seeded skeleton with live Firebase data
-    --    (display_name, email_verified, photo_url) without
-    --    clobbering it on subsequent reseeds.
+    -- 1) Identity. Pinned id + ON CONFLICT (firebase_uid) lets a
+    --    real sign-in overwrite the seeded skeleton with live
+    --    Firebase data (display_name, email_verified, photo_url)
+    --    without clobbering it on subsequent reseeds.
     INSERT INTO identities (id, firebase_uid, email, email_verified)
-    VALUES (uuidv7(), _ashkan_firebase_uid, 'ashkan.daie@gmail.com', true)
+    VALUES (_ashkan_id, _ashkan_firebase_uid, 'ashkan.daie@gmail.com', true)
     ON CONFLICT (firebase_uid) DO NOTHING;
-
-    SELECT id INTO ashkan_id FROM identities
-        WHERE firebase_uid = _ashkan_firebase_uid;
 
     -- 2) Bind ashkan as owner of each dev org. Each iteration is
     --    independent — a missing org or missing owner role logs a
     --    notice and continues rather than failing the whole seed.
     --    WHERE NOT EXISTS keeps reseeds clean against the
     --    UNIQUE(org_id, user_id, role_id) constraint.
-    FOREACH org_slug IN ARRAY _dev_orgs
-    LOOP
+    FOR i IN 1 .. array_length(_dev_org_memberships, 1) LOOP
+        org_slug    := _dev_org_memberships[i][1];
+        member_uuid := _dev_org_memberships[i][2]::UUID;
+
         SELECT id INTO org_id_var FROM organizations WHERE name = org_slug;
         IF org_id_var IS NULL THEN
             RAISE NOTICE 'Skipping membership for %: org not in organizations table.', org_slug;
@@ -100,7 +130,7 @@ BEGIN
         END IF;
 
         INSERT INTO org_members (id, org_id, role_id, user_id, created_by)
-        SELECT uuidv7(), org_id_var, owner_role_id, ashkan_id, ashkan_id
+        SELECT member_uuid, org_id_var, owner_role_id, ashkan_id, ashkan_id
         WHERE NOT EXISTS (
             SELECT 1 FROM org_members
             WHERE org_id  = org_id_var
