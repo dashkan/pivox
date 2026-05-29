@@ -160,19 +160,26 @@ func (s *Server) GenerateContent(ctx context.Context, req *aiv1.GenerateContentR
 // suppress event emission (the unary path collects the assistant
 // text into the returned `Message` directly).
 //
+// `req.GetConversation()` is always non-empty by the time this runs
+// — both callers auto-create via `ensureConversationForStream` when
+// the client doesn't supply one (see Commit C). Stateless internal
+// one-shots (title summarization, etc.) call `s.model.Stream`
+// directly via `summarizeTranscript` rather than enter this path.
+//
 // Flow:
 //
 //  1. Validate the request and resolve org/conversation context.
-//  2. If a `conversation` is set, persist the inbound `messages` to
-//     the DB and load the full conversation history from there.
-//     Otherwise (stateless), use the inbound `messages` as-is and
-//     skip persistence.
-//  3. Call the language model with the assembled context.
-//  4. Stream the response: emit events via `emit` (when set) and
+//  2. Acquire the per-conversation lease (Postgres advisory-ish
+//     UPDATE; sliding TTL extended by a heartbeat goroutine until
+//     the stream finishes).
+//  3. Persist the inbound user/tool turn and load the full prior
+//     transcript (lease-guarded inside Tx A).
+//  4. Call the language model with the assembled context.
+//  5. Stream the response: emit events via `emit` (when set) and
 //     accumulate text into the returned `Message`.
-//  5. If stateful, persist the assistant response.
+//  6. Persist the assistant response (lease-guarded inside Tx B).
 //
-// Returns the assistant `Message` (with name set when persisted),
+// Returns the assistant `Message` (with name set after persist),
 // token usage, and the model identifier.
 func (s *Server) runGenerate(
 	ctx context.Context,

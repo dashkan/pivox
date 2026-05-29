@@ -152,6 +152,11 @@ export function useChatState(opts: UseChatStateOptions): ChatContextValue {
   // the server auto-created one). After that, subsequent turns route
   // to the same conversation via `body.conversation` above.
   //
+  // Single-runtime assumption: this hook backs ONE chat surface per
+  // call. If a route ever needs multiple parallel chat windows under
+  // the same `useChatState` instance, the conversation ref collapses
+  // them to one — switch to a per-runtime ref/state map first.
+  //
   // Latest-ref on conversation so the comparison inside onFinish
   // always reads the current value — without it, the closure would
   // capture the initial `conversation` value forever and the guard
