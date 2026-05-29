@@ -20,57 +20,36 @@ import type { ChatContextValue } from './chat.types';
 import type { ComponentProps, FC, ReactNode } from 'react';
 
 /**
- * Chat is the Pivox chat surface, mirroring the `ImageEditor`
- * namespace: a thin Pivox-styled layer over assistant-ui's headless
- * runtime primitives. Each sub-component is a separable atom — the
- * route composes them just like an image editor route composes
- * `<ImageEditor.Toolbar>` + `<ImageEditor.CropButton>` etc.
+ * Chat is the Pivox chat surface — three high-level atoms over
+ * assistant-ui's headless runtime primitives, styled with
+ * `@pivox/primitives`. Mirrors the `ImageEditor` / `AppShell`
+ * compound-component shape but at a coarser grain.
  *
- * Wiring lives in `@pivox/features/chat` (ChatFeature). The feature
- * owns runtime construction via useChatRuntime and provides the
- * AssistantRuntimeProvider; this namespace only renders against the
- * runtime that provider exposes.
+ * Decomposition lives at the REGION level (header / thread /
+ * composer), not at the primitive level (button / input / message).
+ * Each region has a clear ownership of internal layout, so the
+ * redesign can swap visuals inside `Chat.Thread` or `Chat.Input`
+ * without churning the consumer's compose call.
  *
- * Default composition:
+ * Usage:
  *
  *   <ChatFeature parent={...} getAuthToken={...}>
- *     <Chat.Root>
- *       <Chat.Viewport>
- *         <Chat.Empty>Start the conversation…</Chat.Empty>
- *         <Chat.Messages />
- *       </Chat.Viewport>
- *       <Chat.Composer />
- *     </Chat.Root>
+ *     <Chat.Header>
+ *       <MyConversationTitle />
+ *       <MyNewChatButton />
+ *     </Chat.Header>
+ *     <Chat.Thread />
+ *     <Chat.Input />
  *   </ChatFeature>
  *
- * Custom layouts can drop the compound `Chat.Composer` and build
- * their own from the atoms (Chat.ComposerForm, Chat.ComposerInput,
- * Chat.ComposerSend, Chat.ComposerCancel, Chat.IfRunning,
- * Chat.IfNotRunning). Consumers can also override the default
- * UserMessage / AssistantMessage by passing a `components` prop to
- * Chat.Messages.
+ * For chat surfaces that don't want a header (e.g. inline / embedded
+ * chats), omit `Chat.Header` — the layout collapses. The runtime
+ * (assistant-ui) and the Pivox-side `{state, actions, meta}` context
+ * are provided by `Chat.Provider`, wrapped by `ChatFeature`.
  */
 
 /* ─── Provider ────────────────────────────────────────────────── */
 
-/**
- * Chat.Provider is the namespace's entry point — mirror of
- * `ImageEditor.Provider`. Takes a `value` built by `useChatState`
- * (in `chat.hooks.ts`) and provides BOTH the Pivox `ChatContext`
- * (for chat-level state/actions/meta) AND assistant-ui's
- * `AssistantRuntimeProvider` (driving Thread / Message / Composer
- * primitives downstream).
- *
- * Two providers, one component, because every Chat subcomponent
- * needs both layers — splitting them at the consumer site would
- * invite mismatched mounts where one provider exists without the
- * other.
- *
- * Usage at the feature layer:
- *
- *   const value = useChatState({ parent, getAuthToken, ... });
- *   return <Chat.Provider value={value}>{children}</Chat.Provider>;
- */
 function ChatProvider({
   value,
   children,
@@ -78,62 +57,60 @@ function ChatProvider({
   value: ChatContextValue;
   children: ReactNode;
 }) {
+  // `flex-1 min-h-0` (not `h-full`) so we compose into a flex parent
+  // — e.g. shadcn `SidebarInset` — without colliding with a sibling
+  // header. `min-h-0` is the well-known fix that lets the inner
+  // viewport scroll instead of pushing the layout past the parent.
   return (
     <ChatContext value={value}>
       <AssistantRuntimeProvider runtime={value.meta.runtime}>
-        {children}
+        <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col bg-background">
+          {children}
+        </ThreadPrimitive.Root>
       </AssistantRuntimeProvider>
     </ChatContext>
   );
 }
 
-/* ─── Container atoms ─────────────────────────────────────────── */
+/* ─── Header ──────────────────────────────────────────────────── */
 
-type RootProps = ComponentProps<typeof ThreadPrimitive.Root>;
-
-const Root: FC<RootProps> = ({ className, ...props }) => (
-  <ThreadPrimitive.Root
-    className={cn('flex h-full flex-col bg-background', className)}
-    {...props}
-  />
-);
-
-type ViewportProps = ComponentProps<typeof ThreadPrimitive.Viewport>;
-
-const Viewport: FC<ViewportProps> = ({ className, children, ...props }) => (
-  <ThreadPrimitive.Viewport
+/**
+ * Top bar slot. Renders nothing on its own; consumers fill it with
+ * whatever the redesign requires (conversation title, model picker,
+ * share button, etc.). Defaults to a single horizontal flex row with
+ * gap-2; consumers override via className.
+ *
+ * Place as the FIRST child of `Chat.Provider` — the column-flex
+ * layout positions Header on top, Thread fills, Input pinned at
+ * bottom, in source order.
+ */
+const Header: FC<ComponentProps<'div'>> = ({
+  className,
+  children,
+  ...props
+}) => (
+  <div
     className={cn(
-      'flex flex-1 flex-col overflow-y-auto scroll-smooth bg-background px-4 py-6',
+      'flex shrink-0 items-center gap-2 border-b border-border bg-background px-4 py-2',
       className,
     )}
     {...props}
   >
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6">
-      {children}
-    </div>
-  </ThreadPrimitive.Viewport>
+    {children}
+  </div>
 );
 
-// v0.14: ThreadPrimitive.Empty is deprecated in favor of AuiIf with a
-// state selector. AuiIf unmounts children when condition flips, so
-// the empty state vanishes the moment the first message arrives —
-// same semantics, more general.
-const Empty: FC<ComponentProps<'div'>> = ({ className, children, ...props }) => (
-  <AuiIf condition={(s) => s.thread.isEmpty}>
-    <div
-      className={cn(
-        'flex flex-1 flex-col items-center justify-center text-center',
-        'text-muted-foreground',
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  </AuiIf>
+/* ─── Thread ──────────────────────────────────────────────────── */
+
+const DEFAULT_EMPTY_STATE = (
+  <p className="text-sm text-muted-foreground">Start the conversation…</p>
 );
 
-/* ─── Message renderers (the components prop targets) ─────────── */
+// Hoisted so ThreadPrimitive.Messages receives a stable function ref
+// across Thread re-renders. The render fn closes over nothing
+// per-render; defining it inline would allocate every commit.
+const renderMessage = ({ message }: { message: { role: string } }) =>
+  message.role === 'user' ? <UserMessage /> : <AssistantMessage />;
 
 const UserMessage: FC = () => (
   <MessagePrimitive.Root className="flex w-full justify-end">
@@ -164,169 +141,103 @@ const AssistantMessage: FC = () => (
   </MessagePrimitive.Root>
 );
 
-/* ─── Messages list ──────────────────────────────────────────── */
-
-type MessageRoleComponent = FC;
-
-type MessagesProps = {
+type ThreadProps = {
   /**
-   * Override the user-role renderer. Defaults to `Chat.UserMessage`.
+   * Override the empty-state content. Defaults to a muted
+   * "Start the conversation…" line.
    */
-  userMessage?: MessageRoleComponent;
-  /**
-   * Override the assistant-role renderer. Defaults to
-   * `Chat.AssistantMessage`.
-   */
-  assistantMessage?: MessageRoleComponent;
-};
-
-// v0.14: ThreadPrimitive.Messages migrated from a `components` prop
-// to a children render function — `<Messages>{({message}) => ...}</>`.
-// The render function fires per message; branch on message.role to
-// pick the renderer.
-const Messages: FC<MessagesProps> = ({
-  userMessage: UserMsg = UserMessage,
-  assistantMessage: AssistantMsg = AssistantMessage,
-}) => (
-  <ThreadPrimitive.Messages>
-    {({ message }) =>
-      message.role === 'user' ? <UserMsg /> : <AssistantMsg />
-    }
-  </ThreadPrimitive.Messages>
-);
-
-/* ─── Composer atoms ─────────────────────────────────────────── */
+  empty?: ReactNode;
+} & Omit<ComponentProps<typeof ThreadPrimitive.Viewport>, 'children'>;
 
 /**
- * ComposerForm is the `<form>` root. Submitting (Enter or the Send
- * atom) appends a message via the runtime. Pair with ComposerInput
- * + ComposerSend / ComposerCancel for a custom layout, or use the
- * compound `Composer` below for the default Pivox bar.
+ * Scrolling message list with empty state. Renders the default
+ * user/assistant message bubbles internally — consumers wanting a
+ * different message shape should compose `MessagePrimitive` + the
+ * `useMessage()` hook directly (a third-layer Chat namespace
+ * abstraction would just be visual noise).
  */
-type ComposerFormProps = ComponentProps<typeof ComposerPrimitive.Root>;
-const ComposerForm: FC<ComposerFormProps> = ({ className, ...props }) => (
+const Thread: FC<ThreadProps> = ({ empty, className, ...props }) => (
+  <ThreadPrimitive.Viewport
+    className={cn(
+      'flex flex-1 flex-col overflow-y-auto scroll-smooth bg-background px-4 py-6',
+      className,
+    )}
+    {...props}
+  >
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6">
+      <AuiIf condition={(s) => s.thread.isEmpty}>
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          {empty ?? DEFAULT_EMPTY_STATE}
+        </div>
+      </AuiIf>
+      <ThreadPrimitive.Messages>{renderMessage}</ThreadPrimitive.Messages>
+    </div>
+  </ThreadPrimitive.Viewport>
+);
+
+/* ─── Input ───────────────────────────────────────────────────── */
+
+/**
+ * Bottom composer bar. Hard-codes the textarea + Send/Cancel button
+ * swap because there's no legitimate Pivox-side variation today; if
+ * we ever need a different composer shape (attachments toolbar,
+ * voice input toggle), the redesign rebuilds this from
+ * `ComposerPrimitive` directly. The atoms (ComposerForm,
+ * ComposerInput, ComposerSend) were public in the previous Chat
+ * namespace and have been removed — they were unused and exposed
+ * inner primitives the consumer shouldn't reach.
+ */
+const Input: FC<ComponentProps<typeof ComposerPrimitive.Root>> = ({
+  className,
+  ...props
+}) => (
   <ComposerPrimitive.Root
     className={cn(
       'flex w-full items-end gap-2 border-t border-border bg-background p-3',
       className,
     )}
     {...props}
-  />
-);
-
-/**
- * ComposerInput is a Pivox-styled Textarea slotted into
- * ComposerPrimitive.Input via `asChild`. Consumers can replace it
- * entirely if they want their own input (e.g. wire @pivox/primitives
- * PromptInput for attachments/tools — out of scope for v1).
- */
-type ComposerInputProps = ComponentProps<typeof Textarea>;
-const ComposerInput: FC<ComposerInputProps> = ({ className, ...props }) => (
-  // Note: no `autoFocus`. jsx-a11y/no-autofocus is enforced because
-  // auto-focusing a textarea on mount can hijack the user's keyboard
-  // context (e.g. when navigating via screen reader). Consumers that
-  // want focus on mount should pass `ref` and call `.focus()` from
-  // an effect, scoped to a deliberate interaction (route load, send
-  // action complete, etc.).
-  <ComposerPrimitive.Input asChild>
-    <Textarea
-      rows={1}
-      placeholder="Send a message…"
-      className={cn('min-h-[44px] resize-none', className)}
-      {...props}
-    />
-  </ComposerPrimitive.Input>
-);
-
-const ComposerSend: FC<ComponentProps<typeof Button>> = ({
-  className,
-  children,
-  ...props
-}) => (
-  <ComposerPrimitive.Send asChild>
-    <Button
-      type="submit"
-      size="icon"
-      aria-label="Send message"
-      className={cn('shrink-0', className)}
-      {...props}
-    >
-      {children ?? <SendHorizonalIcon className="size-4" />}
-    </Button>
-  </ComposerPrimitive.Send>
-);
-
-const ComposerCancel: FC<ComponentProps<typeof Button>> = ({
-  className,
-  children,
-  ...props
-}) => (
-  <ComposerPrimitive.Cancel asChild>
-    <Button
-      type="button"
-      size="icon"
-      variant="secondary"
-      aria-label="Stop generation"
-      className={cn('shrink-0', className)}
-      {...props}
-    >
-      {children ?? <SquareIcon className="size-4" />}
-    </Button>
-  </ComposerPrimitive.Cancel>
-);
-
-/* ─── Run-state conditionals ─────────────────────────────────── */
-
-// v0.14: ThreadPrimitive.If is deprecated in favor of AuiIf with a
-// state selector. We expose two named variants — IfRunning,
-// IfNotRunning — instead of a single boolean prop on If, matching
-// architecture-avoid-boolean-props.
-const IfRunning: FC<{ children: ReactNode }> = ({ children }) => (
-  <AuiIf condition={(s) => s.thread.isRunning}>{children}</AuiIf>
-);
-
-const IfNotRunning: FC<{ children: ReactNode }> = ({ children }) => (
-  <AuiIf condition={(s) => !s.thread.isRunning}>{children}</AuiIf>
-);
-
-/* ─── Default composer (compound) ────────────────────────────── */
-
-/**
- * Default Composer bar — input + Send/Cancel button that swaps based
- * on run state. Composes the atoms above; consumers who want a
- * different layout drop this and build from ComposerForm + atoms
- * directly.
- */
-const Composer: FC = () => (
-  <ComposerForm>
+  >
     <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
-      <ComposerInput />
-      <IfNotRunning>
-        <ComposerSend />
-      </IfNotRunning>
-      <IfRunning>
-        <ComposerCancel />
-      </IfRunning>
+      {/* jsx-a11y/no-autofocus: omitted — auto-focusing a textarea
+          on mount hijacks keyboard context for assistive tech. */}
+      <ComposerPrimitive.Input asChild>
+        <Textarea
+          rows={1}
+          placeholder="Send a message…"
+          className="min-h-[44px] resize-none"
+        />
+      </ComposerPrimitive.Input>
+      <AuiIf condition={(s) => !s.thread.isRunning}>
+        <ComposerPrimitive.Send asChild>
+          <Button type="submit" size="icon" aria-label="Send message" className="shrink-0">
+            <SendHorizonalIcon className="size-4" />
+          </Button>
+        </ComposerPrimitive.Send>
+      </AuiIf>
+      <AuiIf condition={(s) => s.thread.isRunning}>
+        <ComposerPrimitive.Cancel asChild>
+          <Button
+            type="button"
+            size="icon"
+            variant="secondary"
+            aria-label="Stop generation"
+            className="shrink-0"
+          >
+            <SquareIcon className="size-4" />
+          </Button>
+        </ComposerPrimitive.Cancel>
+      </AuiIf>
     </div>
-  </ComposerForm>
+  </ComposerPrimitive.Root>
 );
 
 /* ─── Namespace export ───────────────────────────────────────── */
 
 export const Chat = {
   Provider: ChatProvider,
-  Root,
-  Viewport,
-  Empty,
-  Messages,
-  UserMessage,
-  AssistantMessage,
-  Composer,
-  ComposerForm,
-  ComposerInput,
-  ComposerSend,
-  ComposerCancel,
-  IfRunning,
-  IfNotRunning,
+  Header,
+  Thread,
+  Input,
   Context: ChatContext,
 };

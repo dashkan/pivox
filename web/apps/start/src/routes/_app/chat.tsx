@@ -53,15 +53,8 @@ function ChatPage() {
 
   return (
     <ChatFeature parent={parent} getAuthToken={getAuthToken}>
-      <Chat.Root>
-        <Chat.Viewport>
-          <Chat.Empty>
-            <p className="text-sm">Start the conversation…</p>
-          </Chat.Empty>
-          <Chat.Messages />
-        </Chat.Viewport>
-        <Chat.Composer />
-      </Chat.Root>
+      <Chat.Thread />
+      <Chat.Input />
     </ChatFeature>
   );
 }

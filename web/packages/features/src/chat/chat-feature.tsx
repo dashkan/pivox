@@ -18,14 +18,12 @@ import type { UseChatFeatureOptions } from './use-chat-feature';
  *     parent={`organizations/${orgSlug}/users/${userId}`}
  *     getAuthToken={getFirebaseIdToken}
  *   >
- *     <Chat.Root>
- *       <Chat.Viewport>
- *         <Chat.Empty>Start the conversation…</Chat.Empty>
- *         <Chat.Messages />
- *       </Chat.Viewport>
- *       <Chat.Composer />
- *     </Chat.Root>
+ *     <Chat.Header>...</Chat.Header>
+ *     <Chat.Thread />
+ *     <Chat.Input />
  *   </ChatFeature>
+ *
+ * `Chat.Header` is optional — omit for inline/embedded chats.
  */
 export function ChatFeature({
   children,
