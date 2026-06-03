@@ -46,11 +46,11 @@
     }
   },
   "devDependencies": {
-    "@tanstack/react-query": "5.100.14",
-    "@types/react": "19.2.15",
+    "@tanstack/react-query": "5.101.0",
+    "@types/react": "19.2.16",
     "openapi-typescript": "7.13.0",
-    "react": "19.2.6",
-    "vite": "8.0.14"
+    "react": "19.2.7",
+    "vite": "8.0.16"
   },
   "dependencies": {
     "openapi-fetch": "0.17.0",

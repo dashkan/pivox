@@ -16,8 +16,7 @@ export const Route = createFileRoute('/_app/chat')({
 // same VITE_BASE_URL env var the API client reads. Empty fallback
 // matches the rest of the renderer's transport plumbing
 // (lib/api-client.ts, lib/electron-redirect-transport.ts).
-const BASE_URL =
-  import.meta.env.VITE_BASE_URL ?? 'https://pivox.ngrok.app';
+const BASE_URL = import.meta.env.VITE_BASE_URL ?? 'https://pivox.ngrok.app';
 
 function ChatPage() {
   const { state: shellState } = useAppShellContext();
@@ -47,11 +46,7 @@ function ChatPage() {
   const parent = `organizations/${orgSlug}/users/${pivoxUserId}`;
 
   return (
-    <ChatFeature
-      parent={parent}
-      baseUrl={BASE_URL}
-      getAuthToken={getAuthToken}
-    >
+    <ChatFeature parent={parent} baseUrl={BASE_URL} getAuthToken={getAuthToken}>
       <Chat.Thread />
       <Chat.Input />
     </ChatFeature>

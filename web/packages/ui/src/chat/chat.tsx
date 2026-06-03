@@ -13,7 +13,6 @@ import { Textarea } from '@pivox/primitives/textarea';
 import { cn } from '@pivox/primitives/utils';
 import { SendHorizonalIcon, SquareIcon } from 'lucide-react';
 
-
 import { ChatContext } from './chat.context';
 
 import type { ChatContextValue } from './chat.types';
@@ -128,7 +127,9 @@ const UserMessage: FC = () => (
 const AssistantMessage: FC = () => (
   <MessagePrimitive.Root className="flex w-full gap-3">
     <Avatar className="h-8 w-8 shrink-0">
-      <AvatarFallback className="bg-muted text-xs font-medium">AI</AvatarFallback>
+      <AvatarFallback className="bg-muted text-xs font-medium">
+        AI
+      </AvatarFallback>
     </Avatar>
     <div
       className={cn(
@@ -210,7 +211,12 @@ const Input: FC<ComponentProps<typeof ComposerPrimitive.Root>> = ({
       </ComposerPrimitive.Input>
       <AuiIf condition={(s) => !s.thread.isRunning}>
         <ComposerPrimitive.Send asChild>
-          <Button type="submit" size="icon" aria-label="Send message" className="shrink-0">
+          <Button
+            type="submit"
+            size="icon"
+            aria-label="Send message"
+            className="shrink-0"
+          >
             <SendHorizonalIcon className="size-4" />
           </Button>
         </ComposerPrimitive.Send>

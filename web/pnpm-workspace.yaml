@@ -32,7 +32,7 @@ allowBuilds:
 # once `react-jsx-parser` ships a release with @types/react ^19.
 # Check upstream: https://github.com/TroyAlford/react-jsx-parser/releases
 overrides:
-  '@types/react': '19.2.15'
+  '@types/react': '19.2.16'
   '@types/react-dom': '19.2.3'
 ignoredOptionalDependencies:
   - '@types/react'

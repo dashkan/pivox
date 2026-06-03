@@ -18,9 +18,7 @@ export const ChatContext = createContext<ChatContextValue | null>(null);
 export function useChatContext(): ChatContextValue {
   const ctx = use(ChatContext);
   if (!ctx) {
-    throw new Error(
-      'Chat subcomponents must be used within a Chat.Provider',
-    );
+    throw new Error('Chat subcomponents must be used within a Chat.Provider');
   }
   return ctx;
 }

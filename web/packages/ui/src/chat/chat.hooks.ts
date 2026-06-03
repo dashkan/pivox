@@ -96,9 +96,9 @@ export function useChatState(opts: UseChatStateOptions): ChatContextValue {
   const [conversation, setConversation] = useState<string | undefined>(
     initialConversation,
   );
-  const [systemInstruction, setSystemInstruction] = useState<string | undefined>(
-    initialSystemInstruction,
-  );
+  const [systemInstruction, setSystemInstruction] = useState<
+    string | undefined
+  >(initialSystemInstruction);
 
   // Latest-ref for the token getter. The headers callback below
   // dereferences this asynchronously at request time — by then the
