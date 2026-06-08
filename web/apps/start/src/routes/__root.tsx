@@ -46,7 +46,7 @@ export const Route = createRootRouteWithContext<{
         href: robotoLatin,
         as: 'font',
         type: 'font/woff2',
-        crossorigin: 'anonymous',
+        crossOrigin: 'anonymous',
       },
     ],
   }),

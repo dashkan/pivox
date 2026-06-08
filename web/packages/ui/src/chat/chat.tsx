@@ -165,13 +165,19 @@ const Thread: FC<ThreadProps> = ({ empty, className, ...props }) => (
     )}
     {...props}
   >
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
       <AuiIf condition={(s) => s.thread.isEmpty}>
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           {empty ?? DEFAULT_EMPTY_STATE}
         </div>
       </AuiIf>
-      <ThreadPrimitive.Messages>{renderMessage}</ThreadPrimitive.Messages>
+      {/* `mt-auto` absorbs the slack above the messages so they pin to
+          the bottom when the thread underfills the viewport. Collapses
+          to 0 once content overflows, so scroll-up stays reachable —
+          unlike `justify-end`, which clips the overflowing top. */}
+      <div className="mt-auto flex flex-col gap-6">
+        <ThreadPrimitive.Messages>{renderMessage}</ThreadPrimitive.Messages>
+      </div>
     </div>
   </ThreadPrimitive.Viewport>
 );

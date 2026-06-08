@@ -16,7 +16,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/minio/minio-go/v7 v7.2.0
-	github.com/ollama/ollama v0.30.3
+	github.com/ollama/ollama v0.30.7
 	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/pgvector/pgvector-go v0.4.0
 	github.com/pgvector/pgvector-go/pgx v0.4.0
@@ -34,7 +34,7 @@ require (
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.51.0
+	modernc.org/sqlite v1.52.0
 	riverqueue.com/riverui v0.16.0
 )
 
@@ -46,10 +46,10 @@ require (
 	cloud.google.com/go/firestore v1.22.0 // indirect
 	cloud.google.com/go/iam v1.11.0 // indirect
 	cloud.google.com/go/monitoring v1.29.0 // indirect
-	cloud.google.com/go/storage v1.62.2 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.32.0 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.56.0 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.56.0 // indirect
+	cloud.google.com/go/storage v1.62.3 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.33.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.57.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.57.0 // indirect
 	github.com/MicahParks/jwkset v0.11.0 // indirect
 	github.com/MicahParks/keyfunc v1.9.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
@@ -119,17 +119,17 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/exp v0.0.0-20260603202125-055de637280b // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/appengine/v2 v2.0.6 // indirect
-	gopkg.in/ini.v1 v1.67.2 // indirect
-	modernc.org/libc v1.72.5 // indirect
+	gopkg.in/ini.v1 v1.67.3 // indirect
+	modernc.org/libc v1.73.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )

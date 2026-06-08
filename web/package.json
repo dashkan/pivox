@@ -15,6 +15,7 @@
     "test:eslint": "pnpm -r --filter \"./packages/**\" --filter \"./apps/**\" run test:eslint",
     "test:types": "pnpm -r --filter \"./packages/**\" --filter \"./apps/**\" run test:types",
     "web:build": "pnpm run build",
+    "web:build:watch": "pnpm --parallel --filter \"./packages/**\" run build --watch",
     "web:build:primitives": "pnpm --filter @pivox/primitives run build",
     "web:build:image-editor": "pnpm --filter @pivox/image-editor run build",
     "web:build:features": "pnpm --filter @pivox/features build",

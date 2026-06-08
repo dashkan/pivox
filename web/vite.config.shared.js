@@ -57,6 +57,13 @@ function ensureImportFileExtension({ content }) {
 export function pivoxViteConfig(options) {
   const outDir = options.outDir ?? 'dist';
 
+  // Self-detect `vite build --watch` from the CLI args of the process
+  // that loads this config — no env var / script coordination needed.
+  // (Verified: argv carries `--watch` for watch builds, not one-shot.)
+  // Watch is the dev loop; one-shot is `make web-build` / CI / publish.
+  const isWatch =
+    process.argv.includes('--watch') || process.argv.includes('-w');
+
   return defineConfig({
     plugins: [
       externalizeDeps({
@@ -89,13 +96,26 @@ export function pivoxViteConfig(options) {
         afterDiagnostic: (diagnostics) => {
           if (diagnostics.length > 0) {
             console.error('Please fix the above type errors');
-            process.exit(1);
+            // In the watch dev loop a type error — including a
+            // half-saved edit — must NOT kill the watcher: the process
+            // would stop rebuilding for the rest of the session and the
+            // package would silently go stale. Log and keep watching;
+            // the IDE + `test:types` + CI gate real errors. One-shot /
+            // CI / publish builds still hard-fail so bad types can't ship.
+            if (!isWatch) process.exit(1);
           }
         },
       }),
     ],
     build: {
       outDir,
+      // The watch dev loop must not wipe dist between rebuilds. Parallel
+      // package watchers type-check against each other's emitted .d.ts;
+      // a wipe window makes a dependency's declarations momentarily
+      // missing → spurious diagnostics in the dependent. Overwriting in
+      // place keeps every dependency's types present on disk. One-shot
+      // builds DO empty, for clean orphan-free output (prod / publish).
+      emptyOutDir: !isWatch,
       minify: false,
       sourcemap: true,
       lib: {

@@ -10,4 +10,5 @@
 **/vercel
 packages/primitives
 pnpm-lock.yaml
+pnpm-workspace.yaml
 *.gen.ts

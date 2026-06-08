@@ -37,11 +37,11 @@
     "test:types": "tsc"
   },
   "peerDependencies": {
-    "@types/react": "19.2.15",
+    "@types/react": "19.2.17",
     "react": "19.2.6"
   },
   "devDependencies": {
-    "@types/react": "19.2.16",
+    "@types/react": "19.2.17",
     "react": "19.2.7",
     "vite": "8.0.16"
   }

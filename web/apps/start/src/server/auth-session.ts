@@ -182,7 +182,7 @@ function toServerSession(decoded: DecodedIdToken): ServerSession {
  * token can't poison the session.
  */
 export const createSession = createServerFn({ method: 'POST' })
-  .inputValidator((data: { idToken: string }) => {
+  .validator((data: { idToken: string }) => {
     if (!data.idToken) {
       throw new Error('createSession: idToken is required');
     }

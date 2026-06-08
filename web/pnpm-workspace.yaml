@@ -2,7 +2,7 @@ packages:
   - ./packages/*
   - ./apps/*
 allowBuilds:
-  '@firebase/util': true
+  "@firebase/util": true
   electron: true
   electron-winstaller: true
   esbuild: true
@@ -32,11 +32,11 @@ allowBuilds:
 # once `react-jsx-parser` ships a release with @types/react ^19.
 # Check upstream: https://github.com/TroyAlford/react-jsx-parser/releases
 overrides:
-  '@types/react': '19.2.16'
-  '@types/react-dom': '19.2.3'
+  "@types/react": "19.2.17"
+  "@types/react-dom": "19.2.3"
 ignoredOptionalDependencies:
-  - '@types/react'
-  - '@types/react-dom'
+  - "@types/react"
+  - "@types/react-dom"
 cleanupUnusedCatalogs: true
 linkWorkspacePackages: true
 preferWorkspacePackages: true
