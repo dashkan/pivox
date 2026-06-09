@@ -47,7 +47,6 @@
     "typescript-eslint": "8.60.1",
     "vite": "8.0.16",
     "vite-plugin-dts": "5.0.2",
-    "vite-plugin-externalize-deps": "0.10.0",
     "vitest": "4.1.8"
   }
 }

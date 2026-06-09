@@ -21,7 +21,7 @@
 
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
-import { externalizeDeps } from 'vite-plugin-externalize-deps';
+import { externalizeDeps } from './vite-externalize-deps.js';
 
 /**
  * Rewrites relative import specifiers in .d.ts output to include the
