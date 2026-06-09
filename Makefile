@@ -388,6 +388,16 @@ web-start: web-build
 web-start-preview: web-build
 	pnpm run --dir web web:start:preview
 
+# Build the start app (apps/start) on top of the libraries. `web-build`
+# (libraries-only) is a prerequisite so the app build always sees a
+# current dist/. Encoding the dependency here — rather than listing
+# `dev-preview: web-build web-build-start` — guarantees the order even
+# under `make -j`: parallel make can run sibling prerequisites
+# concurrently, but a prereq chain is always serialized. `vite preview`
+# (web:start:preview) serves this built output, so dev-preview needs it.
+web-build-start: web-build
+	pnpm run --dir web web:build:start
+
 electron-start: web-build
 	pnpm run --dir web electron:start
 
