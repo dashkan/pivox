@@ -1,6 +1,6 @@
 import { organizationId } from '@pivox/client';
 import { AppShellFeature } from '@pivox/features/app-shell';
-import { useAuth } from '@pivox/features/auth';
+import { useAuth, usePivoxUserId } from '@pivox/features/auth';
 import { ChatModalFeature } from '@pivox/features/chat';
 import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
 import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
@@ -186,17 +186,19 @@ function AppLayoutRoute() {
 /**
  * Floating chat FAB, mounted in the authed shell so chat is reachable
  * on every route (replaces the old standalone /chat route). Builds the
- * chat `parent` + Firebase-token getter the same way that route did,
- * sourcing the Pivox user UUID from the server-verified `_app` route
- * context (SSR-available, so the button server-renders). Renders
- * nothing until an org is selected — chat is scoped to an org.
+ * chat `parent` + Firebase-token getter the same way that route did.
+ * Renders nothing until an org is selected — chat is scoped to an org.
+ *
+ * Uses the same `usePivoxUserId` hook as the Electron renderer, seeded
+ * with the server-verified id from `_app` route context so the FAB
+ * server-renders; the hook then re-resolves from the live client claim.
  */
 function ChatFab() {
   const { state: shellState } = useAppShellContext();
   const { user: firebaseUser } = useAuth();
   const { user } = Route.useRouteContext();
   const activeOrg = shellState.activeOrganization;
-  const pivoxUserId = user.pivoxUserId;
+  const pivoxUserId = usePivoxUserId(user.pivoxUserId);
 
   const getAuthToken = useCallback(async () => {
     if (!firebaseUser) {

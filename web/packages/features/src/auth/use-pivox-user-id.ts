@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './use-auth';
 
@@ -11,10 +11,16 @@ import { useAuth } from './use-auth';
  * subsequent token rotation, so the value is stable for the lifetime
  * of the user's identity row.
  *
+ * `initialValue` seeds the state for SSR. The web start app passes the
+ * server-verified id from its `_app` route context, so the value is
+ * present during SSR and the client's first render (the lazy
+ * initializer keeps both in sync — no hydration mismatch), then the
+ * effect re-resolves it from the live client claim. Electron has no
+ * server session and passes nothing.
+ *
  * Returns:
- *   - `undefined` while loading (no Firebase user yet, or the claim
- *     hasn't been fetched on the first pass)
- *   - `string` once the claim is read
+ *   - `undefined` while loading (no seed AND no Firebase user yet)
+ *   - `string` once the claim (or seed) is read
  *   - `null` if the user has no `pivox_user_id` claim (e.g. an
  *     account created before the sync-identity hook landed, or one
  *     that failed to provision — the route layer should fall back
@@ -24,26 +30,32 @@ import { useAuth } from './use-auth';
  * and only round-trips to the auth server when the token rotates,
  * so calling this from many places is cheap.
  */
-export function usePivoxUserId(): string | null | undefined {
+export function usePivoxUserId(
+  initialValue?: string | null,
+): string | null | undefined {
   const { user } = useAuth();
   const [pivoxUserId, setPivoxUserId] = useState<string | null | undefined>(
-    undefined,
+    initialValue,
   );
+  // Tracks whether we've ever resolved a live Firebase user, so the
+  // sign-out reset below fires ONLY on an actual sign-out — not on the
+  // initial null while Firebase restores its persisted user. Without
+  // this, a seeded value (start's SSR id) would flash to `undefined`
+  // during the restore window before the claim re-resolves.
+  const hadUserRef = useRef(false);
 
   useEffect(() => {
     if (!user) {
-      // Reset back to "loading" on sign-out so consumers re-gate
-      // on auth instead of holding the previous user's UUID. The
-      // rule against sync setState in an effect targets cascading
-      // renders for derived state — this is the explicit
-      // user-changed-to-null reset, where a single render IS the
-      // correct outcome (the route unmounts the authenticated
-      // tree). Documented escape per the rule's `react.dev/learn/
-      // you-might-not-need-an-effect` reference.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPivoxUserId(undefined);
+      if (hadUserRef.current) {
+        // Reset to "loading" on an actual sign-out so consumers re-gate
+        // on auth instead of holding the previous user's UUID (the
+        // authenticated tree unmounts on sign-out anyway).
+        setPivoxUserId(undefined);
+        hadUserRef.current = false;
+      }
       return;
     }
+    hadUserRef.current = true;
     let cancelled = false;
     void user
       .getIdTokenResult()
