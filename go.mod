@@ -28,9 +28,9 @@ require (
 	github.com/stretchr/testify v1.11.1
 	go.einride.tech/aip v0.86.3
 	google.golang.org/api v0.283.0
-	google.golang.org/genproto v0.0.0-20260526163538-3dc84a4a5aaa
-	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa
+	google.golang.org/genproto v0.0.0-20260608224507-4308a22a1bab
+	google.golang.org/genproto/googleapis/api v0.0.0-20260608224507-4308a22a1bab
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260608224507-4308a22a1bab
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
@@ -93,7 +93,7 @@ require (
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/riverqueue/apiframe v0.0.0-20260528041317-4fa01838d103 // indirect
+	github.com/riverqueue/apiframe v0.0.0-20260609005548-64f48e0e6228 // indirect
 	github.com/riverqueue/river/riverdriver v0.39.0 // indirect
 	github.com/riverqueue/river/rivershared v0.39.0 // indirect
 	github.com/riverqueue/river/rivertype v0.39.0 // indirect
