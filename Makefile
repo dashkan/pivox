@@ -12,8 +12,7 @@
 	ai-native \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
 	test-native-ui \
-	web-build web-build-primitives web-build-image-editor web-build-features \
-	web-build-ui web-build-client web-build-storage web-build-start \
+	web-build web-build-watch web-build-start \
 	web-clean web-start web-start-preview electron-start
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
@@ -344,26 +343,16 @@ ollama-serve:
 web-build:
 	pnpm run --dir web web:build
 
-web-build-primitives:
-	pnpm run --dir web web:build:primitives --watch
-
-web-build-image-editor:
-	pnpm run --dir web web:build:image-editor --watch
-
-web-build-features:
-	pnpm run --dir web web:build:features --watch
-
-web-build-ui:
-	pnpm run --dir web web:build:ui --watch
-
-web-build-client:
-	pnpm run --dir web web:build:client --watch
-
-web-build-storage:
-	pnpm run --dir web web:build:storage --watch
-
-web-build-start:
-	pnpm run --dir web web:build:start
+# `--parallel` (via the web:build:watch script) is load-bearing: each
+# package's `vite build --watch` never exits, so pnpm's default
+# topological run with a concurrency cap of 4 fills its slots with the
+# first 4 leaf packages and STARVES the rest — @pivox/ui, features, and
+# storage never get a watcher, so edits to their src never reach dist/.
+# `--parallel` starts every package's watcher at once. Safe because the
+# `web-build` prerequisite on `dev` produces the initial topo-ordered
+# dist/ before any watcher starts; watchers only do incremental rebuilds.
+web-build-watch:
+	pnpm run --dir web web:build:watch
 
 # Wipes the start app's build/runtime caches that go stale when
 # workspace deps get rebuilt out of order. Symptom is `make dev`
@@ -415,29 +404,22 @@ electron-start: web-build
 dev: web-build
 	pnpx concurrently \
 		--kill-others \
-		--names "cloud,worker,ollama,nginx,ngrok,web-primitives,web-image-editor,web-features,web-ui,web-client,web-storage,start" \
-		--prefix-colors "yellow,green,red,cyan,magenta,blue,gray,gray,gray,gray,gray,white" \
+		--names "cloud,worker,nginx,ngrok,packages,start" \
+		--prefix-colors "yellow,green,cyan,magenta,blue,gray,white" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
-		"$(MAKE) ollama-serve" \
 		"$(MAKE) proxy-nginx" \
 		"$(MAKE) proxy-ngrok" \
-		"$(MAKE) web-build-primitives" \
-		"$(MAKE) web-build-image-editor" \
-		"$(MAKE) web-build-features" \
-		"$(MAKE) web-build-ui" \
-		"$(MAKE) web-build-client" \
-		"$(MAKE) web-build-storage" \
+		"$(MAKE) web-build-watch" \
 		"$(MAKE) web-start"
 
 dev-preview: web-build-start
 	pnpx concurrently \
 		--kill-others \
-		--names "cloud,worker,ollama,nginx,ngrok,build,start" \
-		--prefix-colors "yellow,green,red,cyan,magenta,white" \
+		--names "cloud,worker,nginx,ngrok,build,start" \
+		--prefix-colors "yellow,green,cyan,magenta,white" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
-		"$(MAKE) ollama-serve" \
 		"$(MAKE) proxy-nginx" \
 		"$(MAKE) proxy-ngrok" \
 		"$(MAKE) web-start-preview"
