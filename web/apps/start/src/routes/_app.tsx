@@ -1,6 +1,9 @@
+import { organizationId } from '@pivox/client';
 import { AppShellFeature } from '@pivox/features/app-shell';
+import { useAuth } from '@pivox/features/auth';
+import { ChatModalFeature } from '@pivox/features/chat';
 import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
-import { AppShell } from '@pivox/ui/app-shell';
+import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
 import { SidebarProvider } from '@pivox/ui/sidebar-provider';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
 import {
@@ -9,7 +12,7 @@ import {
   redirect,
   useRouter,
 } from '@tanstack/react-router';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useCallback } from 'react';
 
 import { $api } from '@/lib/api-client';
 import { getServerSession } from '@/server/auth-session';
@@ -175,6 +178,45 @@ function AppLayoutRoute() {
       <Suspense>
         <ProfileDialog />
       </Suspense>
+      <ChatFab />
     </AppShellFeature>
+  );
+}
+
+/**
+ * Floating chat FAB, mounted in the authed shell so chat is reachable
+ * on every route (replaces the old standalone /chat route). Builds the
+ * chat `parent` + Firebase-token getter the same way that route did,
+ * sourcing the Pivox user UUID from the server-verified `_app` route
+ * context (SSR-available, so the button server-renders). Renders
+ * nothing until an org is selected — chat is scoped to an org.
+ */
+function ChatFab() {
+  const { state: shellState } = useAppShellContext();
+  const { user: firebaseUser } = useAuth();
+  const { user } = Route.useRouteContext();
+  const activeOrg = shellState.activeOrganization;
+  const pivoxUserId = user.pivoxUserId;
+
+  const getAuthToken = useCallback(async () => {
+    if (!firebaseUser) {
+      throw new Error('Firebase user not available');
+    }
+    return firebaseUser.getIdToken();
+  }, [firebaseUser]);
+
+  if (!activeOrg || !pivoxUserId) return null;
+
+  const parent = `organizations/${organizationId(activeOrg)}/users/${pivoxUserId}`;
+  // key={parent} remounts the runtime when the active org changes. The
+  // FAB is mounted shell-wide (persists across navigation), so without
+  // this an org switch would keep the previous org's conversation id in
+  // the runtime's state and smuggle it into the new org's next turn.
+  return (
+    <ChatModalFeature
+      key={parent}
+      parent={parent}
+      getAuthToken={getAuthToken}
+    />
   );
 }

@@ -35,3 +35,16 @@ export function ChatFeature({
 
   return <Chat.Provider value={value}>{children}</Chat.Provider>;
 }
+
+/**
+ * Floating-chat variant of {@link ChatFeature}: same runtime wiring, but
+ * renders the bottom-right modal FAB (`Chat.Modal`) instead of a
+ * full-page surface. Mount once in the authed shell to make chat
+ * available on every route. Takes no children — the thread/composer
+ * live inside the popover.
+ */
+export function ChatModalFeature(options: UseChatFeatureOptions) {
+  const value = useChatFeature(options);
+
+  return <Chat.Modal value={value} />;
+}

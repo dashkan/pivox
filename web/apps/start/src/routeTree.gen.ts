@@ -22,7 +22,6 @@ import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
 import { Route as AuthBrokerCallbackRouteImport } from './routes/auth/broker-callback'
 import { Route as AuthActionRouteImport } from './routes/auth/action'
 import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
-import { Route as AppChatRouteImport } from './routes/_app/chat'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
 
 const AppRoute = AppRouteImport.update({
@@ -89,11 +88,6 @@ const AppImageEditorRoute = AppImageEditorRouteImport.update({
   path: '/image-editor',
   getParentRoute: () => AppRoute,
 } as any)
-const AppChatRoute = AppChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppAboutRoute = AppAboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -103,7 +97,6 @@ const AppAboutRoute = AppAboutRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/about': typeof AppAboutRoute
-  '/chat': typeof AppChatRoute
   '/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/broker-callback': typeof AuthBrokerCallbackRoute
@@ -118,7 +111,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/about': typeof AppAboutRoute
-  '/chat': typeof AppChatRoute
   '/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/broker-callback': typeof AuthBrokerCallbackRoute
@@ -136,7 +128,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/_app/about': typeof AppAboutRoute
-  '/_app/chat': typeof AppChatRoute
   '/_app/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/broker-callback': typeof AuthBrokerCallbackRoute
@@ -155,7 +146,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
-    | '/chat'
     | '/image-editor'
     | '/auth/action'
     | '/auth/broker-callback'
@@ -170,7 +160,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/about'
-    | '/chat'
     | '/image-editor'
     | '/auth/action'
     | '/auth/broker-callback'
@@ -187,7 +176,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/_app/about'
-    | '/_app/chat'
     | '/_app/image-editor'
     | '/auth/action'
     | '/auth/broker-callback'
@@ -309,13 +297,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppImageEditorRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/chat': {
-      id: '/_app/chat'
-      path: '/chat'
-      fullPath: '/chat'
-      preLoaderRoute: typeof AppChatRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/about': {
       id: '/_app/about'
       path: '/about'
@@ -328,14 +309,12 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAboutRoute: typeof AppAboutRoute
-  AppChatRoute: typeof AppChatRoute
   AppImageEditorRoute: typeof AppImageEditorRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAboutRoute: AppAboutRoute,
-  AppChatRoute: AppChatRoute,
   AppImageEditorRoute: AppImageEditorRoute,
   AppIndexRoute: AppIndexRoute,
 }

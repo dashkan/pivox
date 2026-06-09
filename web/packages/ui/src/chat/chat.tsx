@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  AssistantModalPrimitive,
   AssistantRuntimeProvider,
   AuiIf,
   ComposerPrimitive,
@@ -11,7 +12,8 @@ import { Avatar, AvatarFallback } from '@pivox/primitives/avatar';
 import { Button } from '@pivox/primitives/button';
 import { Textarea } from '@pivox/primitives/textarea';
 import { cn } from '@pivox/primitives/utils';
-import { SendHorizonalIcon, SquareIcon } from 'lucide-react';
+import { BotIcon, SendHorizonalIcon, SquareIcon, XIcon } from 'lucide-react';
+import { forwardRef } from 'react';
 
 import { ChatContext } from './chat.context';
 
@@ -244,6 +246,88 @@ const Input: FC<ComponentProps<typeof ComposerPrimitive.Root>> = ({
   </ComposerPrimitive.Root>
 );
 
+/* ─── Modal (floating) ────────────────────────────────────────── */
+
+/**
+ * Bottom-right floating chat button (`data-state` open/closed forwarded
+ * by the modal Trigger via `asChild`). Sits at 50% opacity, going full
+ * on hover/focus and while the popover is open. Morphs bot → ✕ on open.
+ */
+const ChatModalButton = forwardRef<
+  HTMLButtonElement,
+  ComponentProps<typeof Button> & { 'data-state'?: 'open' | 'closed' }
+>(function ChatModalButton({ 'data-state': state, className, ...props }, ref) {
+  return (
+    <Button
+      ref={ref}
+      type="button"
+      size="icon"
+      data-state={state}
+      aria-label={state === 'open' ? 'Close chat' : 'Open chat'}
+      className={cn(
+        'relative size-12 rounded-full opacity-50 shadow-lg transition-opacity',
+        'hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
+        className,
+      )}
+      {...props}
+    >
+      <BotIcon
+        data-state={state}
+        className="size-5 transition-all data-[state=open]:scale-0 data-[state=open]:opacity-0"
+      />
+      <XIcon
+        data-state={state}
+        className="absolute size-5 scale-0 opacity-0 transition-all data-[state=open]:scale-100 data-[state=open]:opacity-100"
+      />
+    </Button>
+  );
+});
+
+/**
+ * Floating chat — a bottom-right FAB that opens the thread in a popover
+ * (assistant-ui modal pattern). Self-contained: provides its OWN
+ * ChatContext + runtime (it does not go through `Chat.Provider`, whose
+ * `ThreadPrimitive.Root` flex column is for the full-page surface). Drop
+ * it into any layout to make chat available on every route:
+ *
+ *   <ChatFeature ...>  // full-page surface (Header/Thread/Input)
+ * vs
+ *   <ChatModalFeature parent={...} getAuthToken={...} />  // floating
+ *
+ * Mounted once in the authed shell, the runtime persists across
+ * open/close so the conversation isn't lost when the popover collapses.
+ */
+function ChatModal({ value }: { value: ChatContextValue }) {
+  return (
+    <ChatContext value={value}>
+      <AssistantRuntimeProvider runtime={value.meta.runtime}>
+        <AssistantModalPrimitive.Root>
+          <AssistantModalPrimitive.Anchor className="fixed end-6 bottom-6 z-50">
+            <AssistantModalPrimitive.Trigger asChild>
+              <ChatModalButton />
+            </AssistantModalPrimitive.Trigger>
+          </AssistantModalPrimitive.Anchor>
+          <AssistantModalPrimitive.Content
+            sideOffset={16}
+            className={cn(
+              'z-50 overflow-hidden rounded-2xl border border-border bg-background shadow-xl',
+              'data-[state=open]:animate-in data-[state=closed]:animate-out',
+              'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+              'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+              'data-[side=top]:slide-in-from-bottom-2',
+            )}
+          >
+            <ThreadPrimitive.Root className="flex h-[min(70vh,37.5rem)] w-[min(calc(100vw-3rem),25rem)] flex-col bg-background">
+              <Thread />
+              <Input />
+            </ThreadPrimitive.Root>
+          </AssistantModalPrimitive.Content>
+        </AssistantModalPrimitive.Root>
+      </AssistantRuntimeProvider>
+    </ChatContext>
+  );
+}
+
 /* ─── Namespace export ───────────────────────────────────────── */
 
 export const Chat = {
@@ -251,5 +335,6 @@ export const Chat = {
   Header,
   Thread,
   Input,
+  Modal: ChatModal,
   Context: ChatContext,
 };
