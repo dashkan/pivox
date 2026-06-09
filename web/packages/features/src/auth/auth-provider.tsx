@@ -74,6 +74,7 @@ export function AuthProvider({
   onBeforeSignOut,
   onTokenRefresh,
   onSignedOut,
+  onSessionMissing,
 }: {
   children: React.ReactNode;
   /**
@@ -121,6 +122,22 @@ export function AuthProvider({
    * `<Navigate />` on the next render.
    */
   onSignedOut?: () => void | Promise<void>;
+  /**
+   * Optional hook fired ONCE, on the first auth-state resolution, when
+   * the Firebase client SDK comes up with NO user. In the start app a
+   * valid server session cookie can outlive the client's Firebase
+   * session (e.g. the auth IndexedDB was evicted) — the cookie gate
+   * still renders the app, but CSR calls go out tokenless and 401.
+   * This fires so the host can attempt a silent re-establish
+   * (cookie → custom token → signInWithCustomToken) and fall back to a
+   * real re-login if there's no recoverable server session.
+   *
+   * Fires only on the INITIAL resolution, never on later transitions —
+   * so an explicit sign-out (which also drives the listener to null) is
+   * handled by `onSignedOut`, not here. Electron leaves this unset; its
+   * AuthGateFeature redirects on a null user instead.
+   */
+  onSessionMissing?: () => void | Promise<void>;
 }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,6 +161,15 @@ export function AuthProvider({
     onTokenRefreshRef.current = onTokenRefresh;
   }, [onTokenRefresh]);
   const lastRefreshedUidRef = useRef<string | null>(null);
+  // Latest-ref for onSessionMissing (same always-current-callback
+  // pattern as onTokenRefreshRef) plus a one-shot guard so recovery
+  // fires only on the FIRST auth-state resolution, never on later
+  // null transitions (explicit sign-out is onSignedOut's job).
+  const onSessionMissingRef = useRef(onSessionMissing);
+  useEffect(() => {
+    onSessionMissingRef.current = onSessionMissing;
+  }, [onSessionMissing]);
+  const initialAuthResolvedRef = useRef(false);
 
   useEffect(() => {
     // firebase/auth is now a static import (was previously dynamic to
@@ -157,6 +183,18 @@ export function AuthProvider({
     const unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
+
+      // On the FIRST auth-state resolution only: if the client SDK has
+      // no user, the server session (cookie) may still be valid — a
+      // desync the host can recover silently. Guarded one-shot so later
+      // null transitions (explicit sign-out) fall through to the
+      // onSignedOut path below instead of triggering recovery.
+      if (!initialAuthResolvedRef.current) {
+        initialAuthResolvedRef.current = true;
+        if (!firebaseUser) {
+          void onSessionMissingRef.current?.();
+        }
+      }
       if (!firebaseUser) {
         // Signed out — clear the seen-uid memo so a subsequent
         // sign-in starts fresh (route's onSuccess will mint the

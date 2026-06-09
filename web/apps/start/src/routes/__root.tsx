@@ -1,5 +1,5 @@
 import robotoLatin from '@fontsource-variable/roboto/files/roboto-latin-wght-normal.woff2?url';
-import { AuthProvider } from '@pivox/features/auth';
+import { AuthProvider, recoverClientSession } from '@pivox/features/auth';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
 // Importing @pivox/storage at the top of __root.tsx ensures all item
 // definitions in @pivox/storage/items have been evaluated (each
@@ -15,10 +15,15 @@ import {
   createRootRouteWithContext,
   useRouter,
 } from '@tanstack/react-router';
+import { getAuth, signInWithCustomToken } from 'firebase/auth';
 
 import appCss from '../styles.css?url';
 
-import { clearSession, createSession } from '@/server/auth-session';
+import {
+  clearSession,
+  createSession,
+  recoverSession,
+} from '@/server/auth-session';
 
 /**
  * Root route declares the router-context shape — the per-request
@@ -80,6 +85,28 @@ function RootComponent() {
         // AuthGateFeature for the same purpose; start uses this hook
         // since the server-side gate replaces AuthGateFeature.
         onSignedOut={() => router.navigate({ to: '/auth/login' })}
+        // Desync recovery: the cookie gate let us render, but the
+        // Firebase client SDK came up with no user (e.g. its auth
+        // IndexedDB was evicted). Silently re-establish the client
+        // session from the still-valid cookie via a custom token, or
+        // fall back to a real re-login if there's no recoverable
+        // server session. Skipped on /auth/* routes (no authed session
+        // to recover there). See @pivox/features `recoverClientSession`
+        // and the server-side `recoverSession`.
+        onSessionMissing={async () => {
+          if (router.state.location.pathname.startsWith('/auth')) return;
+          await recoverClientSession({
+            getCurrentUserId: () => getAuth().currentUser?.uid ?? null,
+            mintRecoveryToken: async () =>
+              (await recoverSession())?.customToken ?? null,
+            signInWithToken: async (token) => {
+              await signInWithCustomToken(getAuth(), token);
+            },
+            redirectToLogin: () => {
+              void router.navigate({ to: '/auth/login' });
+            },
+          });
+        }}
       >
         <Outlet />
       </AuthProvider>

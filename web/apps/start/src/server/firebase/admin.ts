@@ -51,9 +51,20 @@ export function firebaseAdmin(): App {
     return cached;
   }
 
-  // Application Default Credentials path. Works on GCP, fails
-  // clearly locally if the env var wasn't set.
-  cached = initializeApp();
+  // Application Default Credentials path. On GCP this uses workload
+  // identity / the metadata server. Locally it uses your
+  // `gcloud auth application-default` credentials — which carry no
+  // private key, so `createCustomToken` (it self-signs the JWT) can't
+  // sign directly and throws "Failed to determine service account".
+  // (`createSessionCookie` is unaffected — it mints via the Firebase
+  // backend over ADC, no local signing.) Passing `serviceAccountId`
+  // makes the Admin SDK sign custom tokens via the IAM Credentials API
+  // AS that SA — the same SA the SSR actor-token path already signs as
+  // (`PIVOX_SSR_SA_EMAIL`), whose Token Creator grant your ADC already
+  // holds. So session-recovery custom-token minting works in dev too,
+  // not just on GCP.
+  const serviceAccountId = process.env.PIVOX_SSR_SA_EMAIL;
+  cached = initializeApp(serviceAccountId ? { serviceAccountId } : undefined);
   return cached;
 }
 

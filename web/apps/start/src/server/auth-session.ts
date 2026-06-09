@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-start/server';
 import { getAuth } from 'firebase-admin/auth';
 
-import { firebaseAdmin } from './firebase/admin';
+import { firebaseAdmin, mintCustomToken } from './firebase/admin';
 
 import type { DecodedIdToken } from 'firebase-admin/auth';
 
@@ -265,6 +265,57 @@ export const getServerSession = createServerFn({ method: 'GET' }).handler(
       return { user: toServerSession(decoded), cookiePresent: true };
     } catch {
       return { user: null, cookiePresent: true };
+    }
+  },
+);
+
+/**
+ * Re-establish a Firebase CLIENT session from a still-valid server
+ * session cookie — for the desync where the cookie outlives the
+ * client's Firebase auth state (e.g. the auth IndexedDB was evicted).
+ * The cookie gate still renders the app, but CSR calls go out tokenless
+ * and 401; this lets the client recover silently.
+ *
+ * Verifies the cookie, then mints a Firebase custom token for its uid —
+ * the same server→client bridge the delegated-auth flow already uses in
+ * production (`internal_hooks.go`, which likewise mints with no extra
+ * claims). The client redeems it via `signInWithCustomToken`, restoring
+ * a fully-persisted, refreshable session; the `syncIdentity`
+ * `beforeUserSignedIn` blocking hook re-stamps the authoritative
+ * `pivox_user_id` claim on the issued ID token, so we pass no claims
+ * here.
+ *
+ * Returns `{ customToken }` on success, or `null` when there's no valid
+ * server session to recover from (genuinely signed out — the client
+ * routes to a real re-login). Only ever mints for the cookie's OWN
+ * verified uid, so it grants no authority the caller didn't already
+ * hold via the cookie.
+ *
+ * Unlike `getServerSession`, this verifies with `checkRevoked: true`.
+ * Recovery is a more sensitive operation than rendering a page — it
+ * reconstitutes a FULL client session (which can then mint Bearer
+ * tokens for the API), so it must verify *more* strictly than the
+ * per-navigation gate, not the same. The gate skips revocation for
+ * latency (it runs on every navigation); recovery runs rarely (only on
+ * desync), so the extra Firebase backend RPC is free and it refuses to
+ * mint for a session revoked elsewhere — sign-out on another device
+ * (`revokeRefreshTokens`), password change, or a disabled account.
+ */
+export const recoverSession = createServerFn({ method: 'POST' }).handler(
+  async (): Promise<{ customToken: string } | null> => {
+    const cookie = getCookie(COOKIE_NAME);
+    if (!cookie) return null;
+    try {
+      const auth = getAuth(firebaseAdmin());
+      const decoded: DecodedIdToken = await auth.verifySessionCookie(
+        cookie,
+        true, // checkRevoked — see doc comment
+      );
+      const customToken = await mintCustomToken(decoded.uid);
+      return { customToken };
+    } catch {
+      // Cookie invalid / revoked / mint failed — nothing to recover.
+      return null;
     }
   },
 );
