@@ -29,10 +29,10 @@
     "electron:start": "pnpm --filter @pivox/electron dev"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.4",
+    "@eslint/js": "catalog:",
     "@types/eslint-plugin-jsx-a11y": "6.10.1",
     "concurrently": "10.0.3",
-    "eslint": "9.39.4",
+    "eslint": "catalog:",
     "eslint-plugin-import-x": "4.16.2",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
@@ -41,12 +41,12 @@
     "eslint-plugin-unused-imports": "4.4.1",
     "globals": "17.6.0",
     "premove": "4.0.0",
-    "prettier": "3.8.3",
+    "prettier": "catalog:",
     "publint": "0.3.21",
-    "typescript": "6.0.3",
+    "typescript": "catalog:",
     "typescript-eslint": "8.61.0",
-    "vite": "8.0.16",
+    "vite": "catalog:",
     "vite-plugin-dts": "5.0.2",
-    "vitest": "4.1.8"
+    "vitest": "catalog:"
   }
 }
