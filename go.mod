@@ -27,7 +27,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	go.einride.tech/aip v0.86.3
-	google.golang.org/api v0.283.0
+	google.golang.org/api v0.284.0
 	google.golang.org/genproto v0.0.0-20260608224507-4308a22a1bab
 	google.golang.org/genproto/googleapis/api v0.0.0-20260608224507-4308a22a1bab
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260608224507-4308a22a1bab

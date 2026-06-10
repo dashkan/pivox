@@ -100,14 +100,14 @@
     "vite": "8.0.16"
   },
   "dependencies": {
-    "@assistant-ui/react": "^0.14.14",
-    "@assistant-ui/react-ai-sdk": "^1.3.32",
+    "@assistant-ui/react": "^0.14.15",
+    "@assistant-ui/react-ai-sdk": "^1.3.33",
     "@pivox/client": "workspace:*",
     "@pivox/image-editor": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/storage": "workspace:*",
-    "ai": "6.0.197",
+    "ai": "6.0.198",
     "lucide-react": "1.17.0",
     "qrcode.react": "4.2.0"
   }
