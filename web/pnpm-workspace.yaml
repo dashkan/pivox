@@ -10,29 +10,34 @@ allowBuilds:
   protobufjs: true
   sharp: true
   unrs-resolver: true
-# Pin @types/react and @types/react-dom to v19 across the workspace.
+# Keep @types/react / @types/react-dom on v19 only across the workspace.
 #
 # Source of the v18 pull: `react-jsx-parser@2.4.1` (transitive via
 # @pivox/primitives → react-jsx-parser) declares the v18 type
-# packages as optionalDependencies in its package.json. Without
-# this override, pnpm installs both @18 and @19 side-by-side; tsc
-# and typescript-eslint's project service walk both type-root
-# directories and emit 80+ no-unsafe-assignment errors across
-# any feature that consumes @pivox/ui (which transitively pulls
-# primitives → react-jsx-parser).
+# packages as optionalDependencies. Without a guard, pnpm installs
+# both @18 and @19 side-by-side; tsc and typescript-eslint's project
+# service walk both type-root directories and emit 80+
+# no-unsafe-assignment errors across any feature that consumes
+# @pivox/ui (which transitively pulls primitives → react-jsx-parser).
 #
-# The `overrides` block below steers consumers in the resolution
-# graph to v19 — nothing actually USES the @18 install
-# (`pnpm why @types/react@18` returns empty). The
-# `ignoredOptionalDependencies` block tells pnpm to skip
-# installing the optional deps entirely so the orphan @18
-# directory isn't even created.
+# `ignoredOptionalDependencies` below is the only guard needed: it
+# tells pnpm to skip react-jsx-parser's optional @18 install entirely,
+# so the orphan @18 directory is never created. The direct devDeps
+# resolve to v19 via the catalog. (Verified: removing it reintroduces
+# the @18 orphan; with it, `@types/react@18` resolves nowhere.)
 #
-# Drop both entries (and update the workspace's @types/react pin)
-# once `react-jsx-parser` ships a release with @types/react ^19.
-# Check upstream: https://github.com/TroyAlford/react-jsx-parser/releases
+# We previously ALSO had `overrides: { "@types/react": "catalog:" }`
+# as belt-and-suspenders — but it was redundant (ignored deps already
+# block the only v18 source) AND broke `pnpm update`, which can't
+# round-trip a catalog-referenced override and ejected the `catalog:`
+# refs in every consumer's package.json to hardcoded semver. Don't
+# re-add it.
+#
+# Drop the ignoredOptionalDependencies entries (the @types/react pin
+# stays in the catalog) once `react-jsx-parser` ships a release with
+# @types/react ^19. Upstream: https://github.com/TroyAlford/react-jsx-parser/releases
 catalog:
-  "@assistant-ui/react": "0.14.15"
+  "@assistant-ui/react": "0.14.16"
   "@assistant-ui/react-ai-sdk": "1.3.33"
   "@eslint/js": "9.39.4"
   "@fontsource-variable/roboto": "5.2.10"
@@ -51,23 +56,20 @@ catalog:
   "@types/react": "19.2.17"
   "@types/react-dom": "19.2.3"
   "@vitejs/plugin-react": "6.0.2"
-  "ai": "6.0.198"
-  "electron": "42.3.3"
+  "ai": "6.0.199"
+  "electron": "42.4.0"
   "electron-builder": "26.15.2"
   "electron-vite": "6.0.0-beta.1"
   "eslint": "9.39.4"
   "firebase": "12.14.0"
   "lucide-react": "1.17.0"
-  "prettier": "3.8.3"
+  "prettier": "3.8.4"
   "react": "19.2.7"
   "react-dom": "19.2.7"
   "tailwindcss": "4.3.0"
   "typescript": "5.9.3"
   "vite": "8.0.16"
   "vitest": "4.1.8"
-overrides:
-  "@types/react": "catalog:"
-  "@types/react-dom": "catalog:"
 ignoredOptionalDependencies:
   - "@types/react"
   - "@types/react-dom"
