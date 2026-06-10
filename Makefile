@@ -10,7 +10,8 @@
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down firebase-deploy clean-fn-revisions \
 	ai-native \
-	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
+	proxy-nginx proxy-nginx-stop proxy-nginx-reload \
+	proxy-envoy proxy-envoy-validate proxy-ngrok \
 	test-native-ui \
 	web-build web-build-watch web-build-start \
 	web-clean web-start web-start-preview electron-start
@@ -315,6 +316,22 @@ proxy-nginx-stop:
 proxy-nginx-reload:
 	nginx -c $(PWD)/configs/nginx.conf -s reload
 
+# Envoy is the active ingress proxy (configs/envoy.yaml) — a 1:1 port
+# of nginx.conf that `make dev` / `dev-preview` now run instead of
+# nginx. The proxy-nginx* targets above are kept for fallback but are
+# no longer wired into the dev loop. Native Homebrew Envoy
+# (`brew install envoy`); no signal-based reload like nginx — Envoy
+# hot-restarts, so on a config edit just restart the process (Ctrl-C
+# the dev loop and re-run, or run proxy-envoy standalone).
+proxy-envoy:
+	envoy -c $(PWD)/configs/envoy.yaml
+
+# Parse + semantically validate the config without binding ports.
+# Run after editing configs/envoy.yaml; CI-friendly (exits non-zero
+# on error).
+proxy-envoy-validate:
+	envoy --mode validate -c $(PWD)/configs/envoy.yaml
+
 proxy-ngrok:
 	ngrok start --config configs/ngrok.yml --all
 
@@ -414,11 +431,11 @@ electron-start: web-build
 dev: web-build
 	pnpx concurrently \
 		--kill-others \
-		--names "cloud,worker,nginx,ngrok,packages,start" \
+		--names "cloud,worker,envoy,ngrok,packages,start" \
 		--prefix-colors "yellow,green,cyan,magenta,blue,gray,white" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
-		"$(MAKE) proxy-nginx" \
+		"$(MAKE) proxy-envoy" \
 		"$(MAKE) proxy-ngrok" \
 		"$(MAKE) web-build-watch" \
 		"$(MAKE) web-start"
@@ -426,10 +443,10 @@ dev: web-build
 dev-preview: web-build-start
 	pnpx concurrently \
 		--kill-others \
-		--names "cloud,worker,nginx,ngrok,build,start" \
+		--names "cloud,worker,envoy,ngrok,build,start" \
 		--prefix-colors "yellow,green,cyan,magenta,white" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
-		"$(MAKE) proxy-nginx" \
+		"$(MAKE) proxy-envoy" \
 		"$(MAKE) proxy-ngrok" \
 		"$(MAKE) web-start-preview"

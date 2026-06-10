@@ -1,0 +1,323 @@
+# Envoy ingress proxy — 1:1 replacement for configs/nginx.conf.
+#
+# ngrok terminates TLS at pivox.ngrok.app and forwards plain HTTP to
+# localhost:8081 (see configs/ngrok.yml). This listener owns 8081 and
+# fans out to the same upstreams nginx did. Run/validate via the
+# `proxy-envoy*` Makefile targets.
+#
+# Phase 1 is a faithful port: same routes, same upstreams, same CORS
+# allow-list, same SSE/WebSocket/gRPC behavior. Phase 2 (later) folds
+# the grpc-gateway REST surface into Envoy's grpc_json_transcoder.
+#
+# Two behavioral notes where Envoy differs from nginx by default and we
+# rely on that difference:
+#   - Envoy STREAMS response bodies by default, so there's no
+#     `proxy_buffering off` to port — SSE/long-poll just work. What we
+#     DO need on those routes is to disable the overall + idle timeouts
+#     (timeout: 0s + idle_timeout: 0s), or Envoy's 15s route timeout /
+#     5min stream-idle timeout would cut long streams.
+#   - Envoy sets x-forwarded-proto from the (cleartext) downstream
+#     connection = `http`. That matches nginx's `$scheme` for the REST
+#     and web routes. The three services that emit absolute URLs
+#     (Keycloak, River UI, storage agent) need `https` — ngrok is
+#     always https — so those routes force x-forwarded-proto: https,
+#     mirroring nginx's $proxy_forwarded_proto map.
+
+admin:
+  # Local-only admin: /config_dump, /stats, /clusters for debugging.
+  address:
+    socket_address: { address: 127.0.0.1, port_value: 9901 }
+
+static_resources:
+  listeners:
+    - name: ingress_8081
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 8081 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                # AUTO sniffs the HTTP/2 cleartext (h2c) preface, so native
+                # gRPC clients (grpcurl) and HTTP/1.1 web/REST clients share
+                # this one listener — nginx's `http2 on` equivalent.
+                codec_type: AUTO
+                # ngrok is one trusted hop in front of us; trust its
+                # x-forwarded-for so the real client IP is preserved.
+                use_remote_address: false
+                xff_num_trusted_hops: 1
+                # WebSocket upgrades for Vite HMR on the web `/` route.
+                upgrade_configs:
+                  - upgrade_type: websocket
+                http_filters:
+                  # CORS preflight + response headers, applied per-route via
+                  # typed_per_filter_config (the /v1, /internal, SSE routes).
+                  - name: envoy.filters.http.cors
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+                  # gzip — mirrors nginx gzip on + gzip_types + min_length.
+                  - name: envoy.filters.http.compressor
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+                      compressor_library:
+                        name: gzip
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+                      response_direction_config:
+                        common_config:
+                          min_content_length: 256
+                          content_type:
+                            - text/plain
+                            - text/css
+                            - application/json
+                            - application/javascript
+                            - text/xml
+                            - application/xml
+                            - image/svg+xml
+                            - font/woff2
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                route_config:
+                  name: ingress_routes
+                  # Envoy is FIRST-MATCH-WINS (nginx is most-specific-wins),
+                  # so the order below is load-bearing: specific prefixes /
+                  # regexes precede their general fallbacks.
+                  virtual_hosts:
+                    - name: ingress
+                      domains: ["*"]
+                      routes:
+                        # --- Service-to-service gRPC: AgentService -----------
+                        # Its own backend (50052), registration-token auth, no
+                        # Firebase. Must precede /pivox. (which it prefixes).
+                        - match: { prefix: "/pivox.agent.v1.AgentService/" }
+                          route: { cluster: grpc_agent, timeout: 0s }
+
+                        # --- Public gRPC (native h2 clients) -> 50051 --------
+                        - match: { prefix: "/pivox." }
+                          route: { cluster: grpc_main, timeout: 0s }
+                        - match: { prefix: "/google." }
+                          route: { cluster: grpc_main, timeout: 0s }
+                        - match: { prefix: "/grpc.reflection." }
+                          route: { cluster: grpc_main, timeout: 0s }
+
+                        # --- Debug endpoints -> 9090 -------------------------
+                        - match: { prefix: "/healthz" }
+                          route: { cluster: debug }
+                        - match: { prefix: "/readyz" }
+                          route: { cluster: debug }
+
+                        # --- Keycloak (dev IDP) -> 8082 ----------------------
+                        # Long-poll admin UI; needs https forwarded-proto so it
+                        # emits https absolute URLs into the HTTPS page.
+                        - match: { prefix: "/keycloak/" }
+                          route:
+                            cluster: keycloak
+                            timeout: 0s
+                            idle_timeout: 0s
+                          request_headers_to_add:
+                            - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+
+                        # --- AI chat SSE (regex, before /v1/) -> 8080 --------
+                        # streamGenerateContent is server-sent events; disable
+                        # timeouts so long generations aren't cut. CORS like
+                        # /v1/ but methods limited to POST.
+                        - match:
+                            safe_regex:
+                              regex: '^/v1/organizations/[^/]+/users/[^/]+:streamGenerateContent$'
+                          route:
+                            cluster: rest_gateway
+                            timeout: 0s
+                            idle_timeout: 0s
+                          response_headers_to_add:
+                            - header: { key: vary, value: origin }
+                          typed_per_filter_config:
+                            envoy.filters.http.cors:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+                              allow_origin_string_match:
+                                - safe_regex: { regex: '^https?://localhost(:[0-9]+)?$' }
+                                - safe_regex: { regex: '^https?://127\.0\.0\.1(:[0-9]+)?$' }
+                                - exact: "null"
+                              allow_methods: "POST, OPTIONS"
+                              allow_headers: "Authorization, Content-Type"
+                              max_age: "86400"
+                              allow_credentials: true
+
+                        # --- REST gateway: internal hooks -> 8080 -----------
+                        - match: { prefix: "/internal/" }
+                          route: { cluster: rest_gateway, timeout: 60s }
+                          response_headers_to_add:
+                            - header: { key: vary, value: origin }
+                          typed_per_filter_config:
+                            envoy.filters.http.cors:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+                              allow_origin_string_match:
+                                - safe_regex: { regex: '^https?://localhost(:[0-9]+)?$' }
+                                - safe_regex: { regex: '^https?://127\.0\.0\.1(:[0-9]+)?$' }
+                                - exact: "null"
+                              allow_methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                              allow_headers: "Authorization, Content-Type"
+                              max_age: "86400"
+                              allow_credentials: true
+
+                        # --- REST gateway: public v1 -> 8080 ----------------
+                        - match: { prefix: "/v1/" }
+                          route: { cluster: rest_gateway, timeout: 60s }
+                          response_headers_to_add:
+                            - header: { key: vary, value: origin }
+                          typed_per_filter_config:
+                            envoy.filters.http.cors:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+                              allow_origin_string_match:
+                                - safe_regex: { regex: '^https?://localhost(:[0-9]+)?$' }
+                                - safe_regex: { regex: '^https?://127\.0\.0\.1(:[0-9]+)?$' }
+                                - exact: "null"
+                              allow_methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                              allow_headers: "Authorization, Content-Type"
+                              max_age: "86400"
+                              allow_credentials: true
+
+                        # --- River UI -> 8080 -------------------------------
+                        # `/river` -> 301 `/river/`. scheme_redirect https so
+                        # the Location is https (ngrok is https) instead of the
+                        # cleartext-connection http — nginx used
+                        # absolute_redirect off to dodge the same problem.
+                        - match: { path: "/river" }
+                          redirect:
+                            scheme_redirect: https
+                            path_redirect: "/river/"
+                            response_code: MOVED_PERMANENTLY
+                        - match: { prefix: "/river/" }
+                          route:
+                            cluster: rest_gateway
+                            timeout: 0s
+                            idle_timeout: 0s
+                          request_headers_to_add:
+                            - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+
+                        # --- TanStack DevTools SSE -> web app (3000) --------
+                        - match: { prefix: "/__tsd/" }
+                          route:
+                            cluster: web_app
+                            timeout: 0s
+                            idle_timeout: 0s
+
+                        # --- Hashed static assets -> web app (immutable) ----
+                        - match: { prefix: "/assets/" }
+                          route: { cluster: web_app }
+                          response_headers_to_add:
+                            - header:
+                                key: cache-control
+                                value: "public, max-age=31536000, immutable"
+
+                        # --- Storage agent -> 8083 --------------------------
+                        # Forwards the Bearer JWT untouched; https proto so the
+                        # agent's redirects/links are https.
+                        - match: { prefix: "/files/" }
+                          route: { cluster: storage_agent, timeout: 60s }
+                          request_headers_to_add:
+                            - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+
+                        # --- Web app (catch-all) -> 3000 --------------------
+                        # WebSocket HMR via the listener upgrade_configs above;
+                        # timeouts off for long-lived HMR sockets.
+                        - match: { prefix: "/" }
+                          route:
+                            cluster: web_app
+                            timeout: 0s
+                            idle_timeout: 0s
+
+  clusters:
+    # gRPC backends speak HTTP/2 (h2c) — explicit http2 upstream config.
+    - name: grpc_main
+      type: STATIC
+      connect_timeout: 5s
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: grpc_main
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 50051 }
+
+    - name: grpc_agent
+      type: STATIC
+      connect_timeout: 5s
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: grpc_agent
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 50052 }
+
+    # HTTP/1.1 backends (default protocol — no protocol options needed).
+    - name: rest_gateway
+      type: STATIC
+      connect_timeout: 5s
+      load_assignment:
+        cluster_name: rest_gateway
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 8080 }
+
+    - name: storage_agent
+      type: STATIC
+      connect_timeout: 5s
+      load_assignment:
+        cluster_name: storage_agent
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 8083 }
+
+    - name: debug
+      type: STATIC
+      connect_timeout: 5s
+      load_assignment:
+        cluster_name: debug
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 9090 }
+
+    - name: keycloak
+      type: STATIC
+      connect_timeout: 5s
+      load_assignment:
+        cluster_name: keycloak
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 8082 }
+
+    # Web app dev server binds IPv6 localhost ([::1]:3000), as in nginx.
+    - name: web_app
+      type: STATIC
+      connect_timeout: 5s
+      load_assignment:
+        cluster_name: web_app
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: "::1", port_value: 3000 }
