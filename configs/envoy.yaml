@@ -1,30 +1,29 @@
-# Envoy ingress proxy — 1:1 replacement for configs/nginx.conf.
+# Envoy ingress proxy — replaces configs/nginx.conf (Phase 1) and the
+# Go grpc-gateway for the REST surface (Phase 2).
 #
 # ngrok terminates TLS at pivox.ngrok.app and forwards plain HTTP to
-# localhost:8081 (see configs/ngrok.yml). This listener owns 8081 and
-# fans out to the same upstreams nginx did. Run/validate via the
-# `proxy-envoy*` Makefile targets.
+# localhost:8081 (configs/ngrok.yml). This listener owns 8081. Run /
+# validate via the `proxy-envoy*` Makefile targets.
 #
-# Phase 1 is a faithful port: same routes, same upstreams, same CORS
-# allow-list, same SSE/WebSocket/gRPC behavior. Phase 2 (later) folds
-# the grpc-gateway REST surface into Envoy's grpc_json_transcoder.
+# THREE client surfaces share this one listener:
+#   1. Native gRPC (grpcurl, macOS grpc-swift)   -> pass-through h2c
+#   2. gRPC-Web (browser)                         -> grpc_web filter
+#   3. REST/JSON (web app, openapi-typescript)    -> grpc_json_transcoder
+# (1)+(2) reach the real gRPC servers untouched; (3) is transcoded to
+# gRPC by Envoy and sent to the same servers — retiring grpc-gateway.
 #
-# Two behavioral notes where Envoy differs from nginx by default and we
-# rely on that difference:
-#   - Envoy STREAMS response bodies by default, so there's no
-#     `proxy_buffering off` to port — SSE/long-poll just work. What we
-#     DO need on those routes is to disable the overall + idle timeouts
-#     (timeout: 0s + idle_timeout: 0s), or Envoy's 15s route timeout /
-#     5min stream-idle timeout would cut long streams.
-#   - Envoy sets x-forwarded-proto from the (cleartext) downstream
-#     connection = `http`. That matches nginx's `$scheme` for the REST
-#     and web routes. The three services that emit absolute URLs
-#     (Keycloak, River UI, storage agent) need `https` — ngrok is
-#     always https — so those routes force x-forwarded-proto: https,
-#     mirroring nginx's $proxy_forwarded_proto map.
+# What still goes to the Go process on :8080 (the old gateway port):
+#   - /internal/  — plain HTTP hooks (Firebase blocking fns), not gRPC.
+#   - AiChat REST (:generateContent / :streamGenerateContent) — the SSE
+#     ai-sdk stream format is produced by Go and can't be reproduced by
+#     the generic transcoder, so AiChat is deliberately NOT transcoded.
+#
+# Behavioral notes carried over from Phase 1: Envoy streams responses
+# natively (no proxy_buffering to port; we disable route+idle timeouts
+# on SSE/long-poll routes instead), and x-forwarded-proto is forced to
+# https on Keycloak/River/storage-agent (ngrok is always https).
 
 admin:
-  # Local-only admin: /config_dump, /stats, /clusters for debugging.
   address:
     socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -39,24 +38,40 @@ static_resources:
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
                 stat_prefix: ingress_http
-                # AUTO sniffs the HTTP/2 cleartext (h2c) preface, so native
-                # gRPC clients (grpcurl) and HTTP/1.1 web/REST clients share
-                # this one listener — nginx's `http2 on` equivalent.
+                # Per-request access log to stdout — shows up in `make dev`
+                # under the `envoy` prefix, one line per proxied request:
+                #   <status> <method> <path> -> <cluster> (<ms>) <flags>
+                # RESPONSE_FLAGS surfaces upstream issues (UH=no healthy
+                # upstream, UF=connect fail, UAEX, etc.). A '-' cluster means
+                # Envoy answered directly (CORS preflight, redirect). This is
+                # the right knob for "see proxied requests"; raising
+                # --log-level instead just floods internal component noise.
+                access_log:
+                  - name: envoy.access_loggers.stdout
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                      log_format:
+                        text_format_source:
+                          inline_string: "%RESPONSE_CODE% %REQ(:METHOD)% %REQ(:PATH)% -> %UPSTREAM_CLUSTER% (%DURATION%ms) %RESPONSE_FLAGS%\n"
                 codec_type: AUTO
-                # ngrok is one trusted hop in front of us; trust its
-                # x-forwarded-for so the real client IP is preserved.
                 use_remote_address: false
                 xff_num_trusted_hops: 1
-                # WebSocket upgrades for Vite HMR on the web `/` route.
                 upgrade_configs:
                   - upgrade_type: websocket
                 http_filters:
-                  # CORS preflight + response headers, applied per-route via
-                  # typed_per_filter_config (the /v1, /internal, SSE routes).
+                  # 1. grpc_web: de-frame browser gRPC-Web <-> gRPC. No-op on
+                  #    non-grpc-web requests (REST, web, native gRPC).
+                  - name: envoy.filters.http.grpc_web
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
+                  # 2. cors: preflight + headers. Short-circuits OPTIONS before
+                  #    the transcoder sees it. Policy is per-route below.
                   - name: envoy.filters.http.cors
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
-                  # gzip — mirrors nginx gzip on + gzip_types + min_length.
+                  # 3. compressor: gzip. Sits ABOVE the transcoder so on the
+                  #    response path it runs AFTER transcoding (gzips the JSON,
+                  #    not the protobuf). Skips application/grpc* (not listed).
                   - name: envoy.filters.http.compressor
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
@@ -76,31 +91,75 @@ static_resources:
                             - application/xml
                             - image/svg+xml
                             - font/woff2
+                  # 4. grpc_json_transcoder: REST/JSON -> gRPC for the 13
+                  #    services below. match_incoming_request_route keeps the
+                  #    /v1 route explicit (-> grpc_main). AiChat is excluded
+                  #    on purpose (SSE stays on Go). Non-matching paths
+                  #    (/internal, AiChat verbs, web, assets) pass through.
+                  - name: envoy.filters.http.grpc_json_transcoder
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+                      proto_descriptor: configs/pivox.pb
+                      services:
+                        - pivox.api.v1.Organizations
+                        - pivox.api.v1.Spaces
+                        - pivox.api.v1.TagKeys
+                        - pivox.api.v1.TagValues
+                        - pivox.api.v1.TagBindings
+                        - pivox.api.v1.ApiKeys
+                        - pivox.api.v1.Dashboards
+                        - pivox.iam.v1.Iam
+                        - pivox.storage.v1.StorageGateways
+                        - pivox.storage.v1.Agents
+                        - pivox.storage.v1.Endpoints
+                        - pivox.assets.v1.Assets
+                        - pivox.assets.v1.Requests
+                      match_incoming_request_route: true
+                      auto_mapping: false
+                      convert_grpc_status: true
+                      print_options:
+                        always_print_primitive_fields: false
+                        preserve_proto_field_names: false
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
                 route_config:
                   name: ingress_routes
-                  # Envoy is FIRST-MATCH-WINS (nginx is most-specific-wins),
-                  # so the order below is load-bearing: specific prefixes /
-                  # regexes precede their general fallbacks.
+                  # FIRST-MATCH-WINS: specific prefixes/regexes precede general.
                   virtual_hosts:
                     - name: ingress
                       domains: ["*"]
                       routes:
-                        # --- Service-to-service gRPC: AgentService -----------
-                        # Its own backend (50052), registration-token auth, no
-                        # Firebase. Must precede /pivox. (which it prefixes).
+                        # --- Service-to-service gRPC: AgentService (50052) ---
+                        # Internal (registration-token auth); no CORS.
                         - match: { prefix: "/pivox.agent.v1.AgentService/" }
                           route: { cluster: grpc_agent, timeout: 0s }
 
-                        # --- Public gRPC (native h2 clients) -> 50051 --------
+                        # --- Public gRPC + gRPC-Web -> 50051 -----------------
+                        # grpc_web de-frames browser calls here; CORS exposes
+                        # the grpc trailers browsers need.
                         - match: { prefix: "/pivox." }
                           route: { cluster: grpc_main, timeout: 0s }
+                          typed_per_filter_config:
+                            envoy.filters.http.cors: &grpc_web_cors
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+                              allow_origin_string_match: &cors_origins
+                                - safe_regex: { regex: '^https?://localhost(:[0-9]+)?$' }
+                                - safe_regex: { regex: '^https?://127\.0\.0\.1(:[0-9]+)?$' }
+                                - exact: "null"
+                              allow_methods: "POST, OPTIONS"
+                              allow_headers: "content-type, x-grpc-web, x-user-agent, grpc-timeout, authorization"
+                              expose_headers: "grpc-status, grpc-message, grpc-status-details-bin"
+                              max_age: "86400"
+                              allow_credentials: true
                         - match: { prefix: "/google." }
                           route: { cluster: grpc_main, timeout: 0s }
+                          typed_per_filter_config:
+                            envoy.filters.http.cors: *grpc_web_cors
                         - match: { prefix: "/grpc.reflection." }
                           route: { cluster: grpc_main, timeout: 0s }
+                          typed_per_filter_config:
+                            envoy.filters.http.cors: *grpc_web_cors
 
                         # --- Debug endpoints -> 9090 -------------------------
                         - match: { prefix: "/healthz" }
@@ -109,24 +168,21 @@ static_resources:
                           route: { cluster: debug }
 
                         # --- Keycloak (dev IDP) -> 8082 ----------------------
-                        # Long-poll admin UI; needs https forwarded-proto so it
-                        # emits https absolute URLs into the HTTPS page.
                         - match: { prefix: "/keycloak/" }
-                          route:
-                            cluster: keycloak
-                            timeout: 0s
-                            idle_timeout: 0s
+                          route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
 
-                        # --- AI chat SSE (regex, before /v1/) -> 8080 --------
-                        # streamGenerateContent is server-sent events; disable
-                        # timeouts so long generations aren't cut. CORS like
-                        # /v1/ but methods limited to POST.
+                        # --- AiChat REST -> Go gateway (8080) ----------------
+                        # BOTH verbs stay on Go: streamGenerateContent is SSE,
+                        # and generateContent rides along to keep the AI surface
+                        # whole. NOT in the transcoder services list, so it
+                        # passes through untranscoded. timeout 0s for the SSE
+                        # stream. CORS like /v1 but POST-only.
                         - match:
                             safe_regex:
-                              regex: '^/v1/organizations/[^/]+/users/[^/]+:streamGenerateContent$'
+                              regex: '^/v1/organizations/[^/]+/users/[^/]+:(streamGenerateContent|generateContent)$'
                           route:
                             cluster: rest_gateway
                             timeout: 0s
@@ -136,74 +192,54 @@ static_resources:
                           typed_per_filter_config:
                             envoy.filters.http.cors:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
-                              allow_origin_string_match:
-                                - safe_regex: { regex: '^https?://localhost(:[0-9]+)?$' }
-                                - safe_regex: { regex: '^https?://127\.0\.0\.1(:[0-9]+)?$' }
-                                - exact: "null"
+                              allow_origin_string_match: *cors_origins
                               allow_methods: "POST, OPTIONS"
                               allow_headers: "Authorization, Content-Type"
                               max_age: "86400"
                               allow_credentials: true
 
-                        # --- REST gateway: internal hooks -> 8080 -----------
+                        # --- REST -> gRPC TRANSCODED -> grpc_main (50051) ----
+                        # The 13 services above. Envoy turns JSON into gRPC and
+                        # routes here (match_incoming_request_route keeps the
+                        # /v1 path). Replaces grpc-gateway for these.
+                        - match: { prefix: "/v1/" }
+                          route: { cluster: grpc_main, timeout: 60s }
+                          response_headers_to_add:
+                            - header: { key: vary, value: origin }
+                          typed_per_filter_config:
+                            envoy.filters.http.cors: &rest_cors
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+                              allow_origin_string_match: *cors_origins
+                              allow_methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                              allow_headers: "Authorization, Content-Type"
+                              max_age: "86400"
+                              allow_credentials: true
+
+                        # --- Internal hooks -> Go gateway (8080) -------------
+                        # Plain HTTP handlers (Firebase blocking fns), NOT gRPC.
+                        # Stays on Go; transcoder passes through (no http rule).
                         - match: { prefix: "/internal/" }
                           route: { cluster: rest_gateway, timeout: 60s }
                           response_headers_to_add:
                             - header: { key: vary, value: origin }
                           typed_per_filter_config:
-                            envoy.filters.http.cors:
-                              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
-                              allow_origin_string_match:
-                                - safe_regex: { regex: '^https?://localhost(:[0-9]+)?$' }
-                                - safe_regex: { regex: '^https?://127\.0\.0\.1(:[0-9]+)?$' }
-                                - exact: "null"
-                              allow_methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-                              allow_headers: "Authorization, Content-Type"
-                              max_age: "86400"
-                              allow_credentials: true
-
-                        # --- REST gateway: public v1 -> 8080 ----------------
-                        - match: { prefix: "/v1/" }
-                          route: { cluster: rest_gateway, timeout: 60s }
-                          response_headers_to_add:
-                            - header: { key: vary, value: origin }
-                          typed_per_filter_config:
-                            envoy.filters.http.cors:
-                              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
-                              allow_origin_string_match:
-                                - safe_regex: { regex: '^https?://localhost(:[0-9]+)?$' }
-                                - safe_regex: { regex: '^https?://127\.0\.0\.1(:[0-9]+)?$' }
-                                - exact: "null"
-                              allow_methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-                              allow_headers: "Authorization, Content-Type"
-                              max_age: "86400"
-                              allow_credentials: true
+                            envoy.filters.http.cors: *rest_cors
 
                         # --- River UI -> 8080 -------------------------------
-                        # `/river` -> 301 `/river/`. scheme_redirect https so
-                        # the Location is https (ngrok is https) instead of the
-                        # cleartext-connection http — nginx used
-                        # absolute_redirect off to dodge the same problem.
                         - match: { path: "/river" }
                           redirect:
                             scheme_redirect: https
                             path_redirect: "/river/"
                             response_code: MOVED_PERMANENTLY
                         - match: { prefix: "/river/" }
-                          route:
-                            cluster: rest_gateway
-                            timeout: 0s
-                            idle_timeout: 0s
+                          route: { cluster: rest_gateway, timeout: 0s, idle_timeout: 0s }
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
 
                         # --- TanStack DevTools SSE -> web app (3000) --------
                         - match: { prefix: "/__tsd/" }
-                          route:
-                            cluster: web_app
-                            timeout: 0s
-                            idle_timeout: 0s
+                          route: { cluster: web_app, timeout: 0s, idle_timeout: 0s }
 
                         # --- Hashed static assets -> web app (immutable) ----
                         - match: { prefix: "/assets/" }
@@ -214,25 +250,18 @@ static_resources:
                                 value: "public, max-age=31536000, immutable"
 
                         # --- Storage agent -> 8083 --------------------------
-                        # Forwards the Bearer JWT untouched; https proto so the
-                        # agent's redirects/links are https.
                         - match: { prefix: "/files/" }
                           route: { cluster: storage_agent, timeout: 60s }
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
 
-                        # --- Web app (catch-all) -> 3000 --------------------
-                        # WebSocket HMR via the listener upgrade_configs above;
-                        # timeouts off for long-lived HMR sockets.
+                        # --- Web app (catch-all) -> 3000, WebSocket HMR ------
                         - match: { prefix: "/" }
-                          route:
-                            cluster: web_app
-                            timeout: 0s
-                            idle_timeout: 0s
+                          route: { cluster: web_app, timeout: 0s, idle_timeout: 0s }
 
   clusters:
-    # gRPC backends speak HTTP/2 (h2c) — explicit http2 upstream config.
+    # gRPC backends speak HTTP/2 (h2c).
     - name: grpc_main
       type: STATIC
       connect_timeout: 5s
@@ -265,7 +294,7 @@ static_resources:
                   address:
                     socket_address: { address: 127.0.0.1, port_value: 50052 }
 
-    # HTTP/1.1 backends (default protocol — no protocol options needed).
+    # HTTP/1.1 backends (default protocol).
     - name: rest_gateway
       type: STATIC
       connect_timeout: 5s
@@ -310,7 +339,6 @@ static_resources:
                   address:
                     socket_address: { address: 127.0.0.1, port_value: 8082 }
 
-    # Web app dev server binds IPv6 localhost ([::1]:3000), as in nginx.
     - name: web_app
       type: STATIC
       connect_timeout: 5s

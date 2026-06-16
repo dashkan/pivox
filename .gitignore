@@ -859,3 +859,8 @@ $RECYCLE.BIN/
 **/xcshareddata/WorkspaceSettings.xcsettings
 
 # End of https://www.toptal.com/developers/gitignore/api/c,go,c++,node,rust,cmake,linux,macos,swift,xcode,direnv,nextjs,python,windows,firebase,objective-c,certificates,jetbrains+all,visualstudiocode
+
+# Generated Envoy proto descriptor set — the FileDescriptorSet the
+# grpc_json_transcoder filter loads. Rebuilt from protos by
+# `make envoy-descriptor` (a prerequisite of the proxy-envoy* targets).
+configs/pivox.pb

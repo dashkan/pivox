@@ -11,7 +11,7 @@
 	docker-up docker-down firebase-deploy clean-fn-revisions \
 	ai-native \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload \
-	proxy-envoy proxy-envoy-validate proxy-ngrok \
+	proxy-envoy proxy-envoy-validate envoy-descriptor proxy-ngrok \
 	test-native-ui \
 	web-build web-build-watch web-build-start \
 	web-clean web-start web-start-preview electron-start
@@ -323,13 +323,28 @@ proxy-nginx-reload:
 # (`brew install envoy`); no signal-based reload like nginx — Envoy
 # hot-restarts, so on a config edit just restart the process (Ctrl-C
 # the dev loop and re-run, or run proxy-envoy standalone).
-proxy-envoy:
-	envoy -c $(PWD)/configs/envoy.yaml
+# Generate the proto FileDescriptorSet that the grpc_json_transcoder
+# filter loads (configs/pivox.pb). buf's descriptor set includes all
+# transitively-imported protos, which the transcoder requires. It's a
+# generated artifact (gitignored) and a prerequisite of the proxy-envoy*
+# targets so it's always current with the protos.
+ENVOY_DESCRIPTOR = configs/pivox.pb
+envoy-descriptor:
+	$(TOOL) buf build --as-file-descriptor-set -o $(ENVOY_DESCRIPTOR)
 
-# Parse + semantically validate the config without binding ports.
+# Per-request access logging is always on (configs/envoy.yaml) — that's
+# what surfaces proxied requests in `make dev`. ENVOY_LOG_LEVEL only
+# affects Envoy's internal component logs; bump it to debug/trace when
+# diagnosing the proxy itself, e.g. `make proxy-envoy ENVOY_LOG_LEVEL=debug`.
+ENVOY_LOG_LEVEL ?= info
+proxy-envoy: envoy-descriptor
+	envoy -c $(PWD)/configs/envoy.yaml -l $(ENVOY_LOG_LEVEL)
+
+# Parse + semantically validate the config without binding ports — also
+# loads the descriptor and checks every transcoded service name resolves.
 # Run after editing configs/envoy.yaml; CI-friendly (exits non-zero
 # on error).
-proxy-envoy-validate:
+proxy-envoy-validate: envoy-descriptor
 	envoy --mode validate -c $(PWD)/configs/envoy.yaml
 
 proxy-ngrok:
