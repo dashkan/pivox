@@ -489,6 +489,15 @@ type Querier interface {
 	// commits — eliminating the TOCTOU window between "no bindings"
 	// and "delete value".
 	GetTagValueForUpdate(ctx context.Context, id uuid.UUID) (TagValue, error)
+	// Materializes a role's permission grants into role_permissions from a
+	// list of catalog permission_id strings (e.g. "organizations.read").
+	// Used at org bootstrap (and the dev seed) to write the static
+	// system-role grant matrix (permission.RoleGrants) into the DB, so
+	// permission checks can also resolve in SQL — e.g. the membership-
+	// scoped operations list — without N+1 Has() calls. Joining by the
+	// stable permission_id string means callers never need the permission
+	// UUIDs. ON CONFLICT makes re-seeding idempotent.
+	GrantPermissionsToRole(ctx context.Context, arg GrantPermissionsToRoleParams) error
 	// HardDeleteIdentity removes the identity row entirely. Operator-only
 	// — the public DeleteAccount LRO uses SoftDeleteIdentity (which
 	// preserves the row so historical *_by audit references continue to
@@ -758,6 +767,10 @@ type Querier interface {
 	// rows for any of: domain not claimed, domain not VERIFIED, no
 	// SsoConfig row, SsoConfig.enabled=false.
 	ResolveProviderByDomain(ctx context.Context, domain string) (ResolveProviderByDomainRow, error)
+	// Returns the catalog permission_id strings granted to a role via
+	// role_permissions (inverse of GrantPermissionsToRole). Used to assert
+	// bootstrap/seed populated the grant rows correctly.
+	RolePermissionIDs(ctx context.Context, roleID uuid.UUID) ([]string, error)
 	RotateRegistrationToken(ctx context.Context, arg RotateRegistrationTokenParams) (StorageGateway, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	// Server-driven title write (the `:summarize` path). Does NOT flip

@@ -108,6 +108,32 @@ func (q *Queries) GetSystemRole(ctx context.Context, arg GetSystemRoleParams) (R
 	return i, err
 }
 
+const grantPermissionsToRole = `-- name: GrantPermissionsToRole :exec
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT $1, p.id
+  FROM permissions p
+ WHERE p.permission_id = ANY($2::text[])
+ON CONFLICT DO NOTHING
+`
+
+type GrantPermissionsToRoleParams struct {
+	RoleID        uuid.UUID `json:"role_id"`
+	PermissionIds []string  `json:"permission_ids"`
+}
+
+// Materializes a role's permission grants into role_permissions from a
+// list of catalog permission_id strings (e.g. "organizations.read").
+// Used at org bootstrap (and the dev seed) to write the static
+// system-role grant matrix (permission.RoleGrants) into the DB, so
+// permission checks can also resolve in SQL — e.g. the membership-
+// scoped operations list — without N+1 Has() calls. Joining by the
+// stable permission_id string means callers never need the permission
+// UUIDs. ON CONFLICT makes re-seeding idempotent.
+func (q *Queries) GrantPermissionsToRole(ctx context.Context, arg GrantPermissionsToRoleParams) error {
+	_, err := q.db.Exec(ctx, grantPermissionsToRole, arg.RoleID, arg.PermissionIds)
+	return err
+}
+
 const listRolesByOrg = `-- name: ListRolesByOrg :many
 SELECT id, org_id, name, display_name, description, is_system, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM roles
  WHERE org_id = $1
@@ -142,6 +168,37 @@ func (q *Queries) ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, 
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const rolePermissionIDs = `-- name: RolePermissionIDs :many
+SELECT p.permission_id
+  FROM role_permissions rp
+  JOIN permissions p ON p.id = rp.permission_id
+ WHERE rp.role_id = $1
+ ORDER BY p.permission_id
+`
+
+// Returns the catalog permission_id strings granted to a role via
+// role_permissions (inverse of GrantPermissionsToRole). Used to assert
+// bootstrap/seed populated the grant rows correctly.
+func (q *Queries) RolePermissionIDs(ctx context.Context, roleID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, rolePermissionIDs, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var permission_id string
+		if err := rows.Scan(&permission_id); err != nil {
+			return nil, err
+		}
+		items = append(items, permission_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

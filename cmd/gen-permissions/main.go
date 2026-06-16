@@ -158,6 +158,25 @@ func emitGo(pf permissionsFile) []byte {
 		}
 		b.WriteString("\t},\n")
 	}
+	b.WriteString("}\n\n")
+
+	b.WriteString("// RoleGrants is the same role-to-permission grant data as `matrix`,\n")
+	b.WriteString("// in ordered-slice form keyed by role name. It seeds the\n")
+	b.WriteString("// role_permissions table (per-org system-role grants) at org\n")
+	b.WriteString("// bootstrap and in the dev seed, so permission checks can also\n")
+	b.WriteString("// resolve in SQL — e.g. the membership-scoped operations list —\n")
+	b.WriteString("// without N+1 Has() round-trips. Kept in lockstep with `matrix` by\n")
+	b.WriteString("// TestRoleGrants_MatchMatrix.\n")
+	b.WriteString("var RoleGrants = map[string][]string{\n")
+	for _, role := range roleOrder {
+		fmt.Fprintf(&b, "\tRole%s: {\n", strings.ToUpper(role[:1])+role[1:])
+		ids := roleAllow[role]
+		sort.Strings(ids)
+		for _, id := range ids {
+			fmt.Fprintf(&b, "\t\t%s,\n", constName(id))
+		}
+		b.WriteString("\t},\n")
+	}
 	b.WriteString("}\n")
 
 	formatted, err := format.Source(b.Bytes())

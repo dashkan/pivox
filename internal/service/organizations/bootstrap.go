@@ -52,6 +52,20 @@ func bootstrapOrgRoles(ctx context.Context, qtx db.Querier, orgID, founderID uui
 		}); err != nil {
 			return fmt.Errorf("seed system role %q: %w", r.name, err)
 		}
+		// Materialize this system role's grants into role_permissions
+		// from the static catalog matrix, so permission checks can also
+		// resolve in SQL (e.g. the membership-scoped operations list)
+		// rather than only via permission.Has() in process. Source of
+		// truth is permissions.yaml -> permission.RoleGrants; the DB rows
+		// are kept in lockstep by the bootstrap test + drift guard.
+		if grants := permission.RoleGrants[r.name]; len(grants) > 0 {
+			if err := qtx.GrantPermissionsToRole(ctx, db.GrantPermissionsToRoleParams{
+				RoleID:        id,
+				PermissionIds: grants,
+			}); err != nil {
+				return fmt.Errorf("grant permissions to system role %q: %w", r.name, err)
+			}
+		}
 		if r.name == permission.RoleOwner {
 			ownerRoleID = id
 		}

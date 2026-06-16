@@ -26,3 +26,28 @@ SELECT * FROM roles
 -- name: GetRoleByID :one
 SELECT * FROM roles
  WHERE id = $1;
+
+-- name: GrantPermissionsToRole :exec
+-- Materializes a role's permission grants into role_permissions from a
+-- list of catalog permission_id strings (e.g. "organizations.read").
+-- Used at org bootstrap (and the dev seed) to write the static
+-- system-role grant matrix (permission.RoleGrants) into the DB, so
+-- permission checks can also resolve in SQL — e.g. the membership-
+-- scoped operations list — without N+1 Has() calls. Joining by the
+-- stable permission_id string means callers never need the permission
+-- UUIDs. ON CONFLICT makes re-seeding idempotent.
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT sqlc.arg(role_id), p.id
+  FROM permissions p
+ WHERE p.permission_id = ANY(sqlc.arg(permission_ids)::text[])
+ON CONFLICT DO NOTHING;
+
+-- name: RolePermissionIDs :many
+-- Returns the catalog permission_id strings granted to a role via
+-- role_permissions (inverse of GrantPermissionsToRole). Used to assert
+-- bootstrap/seed populated the grant rows correctly.
+SELECT p.permission_id
+  FROM role_permissions rp
+  JOIN permissions p ON p.id = rp.permission_id
+ WHERE rp.role_id = sqlc.arg(role_id)
+ ORDER BY p.permission_id;
