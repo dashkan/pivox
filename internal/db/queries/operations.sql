@@ -4,8 +4,8 @@
 -- known at create time, including DeleteOrganization which must
 -- not self-cancel).
 -- name: CreateOperation :one
-INSERT INTO operations (id, parent, metadata, created_by, org_id)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO operations (id, parent, metadata, created_by, org_id, space_id)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: GetOperation :one

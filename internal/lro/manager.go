@@ -273,13 +273,19 @@ type NewLroOpts struct {
 	// OrgID is the reverse pointer to the org this LRO operates
 	// against. Set for org-scoped operations so
 	// CancelRunningOpsForOrg can interrupt them when the org enters
-	// DELETE_REQUESTED. Leave zero for unscoped LROs and for
-	// DeleteOrganization itself (self-pointing org_id would make
-	// the LRO cancel its own work).
+	// DELETE_REQUESTED. Leave zero for space-scoped or account-scoped
+	// LROs and for DeleteOrganization itself (self-pointing org_id
+	// would make the LRO cancel its own work).
 	OrgID pgtype.UUID
-	// CreatedBy is the identity-uuid of the caller that originated
-	// the LRO. Optional; populated by handlers via
-	// server.MustPivoxUserID(ctx) when known.
+	// SpaceID is the reverse pointer to the space this LRO operates
+	// against. Set for space-scoped operations. The operation's authz
+	// scope is SpaceID when set, else OrgID, else the caller's own
+	// account (CreatedBy).
+	SpaceID pgtype.UUID
+	// CreatedBy is the identity-uuid of the caller that originated the
+	// LRO. Required for account-scoped operations (the only authz
+	// signal there); audit + a "my operations" filter for the rest.
+	// Handlers set it via server.MustPivoxUserID(ctx).
 	CreatedBy pgtype.UUID
 }
 
@@ -349,6 +355,7 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 		Parent:    parent,
 		Metadata:  metaJSON,
 		OrgID:     opts.OrgID,
+		SpaceID:   opts.SpaceID,
 		CreatedBy: opts.CreatedBy,
 	})
 	if err != nil {

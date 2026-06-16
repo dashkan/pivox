@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
@@ -101,6 +102,10 @@ func (s *OrganizationsServer) DeleteOrganization(ctx context.Context, req *apiv1
 	opID := uuid.New()
 	return s.lroManager.NewLro(ctx, orgName, lro.NewLroOpts{
 		OperationID: opID,
+		// OrgID left zero (DeleteOrganization must not self-cancel), so
+		// this op authorizes by created_by — the deleter polls their own
+		// delete; the org is going away anyway.
+		CreatedBy: convert.PgUUID(caller),
 		JobArgs: workers.DeleteOrgArgs{
 			OperationID:  opID,
 			OrgID:        org.ID,
@@ -142,6 +147,8 @@ func (s *OrganizationsServer) UndeleteOrganization(ctx context.Context, req *api
 	opID := uuid.New()
 	return s.lroManager.NewLro(ctx, orgName, lro.NewLroOpts{
 		OperationID: opID,
+		OrgID:       convert.PgUUID(org.ID),
+		CreatedBy:   convert.PgUUID(server.MustPivoxUserID(ctx)),
 		JobArgs:     workers.UndeleteOrgArgs{OperationID: opID, OrgID: org.ID},
 		Metadata:    initialMeta,
 	})

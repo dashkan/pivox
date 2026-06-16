@@ -193,6 +193,9 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 	opID := uuid.New()
 	return s.lroManager.NewLro(ctx, req.GetName(), lro.NewLroOpts{
 		OperationID: opID,
+		// Account-scoped op (no org/space). created_by IS the authz
+		// signal here: only the owner of accounts/me can read this op.
+		CreatedBy: convert.PgUUID(firebaseIdentityID),
 		JobArgs: workers.DeleteAccountArgs{
 			OperationID:        opID,
 			FirebaseIdentityID: firebaseIdentityID,

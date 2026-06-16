@@ -58,12 +58,12 @@ CREATE TYPE endpoint_state AS ENUM ('ACTIVE', 'INACTIVE', 'UNREACHABLE');
 CREATE TABLE operations (
     id          UUID PRIMARY KEY DEFAULT uuidv7(),
     -- AIP-151 parent resource: the full resource name the LRO
-    -- operates against (e.g., "organizations/acme/spaces/dev").
-    -- Empty string for unscoped operations. The public Operation
-    -- proto's `name` field is constructed as `{parent}/operations/{id}`
-    -- (or `operations/{id}` if parent is empty), per AIP-151's
-    -- requirement that the name "ends with operations/{unique_id}."
-    parent      TEXT NOT NULL DEFAULT '',
+    -- operates against (e.g., "organizations/acme/spaces/dev" or
+    -- "accounts/me"). Required and non-empty — every LRO targets a
+    -- resource, there are no unscoped operations. The public Operation
+    -- proto's `name` is constructed as `{parent}/operations/{id}`, per
+    -- AIP-151's "ends with operations/{unique_id}" requirement.
+    parent      TEXT NOT NULL CHECK (parent <> ''),
     done        BOOLEAN NOT NULL DEFAULT false,
     metadata    JSONB,
     result      JSONB,
@@ -89,6 +89,13 @@ CREATE TABLE operations (
     -- migration (forward reference: `operations` is declared before
     -- `organizations` so the inline REFERENCES fails to resolve).
     org_id      UUID,
+    -- Optional reverse pointer to the space this LRO operates against.
+    -- NULL for org-scoped or account-scoped ops. The authz scope of an
+    -- operation is space_id when set, else org_id, else the caller's own
+    -- account (created_by). FK added at the bottom of this migration
+    -- (forward reference, like org_id); ON DELETE SET NULL so the op row
+    -- survives a space purge.
+    space_id    UUID,
     created_by UUID,
     create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -584,6 +591,9 @@ ALTER TABLE dashboards
 ALTER TABLE operations
   ADD CONSTRAINT fk_operations_org
   FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE SET NULL;
+ALTER TABLE operations
+  ADD CONSTRAINT fk_operations_space
+  FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE SET NULL;
 
 -- ============================================================================
 -- groups

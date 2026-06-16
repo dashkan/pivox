@@ -441,6 +441,8 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 	opID := uuid.New()
 	return s.lroManager.NewLro(ctx, spaceRsrc, lro.NewLroOpts{
 		OperationID: opID,
+		SpaceID:     convert.PgUUID(resolvedSpace.ID),
+		CreatedBy:   convert.PgUUID(caller),
 		JobArgs: workers.DeleteSpaceArgs{
 			OperationID:  opID,
 			SpaceID:      resolvedSpace.ID,
@@ -492,6 +494,8 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 	opID := uuid.New()
 	return s.lroManager.NewLro(ctx, spaceRsrc, lro.NewLroOpts{
 		OperationID: opID,
+		SpaceID:     convert.PgUUID(spaceID),
+		CreatedBy:   convert.PgUUID(caller),
 		JobArgs: workers.UndeleteSpaceArgs{
 			OperationID: opID,
 			SpaceID:     spaceID,

@@ -1010,6 +1010,7 @@ type Operation struct {
 	ErrorCode    pgtype.Int4 `json:"error_code"`
 	ErrorMessage pgtype.Text `json:"error_message"`
 	OrgID        pgtype.UUID `json:"org_id"`
+	SpaceID      pgtype.UUID `json:"space_id"`
 	CreatedBy    pgtype.UUID `json:"created_by"`
 	CreateTime   time.Time   `json:"create_time"`
 	UpdateTime   time.Time   `json:"update_time"`

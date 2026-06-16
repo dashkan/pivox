@@ -145,6 +145,7 @@ func (s *OrganizationsServer) CreateDomain(ctx context.Context, req *apiv1.Creat
 	return s.lroManager.NewLro(ctx, domainResource, lro.NewLroOpts{
 		OperationID: opID,
 		OrgID:       pgtype.UUID{Bytes: resolvedOrg.ID, Valid: true},
+		CreatedBy:   convert.PgUUID(caller),
 		JobArgs: workers.VerifyDomainArgs{
 			OperationID:  opID,
 			DomainID:     domain.ID,

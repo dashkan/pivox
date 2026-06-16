@@ -16,7 +16,7 @@ const cancelOperation = `-- name: CancelOperation :one
 UPDATE operations
 SET done = true, error_code = 1, error_message = 'cancelled by user', update_time = now()
 WHERE id = $1 AND done = false
-RETURNING id, parent, done, metadata, result, error_code, error_message, org_id, created_by, create_time, update_time, expire_time
+RETURNING id, parent, done, metadata, result, error_code, error_message, org_id, space_id, created_by, create_time, update_time, expire_time
 `
 
 func (q *Queries) CancelOperation(ctx context.Context, id uuid.UUID) (Operation, error) {
@@ -31,6 +31,7 @@ func (q *Queries) CancelOperation(ctx context.Context, id uuid.UUID) (Operation,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.OrgID,
+		&i.SpaceID,
 		&i.CreatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
@@ -43,7 +44,7 @@ const completeOperation = `-- name: CompleteOperation :one
 UPDATE operations
 SET done = true, result = $2, update_time = now()
 WHERE id = $1
-RETURNING id, parent, done, metadata, result, error_code, error_message, org_id, created_by, create_time, update_time, expire_time
+RETURNING id, parent, done, metadata, result, error_code, error_message, org_id, space_id, created_by, create_time, update_time, expire_time
 `
 
 type CompleteOperationParams struct {
@@ -63,6 +64,7 @@ func (q *Queries) CompleteOperation(ctx context.Context, arg CompleteOperationPa
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.OrgID,
+		&i.SpaceID,
 		&i.CreatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
@@ -72,9 +74,9 @@ func (q *Queries) CompleteOperation(ctx context.Context, arg CompleteOperationPa
 }
 
 const createOperation = `-- name: CreateOperation :one
-INSERT INTO operations (id, parent, metadata, created_by, org_id)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, parent, done, metadata, result, error_code, error_message, org_id, created_by, create_time, update_time, expire_time
+INSERT INTO operations (id, parent, metadata, created_by, org_id, space_id)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, parent, done, metadata, result, error_code, error_message, org_id, space_id, created_by, create_time, update_time, expire_time
 `
 
 type CreateOperationParams struct {
@@ -83,6 +85,7 @@ type CreateOperationParams struct {
 	Metadata  []byte      `json:"metadata"`
 	CreatedBy pgtype.UUID `json:"created_by"`
 	OrgID     pgtype.UUID `json:"org_id"`
+	SpaceID   pgtype.UUID `json:"space_id"`
 }
 
 // CreateOperation creates a new operation row. `org_id` is the
@@ -97,6 +100,7 @@ func (q *Queries) CreateOperation(ctx context.Context, arg CreateOperationParams
 		arg.Metadata,
 		arg.CreatedBy,
 		arg.OrgID,
+		arg.SpaceID,
 	)
 	var i Operation
 	err := row.Scan(
@@ -108,6 +112,7 @@ func (q *Queries) CreateOperation(ctx context.Context, arg CreateOperationParams
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.OrgID,
+		&i.SpaceID,
 		&i.CreatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
@@ -138,7 +143,7 @@ const failOperation = `-- name: FailOperation :one
 UPDATE operations
 SET done = true, error_code = $2, error_message = $3, update_time = now()
 WHERE id = $1
-RETURNING id, parent, done, metadata, result, error_code, error_message, org_id, created_by, create_time, update_time, expire_time
+RETURNING id, parent, done, metadata, result, error_code, error_message, org_id, space_id, created_by, create_time, update_time, expire_time
 `
 
 type FailOperationParams struct {
@@ -159,6 +164,7 @@ func (q *Queries) FailOperation(ctx context.Context, arg FailOperationParams) (O
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.OrgID,
+		&i.SpaceID,
 		&i.CreatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
@@ -168,7 +174,7 @@ func (q *Queries) FailOperation(ctx context.Context, arg FailOperationParams) (O
 }
 
 const getOperation = `-- name: GetOperation :one
-SELECT id, parent, done, metadata, result, error_code, error_message, org_id, created_by, create_time, update_time, expire_time FROM operations WHERE id = $1
+SELECT id, parent, done, metadata, result, error_code, error_message, org_id, space_id, created_by, create_time, update_time, expire_time FROM operations WHERE id = $1
 `
 
 func (q *Queries) GetOperation(ctx context.Context, id uuid.UUID) (Operation, error) {
@@ -183,6 +189,7 @@ func (q *Queries) GetOperation(ctx context.Context, id uuid.UUID) (Operation, er
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.OrgID,
+		&i.SpaceID,
 		&i.CreatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
@@ -192,7 +199,7 @@ func (q *Queries) GetOperation(ctx context.Context, id uuid.UUID) (Operation, er
 }
 
 const listOperations = `-- name: ListOperations :many
-SELECT id, parent, done, metadata, result, error_code, error_message, org_id, created_by, create_time, update_time, expire_time FROM operations
+SELECT id, parent, done, metadata, result, error_code, error_message, org_id, space_id, created_by, create_time, update_time, expire_time FROM operations
 WHERE ($2::text IS NULL OR parent = $2)
 ORDER BY create_time DESC
 LIMIT $1
@@ -221,6 +228,7 @@ func (q *Queries) ListOperations(ctx context.Context, arg ListOperationsParams) 
 			&i.ErrorCode,
 			&i.ErrorMessage,
 			&i.OrgID,
+			&i.SpaceID,
 			&i.CreatedBy,
 			&i.CreateTime,
 			&i.UpdateTime,
@@ -237,7 +245,7 @@ func (q *Queries) ListOperations(ctx context.Context, arg ListOperationsParams) 
 }
 
 const listPendingOperations = `-- name: ListPendingOperations :many
-SELECT id, parent, done, metadata, result, error_code, error_message, org_id, created_by, create_time, update_time, expire_time FROM operations WHERE done = false ORDER BY create_time ASC
+SELECT id, parent, done, metadata, result, error_code, error_message, org_id, space_id, created_by, create_time, update_time, expire_time FROM operations WHERE done = false ORDER BY create_time ASC
 `
 
 func (q *Queries) ListPendingOperations(ctx context.Context) ([]Operation, error) {
@@ -258,6 +266,7 @@ func (q *Queries) ListPendingOperations(ctx context.Context) ([]Operation, error
 			&i.ErrorCode,
 			&i.ErrorMessage,
 			&i.OrgID,
+			&i.SpaceID,
 			&i.CreatedBy,
 			&i.CreateTime,
 			&i.UpdateTime,
