@@ -348,4 +348,9 @@ static_resources:
           - lb_endpoints:
               - endpoint:
                   address:
-                    socket_address: { address: "::1", port_value: 3000 }
+                    # IPv4 to match the start dev server's pinned host
+                    # (apps/start vite server.host: 127.0.0.1) and every
+                    # other cluster. Was "::1" — broke when localhost
+                    # resolution flipped IPv6->IPv4 and the dev server
+                    # moved to 127.0.0.1.
+                    socket_address: { address: 127.0.0.1, port_value: 3000 }

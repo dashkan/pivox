@@ -13,6 +13,12 @@ import { nitro } from 'nitro/vite';
 
 const config = defineConfig({
   server: {
+    // Pin to IPv4 loopback so the dev server's bind doesn't depend on
+    // how the OS resolver orders `localhost` (::1 vs 127.0.0.1). That
+    // ordering flipped under macOS 27, moving the server off ::1 and
+    // breaking the envoy `web_app` upstream (which targets 127.0.0.1,
+    // like every other cluster). Deterministic now, regardless of OS.
+    host: '127.0.0.1',
     allowedHosts: ['localhost', 'pivox.ngrok.app'],
   },
   build: {
