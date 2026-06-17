@@ -209,3 +209,59 @@ func TestE2E_Operations_SpaceScopeInheritance(t *testing.T) {
 			"outsider must not see another tenant's space op")
 	})
 }
+
+// TestE2E_Operations_GroupBindingResolution covers the group-derived
+// resolution branch — a member who holds their role ONLY via a group
+// binding (no direct org_members row). This exercises the
+// group_id-IN-(group_members) subquery in both EffectiveOrgPermissions
+// (the org op) and EffectiveSpacePermissions' inherited-org branch (the
+// space op, reached purely through a group binding at the parent org) —
+// the structurally-most-complex paths in the resolver, otherwise
+// untested.
+func TestE2E_Operations_GroupBindingResolution(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := newOperationsHarness(t)
+	ctx := context.Background()
+	ops := longrunningpb.NewOperationsClient(h.Conn())
+
+	orgA := h.SeedOwnedOrg(t, "ops-grp-a", "Ops Grp A", "grpa")
+	space := h.SeedOwnedSpace(t, "ops-grp-a", "dev", "Dev Space")
+
+	// Bound to editor at orgA purely through a group — no direct binding.
+	member := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "group-only"})
+	h.SeedGroupMembership(t, orgA.Row.ID, member, grpcharness.RoleEditor)
+
+	orgB := h.SeedOwnedOrg(t, "ops-grp-b", "Ops Grp B", "grpb")
+
+	orgOp := seedOp(t, h, "organizations/ops-grp-a",
+		convert.PgUUID(orgA.Row.ID), pgtype.UUID{}, convert.PgUUID(orgA.Owner.IdentityID))
+	spaceOp := seedOp(t, h, "organizations/ops-grp-a/spaces/dev",
+		pgtype.UUID{}, convert.PgUUID(space.Row.ID), convert.PgUUID(orgA.Owner.IdentityID))
+
+	t.Run("group-only member sees the org op (org-path group branch)", func(t *testing.T) {
+		h.SetCaller(member)
+		got, err := ops.GetOperation(ctx, &longrunningpb.GetOperationRequest{Name: orgOp})
+		require.NoError(t, err)
+		assert.Equal(t, orgOp, got.GetName())
+	})
+	t.Run("group-only member sees the space op via inherited-org group binding", func(t *testing.T) {
+		h.SetCaller(member)
+		got, err := ops.GetOperation(ctx, &longrunningpb.GetOperationRequest{Name: spaceOp})
+		require.NoError(t, err)
+		assert.Equal(t, spaceOp, got.GetName())
+	})
+	t.Run("group-only member's list includes both", func(t *testing.T) {
+		h.SetCaller(member)
+		resp, err := ops.ListOperations(ctx, &longrunningpb.ListOperationsRequest{})
+		require.NoError(t, err)
+		assert.True(t, containsOp(resp.GetOperations(), orgOp), "org op visible via group")
+		assert.True(t, containsOp(resp.GetOperations(), spaceOp), "space op visible via inherited group")
+	})
+	t.Run("outsider still excluded", func(t *testing.T) {
+		h.SetCaller(orgB.Owner)
+		_, err := ops.GetOperation(ctx, &longrunningpb.GetOperationRequest{Name: orgOp})
+		assert.Equal(t, codes.NotFound, status.Code(err))
+	})
+}

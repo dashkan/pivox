@@ -53,6 +53,42 @@ func (h *Harness) SeedMembership(t *testing.T, orgID uuid.UUID, identity *Caller
 	return identity.IdentityID
 }
 
+// SeedGroupMembership binds an identity to `role` at org scope purely
+// through a group: it creates a group in the org, adds the identity as
+// a group member, and binds the group to the role via org_members
+// (group_id) with NO direct user binding. Exercises the group-derived
+// resolution branch (group_id IN (SELECT … group_members …)) the
+// permission queries resolve. Returns the group id.
+func (h *Harness) SeedGroupMembership(t *testing.T, orgID uuid.UUID, identity *Caller, role string) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+
+	roleRow, err := h.Queries.GetSystemRole(ctx, db.GetSystemRoleParams{OrgID: orgID, Name: role})
+	require.NoError(t, err, "system role %q not found in org %s", role, orgID)
+
+	groupID := uuid.New()
+	_, err = h.Pool.Exec(ctx,
+		`INSERT INTO groups (id, org_id, display_name, created_by) VALUES ($1, $2, $3, $4)`,
+		groupID, orgID, "test-group", identity.IdentityID)
+	require.NoError(t, err)
+
+	_, err = h.Pool.Exec(ctx,
+		`INSERT INTO group_members (id, group_id, user_id, created_by) VALUES ($1, $2, $3, $4)`,
+		uuid.New(), groupID, identity.IdentityID, identity.IdentityID)
+	require.NoError(t, err)
+
+	_, err = h.Queries.CreateOrgGroupMember(ctx, db.CreateOrgGroupMemberParams{
+		ID:        uuid.New(),
+		OrgID:     orgID,
+		RoleID:    roleRow.ID,
+		GroupID:   convert.PgUUID(groupID),
+		CreatedBy: convert.PgUUID(identity.IdentityID),
+	})
+	require.NoError(t, err)
+
+	return groupID
+}
+
 // SeedUserMembershipOnly is retained for compatibility with E2E
 // tests that previously created a `users` row without an
 // org_members binding (to verify group-mediated access reached the
