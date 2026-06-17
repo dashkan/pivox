@@ -44,10 +44,8 @@ func (DeleteOrgArgs) Kind() string { return "lro_delete_org" }
 // (PurgeOrganization | SoftDeleteOrganization) + CompleteOperation
 // + JobCompleteTx all commit together.
 //
-// CancelLocal-the-in-replica-goroutines is gone post-migration —
-// no LRO goroutines run on workers; cross-replica cancellation
-// for long-running River jobs (e.g. VerifyDomainWorker) goes
-// through the SQL update on operations.done, which the worker
+// Cancellation for long-running River jobs (e.g. VerifyDomainWorker)
+// goes through the SQL update on operations.done, which the worker
 // self-checks each tick.
 type DeleteOrgWorker struct {
 	river.WorkerDefaults[DeleteOrgArgs]

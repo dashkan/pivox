@@ -37,10 +37,7 @@ type Manager struct {
 	// pool + river are required by NewLro and only by NewLro. The
 	// rest of Manager (RecoverPending, the LISTEN loop, etc.) uses
 	// queries directly. They're kept optional so callers that don't
-	// touch NewLro (some tests) don't need to wire either field; the
-	// legacy in-process CreateAndRun/runWork path that used to share
-	// this distinction has been deleted — all LROs now run as River
-	// jobs in pivox-worker.
+	// touch NewLro (some tests) don't need to wire either field.
 	pool  *pgxpool.Pool
 	river *river.Client[pgx.Tx]
 
@@ -73,8 +70,8 @@ type ManagerConfig struct {
 	Logger *slog.Logger
 	// Pool is the pgxpool.Pool used by NewLro to begin a transaction
 	// that wraps the operations row insert + the River job insert.
-	// Optional during the transition off legacy CreateAndRun; required
-	// for NewLro. Production wires the same pool used by the REST/gRPC
+	// Optional (some tests construct a pool-less Manager); required for
+	// NewLro. Production wires the same pool used by the REST/gRPC
 	// surface.
 	Pool *pgxpool.Pool
 	// River is the river.Client used by NewLro to enqueue jobs in the
@@ -229,9 +226,8 @@ type NewLroOpts struct {
 }
 
 // NewLro creates a new operation row AND enqueues a River job for it,
-// atomically in a single Postgres transaction. This is the post-River
-// replacement for CreateAndRun: instead of spawning a goroutine in
-// pivox-cloud, work is enqueued and pivox-worker picks it up.
+// atomically in a single Postgres transaction. Work is enqueued for
+// pivox-worker to pick up; pivox-cloud runs no in-process work.
 //
 // `parent` is the AIP-151 parent resource (e.g.,
 // "organizations/acme/spaces/dev"); the public Operation.name is
@@ -243,9 +239,8 @@ type NewLroOpts struct {
 // schema, our operations table in `public` — both writes commit (or
 // roll back) together. No "row exists but no job" or vice versa.
 //
-// Requires Pool + River set on the Manager. Errors at call time if
-// either is nil; this allows the legacy CreateAndRun path to keep
-// working in tests/wiring that hasn't migrated.
+// Requires Pool + River set on the Manager; errors at call time if
+// either is nil (some tests construct a pool-less Manager).
 func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*longrunningpb.Operation, error) {
 	if m.pool == nil {
 		return nil, apierr.Internal("lro: NewLro requires Manager.Pool")
@@ -266,9 +261,9 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 		}
 	}
 
-	// Refuse new operations once Shutdown has begun. Matches the
-	// CreateAndRun gate; cheap insurance even though pivox-worker
-	// processes jobs independently of pivox-cloud's lifecycle.
+	// Refuse new operations once Shutdown has begun — cheap insurance
+	// even though pivox-worker processes jobs independently of
+	// pivox-cloud's lifecycle.
 	m.mu.Lock()
 	if m.shuttingDown {
 		m.mu.Unlock()

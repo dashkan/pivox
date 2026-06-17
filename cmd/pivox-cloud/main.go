@@ -249,9 +249,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	//      with the operations row insert in a single tx.
 	//   2. River UI mounted at /river — the UI needs a Client to
 	//      query job state.
-	//   3. Future-proofing: as LRO handlers migrate off the legacy
-	//      CreateAndRun + runWork path (#69 Phase 5+), they all
-	//      flow through this Client.
+	//   3. All LRO handlers enqueue their jobs through this Client.
 	// Constructed without Workers + without Start so it's a
 	// query/insert-only handle. Migrations are owned by pivox-worker;
 	// pivox-cloud assumes the river schema exists.
@@ -801,12 +799,10 @@ func serve(cmd *cobra.Command, args []string) error {
 	_ = restServer.Shutdown(shutdownCtx)
 	_ = debugServer.Shutdown(shutdownCtx)
 
-	// Drain in-flight LRO goroutines before pool.Close runs in the
-	// outer defer. GracefulStop above ensures no new RPCs land
-	// (CreateAndRun would also self-reject post-Shutdown), but
-	// already-running WorkFuncs need their bookkeeping write to
-	// complete on a live pool. Anything past the deadline is left for
-	// RecoverPending on next start.
+	// Shut down the LRO manager — stop the LISTEN goroutine and let it
+	// release its pool conn — before pool.Close runs in the outer
+	// defer. GracefulStop above ensures no new RPCs land (NewLro also
+	// self-rejects post-Shutdown).
 	if err := lroManager.Shutdown(shutdownCtx); err != nil {
 		logger.Warn("lro shutdown drain timed out", "error", err)
 	}
