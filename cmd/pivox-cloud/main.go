@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -87,6 +88,7 @@ func main() {
 	f.String("rest-port", envOrDefault("PIVOX_REST_PORT", ":8080"), "REST gateway listen address")
 	f.String("debug-port", envOrDefault("PIVOX_DEBUG_PORT", ":9090"), "Debug/health listen address")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
+	f.Bool("enable-reflection", envOrBool("PIVOX_ENABLE_REFLECTION", false), "Register gRPC server reflection for dev tooling (grpcurl, buf curl). OFF by default — never enable in production; it exposes the full API surface to unauthenticated callers.")
 	// Firebase credentials AND space ID resolve entirely through
 	// Google's standard ADC chain (service-account JSON → metadata
 	// server → gcloud user identity + quota space). No Pivox-named
@@ -132,21 +134,32 @@ func envOrDuration(key string, defaultVal time.Duration) time.Duration {
 	return defaultVal
 }
 
+func envOrBool(key string, defaultVal bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return defaultVal
+}
+
 func must(s string, _ error) string { return s }
 
 func serve(cmd *cobra.Command, args []string) error {
 	f := cmd.Flags()
 	sessionTTL, _ := f.GetDuration("delegated-auth-session-ttl")
 	pollInterval, _ := f.GetDuration("delegated-auth-poll-interval")
+	enableReflection, _ := f.GetBool("enable-reflection")
 	cfg := &config.Config{
-		DatabaseURL:     must(f.GetString("database-url")),
-		GRPCPort:        must(f.GetString("grpc-port")),
-		ServiceGRPCPort: must(f.GetString("service-grpc-port")),
-		RESTPort:        must(f.GetString("rest-port")),
-		DebugPort:       must(f.GetString("debug-port")),
-		LogLevel:        must(f.GetString("log-level")),
-		SyncAuth:        loadSyncAuthConfig(cmd),
-		SsrAuth:         loadSsrAuthConfig(cmd),
+		DatabaseURL:      must(f.GetString("database-url")),
+		GRPCPort:         must(f.GetString("grpc-port")),
+		ServiceGRPCPort:  must(f.GetString("service-grpc-port")),
+		RESTPort:         must(f.GetString("rest-port")),
+		DebugPort:        must(f.GetString("debug-port")),
+		LogLevel:         must(f.GetString("log-level")),
+		EnableReflection: enableReflection,
+		SyncAuth:         loadSyncAuthConfig(cmd),
+		SsrAuth:          loadSsrAuthConfig(cmd),
 		DelegatedAuth: config.DelegatedAuthConfig{
 			SessionTTL:   sessionTTL,
 			PollInterval: pollInterval,
@@ -323,24 +336,33 @@ func serve(cmd *cobra.Command, args []string) error {
 		// Logging is FIRST so it sees every RPC including the ones
 		// auth/validate reject — those would otherwise fail silently
 		// from the operator's perspective.
+		// The auth/authz interceptors are gated by method prefix (see
+		// server.Gated*Interceptor): Auth runs for pivox.* + LRO;
+		// Membership, Permission and Validate run for pivox.* only.
+		// Everything else (server reflection, health, other
+		// infrastructure) bypasses the chain entirely. Logging is NOT
+		// gated — it observes every RPC. LRO (google.longrunning.
+		// Operations) is therefore authenticated but skips membership/
+		// permission: an operation is caller-scoped and we don't annotate
+		// the vendored google proto.
 		grpc.ChainUnaryInterceptor(
 			server.LoggingUnaryInterceptor(logger),
-			server.AuthInterceptor(authChainSvc),
+			server.GatedUnaryInterceptor(server.IsPivoxOrLRO, server.AuthInterceptor(authChainSvc)),
 			// Membership check runs after Auth so the caller's UID is
 			// in context, and before Permission/Validate so we don't
 			// leak field shape errors to memberless callers.
 			// Allowlisted methods (CreateOrganization,
 			// ListOrganizations, AcceptInvitation, GetInvitation)
 			// bypass — see server/membership_interceptor.go.
-			server.MembershipRequiredInterceptor(queries),
-			permissionInterceptor,
-			server.FieldMaskAwareValidationInterceptor(validator),
+			server.GatedUnaryInterceptor(server.IsPivox, server.MembershipRequiredInterceptor(queries)),
+			server.GatedUnaryInterceptor(server.IsPivox, permissionInterceptor),
+			server.GatedUnaryInterceptor(server.IsPivox, server.FieldMaskAwareValidationInterceptor(validator)),
 		),
 		grpc.ChainStreamInterceptor(
 			server.LoggingStreamInterceptor(logger),
-			server.AuthStreamInterceptor(authChainSvc),
-			server.MembershipRequiredStreamInterceptor(queries),
-			permissionStreamInterceptor,
+			server.GatedStreamInterceptor(server.IsPivoxOrLRO, server.AuthStreamInterceptor(authChainSvc)),
+			server.GatedStreamInterceptor(server.IsPivox, server.MembershipRequiredStreamInterceptor(queries)),
+			server.GatedStreamInterceptor(server.IsPivox, permissionStreamInterceptor),
 			// Stream validator parallels the unary chain's
 			// FieldMaskAwareValidationInterceptor so CEL rules and
 			// `string.in`-style constraints on streaming RPC
@@ -351,16 +373,22 @@ func serve(cmd *cobra.Command, args []string) error {
 			// (in: [user, assistant, system, tool]) fire only on
 			// unary callers and let malformed streaming requests
 			// reach the handler.
-			server.ValidateStreamInterceptor(validator),
+			server.GatedStreamInterceptor(server.IsPivox, server.ValidateStreamInterceptor(validator)),
 		),
 	)
 
 	// Register all services. permResolver is reused here by service
 	// handlers (TestIamPermissions, etc.). Caller identity comes from
 	// the verified-token `pivox_user_id` claim and is read directly
-	// via server.MustPivoxUserID(ctx) in handlers — no injected
-	// resolver needed.
-	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(operations.Config{LRO: lroManager}))
+	// Operations authorizes each call against the op's scope
+	// (space_id → spaces.read, org_id → organizations.read, else
+	// created_by) via the resolver, and trims ListOperations to the
+	// caller's visible scopes in one query.
+	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(operations.Config{
+		LRO:      lroManager,
+		Queries:  queries,
+		Resolver: permResolver,
+	}))
 
 	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(spaces.Config{
 		Pool:          pool,
@@ -461,7 +489,16 @@ func serve(cmd *cobra.Command, args []string) error {
 	})
 	aiv1.RegisterAiChatServer(grpcServer, aiChatServer)
 
-	reflection.Register(grpcServer)
+	// Server reflection is registered only when explicitly enabled
+	// (PIVOX_ENABLE_REFLECTION / --enable-reflection, off by default).
+	// It exposes the full API surface to unauthenticated callers — the
+	// AuthInterceptor exempts reflection methods — so it's a dev-only
+	// convenience for grpcurl / buf curl. Production leaves it unset and
+	// the edge proxy blocks the reflection route (defense in depth).
+	if cfg.EnableReflection {
+		reflection.Register(grpcServer)
+		logger.Warn("gRPC server reflection ENABLED — dev only; exposes the API surface to unauthenticated callers")
+	}
 
 	// Start gRPC listener (public surface)
 	grpcLis, err := net.Listen("tcp", cfg.GRPCPort)
@@ -520,7 +557,9 @@ func serve(cmd *cobra.Command, args []string) error {
 		// storage request 401s.
 		SessionSigningKey: storageSessionSigningKey,
 	}))
-	reflection.Register(serviceGRPCServer)
+	if cfg.EnableReflection {
+		reflection.Register(serviceGRPCServer)
+	}
 
 	serviceGRPCLis, err := net.Listen("tcp", cfg.ServiceGRPCPort)
 	if err != nil {

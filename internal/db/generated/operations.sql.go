@@ -198,6 +198,88 @@ func (q *Queries) GetOperation(ctx context.Context, id uuid.UUID) (Operation, er
 	return i, err
 }
 
+const listAuthorizedOperations = `-- name: ListAuthorizedOperations :many
+SELECT o.id, o.parent, o.done, o.metadata, o.result, o.error_code, o.error_message, o.org_id, o.space_id, o.created_by, o.create_time, o.update_time, o.expire_time FROM operations o
+WHERE
+  (o.org_id IS NULL AND o.space_id IS NULL AND o.created_by = $1)
+  OR (o.space_id IS NULL AND o.org_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM org_members om
+          JOIN role_permissions rp ON rp.role_id = om.role_id
+          JOIN permissions perm ON perm.id = rp.permission_id
+         WHERE om.org_id = o.org_id
+           AND perm.permission_id = 'organizations.read'
+           AND (om.user_id = $1
+                OR om.group_id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $1))))
+  OR (o.space_id IS NOT NULL AND (
+        EXISTS (SELECT 1 FROM space_members sm
+                  JOIN role_permissions rp ON rp.role_id = sm.role_id
+                  JOIN permissions perm ON perm.id = rp.permission_id
+                 WHERE sm.space_id = o.space_id
+                   AND perm.permission_id = 'spaces.read'
+                   AND (sm.user_id = $1
+                        OR sm.group_id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $1)))
+        OR EXISTS (SELECT 1 FROM spaces s
+                     JOIN org_members om ON om.org_id = s.org_id
+                     JOIN role_permissions rp ON rp.role_id = om.role_id
+                     JOIN permissions perm ON perm.id = rp.permission_id
+                    WHERE s.id = o.space_id
+                      AND perm.permission_id = 'spaces.read'
+                      AND (om.user_id = $1
+                           OR om.group_id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $1)))))
+ORDER BY o.create_time DESC
+LIMIT $2
+`
+
+type ListAuthorizedOperationsParams struct {
+	Caller   pgtype.UUID `json:"caller"`
+	PageSize int32       `json:"page_size"`
+}
+
+// Operations the caller is permitted to see, scope-trimmed in one query
+// (no N+1):
+//   - account-scoped (no org/space): only the creator;
+//   - org-scoped: caller has organizations.read at the op's org;
+//   - space-scoped: caller has spaces.read at the op's space, via direct
+//     space membership OR inherited parent-org membership.
+//
+// Membership resolves both direct (user_id) and group (group_id)
+// bindings, mirroring GetEffectiveOrgRoles/GetEffectiveSpaceRoles;
+// role_permissions supplies the generic read grant (all system roles
+// hold it today, but the join future-proofs custom roles that may not).
+func (q *Queries) ListAuthorizedOperations(ctx context.Context, arg ListAuthorizedOperationsParams) ([]Operation, error) {
+	rows, err := q.db.Query(ctx, listAuthorizedOperations, arg.Caller, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Operation{}
+	for rows.Next() {
+		var i Operation
+		if err := rows.Scan(
+			&i.ID,
+			&i.Parent,
+			&i.Done,
+			&i.Metadata,
+			&i.Result,
+			&i.ErrorCode,
+			&i.ErrorMessage,
+			&i.OrgID,
+			&i.SpaceID,
+			&i.CreatedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.ExpireTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOperations = `-- name: ListOperations :many
 SELECT id, parent, done, metadata, result, error_code, error_message, org_id, space_id, created_by, create_time, update_time, expire_time FROM operations
 WHERE ($2::text IS NULL OR parent = $2)

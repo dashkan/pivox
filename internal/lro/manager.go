@@ -370,7 +370,7 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 		return nil, apierr.Internal("failed to commit tx")
 	}
 
-	return dbToProto(dbOp)
+	return OperationToProto(dbOp)
 }
 
 // CreateAndRun creates a new operation and runs the work function
@@ -437,7 +437,7 @@ func (m *Manager) createAndRun(ctx context.Context, parent string, orgID pgtype.
 
 	go m.runWork(ctx, opID, work)
 
-	return dbToProto(dbOp)
+	return OperationToProto(dbOp)
 }
 
 func (m *Manager) runWork(parent context.Context, opID uuid.UUID, work WorkFunc) {
@@ -618,13 +618,13 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	}
 }
 
-// parseOperationName extracts the UUID from an AIP-151 operation
+// ParseOperationName extracts the UUID from an AIP-151 operation
 // name. Per the spec the name "ends with `operations/{unique_id}`",
 // so we accept any path whose last two segments are
 // `operations/<uuid>`. Anything before is the parent resource (an
 // AIP path like `organizations/acme/spaces/dev`) and is allowed to
 // be empty for root-scoped operations.
-func parseOperationName(name string) (uuid.UUID, error) {
+func ParseOperationName(name string) (uuid.UUID, error) {
 	parts := strings.Split(name, "/")
 	if len(parts) < 2 {
 		return uuid.Nil, fmt.Errorf("invalid operation name %q: must end with operations/{id}", name)
@@ -641,7 +641,7 @@ func parseOperationName(name string) (uuid.UUID, error) {
 
 // GetOperation retrieves an operation by name.
 func (m *Manager) GetOperation(ctx context.Context, name string) (*longrunningpb.Operation, error) {
-	opID, err := parseOperationName(name)
+	opID, err := ParseOperationName(name)
 	if err != nil {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name", err.Error()))
 	}
@@ -652,7 +652,7 @@ func (m *Manager) GetOperation(ctx context.Context, name string) (*longrunningpb
 		}
 		return nil, apierr.Internal("failed to get operation")
 	}
-	return dbToProto(dbOp)
+	return OperationToProto(dbOp)
 }
 
 // ListOperations lists operations with optional filtering by parent.
@@ -679,7 +679,7 @@ func (m *Manager) ListOperations(ctx context.Context, parent string, pageSize in
 
 	ops := make([]*longrunningpb.Operation, 0, len(dbOps))
 	for _, dbOp := range dbOps {
-		op, err := dbToProto(dbOp)
+		op, err := OperationToProto(dbOp)
 		if err != nil {
 			continue
 		}
@@ -698,7 +698,7 @@ func (m *Manager) WaitOperation(ctx context.Context, name string) (*longrunningp
 		return op, nil
 	}
 
-	opID, _ := parseOperationName(name)
+	opID, _ := ParseOperationName(name)
 
 	ch := make(chan struct{}, 1)
 	m.mu.Lock()
@@ -730,7 +730,7 @@ func (m *Manager) WaitOperation(ctx context.Context, name string) (*longrunningp
 
 // DeleteOperation deletes a completed operation.
 func (m *Manager) DeleteOperation(ctx context.Context, name string) error {
-	opID, err := parseOperationName(name)
+	opID, err := ParseOperationName(name)
 	if err != nil {
 		return apierr.InvalidArgument(apierr.FieldViolation("name", err.Error()))
 	}
@@ -766,7 +766,7 @@ func (m *Manager) DeleteOperation(ctx context.Context, name string) error {
 // remote goroutine continues until it next checks ctx.Done() / makes
 // a DB call that observes the cancelled row.
 func (m *Manager) CancelOperation(ctx context.Context, name string) error {
-	opID, err := parseOperationName(name)
+	opID, err := ParseOperationName(name)
 	if err != nil {
 		return apierr.InvalidArgument(apierr.FieldViolation("name", err.Error()))
 	}

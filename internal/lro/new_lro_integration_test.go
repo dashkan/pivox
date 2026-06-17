@@ -78,7 +78,7 @@ func TestNewLro_AtomicallyInsertsOperationAndJob(t *testing.T) {
 	assert.False(t, op.Done)
 
 	// Operations row must exist after commit.
-	opID, err := parseOperationName(op.Name)
+	opID, err := ParseOperationName(op.Name)
 	require.NoError(t, err)
 	dbOp, err := queries.GetOperation(ctx, opID)
 	require.NoError(t, err, "operations row missing — tx didn't commit?")

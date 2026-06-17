@@ -580,6 +580,17 @@ type Querier interface {
 	// correctly as pgtype.Text.
 	ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]ListAssetsBySpaceRow, error)
 	ListAssetsBySpaceWithDeleted(ctx context.Context, arg ListAssetsBySpaceWithDeletedParams) ([]Asset, error)
+	// Operations the caller is permitted to see, scope-trimmed in one query
+	// (no N+1):
+	//   - account-scoped (no org/space): only the creator;
+	//   - org-scoped: caller has organizations.read at the op's org;
+	//   - space-scoped: caller has spaces.read at the op's space, via direct
+	//     space membership OR inherited parent-org membership.
+	// Membership resolves both direct (user_id) and group (group_id)
+	// bindings, mirroring GetEffectiveOrgRoles/GetEffectiveSpaceRoles;
+	// role_permissions supplies the generic read grant (all system roles
+	// hold it today, but the join future-proofs custom roles that may not).
+	ListAuthorizedOperations(ctx context.Context, arg ListAuthorizedOperationsParams) ([]Operation, error)
 	// Live dashboards in a space, newest-first. Pagination is offset-
 	// based for v1 — the catalog is small (≤ 100s of dashboards per
 	// space) and the surface won't grow until customers start

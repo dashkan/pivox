@@ -139,7 +139,9 @@ func authenticate(ctx context.Context, auth authn.Service) (context.Context, err
 // gRPC server with its own interceptor chain — see cmd/pivox-cloud/main.go
 // and server.AgentAuthStreamInterceptor.
 //
-// Reflection and health checks are handled by gRPC itself.
+// It runs unconditionally here; which methods it actually applies to is
+// decided one level up by GatedUnaryInterceptor in main.go (pivox.* +
+// LRO). Infrastructure methods (reflection, health) bypass it there.
 func AuthInterceptor(auth authn.Service) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,

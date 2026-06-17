@@ -160,17 +160,23 @@ func New(t *testing.T, opts ...Option) *Harness {
 	validator, err := protovalidate.New()
 	require.NoError(t, err)
 
+	// Mirror the production gated chain (cmd/pivox-cloud/main.go): auth
+	// covers first-party + LRO methods; membership/permission/validation
+	// apply only to first-party (pivox.*) methods. This lets the LRO
+	// surface (google.longrunning.Operations) reach its handler — which
+	// does its own object-level authz — instead of being default-denied
+	// by the permission gate.
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			server.AuthInterceptor(h.Auth),
-			server.MembershipRequiredInterceptor(queries),
-			permissionInterceptor,
-			server.FieldMaskAwareValidationInterceptor(validator),
+			server.GatedUnaryInterceptor(server.IsPivoxOrLRO, server.AuthInterceptor(h.Auth)),
+			server.GatedUnaryInterceptor(server.IsPivox, server.MembershipRequiredInterceptor(queries)),
+			server.GatedUnaryInterceptor(server.IsPivox, permissionInterceptor),
+			server.GatedUnaryInterceptor(server.IsPivox, server.FieldMaskAwareValidationInterceptor(validator)),
 		),
 		grpc.ChainStreamInterceptor(
-			server.AuthStreamInterceptor(h.Auth),
-			server.MembershipRequiredStreamInterceptor(queries),
-			permissionStreamInterceptor,
+			server.GatedStreamInterceptor(server.IsPivoxOrLRO, server.AuthStreamInterceptor(h.Auth)),
+			server.GatedStreamInterceptor(server.IsPivox, server.MembershipRequiredStreamInterceptor(queries)),
+			server.GatedStreamInterceptor(server.IsPivox, permissionStreamInterceptor),
 		),
 	)
 

@@ -33,7 +33,7 @@ func TestDbToProto_Pending(t *testing.T) {
 		UpdateTime:   now,
 	}
 
-	op, err := dbToProto(dbOp)
+	op, err := OperationToProto(dbOp)
 	require.NoError(t, err)
 
 	assert.Equal(t, "organizations/acme/operations/"+opID.String(), op.Name)
@@ -67,7 +67,7 @@ func TestDbToProto_CompletedWithResult_NestedParent(t *testing.T) {
 		UpdateTime:   now,
 	}
 
-	op, err := dbToProto(dbOp)
+	op, err := OperationToProto(dbOp)
 	require.NoError(t, err)
 
 	assert.Equal(t, "organizations/acme/spaces/dev/operations/"+opID.String(), op.Name)
@@ -77,7 +77,7 @@ func TestDbToProto_CompletedWithResult_NestedParent(t *testing.T) {
 }
 
 // TestDbToProto_EmptyParent: AIP-151 also allows the unparented form
-// `operations/{unique_id}` for root-scoped LROs. dbToProto falls
+// `operations/{unique_id}` for root-scoped LROs. OperationToProto falls
 // back to that when Parent is empty.
 func TestDbToProto_EmptyParent(t *testing.T) {
 	now := time.Now()
@@ -94,7 +94,7 @@ func TestDbToProto_EmptyParent(t *testing.T) {
 		UpdateTime:   now,
 	}
 
-	op, err := dbToProto(dbOp)
+	op, err := OperationToProto(dbOp)
 	require.NoError(t, err)
 
 	assert.Equal(t, "operations/"+opID.String(), op.Name)

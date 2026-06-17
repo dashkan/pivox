@@ -53,7 +53,7 @@ func DoneOperation(response proto.Message) (*longrunningpb.Operation, error) {
 	}, nil
 }
 
-func dbToProto(op db.Operation) (*longrunningpb.Operation, error) {
+func OperationToProto(op db.Operation) (*longrunningpb.Operation, error) {
 	// AIP-151: name must end with "operations/{unique_id}".
 	// When parent is set, prefix it (e.g.,
 	// "organizations/acme/spaces/dev/operations/{uuid}"). When parent

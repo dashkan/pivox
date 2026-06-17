@@ -17,6 +17,14 @@ type Config struct {
 	RESTPort        string
 	DebugPort       string
 	LogLevel        string
+	// EnableReflection registers gRPC server reflection (grpc.reflection.v1
+	// and v1alpha) on the gRPC servers. OFF by default: reflection exposes
+	// the full API surface to unauthenticated callers (the AuthInterceptor
+	// exempts reflection methods, so registering it makes the schema world-
+	// readable). Enable only in dev — PIVOX_ENABLE_REFLECTION=true — for
+	// tooling like grpcurl / buf curl. In production this stays unset AND
+	// the edge proxy blocks the reflection route (defense in depth).
+	EnableReflection bool
 	// Rate limiting is the responsibility of the edge proxy / load
 	// balancer in front of pivox-cloud (Cloudflare, GCLB, nginx). The
 	// Cloud Controller does not implement app-level per-IP limits;
