@@ -5,15 +5,22 @@ import (
 	"bytes"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 )
 
-// Smoke tests for the role↔permission matrix. The matrix is a flat
+// Smoke tests for the role↔permission grants. The grant data is a flat
 // data structure but it's load-bearing — it encodes the entire access-
 // control surface of the v1 product. Each test pins a permission to a
-// specific role's column so casual edits to the matrix get caught.
+// specific role's column so casual edits to the grants get caught.
+
+// roleGrants reports whether a system role grants a permission per the
+// generated RoleGrants data — the source that seeds role_permissions.
+func roleGrants(role, perm string) bool {
+	return slices.Contains(RoleGrants[role], perm)
+}
 
 func TestMatrix_OwnerHasDestructionClassPermissions(t *testing.T) {
 	// Owner is the destruction-class tier. Permissions only owner has,
@@ -26,10 +33,10 @@ func TestMatrix_OwnerHasDestructionClassPermissions(t *testing.T) {
 	}
 	for _, p := range cases {
 		t.Run(p, func(t *testing.T) {
-			if !Has(RoleOwner, p) {
+			if !roleGrants(RoleOwner, p) {
 				t.Errorf("owner should have %q", p)
 			}
-			if Has(RoleAdmin, p) {
+			if roleGrants(RoleAdmin, p) {
 				t.Errorf("admin should NOT have %q (destruction-class, owner-only)", p)
 			}
 		})
@@ -67,7 +74,7 @@ func TestMatrix_AdminHasDayToDayManagement(t *testing.T) {
 	}
 	for _, p := range cases {
 		t.Run(p, func(t *testing.T) {
-			if !Has(RoleAdmin, p) {
+			if !roleGrants(RoleAdmin, p) {
 				t.Errorf("admin should have %q", p)
 			}
 		})
@@ -107,14 +114,14 @@ func TestMatrix_EditorCanMutateContentNotIam(t *testing.T) {
 	}
 	for _, p := range canDo {
 		t.Run("can/"+p, func(t *testing.T) {
-			if !Has(RoleEditor, p) {
+			if !roleGrants(RoleEditor, p) {
 				t.Errorf("editor should have %q", p)
 			}
 		})
 	}
 	for _, p := range cantDo {
 		t.Run("cant/"+p, func(t *testing.T) {
-			if Has(RoleEditor, p) {
+			if roleGrants(RoleEditor, p) {
 				t.Errorf("editor should NOT have %q", p)
 			}
 		})
@@ -150,14 +157,14 @@ func TestMatrix_ViewerIsReadOnly(t *testing.T) {
 	}
 	for _, p := range canDo {
 		t.Run("can/"+p, func(t *testing.T) {
-			if !Has(RoleViewer, p) {
+			if !roleGrants(RoleViewer, p) {
 				t.Errorf("viewer should have %q", p)
 			}
 		})
 	}
 	for _, p := range cantDo {
 		t.Run("cant/"+p, func(t *testing.T) {
-			if Has(RoleViewer, p) {
+			if roleGrants(RoleViewer, p) {
 				t.Errorf("viewer should NOT have %q", p)
 			}
 		})
@@ -165,16 +172,16 @@ func TestMatrix_ViewerIsReadOnly(t *testing.T) {
 }
 
 func TestMatrix_UnknownRoleDeniesEverything(t *testing.T) {
-	if Has("rando", OrganizationsRead) {
+	if roleGrants("rando", OrganizationsRead) {
 		t.Error("unknown role must not grant any permission")
 	}
-	if Has("", OrganizationsRead) {
+	if roleGrants("", OrganizationsRead) {
 		t.Error("empty role must not grant any permission")
 	}
 }
 
 func TestMatrix_UnknownPermissionDeniesForKnownRole(t *testing.T) {
-	if Has(RoleOwner, "fake.permission") {
+	if roleGrants(RoleOwner, "fake.permission") {
 		t.Error("owner must not grant unknown permission")
 	}
 }
@@ -186,8 +193,8 @@ func TestMatrix_UnknownPermissionDeniesForKnownRole(t *testing.T) {
 func TestMatrix_AllConstantsCoveredByMatrix(t *testing.T) {
 	for _, p := range All {
 		t.Run(p, func(t *testing.T) {
-			covered := Has(RoleOwner, p) || Has(RoleAdmin, p) ||
-				Has(RoleEditor, p) || Has(RoleViewer, p)
+			covered := roleGrants(RoleOwner, p) || roleGrants(RoleAdmin, p) ||
+				roleGrants(RoleEditor, p) || roleGrants(RoleViewer, p)
 			if !covered {
 				t.Errorf("permission constant %q is in `All` but no role grants it", p)
 			}
@@ -204,8 +211,7 @@ func TestMatrix_AllConstantsCoveredByMatrix(t *testing.T) {
 //   - Permission added to migration but no Go constant defined → handler
 //     can't reference it without a typo.
 //   - Permission constant defined but never seeded → handler check
-//     against it always fails the org_members → role_permissions join
-//     (when v2 wires custom-role lookup) or matrix lookup (today).
+//     against it always fails the org_members → role_permissions join.
 //   - Typo in constant value vs migration row.
 //
 // If this test fails, fix one side or the other. Both must agree.

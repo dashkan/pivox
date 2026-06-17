@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -494,30 +495,22 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	//     the org at all" and "caller is in the org under no role
 	//     that grants storage read AND has no per-space binding."
 	//
-	// The trigger is catalog-driven (read from
-	// `permission.matrix`, not enumerated by role name), so a
-	// future role added without storage-read won't accidentally
-	// trigger the org-wide branch. Citations:
-	// `internal/permission/permissions_gen.go:381` (RoleViewer's
-	// AssetsAssetsRead grant; equivalent rows in the Owner / Admin
-	// / Editor blocks). All four current system roles include
-	// storage read, so any org-member today gets org-wide patterns.
+	// The trigger is catalog-driven: it's read from the identity's
+	// effective org permissions (resolved via `role_permissions`),
+	// not enumerated by role name. So a future role added without
+	// storage-read won't accidentally trigger the org-wide branch.
+	// All four current system roles include storage read, so any
+	// org-member today gets org-wide patterns.
 	identityID := server.MustPivoxUserID(ctx)
-	orgRoles, err := s.queries.GetEffectiveOrgRoles(ctx, db.GetEffectiveOrgRolesParams{
+	orgPerms, err := s.queries.EffectiveOrgPermissions(ctx, db.EffectiveOrgPermissionsParams{
 		OrgID:      orgID,
 		IdentityID: convert.PgUUID(identityID),
 	})
 	if err != nil {
-		slog.ErrorContext(ctx, "get effective org roles for storage session", "error", err, "org_id", orgID)
-		return nil, apierr.Internal("get effective org roles")
+		slog.ErrorContext(ctx, "get effective org permissions for storage session", "error", err, "org_id", orgID)
+		return nil, apierr.Internal("get effective org permissions")
 	}
-	hasOrgWideRead := false
-	for _, role := range orgRoles {
-		if permission.Has(role, permission.AssetsAssetsRead) {
-			hasOrgWideRead = true
-			break
-		}
-	}
+	hasOrgWideRead := slices.Contains(orgPerms, permission.AssetsAssetsRead)
 
 	// If the caller has no qualifying org-role, fall back to direct
 	// per-space membership — DB query, mirrors GetEffectiveSpaceRoles'

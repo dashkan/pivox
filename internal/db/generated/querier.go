@@ -231,6 +231,16 @@ type Querier interface {
 	DeleteTagBinding(ctx context.Context, id uuid.UUID) error
 	DeleteTagKey(ctx context.Context, id uuid.UUID) error
 	DeleteTagValue(ctx context.Context, id uuid.UUID) error
+	// Catalog permission_id strings the identity holds at the org, resolved
+	// via role_permissions (direct user bindings + group-derived). DB-side
+	// source of truth for authorization; resolves system + custom roles
+	// identically (no is_system filter — role_permissions is keyed by role_id).
+	EffectiveOrgPermissions(ctx context.Context, arg EffectiveOrgPermissionsParams) ([]string, error)
+	// Catalog permission_id strings the identity holds at the space: direct
+	// space-level bindings UNION inherited parent-org bindings, via
+	// role_permissions. One query (replaces the old parent-org lookup +
+	// space-roles + org-roles round-trips).
+	EffectiveSpacePermissions(ctx context.Context, arg EffectiveSpacePermissionsParams) ([]string, error)
 	FailOperation(ctx context.Context, arg FailOperationParams) (Operation, error)
 	GetApiKey(ctx context.Context, id uuid.UUID) (ApiKey, error)
 	GetApiKeyByOrgAndKeyID(ctx context.Context, arg GetApiKeyByOrgAndKeyIDParams) (ApiKey, error)
@@ -318,27 +328,6 @@ type Querier interface {
 	// the worker's UPDATE to block until our tx resolves, so we always
 	// evaluate the precondition against the row's actual current state.
 	GetDomainByNameForUpdate(ctx context.Context, arg GetDomainByNameForUpdateParams) (Domain, error)
-	// Returns the system-role names an identity has at the given org,
-	// considering both direct user bindings (org_members.user_id) and
-	// group-derived bindings (org_members.group_id matching a group the
-	// user is a member of via group_members). Custom roles are excluded
-	// — v1 only resolves against the system-role permission matrix.
-	//
-	// Used by the permission resolver as the org-scope half of effective-
-	// role resolution. Space-scope inheritance is handled at the resolver
-	// layer by unioning this with `GetEffectiveSpaceRoles`.
-	//
-	// Post-principal-split: the polymorphic `principal_kind/principal_id`
-	// pair was replaced by typed `user_id`/`group_id` columns (XOR
-	// enforced at the row level). The OR branches below select on the
-	// live column for each binding shape.
-	GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgRolesParams) ([]string, error)
-	// Returns the system-role names an identity has at the given space —
-	// direct + group-derived space-level bindings only. Org-level
-	// inheritance (an org-admin is also a space-admin) is the resolver's
-	// responsibility to union in via GetEffectiveOrgRoles against the
-	// space's parent org.
-	GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error)
 	// GetIdentitiesByIDs is the batched lookup used by the audit
 	// resolver to inflate Actor messages on resource reads. The IDs are
 	// typically a deduped slice of cache misses; row order is not
@@ -417,16 +406,6 @@ type Querier interface {
 	GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceMemberByGroup(ctx context.Context, arg GetSpaceMemberByGroupParams) (GetSpaceMemberByGroupRow, error)
 	GetSpaceMemberByUser(ctx context.Context, arg GetSpaceMemberByUserParams) (GetSpaceMemberByUserRow, error)
-	// Resolves a space's parent org_id. Used by the permission resolver
-	// when a space-scoped permission check needs to fold in org-level
-	// inheritance.
-	//
-	// Returns the parent org regardless of the space's soft-delete state:
-	// the parent relationship is immutable, and the resolver runs for
-	// soft-deleted spaces too (UndeleteSpace, reads during the grace
-	// window). Filtering on delete_time would break those flows by
-	// returning ErrNoRows after the gate has already admitted the row.
-	GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	// GetSsoConfigByFirebaseProviderID is the query backing the
 	// POST /internal/v1/sso:getProviderConfig endpoint. The OAuth
 	// broker (web/start) calls this with a provider id (e.g. `oidc.acme`)

@@ -1,8 +1,9 @@
 // Permission generator. Reads internal/permission/permissions.yaml
 // (the source of truth for the v1 permission catalog) and emits
 // internal/permission/permissions_gen.go containing typed permission
-// constants, the canonical `All` slice, and the role-to-permission
-// grant matrix.
+// constants, the canonical `All` slice, and the `RoleGrants`
+// role-to-permission grant data (which seeds the role_permissions
+// table — the DB-side source of truth for authorization).
 //
 // Adding a permission:
 //
@@ -206,28 +207,13 @@ func emitGo(pf permissionsFile) []byte {
 		}
 	}
 	roleOrder := []string{"owner", "admin", "editor", "viewer"}
-	b.WriteString("// matrix is the role-to-permission grant map. Each role's set is\n")
-	b.WriteString("// the union of every permission whose `roles:` list mentions that\n")
-	b.WriteString("// role name in permissions.yaml.\n")
-	b.WriteString("var matrix = map[string]map[string]bool{\n")
-	for _, role := range roleOrder {
-		fmt.Fprintf(&b, "\tRole%s: {\n", strings.ToUpper(role[:1])+role[1:])
-		ids := roleAllow[role]
-		sort.Strings(ids)
-		for _, id := range ids {
-			fmt.Fprintf(&b, "\t\t%s: true,\n", constName(id))
-		}
-		b.WriteString("\t},\n")
-	}
-	b.WriteString("}\n\n")
-
-	b.WriteString("// RoleGrants is the same role-to-permission grant data as `matrix`,\n")
-	b.WriteString("// in ordered-slice form keyed by role name. It seeds the\n")
-	b.WriteString("// role_permissions table (per-org system-role grants) at org\n")
-	b.WriteString("// bootstrap and in the dev seed, so permission checks can also\n")
-	b.WriteString("// resolve in SQL — e.g. the membership-scoped operations list —\n")
-	b.WriteString("// without N+1 Has() round-trips. Kept in lockstep with `matrix` by\n")
-	b.WriteString("// TestRoleGrants_MatchMatrix.\n")
+	b.WriteString("// RoleGrants is the role-to-permission grant data, in ordered-slice\n")
+	b.WriteString("// form keyed by role name. Each role's set is the union of every\n")
+	b.WriteString("// permission whose `roles:` list mentions that role name in\n")
+	b.WriteString("// permissions.yaml. It seeds the role_permissions table (per-org\n")
+	b.WriteString("// system-role grants) at org bootstrap and in the dev seed, so\n")
+	b.WriteString("// permission checks resolve in SQL — the DB-side source of truth\n")
+	b.WriteString("// for authorization.\n")
 	b.WriteString("var RoleGrants = map[string][]string{\n")
 	for _, role := range roleOrder {
 		fmt.Fprintf(&b, "\tRole%s: {\n", strings.ToUpper(role[:1])+role[1:])

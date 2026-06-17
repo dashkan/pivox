@@ -13,11 +13,11 @@ import (
 
 // TestE2E_Bootstrap_PopulatesRolePermissions verifies that creating an
 // org through the real CreateOrganization handler materializes the
-// static system-role grant matrix (permission.RoleGrants) into the
-// role_permissions table for all 4 system roles. This is the
-// SQL-resolvable side of the permission model — the membership-scoped
-// operations list (and any future set-based authz query) joins these
-// rows instead of calling permission.Has() per row.
+// system-role grant data (permission.RoleGrants) into the
+// role_permissions table for all 4 system roles. role_permissions is
+// the DB-side source of truth for authorization — the permission
+// resolver, the membership-scoped operations list, and any future
+// set-based authz query all join these rows.
 func TestE2E_Bootstrap_PopulatesRolePermissions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")

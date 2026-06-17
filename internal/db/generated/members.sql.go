@@ -249,55 +249,40 @@ func (q *Queries) DeleteSpaceUserMember(ctx context.Context, arg DeleteSpaceUser
 	return result.RowsAffected(), nil
 }
 
-const getEffectiveOrgRoles = `-- name: GetEffectiveOrgRoles :many
-SELECT DISTINCT r.name
+const effectiveOrgPermissions = `-- name: EffectiveOrgPermissions :many
+SELECT DISTINCT perm.permission_id
   FROM org_members om
-  JOIN roles r ON r.id = om.role_id
+  JOIN role_permissions rp ON rp.role_id = om.role_id
+  JOIN permissions perm ON perm.id = rp.permission_id
  WHERE om.org_id = $1
-   AND r.is_system = true
-   AND (
-     om.user_id = $2
-     OR
-     om.group_id IN (
-       SELECT gm.group_id
-         FROM group_members gm
-        WHERE gm.user_id = $2
-     )
-   )
+   AND ( om.user_id = $2
+         OR om.group_id IN (
+              SELECT gm.group_id FROM group_members gm
+               WHERE gm.user_id = $2 ) )
 `
 
-type GetEffectiveOrgRolesParams struct {
+type EffectiveOrgPermissionsParams struct {
 	OrgID      uuid.UUID   `json:"org_id"`
 	IdentityID pgtype.UUID `json:"identity_id"`
 }
 
-// Returns the system-role names an identity has at the given org,
-// considering both direct user bindings (org_members.user_id) and
-// group-derived bindings (org_members.group_id matching a group the
-// user is a member of via group_members). Custom roles are excluded
-// — v1 only resolves against the system-role permission matrix.
-//
-// Used by the permission resolver as the org-scope half of effective-
-// role resolution. Space-scope inheritance is handled at the resolver
-// layer by unioning this with `GetEffectiveSpaceRoles`.
-//
-// Post-principal-split: the polymorphic `principal_kind/principal_id`
-// pair was replaced by typed `user_id`/`group_id` columns (XOR
-// enforced at the row level). The OR branches below select on the
-// live column for each binding shape.
-func (q *Queries) GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgRolesParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, getEffectiveOrgRoles, arg.OrgID, arg.IdentityID)
+// Catalog permission_id strings the identity holds at the org, resolved
+// via role_permissions (direct user bindings + group-derived). DB-side
+// source of truth for authorization; resolves system + custom roles
+// identically (no is_system filter — role_permissions is keyed by role_id).
+func (q *Queries) EffectiveOrgPermissions(ctx context.Context, arg EffectiveOrgPermissionsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, effectiveOrgPermissions, arg.OrgID, arg.IdentityID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	items := []string{}
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var permission_id string
+		if err := rows.Scan(&permission_id); err != nil {
 			return nil, err
 		}
-		items = append(items, name)
+		items = append(items, permission_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -305,46 +290,53 @@ func (q *Queries) GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgR
 	return items, nil
 }
 
-const getEffectiveSpaceRoles = `-- name: GetEffectiveSpaceRoles :many
-SELECT DISTINCT r.name
-  FROM space_members sm
-  JOIN roles r ON r.id = sm.role_id
- WHERE sm.space_id = $1
-   AND r.is_system = true
-   AND (
-     sm.user_id = $2
-     OR
-     sm.group_id IN (
-       SELECT gm.group_id
-         FROM group_members gm
-        WHERE gm.user_id = $2
-     )
-   )
+const effectiveSpacePermissions = `-- name: EffectiveSpacePermissions :many
+SELECT DISTINCT perm.permission_id
+  FROM permissions perm
+ WHERE perm.id IN (
+   SELECT rp.permission_id
+     FROM space_members sm
+     JOIN role_permissions rp ON rp.role_id = sm.role_id
+    WHERE sm.space_id = $1
+      AND ( sm.user_id = $2
+            OR sm.group_id IN (
+                 SELECT gm.group_id FROM group_members gm
+                  WHERE gm.user_id = $2 ) )
+   UNION
+   SELECT rp.permission_id
+     FROM spaces s
+     JOIN org_members om ON om.org_id = s.org_id
+     JOIN role_permissions rp ON rp.role_id = om.role_id
+    WHERE s.id = $1
+      AND ( om.user_id = $2
+            OR om.group_id IN (
+                 SELECT gm.group_id FROM group_members gm
+                  WHERE gm.user_id = $2 ) )
+ )
 `
 
-type GetEffectiveSpaceRolesParams struct {
+type EffectiveSpacePermissionsParams struct {
 	SpaceID    uuid.UUID   `json:"space_id"`
 	IdentityID pgtype.UUID `json:"identity_id"`
 }
 
-// Returns the system-role names an identity has at the given space —
-// direct + group-derived space-level bindings only. Org-level
-// inheritance (an org-admin is also a space-admin) is the resolver's
-// responsibility to union in via GetEffectiveOrgRoles against the
-// space's parent org.
-func (q *Queries) GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, getEffectiveSpaceRoles, arg.SpaceID, arg.IdentityID)
+// Catalog permission_id strings the identity holds at the space: direct
+// space-level bindings UNION inherited parent-org bindings, via
+// role_permissions. One query (replaces the old parent-org lookup +
+// space-roles + org-roles round-trips).
+func (q *Queries) EffectiveSpacePermissions(ctx context.Context, arg EffectiveSpacePermissionsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, effectiveSpacePermissions, arg.SpaceID, arg.IdentityID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	items := []string{}
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var permission_id string
+		if err := rows.Scan(&permission_id); err != nil {
 			return nil, err
 		}
-		items = append(items, name)
+		items = append(items, permission_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -547,26 +539,6 @@ func (q *Queries) GetSpaceMemberByUser(ctx context.Context, arg GetSpaceMemberBy
 		&i.RoleName,
 	)
 	return i, err
-}
-
-const getSpaceParentOrg = `-- name: GetSpaceParentOrg :one
-SELECT org_id FROM spaces WHERE id = $1
-`
-
-// Resolves a space's parent org_id. Used by the permission resolver
-// when a space-scoped permission check needs to fold in org-level
-// inheritance.
-//
-// Returns the parent org regardless of the space's soft-delete state:
-// the parent relationship is immutable, and the resolver runs for
-// soft-deleted spaces too (UndeleteSpace, reads during the grace
-// window). Filtering on delete_time would break those flows by
-// returning ErrNoRows after the gate has already admitted the row.
-func (q *Queries) GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, getSpaceParentOrg, id)
-	var org_id uuid.UUID
-	err := row.Scan(&org_id)
-	return org_id, err
 }
 
 const listOrgMembers = `-- name: ListOrgMembers :many

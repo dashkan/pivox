@@ -21,7 +21,6 @@ import (
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
-	"github.com/dashkan/pivox/internal/permission"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/server"
 )
@@ -165,7 +164,11 @@ func (s *IamServer) GetRole(ctx context.Context, req *iampb.GetRoleRequest) (*ia
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Role", req.GetName())
 	}
-	return convert.RoleToProto(role, orgSlug, permissionsForRole(role.Name)), nil
+	perms, err := s.queries.RolePermissionIDs(ctx, role.ID)
+	if err != nil {
+		return nil, apierr.Internal("load role permissions")
+	}
+	return convert.RoleToProto(role, orgSlug, perms), nil
 }
 
 // ListRoles returns all roles in the org. v1 has only the 4 system
@@ -187,7 +190,12 @@ func (s *IamServer) ListRoles(ctx context.Context, req *iampb.ListRolesRequest) 
 	}
 	out := make([]*iampb.Role, len(rows))
 	for i, r := range rows {
-		out[i] = convert.RoleToProto(r, orgSlug, permissionsForRole(r.Name))
+		perms, err := s.queries.RolePermissionIDs(ctx, r.ID)
+		if err != nil {
+			slog.ErrorContext(ctx, "iam: load role permissions failed", "role_id", r.ID, "error", err)
+			return nil, apierr.Internal("load role permissions")
+		}
+		out[i] = convert.RoleToProto(r, orgSlug, perms)
 	}
 	return &iampb.ListRolesResponse{Roles: out}, nil
 }
@@ -211,19 +219,4 @@ func parseOrgParent(parent string) (string, error) {
 			fmt.Sprintf("invalid parent %q: expected organizations/{org}", parent)))
 	}
 	return parts[1], nil
-}
-
-// permissionsForRole returns the set of permission_id strings a
-// system role grants. For v1 this is the static matrix from
-// internal/permission. Once custom roles ship in v2, the resolver
-// will additionally read role_permissions for non-system roles —
-// this helper stays as the system-role fast path.
-func permissionsForRole(roleName string) []string {
-	out := make([]string, 0, len(permission.All))
-	for _, p := range permission.All {
-		if permission.Has(roleName, p) {
-			out = append(out, p)
-		}
-	}
-	return out
 }

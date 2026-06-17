@@ -1,54 +1,3 @@
--- name: GetEffectiveOrgRoles :many
--- Returns the system-role names an identity has at the given org,
--- considering both direct user bindings (org_members.user_id) and
--- group-derived bindings (org_members.group_id matching a group the
--- user is a member of via group_members). Custom roles are excluded
--- — v1 only resolves against the system-role permission matrix.
---
--- Used by the permission resolver as the org-scope half of effective-
--- role resolution. Space-scope inheritance is handled at the resolver
--- layer by unioning this with `GetEffectiveSpaceRoles`.
---
--- Post-principal-split: the polymorphic `principal_kind/principal_id`
--- pair was replaced by typed `user_id`/`group_id` columns (XOR
--- enforced at the row level). The OR branches below select on the
--- live column for each binding shape.
-SELECT DISTINCT r.name
-  FROM org_members om
-  JOIN roles r ON r.id = om.role_id
- WHERE om.org_id = sqlc.arg(org_id)
-   AND r.is_system = true
-   AND (
-     om.user_id = sqlc.arg(identity_id)
-     OR
-     om.group_id IN (
-       SELECT gm.group_id
-         FROM group_members gm
-        WHERE gm.user_id = sqlc.arg(identity_id)
-     )
-   );
-
--- name: GetEffectiveSpaceRoles :many
--- Returns the system-role names an identity has at the given space —
--- direct + group-derived space-level bindings only. Org-level
--- inheritance (an org-admin is also a space-admin) is the resolver's
--- responsibility to union in via GetEffectiveOrgRoles against the
--- space's parent org.
-SELECT DISTINCT r.name
-  FROM space_members sm
-  JOIN roles r ON r.id = sm.role_id
- WHERE sm.space_id = sqlc.arg(space_id)
-   AND r.is_system = true
-   AND (
-     sm.user_id = sqlc.arg(identity_id)
-     OR
-     sm.group_id IN (
-       SELECT gm.group_id
-         FROM group_members gm
-        WHERE gm.user_id = sqlc.arg(identity_id)
-     )
-   );
-
 -- name: GetOrgMemberByUser :one
 -- Looks up a single org-scope user binding. After the principal_id
 -- split, user and group lookups are separate queries — the
@@ -207,18 +156,6 @@ SELECT om.id, om.org_id, om.role_id, om.user_id, om.group_id,
    AND r.name = 'owner'
  ORDER BY om.create_time, om.id;
 
--- name: GetSpaceParentOrg :one
--- Resolves a space's parent org_id. Used by the permission resolver
--- when a space-scoped permission check needs to fold in org-level
--- inheritance.
---
--- Returns the parent org regardless of the space's soft-delete state:
--- the parent relationship is immutable, and the resolver runs for
--- soft-deleted spaces too (UndeleteSpace, reads during the grace
--- window). Filtering on delete_time would break those flows by
--- returning ErrNoRows after the gate has already admitted the row.
-SELECT org_id FROM spaces WHERE id = $1;
-
 -- name: ListSpaceMembershipsForIdentityInOrg :many
 -- Returns the spaces in `org_id` that `identity_id` is a member of —
 -- via direct user binding (space_members.user_id) OR group-derived
@@ -251,3 +188,46 @@ SELECT DISTINCT s.id, s.org_id, s.name
      )
    )
  ORDER BY s.name;
+
+-- name: EffectiveOrgPermissions :many
+-- Catalog permission_id strings the identity holds at the org, resolved
+-- via role_permissions (direct user bindings + group-derived). DB-side
+-- source of truth for authorization; resolves system + custom roles
+-- identically (no is_system filter — role_permissions is keyed by role_id).
+SELECT DISTINCT perm.permission_id
+  FROM org_members om
+  JOIN role_permissions rp ON rp.role_id = om.role_id
+  JOIN permissions perm ON perm.id = rp.permission_id
+ WHERE om.org_id = sqlc.arg(org_id)
+   AND ( om.user_id = sqlc.arg(identity_id)
+         OR om.group_id IN (
+              SELECT gm.group_id FROM group_members gm
+               WHERE gm.user_id = sqlc.arg(identity_id) ) );
+
+-- name: EffectiveSpacePermissions :many
+-- Catalog permission_id strings the identity holds at the space: direct
+-- space-level bindings UNION inherited parent-org bindings, via
+-- role_permissions. One query (replaces the old parent-org lookup +
+-- space-roles + org-roles round-trips).
+SELECT DISTINCT perm.permission_id
+  FROM permissions perm
+ WHERE perm.id IN (
+   SELECT rp.permission_id
+     FROM space_members sm
+     JOIN role_permissions rp ON rp.role_id = sm.role_id
+    WHERE sm.space_id = sqlc.arg(space_id)
+      AND ( sm.user_id = sqlc.arg(identity_id)
+            OR sm.group_id IN (
+                 SELECT gm.group_id FROM group_members gm
+                  WHERE gm.user_id = sqlc.arg(identity_id) ) )
+   UNION
+   SELECT rp.permission_id
+     FROM spaces s
+     JOIN org_members om ON om.org_id = s.org_id
+     JOIN role_permissions rp ON rp.role_id = om.role_id
+    WHERE s.id = sqlc.arg(space_id)
+      AND ( om.user_id = sqlc.arg(identity_id)
+            OR om.group_id IN (
+                 SELECT gm.group_id FROM group_members gm
+                  WHERE gm.user_id = sqlc.arg(identity_id) ) )
+ );
