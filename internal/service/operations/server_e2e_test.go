@@ -30,25 +30,38 @@ import (
 // server trims visibility to it.
 
 func newOperationsHarness(t *testing.T) *grpcharness.Harness {
-	return grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
-		permResolver := permission.NewResolver(h.Queries)
-		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
-		require.NoError(t, err)
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
-			Pool:       h.Pool,
-			Queries:    h.Queries,
-			Auth:       h.Auth,
-			Codec:      codec,
-			Resolver:   permResolver,
-			LROManager: h.LROManager,
-			Encryptor:  h.Encryptor,
-		}))
-		longrunningpb.RegisterOperationsServer(s, operations.NewOperationsServer(operations.Config{
-			LRO:      h.LROManager,
-			Queries:  h.Queries,
-			Resolver: permResolver,
-		}))
-	}))
+	return grpcharness.New(t,
+		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+			permResolver := permission.NewResolver(h.Queries)
+			codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+			require.NoError(t, err)
+			apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
+				Pool:       h.Pool,
+				Queries:    h.Queries,
+				Auth:       h.Auth,
+				Codec:      codec,
+				Resolver:   permResolver,
+				LROManager: h.LROManager,
+				Encryptor:  h.Encryptor,
+			}))
+			longrunningpb.RegisterOperationsServer(s, operations.NewOperationsServer(operations.Config{
+				LRO:      h.LROManager,
+				Queries:  h.Queries,
+				Resolver: permResolver,
+			}))
+		}),
+		grpcharness.WithSpacesServer(),
+	)
+}
+
+// containsOp reports whether ops includes one named name.
+func containsOp(ops []*longrunningpb.Operation, name string) bool {
+	for _, o := range ops {
+		if o.GetName() == name {
+			return true
+		}
+	}
+	return false
 }
 
 // seedOp inserts an operation row directly with a pinned scope, returning
@@ -141,4 +154,58 @@ func TestE2E_Operations_ListTrimsToVisibleScopes(t *testing.T) {
 	assert.True(t, seen[orgAOp], "ownerA should see orgA's op")
 	assert.True(t, seen[acctAOp], "ownerA should see their own account op")
 	assert.False(t, seen[orgBOp], "ownerA must NOT see orgB's op (cross-tenant)")
+}
+
+// TestE2E_Operations_SpaceScopeInheritance covers the space-scoped branch
+// and specifically the org→space inheritance path: a member with only an
+// org binding (no space_members row) must see a space-scoped op via their
+// inherited org role. This exercises the second EXISTS in
+// ListAuthorizedOperations and the resolver's space-scope union, the most
+// complex authz artifact in the feature.
+func TestE2E_Operations_SpaceScopeInheritance(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := newOperationsHarness(t)
+	ctx := context.Background()
+	ops := longrunningpb.NewOperationsClient(h.Conn())
+
+	orgA := h.SeedOwnedOrg(t, "ops-space-a", "Ops Space A", "spacea")
+	space := h.SeedOwnedSpace(t, "ops-space-a", "dev", "Dev Space")
+
+	// An org editor with NO direct space membership — visibility must
+	// come purely from org→space inheritance.
+	inheritor := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "space-inheritor"})
+	h.SeedMembership(t, orgA.Row.ID, inheritor, grpcharness.RoleEditor)
+
+	orgB := h.SeedOwnedOrg(t, "ops-space-b", "Ops Space B", "spaceb")
+
+	spaceOp := seedOp(t, h, "organizations/ops-space-a/spaces/dev",
+		pgtype.UUID{}, convert.PgUUID(space.Row.ID), convert.PgUUID(orgA.Owner.IdentityID))
+
+	t.Run("inherited org member sees the space op (Get)", func(t *testing.T) {
+		h.SetCaller(inheritor)
+		got, err := ops.GetOperation(ctx, &longrunningpb.GetOperationRequest{Name: spaceOp})
+		require.NoError(t, err)
+		assert.Equal(t, spaceOp, got.GetName())
+	})
+	t.Run("inherited org member sees the space op (List)", func(t *testing.T) {
+		h.SetCaller(inheritor)
+		resp, err := ops.ListOperations(ctx, &longrunningpb.ListOperationsRequest{})
+		require.NoError(t, err)
+		assert.True(t, containsOp(resp.GetOperations(), spaceOp),
+			"org member should see the space op via inheritance")
+	})
+	t.Run("outsider gets NotFound for the space op", func(t *testing.T) {
+		h.SetCaller(orgB.Owner)
+		_, err := ops.GetOperation(ctx, &longrunningpb.GetOperationRequest{Name: spaceOp})
+		assert.Equal(t, codes.NotFound, status.Code(err))
+	})
+	t.Run("outsider's list excludes the space op", func(t *testing.T) {
+		h.SetCaller(orgB.Owner)
+		resp, err := ops.ListOperations(ctx, &longrunningpb.ListOperationsRequest{})
+		require.NoError(t, err)
+		assert.False(t, containsOp(resp.GetOperations(), spaceOp),
+			"outsider must not see another tenant's space op")
+	})
 }
