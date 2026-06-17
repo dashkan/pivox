@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +17,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"google.golang.org/grpc/codes"
-	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -31,70 +29,32 @@ import (
 // other consumer.
 const notifyChannel = "pivox_lro_done"
 
-// WorkFunc performs the actual work for an operation. The supplied
-// `progress` reports phase transitions back to the operation
-// metadata so polling clients can observe state. Progress reporting
-// is best-effort; the Update method swallows DB errors and never
-// returns one (a metadata write failure must not abort the work).
-type WorkFunc func(ctx context.Context, progress Progress) (proto.Message, error)
-
-// Progress is the phase-reporting handle passed to a WorkFunc. It
-// captures the operation ID so callers don't have to thread it
-// manually. Implementations are safe to call from any goroutine.
-type Progress interface {
-	Update(ctx context.Context, metadata proto.Message)
-}
-
-type managerProgress struct {
-	m    *Manager
-	opID uuid.UUID
-}
-
-func (p *managerProgress) Update(ctx context.Context, metadata proto.Message) {
-	p.m.UpdateMetadata(ctx, p.opID, metadata)
-}
-
 // Manager manages long-running operations.
 type Manager struct {
 	queries db.Querier
 	logger  *slog.Logger
 
 	// pool + river are required by NewLro and only by NewLro. The
-	// rest of Manager (CreateAndRun, runWork, RecoverPending, etc.)
-	// uses queries directly. They're kept optional for now so the
-	// transition off the legacy path is incremental — handlers
-	// migrate one at a time, tests that don't touch NewLro don't
-	// need to wire either field. Once every LRO is on the new path
-	// these become required and CreateAndRun/runWork get deleted.
+	// rest of Manager (RecoverPending, the LISTEN loop, etc.) uses
+	// queries directly. They're kept optional so callers that don't
+	// touch NewLro (some tests) don't need to wire either field; the
+	// legacy in-process CreateAndRun/runWork path that used to share
+	// this distinction has been deleted — all LROs now run as River
+	// jobs in pivox-worker.
 	pool  *pgxpool.Pool
 	river *river.Client[pgx.Tx]
 
 	mu        sync.Mutex
 	listeners map[uuid.UUID][]chan struct{}
-	// running maps op id → cancel fn for the goroutine running its
-	// WorkFunc. CancelOperation calls the registered fn so the work
-	// goroutine sees ctx.Done() and aborts; without this, marking the
-	// DB row done is just a label and the goroutine runs to
-	// completion, overwriting the cancel state on success. The map
-	// is populated when runWork starts and cleared when it returns.
-	running map[uuid.UUID]context.CancelFunc
 
 	// shuttingDown gates new starts. Flipped by Shutdown under mu so
-	// CreateAndRun's "is shutdown in flight?" check and its wg.Add are
-	// atomic with Shutdown's "stop accepting work, then Wait." Without
-	// the lock, an Add could land after Wait returns — undefined
-	// behavior on sync.WaitGroup.
+	// NewLro's "is shutdown in flight?" check observes it atomically
+	// with Shutdown's "stop accepting work."
 	shuttingDown bool
-	// shutdownCtx is cancelled by Shutdown. Each runWork forwards its
-	// cancellation into that op's workCtx via context.AfterFunc, so a
-	// shutdown signal aborts every in-flight WorkFunc. This is the
-	// graceful-stop counterpart to CancelOperation's per-op cancel.
+	// shutdownCtx is cancelled by Shutdown. The LISTEN loop consumes
+	// it to know when to stop and release its pool connection.
 	shutdownCtx    context.Context
 	shutdownCancel context.CancelFunc
-	// wg tracks in-flight runWork goroutines so Shutdown can wait for
-	// them to finish their bookkeeping (FailOperation/CompleteOperation)
-	// before the caller closes the DB pool.
-	wg sync.WaitGroup
 	// shutdownOnce makes Shutdown idempotent — repeat callers from
 	// duplicated signal handlers don't double-cancel or re-flip flags.
 	shutdownOnce sync.Once
@@ -141,7 +101,6 @@ func NewManager(cfg ManagerConfig) *Manager {
 		pool:           cfg.Pool,
 		river:          cfg.River,
 		listeners:      make(map[uuid.UUID][]chan struct{}),
-		running:        make(map[uuid.UUID]context.CancelFunc),
 		shutdownCtx:    shutdownCtx,
 		shutdownCancel: shutdownCancel,
 	}
@@ -228,26 +187,6 @@ func (m *Manager) listenOnce(ctx context.Context) error {
 			continue
 		}
 		m.notifyListeners(opID)
-	}
-}
-
-// UpdateMetadata replaces the metadata blob on an in-flight
-// operation. Used by multi-phase work functions to surface progress
-// (e.g. DeleteOrganization transitioning VALIDATING →
-// CANCELLING_OPERATIONS → MARKING_DELETED) so polling clients see
-// the current phase. Marshal errors are logged but not returned —
-// progress reporting is best-effort and must not abort the work.
-func (m *Manager) UpdateMetadata(ctx context.Context, opID uuid.UUID, metadata proto.Message) {
-	metaJSON, err := marshalAny(metadata)
-	if err != nil {
-		m.logger.Error("lro: marshal metadata for update", "op", opID, "error", err)
-		return
-	}
-	if err := m.queries.UpdateOperationMetadata(ctx, db.UpdateOperationMetadataParams{
-		ID:       opID,
-		Metadata: metaJSON,
-	}); err != nil {
-		m.logger.Error("lro: update operation metadata", "op", opID, "error", err)
 	}
 }
 
@@ -373,222 +312,20 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 	return OperationToProto(dbOp)
 }
 
-// CreateAndRun creates a new operation and runs the work function
-// asynchronously. `parent` is the AIP-151 parent resource the LRO
-// operates against (e.g., "organizations/acme/spaces/dev"); the
-// public Operation.name is constructed as
-// `{parent}/operations/{uuid}`. Pass an empty string for unscoped
-// LROs (root-level operations), in which case the name falls back
-// to the unparented `operations/{uuid}` form.
+// Shutdown stops accepting new operations (NewLro returns
+// Unavailable afterward) and stops the LISTEN loop, blocking until
+// the listener goroutine releases its pool connection or ctx
+// expires. Idempotent — duplicate signal handlers calling it twice
+// is safe.
 //
-// The operation is unscoped — operations.org_id is NULL — so it
-// isn't cancellable via DeleteOrganization's CANCELLING_OPERATIONS
-// phase. Use CreateAndRunForOrg when the LRO targets an
-// organization and should be cancelled if the org is soft-deleted.
-func (m *Manager) CreateAndRun(ctx context.Context, parent string, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
-	return m.createAndRun(ctx, parent, pgtype.UUID{}, metadata, work)
-}
-
-// CreateAndRunForOrg is the org-scoped variant: the operation row's
-// org_id is set to `orgID`, so DeleteOrganization's
-// CancelRunningOpsForOrg will mark this LRO done with codes.Cancelled
-// when the org enters DELETE_REQUESTED. Use this for any LRO whose
-// progress would mutate org-scoped state (asset imports, domain
-// verifications, gateway upgrades). DO NOT use it for the
-// DeleteOrganization LRO itself — a self-pointing org_id would
-// cause the cancellation phase to cancel its own work.
-func (m *Manager) CreateAndRunForOrg(ctx context.Context, parent string, orgID uuid.UUID, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
-	return m.createAndRun(ctx, parent, pgtype.UUID{Bytes: orgID, Valid: true}, metadata, work)
-}
-
-func (m *Manager) createAndRun(ctx context.Context, parent string, orgID pgtype.UUID, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
-	opID := uuid.New()
-
-	var metaJSON json.RawMessage
-	if metadata != nil {
-		var err error
-		metaJSON, err = marshalAny(metadata)
-		if err != nil {
-			return nil, apierr.Internal("failed to marshal operation metadata")
-		}
-	}
-
-	// Reserve a wg slot under mu so Shutdown's "flip the flag, then
-	// Wait" sequence can't observe Add() after Wait() has returned.
-	// If shutdown is already in flight, refuse the new operation.
-	m.mu.Lock()
-	if m.shuttingDown {
-		m.mu.Unlock()
-		return nil, apierr.Unavailable("server is shutting down; no new operations accepted")
-	}
-	m.wg.Add(1)
-	m.mu.Unlock()
-
-	dbOp, err := m.queries.CreateOperation(ctx, db.CreateOperationParams{
-		ID:       opID,
-		Parent:   parent,
-		Metadata: metaJSON,
-		OrgID:    orgID,
-	})
-	if err != nil {
-		m.wg.Done()
-		return nil, apierr.Internal("failed to create operation")
-	}
-
-	go m.runWork(ctx, opID, work)
-
-	return OperationToProto(dbOp)
-}
-
-func (m *Manager) runWork(parent context.Context, opID uuid.UUID, work WorkFunc) {
-	defer m.wg.Done()
-
-	// Detach from the originating RPC's cancellation while keeping its
-	// values (trace IDs, slog attrs, span context). LROs must outlive
-	// the request that started them — `WithoutCancel` is precisely the
-	// "values without lifetime" primitive.
-	//
-	// Two derived contexts:
-	//  - workCtx: cancellable, passed to the WorkFunc. Three triggers
-	//    cancel it: CancelOperation (per-op, via the registered cancel
-	//    fn), CancelLocal (bulk, same map), and Shutdown (manager-wide,
-	//    via the AfterFunc below). The WorkFunc observes ctx.Done()
-	//    regardless of which fired.
-	//  - cleanupCtx: derived from `detached` but not from workCtx, so
-	//    the final FailOperation/CompleteOperation write inherits
-	//    request-scoped values for log correlation but is not aborted
-	//    by the same cancellation that ended the work. Shutdown's
-	//    wg.Wait gives this bookkeeping its drain budget.
-	detached := context.WithoutCancel(parent)
-	workCtx, cancel := context.WithCancel(detached)
-	defer cancel()
-	cleanupCtx := detached
-
-	// Forward shutdown into workCtx without spawning a watcher
-	// goroutine. AfterFunc fires `cancel` if shutdownCtx is or becomes
-	// done; `stop()` deregisters when work completes. If shutdownCtx
-	// is already cancelled at registration time, AfterFunc invokes
-	// the callback immediately in its own goroutine — covering the
-	// Shutdown-fires-between-CreateAndRun-and-here race.
-	stop := context.AfterFunc(m.shutdownCtx, cancel)
-	defer stop()
-
-	m.mu.Lock()
-	m.running[opID] = cancel
-	m.mu.Unlock()
-	defer func() {
-		m.mu.Lock()
-		delete(m.running, opID)
-		m.mu.Unlock()
-	}()
-
-	var (
-		result proto.Message
-		err    error
-	)
-	// Recover panics from user-supplied WorkFunc so a single bad LRO
-	// can't take down pivox-cloud. The synchronous RPC path is covered
-	// by gRPC's recovery interceptor; this goroutine is detached and
-	// outside that chain. The closure scope keeps the bookkeeping
-	// defers above untouched — they always run.
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				m.logger.ErrorContext(cleanupCtx, "lro: WorkFunc panicked",
-					"op", opID, "panic", r, "stack", string(debug.Stack()))
-				err = grpcstatus.Errorf(codes.Internal, "operation panicked: %v", r)
-			}
-		}()
-		progress := &managerProgress{m: m, opID: opID}
-		result, err = work(workCtx, progress)
-	}()
-
-	// Distinguish shutdown-induced cancellation in the recorded
-	// failure so RecoverPending isn't the only way to tell what
-	// happened. Plain CancelOperation already sets the DB row done via
-	// its own SQL path — this branch only reshapes the message that
-	// FailOperation will record below.
-	if errors.Is(err, context.Canceled) && m.shutdownCtx.Err() != nil {
-		err = grpcstatus.Error(codes.Aborted, "operation aborted by server shutdown")
-	}
-
-	ctx := cleanupCtx
-	// dbDone tracks whether the bookkeeping row has been written
-	// (done=true). Listeners are only notified when this is true —
-	// otherwise WaitOperation would wake up, observe done=false, and
-	// the caller would see a stuck operation. A DB-write failure
-	// here is recovered on the next server restart via
-	// RecoverPending; we log loudly so the failure is investigable.
-	dbDone := false
-	if err != nil {
-		errCode := int32(codes.Internal)
-		errMsg := err.Error()
-		if st, ok := grpcstatus.FromError(err); ok {
-			errCode = int32(st.Code())
-			errMsg = st.Message()
-		}
-		if _, dbErr := m.queries.FailOperation(ctx, db.FailOperationParams{
-			ID:           opID,
-			ErrorCode:    pgtype.Int4{Int32: errCode, Valid: true},
-			ErrorMessage: pgtype.Text{String: errMsg, Valid: true},
-		}); dbErr != nil {
-			m.logger.ErrorContext(ctx, "lro: FailOperation DB write failed; row stuck done=false until RecoverPending",
-				"op", opID, "error", dbErr)
-		} else {
-			dbDone = true
-		}
-	} else {
-		var resultJSON json.RawMessage
-		if result != nil {
-			var marshalErr error
-			resultJSON, marshalErr = marshalAny(result)
-			if marshalErr != nil {
-				m.logger.ErrorContext(ctx, "lro: marshal operation result failed", "op", opID, "error", marshalErr)
-				if _, dbErr := m.queries.FailOperation(ctx, db.FailOperationParams{
-					ID:           opID,
-					ErrorCode:    pgtype.Int4{Int32: int32(codes.Internal), Valid: true},
-					ErrorMessage: pgtype.Text{String: "marshal result: " + marshalErr.Error(), Valid: true},
-				}); dbErr != nil {
-					m.logger.ErrorContext(ctx, "lro: FailOperation (marshal-error path) DB write failed; row stuck done=false until RecoverPending",
-						"op", opID, "error", dbErr)
-				} else {
-					m.notifyListeners(opID)
-				}
-				return
-			}
-		}
-		if _, dbErr := m.queries.CompleteOperation(ctx, db.CompleteOperationParams{
-			ID:     opID,
-			Result: resultJSON,
-		}); dbErr != nil {
-			m.logger.ErrorContext(ctx, "lro: CompleteOperation DB write failed; row stuck done=false until RecoverPending",
-				"op", opID, "error", dbErr)
-		} else {
-			dbDone = true
-		}
-	}
-
-	if dbDone {
-		m.notifyListeners(opID)
-	}
-}
-
-// Shutdown stops accepting new operations, signals every in-flight
-// WorkFunc via shutdownCtx, and blocks until all runWork goroutines
-// have finished their bookkeeping (FailOperation/CompleteOperation)
-// or until ctx expires. After Shutdown returns, CreateAndRun /
-// CreateAndRunForOrg return Unavailable. Idempotent — duplicate
-// signal handlers calling it twice is safe.
-//
-// Caller (main.go) supplies the drain budget. Anything not finished
-// when ctx expires is left for RecoverPending on the next start —
-// rows stuck done=false get marked Aborted("operation abandoned
-// during server restart").
+// Work execution lives in pivox-worker, not here, so there are no
+// in-process LRO goroutines to drain — Shutdown only gates new
+// NewLro starts and tears down the completion listener.
 //
 // Order in main.go: GracefulStop the gRPC server first (so no new
-// CreateAndRun calls land), then Manager.Shutdown(ctx), then close
-// the DB pool. Closing the pool before Shutdown returns can produce
-// "use of closed connection" log noise from the bookkeeping writes.
+// NewLro calls land), then Manager.Shutdown(ctx), then close the DB
+// pool. Closing the pool before the listener releases its conn can
+// produce "use of closed connection" log noise.
 func (m *Manager) Shutdown(ctx context.Context) error {
 	m.shutdownOnce.Do(func() {
 		m.mu.Lock()
@@ -599,7 +336,6 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 
 	done := make(chan struct{})
 	go func() {
-		m.wg.Wait()
 		// Wait for the LISTEN goroutine to release its pool conn
 		// before returning, so the caller can close the pool
 		// without a "use of closed connection" race. listenWG is
@@ -750,37 +486,26 @@ func (m *Manager) DeleteOperation(ctx context.Context, name string) error {
 	return nil
 }
 
-// CancelOperation cancels a running operation. Two-step:
-//  1. Cancel the in-flight goroutine (if any) by invoking the
-//     context.CancelFunc registered in runWork. The goroutine sees
-//     ctx.Done() and aborts; runWork then writes the failure to the
-//     DB via FailOperation as part of its normal exit path.
-//  2. Best-effort write `done=true, error=Cancelled` to the DB. This
-//     covers the case where the goroutine isn't on this replica
-//     (cross-replica cancellation) — without it, a cancel issued from
-//     a different server would only mark intent locally.
+// CancelOperation cancels a running operation. Cancellation is a
+// race-safe DB mark: the CancelOperation query flips the row
+// `done=true, error=Cancelled` only when it's still `done=false`, so
+// a cancel never clobbers an already-completed result. The matching
+// pg_notify wakes any in-process WaitOperation listeners immediately;
+// the pivox-worker job processing this LRO observes the cancelled row
+// on its next DB write/poll and stops. There is no in-process
+// goroutine to cancel — work runs in pivox-worker, not here.
 //
-// When the goroutine IS local, both writes happen and the second one
-// is absorbed (race-safe SQL refuses to flip an already-done row).
-// When the goroutine is on another replica, only step 2 runs; the
-// remote goroutine continues until it next checks ctx.Done() / makes
-// a DB call that observes the cancelled row.
+// ErrNoRows from the query means the row is either already done (the
+// race-safe UPDATE matched nothing) or absent. We disambiguate with a
+// GetOperation: present → already-done, treat as a no-op success;
+// absent → NotFound.
 func (m *Manager) CancelOperation(ctx context.Context, name string) error {
 	opID, err := ParseOperationName(name)
 	if err != nil {
 		return apierr.InvalidArgument(apierr.FieldViolation("name", err.Error()))
 	}
 
-	// Step 1: cancel the in-flight goroutine on this replica, if any.
-	m.mu.Lock()
-	cancel, ok := m.running[opID]
-	m.mu.Unlock()
-	if ok {
-		cancel()
-	}
-
-	// Step 2: mark the DB row done. Race-safe: only flips
-	// done=false → done=true.
+	// Mark the DB row done. Race-safe: only flips done=false → done=true.
 	_, err = m.queries.CancelOperation(ctx, opID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -794,30 +519,6 @@ func (m *Manager) CancelOperation(ctx context.Context, name string) error {
 	}
 	m.notifyListeners(opID)
 	return nil
-}
-
-// CancelLocal fires the cancel func for any of the supplied opIDs
-// that are running on THIS replica. No DB write — callers use this
-// after a bulk SQL UPDATE has already marked the rows done. The bulk
-// SQL handles cross-replica completion (other replicas' goroutines
-// see ErrNoRows on their next DB poll); CancelLocal handles the
-// in-replica goroutines that would otherwise run to completion
-// before noticing the row was cancelled.
-func (m *Manager) CancelLocal(opIDs ...uuid.UUID) {
-	if len(opIDs) == 0 {
-		return
-	}
-	m.mu.Lock()
-	cancels := make([]context.CancelFunc, 0, len(opIDs))
-	for _, id := range opIDs {
-		if c, ok := m.running[id]; ok {
-			cancels = append(cancels, c)
-		}
-	}
-	m.mu.Unlock()
-	for _, c := range cancels {
-		c()
-	}
 }
 
 // RecoverPending marks any pending (non-done) operations as failed on startup.

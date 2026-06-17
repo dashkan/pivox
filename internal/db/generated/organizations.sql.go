@@ -28,8 +28,8 @@ RETURNING id
 // phase to interrupt in-flight org-scoped LROs before the cascade
 // deletes their target rows.
 //
-// Scope: this matches operations whose creator passed `org_id` to
-// Manager.CreateAndRun. Today the only org-targeting LROs in code
+// Scope: this matches operations whose creator set `org_id` via
+// NewLroOpts.OrgID. Today the only org-targeting LROs in code
 // are DeleteOrganization itself (which intentionally passes NULL
 // to avoid self-cancellation) and UndeleteOrganization (also NULL
 // so concurrent undeletes don't kill each other mid-flight). Future

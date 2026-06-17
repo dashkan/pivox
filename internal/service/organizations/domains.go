@@ -283,15 +283,6 @@ func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.Delet
 		return nil, err
 	}
 
-	// Fire local cancel funcs after the tx commits so the verify
-	// goroutine on this replica observes ctx.Done() instead of
-	// running until its next poll returns ErrNoRows. Doing this
-	// outside the tx is safe — the row is gone post-commit, so a
-	// late MarkDomainVerified write would no-op (UPDATE 0 rows).
-	if s.lroManager != nil && len(res.cancelledIDs) > 0 {
-		s.lroManager.CancelLocal(res.cancelledIDs...)
-	}
-
 	return convert.DomainToProto(res.row, resolvedOrg.Slug, nil), nil
 }
 

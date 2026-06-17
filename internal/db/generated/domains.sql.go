@@ -26,8 +26,8 @@ RETURNING id
 // CancelDomainOpsForDomain marks running CreateDomain LROs for the
 // given (org, domain) pair as cancelled. The match is on
 // metadata->>'domain' (set by runVerifyDomain) AND on the
-// operations.org_id reverse pointer (populated by
-// CreateAndRunForOrg). The org_id filter is defense-in-depth: it
+// operations.org_id reverse pointer (populated by NewLro via
+// NewLroOpts.OrgID). The org_id filter is defense-in-depth: it
 // prevents a cross-org cancel even in the hypothetical case where
 // the same domain string ever appeared in two orgs (impossible
 // today thanks to UNIQUE(domain), but cheap insurance).

@@ -31,13 +31,13 @@ import (
 // collisions.
 //
 // Force: cancels in-flight org-scoped LROs (those that opted in by
-// passing the org id to lro.CreateAndRunForOrg), then hard-deletes
-// the org row. FK ON DELETE CASCADE removes spaces, members,
-// domains, SSO config, assets, requests, tags, API keys, and AI
-// conversations transitively. The slug is freed at completion.
+// setting OrgID on lro.NewLroOpts), then hard-deletes the org row.
+// FK ON DELETE CASCADE removes spaces, members, domains, SSO config,
+// assets, requests, tags, API keys, and AI conversations
+// transitively. The slug is freed at completion.
 //
 // Cancellation scope: today the only LROs that opt in to org-
-// scoped cancellation are those wired through CreateAndRunForOrg.
+// scoped cancellation are those that set OrgID on NewLro.
 // DeleteOrganization itself passes NULL (to avoid self-cancelling
 // in CANCELLING_OPERATIONS); other deferred LROs (asset imports,
 // domain verifications, gateway upgrades) will populate org_id when
@@ -139,15 +139,17 @@ func (s *OrganizationsServer) UndeleteOrganization(ctx context.Context, req *api
 	orgName := "organizations/" + resolved.Slug
 	initialMeta := &apiv1.UndeleteOrganizationMetadata{Organization: orgName}
 
-	// First handler ported off the legacy CreateAndRun + runWork
-	// goroutine path onto River (#69 Phase 5). The actual SQL action
-	// runs in pivox-worker's UndeleteOrgWorker; pivox-cloud just
-	// enqueues + returns the Operation row immediately. NewLro inserts
+	// River-backed (#69 Phase 5): the actual SQL action runs in
+	// pivox-worker's UndeleteOrgWorker; pivox-cloud just enqueues +
+	// returns the Operation row immediately. NewLro inserts
 	// the operations row and the river_job row in one tx — atomic.
 	opID := uuid.New()
+	// org_id left NULL — matching DeleteOrganization and the original
+	// design. An undelete restoring an org shouldn't be cancellable by
+	// CancelRunningOpsForOrg, and the op authorizes by created_by (the
+	// restorer polls their own undelete), consistent with delete.
 	return s.lroManager.NewLro(ctx, orgName, lro.NewLroOpts{
 		OperationID: opID,
-		OrgID:       convert.PgUUID(org.ID),
 		CreatedBy:   convert.PgUUID(server.MustPivoxUserID(ctx)),
 		JobArgs:     workers.UndeleteOrgArgs{OperationID: opID, OrgID: org.ID},
 		Metadata:    initialMeta,
