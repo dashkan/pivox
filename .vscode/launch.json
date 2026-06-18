@@ -2,34 +2,53 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Next.js: debug server-side",
-      "type": "node-terminal",
+      "name": "build",
       "request": "launch",
-      "cwd": "${workspaceFolder}/web/app",
-      "command": "pnpm dev --inspect"
-    },
-    {
-      "name": "Next.js: debug client-side",
-      "type": "chrome",
-      "request": "launch",
-      "cwd": "${workspaceFolder}/web/app",
-      "url": "http://localhost:3000"
-    },
-    {
-      "name": "Next.js: debug full stack",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceFolder}/web/app",
-      "program": "pnpm next",
-      "runtimeArgs": ["--inspect"],
+      "runtimeArgs": ["run", "web:build:watch"],
+      "runtimeExecutable": "pnpm",
       "skipFiles": ["<node_internals>/**"],
-      "serverReadyAction": {
-        "action": "debugWithEdge",
-        "killOnServerStop": true,
-        "pattern": "- Local:.+(https?://.+)",
-        "uriFormat": "%s",
-        "webRoot": "${workspaceFolder}/web/app"
-      }
+      "type": "node",
+      "cwd": "${workspaceFolder}/web"
+    },
+    {
+      "name": "start",
+      "request": "launch",
+      "runtimeArgs": ["run", "web:start"],
+      "runtimeExecutable": "pnpm",
+      "skipFiles": ["<node_internals>/**"],
+      "type": "node",
+      "cwd": "${workspaceFolder}/web",
+      "preLaunchTask": "Build & Watch Packages"
+    },
+    {
+      "name": "cloud",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/pivox-cloud"
+    },
+    {
+      "name": "worker",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/pivox-worker"
+    },
+    {
+      "name": "envoy",
+      "type": "node",
+      "env": {
+        "ENVOY_LOG_LEVEL": "info"
+      },
+      "request": "launch",
+      "runtimeExecutable": "envoy", // Just the name, no path needed!
+      "runtimeArgs": [
+        "-c",
+        "${workspaceFolder}/configs/envoy.yaml",
+        "-l",
+        "${ENVOY_LOG_LEVEL}"
+      ],
+      "console": "integratedTerminal"
     }
   ]
 }

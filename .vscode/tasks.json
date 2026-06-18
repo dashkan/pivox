@@ -1,0 +1,124 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Packages",
+      "type": "shell",
+      "command": "pnpm",
+      "isBackground": false,
+      "args": ["run", "--dir", "web", "web:build"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      // One-shot build: reuse the vite error pattern so transform/build
+      // failures surface in the Problems panel. No background section —
+      // the task exits on its own.
+      "problemMatcher": {
+        "owner": "vite",
+        "source": "vite",
+        // pnpm prefixes every line with "packages/<name> build:" and vite
+        // reports paths relative to each package dir, so let VSCode probe
+        // each workspace package root when resolving the file.
+        "fileLocation": [
+          "search",
+          { "include": ["${workspaceFolder}/web/packages"] }
+        ],
+        "pattern": {
+          // Tolerate the leading "packages/<name> build: " pnpm prefix,
+          // then capture <file>:<line>:<col> followed by the message.
+          // Build-summary lines (dist/… 0.2 kB) and "built in 285ms."
+          // have no :line:col and won't match.
+          "regexp": "^(?:.*\\bbuild:\\s+)?(?:[✘✗x]\\s+\\[?ERROR\\]?\\s+)?(\\S.*?):(\\d+):(\\d+):?\\s*(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        }
+      }
+    },
+    {
+      "label": "Build & Watch Packages",
+      "type": "shell",
+      "command": "pnpm",
+      "isBackground": true,
+      "args": ["run", "--dir", "web", "web:build:watch"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      // Background watch task. The `background` section is what makes the
+      // preLaunchTask on the "start" launch config terminate: VSCode treats
+      // the task as "busy" from start (activeOnStart) and only releases the
+      // launch once it sees an end marker. `built in <n>ms` is the signal
+      // that a package's dist was actually written; "watching for file
+      // changes..." prints before the first bundle is emitted, so it is NOT
+      // used as the end marker. beginsPattern re-arms the matcher (and clears
+      // stale problems) on every incremental rebuild.
+      //
+      // Note: with 7 packages building in parallel, the launch is released on
+      // the FIRST package's "built in" line, not after all 7 finish. That is
+      // the standard single-flag background-matcher behavior; the start dev
+      // server resolves the remaining packages as their dist lands.
+      "problemMatcher": {
+        "owner": "vite",
+        "source": "vite",
+        "fileLocation": [
+          "search",
+          { "include": ["${workspaceFolder}/web/packages"] }
+        ],
+        "pattern": {
+          "regexp": "^(?:.*\\bbuild:\\s+)?(?:[✘✗x]\\s+\\[?ERROR\\]?\\s+)?(\\S.*?):(\\d+):(\\d+):?\\s*(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "build started\\.\\.\\.",
+          "endsPattern": "built in \\d+\\s*m?s"
+        }
+      }
+    },
+    {
+      "label": "Start Envoy",
+      "type": "shell",
+      "command": "envoy",
+      "isBackground": true,
+      "args": ["-c", "${workspaceFolder}/configs/envoy.yaml", "-l", "info"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start ngrok",
+      "type": "shell",
+      "command": "ngrok",
+      "isBackground": true,
+      "args": [
+        "start",
+        "--config",
+        "${workspaceFolder}/configs/ngrok.yml",
+        "--all"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

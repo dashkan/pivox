@@ -34,7 +34,7 @@
     "firebase-admin": "14.0.0",
     "google-auth-library": "10.7.0",
     "lucide-react": "catalog:",
-    "nitro": "3.0.260603-beta",
+    "nitro": "3.0.260610-beta",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:"
