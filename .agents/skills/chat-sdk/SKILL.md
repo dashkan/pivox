@@ -1,11 +1,42 @@
 ---
 name: chat-sdk
-description: Build multi-platform chat bots with Chat SDK (`chat` npm package). Use when developers want to build a Slack, Teams, Google Chat, Discord, Telegram, GitHub, Linear, or WhatsApp bot, handle mentions, direct messages, subscribed threads, reactions, slash commands, cards, modals, files, or AI streaming, set up webhook routes or multi-adapter bots, send rich cards or streamed AI responses to chat platforms, or build a custom adapter or state adapter.
+description: Build multi-platform chat bots with Chat SDK (`chat` npm package). Use when developers want to scaffold a bot with create-chat-sdk, build a Slack, Teams, Google Chat, Discord, Telegram, GitHub, Linear, or WhatsApp bot, handle mentions, direct messages, subscribed threads, reactions, slash commands, cards, modals, files, or AI streaming, set up webhook routes or multi-adapter bots, send rich cards or streamed AI responses to chat platforms, or build a custom adapter or state adapter.
 ---
 
 # Chat SDK
 
 Unified TypeScript SDK for building chat bots across Slack, Teams, Google Chat, Discord, Telegram, GitHub, Linear, and WhatsApp. Write bot logic once, deploy everywhere.
+
+## Scaffold a new project
+
+Use `create-chat-sdk` with explicit adapters so coding agents can scaffold a webhook-only Next.js bot project without prompts:
+
+```bash
+npm create chat-sdk@latest -- my-bot --adapter slack memory -y
+```
+
+Non-interactive example:
+
+```bash
+npm create chat-sdk@latest -- my-bot --adapter slack redis -d "My bot" --pm pnpm -y
+```
+
+With npm, the `--` separator is required — npm consumes the flags itself instead of forwarding them to the CLI. `pnpm create` and `yarn create` forward flags without it.
+
+Key flags:
+- `--adapter <values...>` — platform or state adapters from `chat/adapters`
+- `-d, --description <text>` — project description
+- `--pm <manager>` — package manager (`npm`, `yarn`, `pnpm`, `bun`)
+- `-y, --yes` — skip prompts and accept defaults
+- `--interactive` — always prompt, even when a coding agent environment is detected
+- `-f, --force` — overwrite generated files in an existing directory
+- `-s, --skip-install` — skip dependency installation
+- `--no-git` — skip git repository initialization
+- `-q, --quiet` — suppress non-essential output
+
+When `create-chat-sdk` detects a coding agent environment, it automatically uses non-interactive defaults. Pass at least one platform adapter with `--adapter`; the state adapter defaults to `memory`. If no project name is provided, it uses `my-bot`.
+
+Generated projects include `src/lib/bot.ts`, `src/app/api/webhooks/[platform]/route.ts`, `.env.example`, `next.config.ts`, and adapter dependencies. If the Web adapter is selected, the CLI also creates `src/app/api/chat/route.ts` and `src/lib/auth-stub.ts`.
 
 ## Start with published sources
 
@@ -14,6 +45,7 @@ When Chat SDK is installed in a user project, inspect the published files that s
 ```
 node_modules/chat/docs/                    # bundled docs
 node_modules/chat/dist/index.d.ts          # core API types
+node_modules/chat/dist/adapters/index.d.ts # static adapter catalog types
 node_modules/chat/dist/jsx-runtime.d.ts    # JSX runtime types
 node_modules/chat/docs/contributing/       # adapter-authoring docs
 node_modules/chat/resources/guides/        # framework/platform guides (markdown)
@@ -35,7 +67,7 @@ Read these before writing code:
 - `node_modules/chat/docs/slash-commands.mdx` — slash command routing
 - `node_modules/chat/docs/direct-messages.mdx` — DM behavior and `openDM()`
 - `node_modules/chat/docs/files.mdx` — attachments/uploads
-- `node_modules/chat/docs/state.mdx` — persistence, locking, dedupe
+- `node_modules/chat/docs/state-adapters.mdx` — persistence, locking, dedupe
 - `node_modules/chat/docs/adapters.mdx` — cross-platform feature matrix
 - `node_modules/chat/docs/api/chat.mdx` — exact `Chat` API
 - `node_modules/chat/docs/api/thread.mdx` — exact `Thread` API
@@ -44,6 +76,16 @@ Read these before writing code:
 
 For the specific adapter or state package you are using, inspect that installed package's `dist/index.d.ts` export surface in `node_modules`.
 
+## Adapter catalog subpath
+
+Chat SDK exposes a zero-dependency static catalog at `chat/adapters`. Agents can import `ADAPTERS`, `ADAPTER_NAMES`, `getAdapter`, `isAdapterSlug`, `listEnvVars`, `getSecretEnvVars`, and metadata types like `CatalogAdapter` and `AdapterSlug` from this subpath without importing any adapter implementation package.
+
+Use it for:
+- Listing official and vendor-official adapter slugs, names, npm packages, groups, and platform vs state types.
+- Building setup or onboarding flows that need package names, peer dependencies, and install guidance before any adapter is installed.
+- Discovering required, optional, and credential-mode environment variables for an adapter, including which variables are secrets.
+- Keeping vendor-official adapter docs and metadata aligned with the catalog when adding or updating a listed adapter.
+
 ## Available resources
 
 <!-- RESOURCES:START -->
@@ -51,6 +93,9 @@ For the specific adapter or state package you are using, inspect that installed 
 ### Guides
 
 - `node_modules/chat/resources/guides/how-to-build-an-ai-agent-for-slack-with-chat-sdk-and-ai-sdk.md` — Build a Slack AI agent using Chat SDK, AI SDK's ToolLoopAgent, and Vercel AI Gateway. Covers project setup, tool definitions, streaming responses, deployment to Vercel, and scaling tool selection with toolpick.
+- `node_modules/chat/resources/guides/human-in-the-loop-with-chat-sdk-and-workflow-sdk.md` — Pause durable workflows on Slack approval cards using Chat SDK and Workflow SDK. Uses createWebhook to suspend workflows until a button click, with patterns for multi-stage approvals, timeouts via durable sleep, and approver validation.
+- `node_modules/chat/resources/guides/liveblocks-chat-sdk-ai-sdk.md` — Build an AI agent that replies to @-mentions in Liveblocks comment threads with streamed responses and tool calling. Uses Chat SDK, the Liveblocks adapter, AI SDK's ToolLoopAgent, and Redis for thread subscriptions and distributed locking.
+- `node_modules/chat/resources/guides/slack-bot-vercel-blob.md` — Build a Slack bot that lists, reads, uploads, and deletes files in Vercel Blob through tool calls. Uses Chat SDK, AI SDK's ToolLoopAgent, and Files SDK's createFileTools factory with approval-gated write tools and a read-only mode.
 - `node_modules/chat/resources/guides/run-and-track-deploys-from-slack.md` — Build a Slack deploy bot with Chat SDK and Vercel Workflow. Dispatch GitHub Actions from a slash command, gate production behind approval, poll for completion, and notify Linear and GitHub when the run finishes.
 - `node_modules/chat/resources/guides/triage-form-submissions-with-chat-sdk.md` — Build a Slack bot that triages form submissions with interactive cards. Forward, edit, or mark as spam without leaving Slack. Built with Chat SDK, Hono, and Resend.
 - `node_modules/chat/resources/guides/how-to-build-a-slack-bot-with-next-js-and-redis.md` — This guide walks through building a Slack bot with Next.js, covering project setup, Slack app configuration, event handling, interactive features, and deployment.
@@ -62,6 +107,7 @@ For the specific adapter or state package you are using, inspect that installed 
 Listed in `node_modules/chat/resources/templates.json`:
 
 - **Chat SDK Liveblocks Bot** — Build a bot that you can engage with inside Liveblocks. (https://vercel.com/templates/next.js/chat-sdk-liveblocks-bot)
+- **Durable iMessage Agent** — Durable iMessage agent powered by the Sendblue adapter. (https://vercel.com/templates/nitro/durable-imessage-ai-agent)
 - **Knowledge Agent** — Open source file-system and knowledge based agent template. Build AI agents that stay up to date with your knowledge base. (https://vercel.com/templates/nuxt/chat-sdk-knowledge-agent)
 - **Community Agent** — Open source AI-powered Slack community management bot with a built-in Next.js admin panel. Uses Chat SDK, AI SDK, and Vercel Workflow. (https://vercel.com/templates/next.js/chat-sdk-community-agent)
 

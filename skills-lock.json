@@ -5,7 +5,7 @@
       "source": "vercel/ai-elements",
       "sourceType": "github",
       "skillPath": "skills/ai-elements/SKILL.md",
-      "computedHash": "84f3a2a57fa71ae5061786280987575d673792d6dda9a63941efb2795b83543a"
+      "computedHash": "7e81acdd3028bb68aa4387b2bd083c5812a50e2be1bea08c76994dcfb8f6a3d3"
     },
     "ai-sdk": {
       "source": "vercel/ai",
@@ -19,6 +19,42 @@
       "skillPath": "skills/algorithmic-art/SKILL.md",
       "computedHash": "b2ca295de7f9c86c444f1fa21239e22e0eb7013ced1c652169b9402cc96ff744"
     },
+    "aspire": {
+      "source": "microsoft/aspire-skills",
+      "sourceType": "github",
+      "skillPath": "skills/aspire/SKILL.md",
+      "computedHash": "2ef2026f8a6e967afe3f40bc67b7f27a67e78a9b6c13a5c72795161d743a5a5d"
+    },
+    "aspire-deployment": {
+      "source": "microsoft/aspire-skills",
+      "sourceType": "github",
+      "skillPath": "skills/aspire-deployment/SKILL.md",
+      "computedHash": "631213dc07f7e717f00f9f586090af2f7d8baef636ff65eee28f2e79e7e0413d"
+    },
+    "aspire-init": {
+      "source": "microsoft/aspire-skills",
+      "sourceType": "github",
+      "skillPath": "skills/aspire-init/SKILL.md",
+      "computedHash": "2bb59cf919c89968f168cb4adcc53470f98ad38c1acfa315c37bb01f085cae23"
+    },
+    "aspire-monitoring": {
+      "source": "microsoft/aspire-skills",
+      "sourceType": "github",
+      "skillPath": "skills/aspire-monitoring/SKILL.md",
+      "computedHash": "5169417d64fdf487d5503ee3e9e9dd1894cec76b9dfcdb287b69acfc909630c3"
+    },
+    "aspire-orchestration": {
+      "source": "microsoft/aspire-skills",
+      "sourceType": "github",
+      "skillPath": "skills/aspire-orchestration/SKILL.md",
+      "computedHash": "1d272616e5d057e26eb849915b538baafe78eb3eb76d4e47a850df814254fc13"
+    },
+    "aspireify": {
+      "source": "microsoft/aspire-skills",
+      "sourceType": "github",
+      "skillPath": "skills/aspireify/SKILL.md",
+      "computedHash": "c6fa8c3446a81c26e4426176e654ac7859c4e06b0b65c9ffacdc929fd03aedc1"
+    },
     "brand-guidelines": {
       "source": "anthropics/skills",
       "sourceType": "github",
@@ -29,7 +65,7 @@
       "source": "vercel/components.build",
       "sourceType": "github",
       "skillPath": "skills/building-components/SKILL.md",
-      "computedHash": "ca96444b70257eb3f4f4c76dfdd4a32312c835fe3c8755d2e3d75ac78d384bfd"
+      "computedHash": "20889af7cb9b3abca1e38824f7fffaa873eb0cc4d45187967b97bd85462cf934"
     },
     "canvas-design": {
       "source": "anthropics/skills",
@@ -41,13 +77,13 @@
       "source": "vercel/chat",
       "sourceType": "github",
       "skillPath": "skills/chat/SKILL.md",
-      "computedHash": "f41a3bdb8a65b92b4fa414e6a806a55b86efbe6716186367ea752c0b5c3cb7fe"
+      "computedHash": "3e3e195307f762a685cc38d7f7364d5daff49abd43924d72e53bb214daf83f86"
     },
     "claude-api": {
       "source": "anthropics/skills",
       "sourceType": "github",
       "skillPath": "skills/claude-api/SKILL.md",
-      "computedHash": "3d1c50b50f7640b225dcd9b3b29a3983406b342c22e9f0ed4cb65a92451b7bf2"
+      "computedHash": "9f19be17e56542510e93d2943227c776ecbbe978307fc43d660dd04b346ef395"
     },
     "doc-coauthoring": {
       "source": "anthropics/skills",
@@ -65,13 +101,13 @@
       "source": "anthropics/skills",
       "sourceType": "github",
       "skillPath": "skills/frontend-design/SKILL.md",
-      "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
+      "computedHash": "4eabc66183767153e404b39d1b839b1c37f2d82d86f0a0d7e880a579d8d62336"
     },
     "golang-benchmark": {
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-benchmark/SKILL.md",
-      "computedHash": "8536132b33bb500e62bc4114ca0156e82d77ddab905da9ccf5330a961e239219"
+      "computedHash": "d55e48cca7d2f72df26c16b86406d255ff8a72a8ffe06885b65c19f478b693c8"
     },
     "golang-cli": {
       "source": "samber/cc-skills-golang",
@@ -101,7 +137,7 @@
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-continuous-integration/SKILL.md",
-      "computedHash": "b7774781e026ac3c401ee7e664fcd8d2b00001b7a3e63b0600a41ac6c1355a31"
+      "computedHash": "3e05e6159414419c167712b788bf0a066818b514c3385a2907de2c33ee886f1a"
     },
     "golang-data-structures": {
       "source": "samber/cc-skills-golang",
@@ -125,7 +161,7 @@
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-dependency-management/SKILL.md",
-      "computedHash": "acd14b03e195c81cc7096692dbda76e862cd9a2fa5dc67658e3ec2ff869c0c78"
+      "computedHash": "ffd555d5725caccd12580da345de21be78e79a9d77edd90654feb24c3d284591"
     },
     "golang-design-patterns": {
       "source": "samber/cc-skills-golang",
@@ -155,13 +191,13 @@
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-grpc/SKILL.md",
-      "computedHash": "0d7ec130732714938f7c8fae01bff2738ee33f23127339f4743ea6b35387ebba"
+      "computedHash": "7e970412c5119417893584fbcb6e5dde2d966ab66b9dbadb8f993a2b7911a2e8"
     },
     "golang-lint": {
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-lint/SKILL.md",
-      "computedHash": "2d397eae35b11da7a944e6c540cb37a1e97cd0ab438074401d8c2cab28798795"
+      "computedHash": "81a462768bbf77cef21743c95a086ab3554380e39d04e5be158c27b2dfc65e80"
     },
     "golang-modernize": {
       "source": "samber/cc-skills-golang",
@@ -185,7 +221,7 @@
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-performance/SKILL.md",
-      "computedHash": "a9ef31c74a35c7bdf345c8a3c387a9ef6351e5c92f2ececb91c706dc41b4c765"
+      "computedHash": "3082d63106a56aeccd20baaf2d6c63f9bdc857f778ca8f339b7cbea1c7203f17"
     },
     "golang-popular-libraries": {
       "source": "samber/cc-skills-golang",
@@ -251,7 +287,7 @@
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-security/SKILL.md",
-      "computedHash": "15ea1dedeac2ec08627a47652b420480daf39211b244880956aa7a7e2d8f4f54"
+      "computedHash": "5513da820ab46896b74c078d9efe2656d8f079059209ffdc7c69c4931921ced5"
     },
     "golang-stay-updated": {
       "source": "samber/cc-skills-golang",
@@ -275,19 +311,19 @@
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-swagger/SKILL.md",
-      "computedHash": "c86d9cdfc146711200440f1f25c58544d6805f45d040466b4fa6d77905fa4e27"
+      "computedHash": "75233e140f086b251aa9d99e4eb7d79e2e2ed66073156b0c4de428e4dc906c6e"
     },
     "golang-testing": {
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-testing/SKILL.md",
-      "computedHash": "489cf0a9043fb1ba37aa408163c994ebe1f2fa4d6d7cb1859217ddf0a78f7a61"
+      "computedHash": "28a13faa42b4ae4623bb49994888dcf7f2a66d07587177db5fd5071b12f04a26"
     },
     "golang-troubleshooting": {
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
       "skillPath": "skills/golang-troubleshooting/SKILL.md",
-      "computedHash": "48409ef79fc7c02a4e07bd727a162f2814819753803e87e65168cfb90daeda2d"
+      "computedHash": "e9e300c027cc1162c79f809dcb8554fd5350c1d1170495eb291384194e52d474"
     },
     "golang-uber-dig": {
       "source": "samber/cc-skills-golang",
@@ -341,7 +377,7 @@
       "source": "vercel/streamdown",
       "sourceType": "github",
       "skillPath": "skills/streamdown/SKILL.md",
-      "computedHash": "fb49b9edaf9d645d5fe56af9105050d7ae4765179d4996cb89efc049a7ecb000"
+      "computedHash": "c842552c75b80abb74ef8f92481d34684c709884dd2df22c2ab3b183aee582fe"
     },
     "template-skill": {
       "source": "anthropics/skills",
@@ -359,19 +395,19 @@
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/composition-patterns/SKILL.md",
-      "computedHash": "f98931159fa9c7fed043bcd18a891a46dcf89ababa38df13a4c5b7b30dc0ce07"
+      "computedHash": "575757e3e25761c8c562d6e395d29f0b76c98b1273c0bd72d88e6ab1bc9c7d42"
     },
     "vercel-react-best-practices": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/react-best-practices/SKILL.md",
-      "computedHash": "3219a1944e404ffc14d1d9d6aef6dd2e3855b81387ee0a044ccbfe14d34c2357"
+      "computedHash": "ca7b0c0c6e5f2750043f7f0cd72d16ac4e2abc48f9b5500d047a4b77a2506212"
     },
     "vercel-react-view-transitions": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/react-view-transitions/SKILL.md",
-      "computedHash": "4fea9144f604256d0a21faaea904b7e205e7676e316721ba5fdd68c2600c7d42"
+      "computedHash": "c8952fc9127fa0564d0cb71dccb4215a5608ac933b5831104f09173a97a46f85"
     },
     "web-artifacts-builder": {
       "source": "anthropics/skills",
