@@ -1,0 +1,190 @@
+// Aspire TypeScript AppHost
+// For more information, see: https://aspire.dev
+
+import {
+  createBuilder,
+  EndpointProperty,
+  refExpr,
+} from "./.aspire/modules/aspire.mjs";
+
+const builder = await createBuilder();
+
+const pgUsername = await builder.addParameter("postgres-username", {
+  secret: true,
+});
+const pgPassword = await builder.addParameter("postgres-password", {
+  secret: true,
+});
+
+const postgres = await builder
+  .addPostgres("postgres")
+  // Aspire's default image is plain `postgres`, which has no `vector` type.
+  // Pin the same pgvector image the repo's test stack uses so
+  // `CREATE EXTENSION vector` (000001_init.up.sql) and pgx's RegisterTypes
+  // hook (cmd/pivox-cloud/main.go) both work.
+  .withImage("pgvector/pgvector", { tag: "pg18" })
+  .withUserName(pgUsername)
+  .withPassword(pgPassword)
+  // PG18 images store data in a major-version subdir and expect the mount at
+  // `/var/lib/postgresql` (the parent), not `/var/lib/postgresql/data`. Aspire's
+  // withDataBindMount auto-detects the path from the image tag, but the pgvector
+  // tag `pg18` doesn't parse as "18", so it falls back to the PG17 path. Mount
+  // explicitly to the PG18 path — matches docker-compose.test.yml.
+  .withBindMount("./.data/pg", "/var/lib/postgresql");
+
+const db = postgres.addDatabase("pivox", {
+  databaseName: "pivox",
+});
+
+const pgEndpoint = postgres.getEndpoint("tcp");
+const pgHost = await pgEndpoint.property(EndpointProperty.Host);
+const pgPort = await pgEndpoint.property(EndpointProperty.Port);
+
+// pgx (pgxpool.ParseConfig) wants a libpq URL, not Aspire's Npgsql keyword
+// string. Build the postgres:// URL from the server endpoint + the parameters.
+const pivoxDatabaseUrl = refExpr`postgres://${pgUsername}:${pgPassword}@${pgHost}:${pgPort}/pivox?sslmode=disable`;
+
+// One-shot migration step. Shells out to the repo's golang-migrate CLI; the DB
+// URL is a deferred expression (dynamic port) so it's injected as an env var
+// and expanded by `sh -c` at runtime. workingDirectory ".." = repo root.
+// `migrate up` is idempotent, so it's safe on every start.
+const dbMigrate = await builder
+  .addExecutable("db-migrate", "sh", "..", [
+    "-c",
+    'migrate -path internal/db/migrations -database "$PIVOX_DATABASE_URL" up',
+  ])
+  .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
+  .waitFor(db);
+
+// First-use-only seed. seed.sql is not idempotent (straight INSERTs), so guard
+// it: only seed when the `organizations` table is empty. Runs after migrations.
+const dbSeed = await builder
+  .addExecutable("db-seed", "sh", "..", [
+    "-c",
+    [
+      'count=$(psql -tAqc "SELECT count(*) FROM organizations" "$PIVOX_DATABASE_URL")',
+      'if [ "$count" = "0" ]; then',
+      '  psql -v ON_ERROR_STOP=1 "$PIVOX_DATABASE_URL" -f scripts/seed.sql',
+      "else",
+      '  echo "db already seeded ($count orgs), skipping"',
+      "fi",
+    ].join("\n"),
+  ])
+  .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
+  .waitForCompletion(dbMigrate);
+
+// --- rustfs (S3 storage backend) ---
+// Pinned to host :9000 with rustfsadmin/rustfsadmin to match the dev seed
+// (scripts/seeds/10_storage_gateways.sql endpoint_uri http://localhost:9000).
+// Note: the seeded buckets (pivox-dev, meridian-*, ...) are NOT auto-created;
+// the storage agent errors on a missing bucket. Create them on first run.
+await builder
+  .addContainer("rustfs", "rustfs/rustfs:latest")
+  .withEnvironment("RUSTFS_ROOT_USER", "rustfsadmin")
+  .withEnvironment("RUSTFS_ROOT_PASSWORD", "rustfsadmin")
+  .withArgs(["server", "/data"])
+  .withBindMount("./.data/rustfs", "/data")
+  .withHttpEndpoint({ name: "s3", port: 9000, targetPort: 9000 })
+  // Management/admin console.
+  .withHttpEndpoint({ name: "console", port: 9001, targetPort: 9001 });
+
+// --- keycloak (dev IDP) ---
+// Pinned to host :8082 to match envoy's keycloak cluster. Data persisted.
+// Served at ROOT (no KC_HTTP_RELATIVE_PATH): envoy proxies /realms/ and
+// /resources/ to it, and the admin console is reached directly via the Aspire
+// proxy — so keycloak never needs a base-path prefix. Serving at root also
+// keeps the integration's built-in health probe (root OIDC discovery) green.
+// KC_PROXY_HEADERS is load-bearing: envoy sets x-forwarded-proto=https, and
+// keycloak only trusts it (+ Host) to build public https issuer/token URLs when
+// this is set; otherwise discovery advertises non-https and the broker's
+// requireSecureIssuer rejects it. No KC_HOSTNAME — derived from forwarded host.
+await builder
+  .addKeycloak("keycloak", { port: 8082 })
+  .withEnvironment("KC_PROXY_HEADERS", "xforwarded")
+  .withEnvironment("KC_HOSTNAME_STRICT", "false")
+  .withEnvironment("KC_HTTP_ENABLED", "true")
+  // Imports the `acme` realm (exported from the docker-compose keycloak) on
+  // startup. The integration mounts this dir at /opt/keycloak/data/import and
+  // runs --import-realm. Realms already present in the persisted data are
+  // skipped, so this is a no-op once acme exists in ./.data/keycloak.
+  .withRealmImport("../configs/keycloak")
+  .withDataBindMount("./.data/keycloak");
+
+// --- api (pivox-cloud) — host process, binds its own ports ---
+// Override the service gRPC listener to all-interfaces. The default
+// 127.0.0.1:50052 is loopback-only and unreachable from the envoy CONTAINER
+// via host.docker.internal (which routes to the host gateway, not loopback).
+await builder
+  .addGoApp("api", "../cmd/pivox-cloud")
+  .withReference(db)
+  .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
+  .withEnvironment("PIVOX_SERVICE_GRPC_PORT", ":50052")
+  // Don't boot until migrations finished (the `vector` type must exist before
+  // pgx's RegisterTypes runs). Waiting on the seed too gives a fully ready DB.
+  .waitForCompletion(dbSeed);
+
+// --- worker (pivox-worker) — host process, River-backed periodic jobs ---
+// Mirrors the `make air-worker` leg of the dev target. No envoy-facing port;
+// it only needs the DB. River runs its own (idempotent) migrations on start.
+await builder
+  .addGoApp("worker", "../cmd/pivox-worker")
+  .withReference(db)
+  .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
+  .waitForCompletion(dbSeed);
+
+// --- web libraries build (mirrors the `web-build` prereq of `make dev`) ---
+// The start app imports from @pivox/* workspace packages at vite config-LOAD
+// time, so their dist/ must exist before the dev server boots. One-shot; the
+// watcher below handles incremental rebuilds after. Assumes deps are already
+// installed (same as the Makefile) — run `pnpm -C web install` if not.
+const webBuild = await builder.addExecutable("web-build", "pnpm", "../web", [
+  "run",
+  "web:build",
+]);
+
+// --- web libraries watcher (the `packages` leg of `make dev`) ---
+await builder
+  .addExecutable("web-build-watch", "pnpm", "../web", ["run", "web:build:watch"])
+  .waitForCompletion(webBuild);
+
+// --- start (TanStack Start / Vite dev server) — the `start` leg of dev ---
+// Pinned to :3000 to match envoy's web_app cluster. The dev server binds
+// 127.0.0.1:3000 (its default) and the envoy container reaches it via
+// host.docker.internal, which resolves to the host loopback on Docker Desktop.
+// pnpm is the workspace package manager; install is off (web-build needs deps).
+await builder
+  .addViteApp("start", "../web/apps/start", { runScriptName: "dev" })
+  .withPnpm({ install: false })
+  // isProxied:false → the dev server binds :3000 directly (no DCP proxy). A
+  // non-container resource can't be proxied when port === targetPort, and we
+  // want vite on the real :3000 so envoy's web_app cluster reaches it.
+  .withHttpEndpoint({ name: "http", port: 3000, targetPort: 3000, isProxied: false })
+  .waitForCompletion(webBuild);
+
+// --- envoy (L7 ingress) ---
+// Uses the Aspire-specific config (clusters -> host.docker.internal). Mounts
+// the gitignored proto descriptor for grpc_json_transcoder. Pinned to host
+// :8081 so ngrok can reach it. TODO: verify/bump the envoy image tag.
+const envoy = await builder
+  .addContainer("envoy", "envoyproxy/envoy:v1.31-latest")
+  .withBindMount("../configs/envoy.aspire.yaml", "/etc/envoy/envoy.yaml", {
+    isReadOnly: true,
+  })
+  .withBindMount("../configs/pivox.pb", "/etc/envoy/pivox.pb", {
+    isReadOnly: true,
+  })
+  .withArgs(["-c", "/etc/envoy/envoy.yaml"])
+  .withHttpEndpoint({ name: "ingress", port: 8081, targetPort: 8081 });
+
+// --- ngrok (public tunnel -> pivox.ngrok.app) ---
+// Tunnels to envoy via host.docker.internal:8081. NGROK_AUTHTOKEN comes from
+// your direnv .envrc — the apphost process inherits it, but containers don't,
+// so forward it explicitly. Stop `make proxy-ngrok` first: ngrok allows one
+// agent session per reserved domain.
+await builder
+  .addContainer("ngrok", "ngrok/ngrok:latest")
+  .withEnvironment("NGROK_AUTHTOKEN", process.env.NGROK_AUTHTOKEN ?? "")
+  .withArgs(["http", "host.docker.internal:8081", "--domain", "pivox.ngrok.app"])
+  .waitFor(envoy);
+
+await builder.build().run();
