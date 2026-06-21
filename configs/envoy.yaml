@@ -168,7 +168,17 @@ static_resources:
                           route: { cluster: debug }
 
                         # --- Keycloak (dev IDP) -> 8082 ----------------------
-                        - match: { prefix: "/keycloak/" }
+                        # Keycloak serves at ROOT (no /keycloak base path). The
+                        # browser SSO login hits /realms/ (auth, login-actions)
+                        # and /resources/ (login theme css/js). Admin console
+                        # (/admin, /js) is reached directly at localhost:8082,
+                        # not via envoy.
+                        - match: { prefix: "/realms/" }
+                          route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
+                          request_headers_to_add:
+                            - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                        - match: { prefix: "/resources/" }
                           route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }

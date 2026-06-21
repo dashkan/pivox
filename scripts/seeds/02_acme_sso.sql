@@ -152,7 +152,7 @@ BEGIN
         'Acme SSO (Keycloak)',
         true,
         jsonb_build_object(
-            'issuer',    'https://pivox.ngrok.app/keycloak/realms/acme',
+            'issuer',    'https://pivox.ngrok.app/realms/acme',
             'client_id', 'pivox'
         ),
         decode(
