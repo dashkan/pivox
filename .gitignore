@@ -46,6 +46,9 @@
 .docker/
 bin/
 tmp/
+# Delve/IDE debug binaries (`dlv debug`, VS Code Go, Aspire run-with-debugger).
+# Pattern-only (no leading slash) so it's ignored in every directory.
+__debug_bin*
 build-errors.log
 .envrc.*
 
