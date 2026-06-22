@@ -62,6 +62,20 @@ export interface StorageItem<T> {
    */
   readonly broadcast: boolean;
   /**
+   * Ownership scope of the value, which governs sign-out behavior:
+   *
+   * - `'user'` — tied to the signed-in user (e.g. the selected org).
+   *   MUST be cleared on sign-out via `clearUserScopedItems()` so the
+   *   next user can't inherit the previous user's state.
+   * - `'device'` — a per-device/per-tab preference (theme, sidebar,
+   *   login auto-fill) that SURVIVES sign-out.
+   *
+   * Defaults to `'device'`: a setting is only user-state if it's
+   * explicitly declared so. New per-user items must opt in with
+   * `scope: 'user'` to be auto-cleared on sign-out.
+   */
+  readonly scope: 'user' | 'device';
+  /**
    * Optional synchronous side effect, invoked by the pre-hydration
    * inline script with the parsed value (or null if absent in both
    * stores). Runs ONCE on app boot, BEFORE any framework mounts and
@@ -109,6 +123,12 @@ export function defineItem<T>(opts: {
    * for the rationale on why per-tab is the safer default.
    */
   broadcast?: boolean;
+  /**
+   * Sign-out ownership. Defaults to `'device'`. Set `'user'` for
+   * per-user state that must be cleared on sign-out. See
+   * StorageItem.scope.
+   */
+  scope?: 'user' | 'device';
   onBoot?: (value: T | null) => void;
 }): StorageItem<T> {
   const item: StorageItem<T> = Object.freeze({
@@ -117,6 +137,7 @@ export function defineItem<T>(opts: {
     parse: opts.parse,
     maxAge: opts.maxAge ?? DEFAULT_MAX_AGE_SECONDS,
     broadcast: opts.broadcast ?? false,
+    scope: opts.scope ?? 'device',
     ...(opts.onBoot ? { onBoot: opts.onBoot } : {}),
   });
   registry.set(opts.name, item as StorageItem<unknown>);

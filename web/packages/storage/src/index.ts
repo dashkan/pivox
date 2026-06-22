@@ -24,7 +24,13 @@
  */
 
 export { defineItem, allItems, type StorageItem } from './define';
-export { storage, get, set, clear } from './operations';
+export {
+  storage,
+  get,
+  set,
+  clear,
+  clearUserScopedItems,
+} from './operations';
 export { subscribeToChanges } from './notify';
 export {
   THEME,

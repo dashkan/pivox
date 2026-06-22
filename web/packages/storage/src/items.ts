@@ -96,6 +96,10 @@ export const LAST_EMAIL = defineItem<string>({
 export const ACTIVE_ORG = defineItem<string>({
   name: 'pivox.active-organization',
   path: '/',
+  // Per-user: this is the signed-in user's org selection. Cleared on
+  // sign-out via clearUserScopedItems() so the next user doesn't
+  // inherit it (both the cookie on web and localStorage on electron).
+  scope: 'user',
   parse: (v) => (v.length > 0 ? v : null),
 });
 

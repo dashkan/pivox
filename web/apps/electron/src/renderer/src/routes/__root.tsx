@@ -1,5 +1,6 @@
 import { AuthProvider } from '@pivox/features/auth';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
+import { clearUserScopedItems } from '@pivox/storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Outlet, createRootRouteWithContext } from '@tanstack/react-router';
 
@@ -36,7 +37,16 @@ function RootComponent() {
     // delayDuration={0} matches shadcn's recommended sidebar shape.
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={0}>
-        <AuthProvider>
+        {/* Clear the outgoing user's state on sign-out so the next user
+            doesn't inherit the selected org / cached org-list. No server
+            session here (electron has no cookie) — just the client caches:
+            user-scoped storage (localStorage) + the React Query cache. */}
+        <AuthProvider
+          onBeforeSignOut={() => {
+            clearUserScopedItems();
+            queryClient.clear();
+          }}
+        >
           <div className="min-h-screen bg-background font-sans text-foreground antialiased">
             <Outlet />
           </div>

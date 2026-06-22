@@ -17,6 +17,7 @@
  * in the start app's `server/prefs.ts`, not through this module.
  */
 
+import { allItems } from './define';
 import { getCachedValue, notifyChange } from './notify';
 
 import type { StorageItem } from './define';
@@ -248,10 +249,25 @@ export function clear<T>(item: StorageItem<T>): void {
 }
 
 /**
+ * Clear every `scope: 'user'` item from the platform backend. Call on
+ * sign-out so the next user can't inherit the previous user's state
+ * (e.g. the selected org). Device-scoped items (theme, sidebar) are
+ * left untouched.
+ *
+ * Registry-driven: a new per-user item is auto-cleared as soon as it's
+ * declared `scope: 'user'` — no need to remember to add it here.
+ */
+export function clearUserScopedItems(): void {
+  for (const item of allItems()) {
+    if (item.scope === 'user') clear(item);
+  }
+}
+
+/**
  * Composed surface. Lets consumers `import { storage }` and call
  * methods on it, mirroring the conventional `storage.get / set / clear`
  * shape — preferred over importing each top-level function separately.
  *
  * Both shapes work; the namespace object is just sugar.
  */
-export const storage = { get, set, clear };
+export const storage = { get, set, clear, clearUserScopedItems };

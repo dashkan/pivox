@@ -1,3 +1,4 @@
+import { ACTIVE_ORG } from '@pivox/storage';
 import { createServerFn } from '@tanstack/react-start';
 import {
   deleteCookie,
@@ -236,6 +237,11 @@ export const clearSession = createServerFn({ method: 'POST' }).handler(
       }
     }
     deleteCookie(COOKIE_NAME, { path: '/' });
+    // Defensively drop the user-scoped active-org cookie too, so the
+    // SSR `_app` beforeLoad/prefetch can't read the previous user's org
+    // if the client-side clear races the post-sign-out redirect. Other
+    // user-scoped cookies (if added later) should be deleted here too.
+    deleteCookie(ACTIVE_ORG.name, { path: ACTIVE_ORG.path });
   },
 );
 

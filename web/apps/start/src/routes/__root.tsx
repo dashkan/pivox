@@ -6,8 +6,8 @@ import { TooltipProvider } from '@pivox/primitives/tooltip';
 // `defineItem` self-registers) BEFORE buildBootScript() reads the
 // registry. The route module is the earliest point in the load
 // graph where the bootstrap script gets serialized.
-import { buildBootScript } from '@pivox/storage';
-import { QueryClient } from '@tanstack/react-query';
+import { buildBootScript, clearUserScopedItems } from '@pivox/storage';
+import { QueryClient, useQueryClient } from '@tanstack/react-query';
 import {
   HeadContent,
   Outlet,
@@ -61,6 +61,7 @@ export const Route = createRootRouteWithContext<{
 
 function RootComponent() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   return (
     // TooltipProvider at the root so Radix Tooltip consumers
     // (currently SidebarMenuButton's tooltip prop in @pivox/ui/
@@ -70,7 +71,15 @@ function RootComponent() {
     // navigable; the default 700ms feels broken.
     <TooltipProvider delayDuration={0}>
       <AuthProvider
-        onBeforeSignOut={() => clearSession()}
+        // Drop the outgoing user's state before Firebase tears down auth:
+        // user-scoped storage (selected org) + the React Query cache, so the
+        // next user can't see the previous user's org/org-list. Client clears
+        // run first (can't throw out the await) then the server session clear.
+        onBeforeSignOut={async () => {
+          clearUserScopedItems();
+          queryClient.clear();
+          await clearSession();
+        }}
         // Proactive cookie refresh — Firebase rotates the ID token
         // every ~55 min while the app is open; each rotation re-mints
         // the cookie so the 14-day window slides forward continuously.
