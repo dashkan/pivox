@@ -399,6 +399,26 @@ func TestHandleServerMessage_ConfigUpdate_DeniedPatterns(t *testing.T) {
 	assert.False(t, denied.IsDenied("readme.md"))
 }
 
+// A panic inside a message handler must NOT crash the ReceiveLoop goroutine —
+// that would skip the pending-channel cleanup and leave roundTrip callers
+// (e.g. Handshake) blocked until their timeout. handleServerMessage recovers
+// per message so one bad control message can't take down the stream. The panic
+// is induced via a nil endpoints store (struct literal bypasses NewStream's
+// non-nil guard); the ConfigUpdate handler calls s.endpoints.Update -> nil deref.
+func TestHandleServerMessage_RecoversFromHandlerPanic(t *testing.T) {
+	s := &Stream{logger: slog.Default()} // endpoints == nil
+
+	assert.NotPanics(t, func() {
+		s.handleServerMessage(context.Background(), &agentv1.ControlMessage{
+			Message: &agentv1.ControlMessage_ConfigUpdate{
+				ConfigUpdate: &agentv1.ConfigUpdate{
+					Endpoints: []*agentv1.EndpointConfig{{Name: "e1"}},
+				},
+			},
+		})
+	})
+}
+
 func TestHandleServerMessage_ConfigUpdate_Endpoints(t *testing.T) {
 	bidi := newMockBidiStream()
 	endpoints := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})

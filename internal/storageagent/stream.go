@@ -248,6 +248,18 @@ func (s *Stream) ReceiveLoop(ctx context.Context) error {
 // through any persistent writes (Grant/Revoke against the SQLite
 // store).
 func (s *Stream) handleServerMessage(ctx context.Context, msg *agentv1.ControlMessage) {
+	// Isolate handler panics: handleServerMessage runs in the ReceiveLoop
+	// goroutine, and a panic here (e.g. a malformed/unexpected control message)
+	// would crash the loop WITHOUT running its pending-channel cleanup, leaving
+	// roundTrip callers (Handshake) blocked until timeout. Recover so one bad
+	// message can't take down the whole stream; the controller can resend.
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("recovered from panic handling server message",
+				"type", controlMessageName(msg), "panic", r)
+		}
+	}()
+
 	// Per-message consumer span continuing the control-plane operation that
 	// produced this message (trace context carried in msg.TraceContext). Work
 	// done below (SQLite writes via sessions/denied/endpoints) nests under it.
