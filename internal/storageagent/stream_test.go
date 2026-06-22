@@ -144,22 +144,6 @@ func TestSendHeartbeat_StreamError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SendTelemetry
-// ---------------------------------------------------------------------------
-
-func TestSendTelemetry_Success(t *testing.T) {
-	bidi := newMockBidiStream()
-	s := newTestStream(bidi)
-
-	err := s.SendTelemetry(context.Background(), &agentv1.Telemetry{})
-	require.NoError(t, err)
-
-	msgs := bidi.sentMessages()
-	require.Len(t, msgs, 1)
-	assert.NotNil(t, msgs[0].GetTelemetry())
-}
-
-// ---------------------------------------------------------------------------
 // SendEndpointHealth
 // ---------------------------------------------------------------------------
 

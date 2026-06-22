@@ -8026,12 +8026,6 @@ paths:
           in: query
           required: false
         - schema:
-            type: boolean
-          name: telemetry
-          description: Optional. Whether to enable telemetry collection.
-          in: query
-          required: false
-        - schema:
             type: string
           name: role
           description: |-

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	agent "github.com/dashkan/pivox/internal/storageagent"
+	"github.com/dashkan/pivox/internal/telemetry"
 )
 
 func storageCmd() *cobra.Command {
@@ -40,12 +41,14 @@ the cloud.`,
 	f.Int("port", envOrDefaultInt("PIVOX_PORT", defaultPort), "HTTPS listen port")
 	f.String("bind", envOrDefault("PIVOX_BIND", "0.0.0.0"), "Bind address")
 	addControlPlaneFlag(f)
-	f.Bool("telemetry", envOrDefault("PIVOX_TELEMETRY", "true") == "true", "Enable telemetry reporting to Pivox Cloud")
 	f.String("role", envOrDefault("PIVOX_ROLE", "both"), "Agent role: both, serve, worker")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
 	f.Bool("plaintext", envOrDefault("PIVOX_PLAINTEXT", "false") == "true", "Use plaintext (no TLS) for the control plane gRPC connection")
 
-	_ = cmd.MarkFlagRequired("token")
+	// NOTE: token is required but NOT via cmd.MarkFlagRequired — that only
+	// checks the command line and ignores the PIVOX_TOKEN env default, which
+	// would break env-driven setups (direnv, Aspire). Validated at runtime
+	// below so either --token or PIVOX_TOKEN satisfies it.
 
 	return cmd
 }
@@ -54,12 +57,14 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	f := cmd.Flags()
 
 	token, _ := f.GetString("token")
+	if token == "" {
+		return fmt.Errorf("token is required: set --token or PIVOX_TOKEN (the storage gateway registration token)")
+	}
 	cacheDir, _ := f.GetString("cache-dir")
 	stateDir, _ := f.GetString("state-dir")
 	cacheSize, _ := f.GetInt("cache-size")
 	port, _ := f.GetInt("port")
 	bind, _ := f.GetString("bind")
-	telemetry, _ := f.GetBool("telemetry")
 	logLevel, _ := f.GetString("log-level")
 	plaintext, _ := f.GetBool("plaintext")
 
@@ -83,7 +88,6 @@ func runStorage(cmd *cobra.Command, args []string) error {
 		"cache_dir", cacheDir,
 		"state_dir", stateDir,
 		"cache_size_gb", cacheSize,
-		"telemetry", telemetry,
 	)
 
 	// Construct the in-memory blob cache used by S3-backed endpoints.
@@ -134,6 +138,22 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	// reconnect loop. Boot has already completed by this point.
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	// OpenTelemetry (traces + metrics). No-op unless an OTLP endpoint is
+	// configured in the environment (the Aspire AppHost injects it).
+	otelShutdown, err := telemetry.Setup(ctx, telemetry.Config{
+		ServiceName: "pivox-agent",
+		Logger:      logger,
+	})
+	if err != nil {
+		return fmt.Errorf("setup telemetry: %w", err)
+	}
+	defer func() {
+		if err := otelShutdown(context.Background()); err != nil {
+			logger.Warn("telemetry shutdown", "error", err)
+		}
+	}()
+
 	go state.Sessions.StartCleanup(ctx, 1*time.Minute)
 
 	// Start the HTTP file server alongside the bidi connection.

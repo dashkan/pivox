@@ -6549,11 +6549,6 @@ paths:
           in: query
           required: false
           type: string
-        - name: telemetry
-          description: Optional. Whether to enable telemetry collection.
-          in: query
-          required: false
-          type: boolean
         - name: role
           description: |-
             Optional. The role the agent should perform. Defaults to BOTH

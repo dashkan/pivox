@@ -49,6 +49,11 @@ func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *C
 		creds = grpc.WithTransportCredentials(insecure.NewCredentials())
 	}
 
+	// No otelgrpc client StatsHandler: the only RPC on this connection is the
+	// long-lived Connect bidi stream, where a per-RPC client span would stay
+	// open for the whole session (never exporting while healthy). Trace context
+	// flows per-message via streamtrace instead (stamped into each AgentMessage
+	// / read off each ControlMessage), and each message gets its own span.
 	conn, err := grpc.NewClient(addr, creds)
 	if err != nil {
 		return fmt.Errorf("dial %s: %w", addr, err)

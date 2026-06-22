@@ -1,0 +1,37 @@
+# OpenTelemetry Collector config for the Aspire dev stack, mounted via
+# addOpenTelemetryCollector(...).withConfig(...). The toolkit ships no default
+# pipeline (you get "no receiver/pipeline" without this) and appends its own
+# health_check extension via --config merge.
+#
+# Receives OTLP from the envoy container (plaintext, :4317) and forwards to the
+# Aspire dashboard. Endpoint = OTEL_EXPORTER_OTLP_ENDPOINT (from
+# withOtlpExporter — the CONTAINER-reachable dashboard address; the toolkit's
+# own ASPIRE_ENDPOINT is loopback-only). Header key = ASPIRE_API_KEY (toolkit).
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  otlp:
+    endpoint: ${env:OTEL_EXPORTER_OTLP_ENDPOINT}
+    headers:
+      x-otlp-api-key: ${env:ASPIRE_API_KEY}
+    tls:
+      # Dashboard serves OTLP over TLS with a dev cert — skip verification.
+      insecure_skip_verify: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      exporters: [otlp]
+    logs:
+      receivers: [otlp]
+      exporters: [otlp]

@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pgxvector "github.com/pgvector/pgvector-go/pgx"
@@ -31,6 +32,8 @@ import (
 
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/firebase"
+	"github.com/dashkan/pivox/internal/telemetry"
+	"github.com/dashkan/pivox/internal/telemetry/rivertrace"
 	"github.com/dashkan/pivox/internal/workers"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -102,6 +105,21 @@ func serve(cmd *cobra.Command, _ []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	// OpenTelemetry (traces + metrics). No-op unless an OTLP endpoint is
+	// configured in the environment (the Aspire AppHost injects it).
+	otelShutdown, err := telemetry.Setup(ctx, telemetry.Config{
+		ServiceName: "pivox-worker",
+		Logger:      logger,
+	})
+	if err != nil {
+		return fmt.Errorf("setup telemetry: %w", err)
+	}
+	defer func() {
+		if err := otelShutdown(context.Background()); err != nil {
+			logger.Warn("telemetry shutdown", "error", err)
+		}
+	}()
+
 	// Register pgvector types per-connection so the scanner can
 	// decode `vector` columns (currently `assets.embedding`).
 	// Worker jobs that touch assets (purge, etc.) hit the same
@@ -111,6 +129,8 @@ func serve(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("parse pool config: %w", err)
 	}
+	// Emit a span per query (no-op when OTel export is disabled).
+	poolCfg.ConnConfig.Tracer = otelpgx.NewTracer()
 	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		return pgxvector.RegisterTypes(ctx, conn)
 	}
@@ -223,6 +243,11 @@ func serve(cmd *cobra.Command, _ []string) error {
 		Schema:       riverSchema,
 		Workers:      riverWorkers,
 		PeriodicJobs: periodic,
+		// rivertrace (outer) restores the enqueuing request's trace context
+		// from job metadata; otelriver then opens river.work as a child of
+		// it — so api insert and worker execution share one distributed trace.
+		// The ordering is load-bearing, so the slice is built in one place.
+		Middleware: rivertrace.Middlewares(),
 	})
 	if err != nil {
 		return fmt.Errorf("river client: %w", err)

@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // HTTPServer serves files from storage endpoints with session-based auth.
@@ -91,7 +93,10 @@ func (s *HTTPServer) ListenAndServe(addr string) error {
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", addr, err)
 	}
-	srv := &http.Server{Handler: s.muxedHandler()}
+	// otelhttp opens a server span per /files/ request (extracting any
+	// incoming traceparent from envoy/the browser) — the agent's primary
+	// trace source. No-op when OTel export is disabled.
+	srv := &http.Server{Handler: otelhttp.NewHandler(s.muxedHandler(), "storage-agent")}
 	return srv.Serve(ln)
 }
 

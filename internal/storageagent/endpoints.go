@@ -14,6 +14,7 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 )
@@ -316,9 +317,18 @@ func newS3Client(ctx context.Context, cfg *agentv1.S3EndpointConfig) (*minio.Cli
 	secure := u.Scheme == "https"
 	host := u.Host
 
+	// Wrap minio's own tuned transport with otelhttp so each S3 request
+	// (GetObject, etc.) gets a client span nested under the /files/ server
+	// span. No-op when OTel export is disabled.
+	baseTransport, err := minio.DefaultTransport(secure)
+	if err != nil {
+		return nil, fmt.Errorf("s3 transport: %w", err)
+	}
+
 	opts := &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.GetAccessKeyId(), cfg.GetSecretAccessKey(), ""),
-		Secure: secure,
+		Creds:     credentials.NewStaticV4(cfg.GetAccessKeyId(), cfg.GetSecretAccessKey(), ""),
+		Secure:    secure,
+		Transport: otelhttp.NewTransport(baseTransport),
 	}
 
 	if cfg.GetRegion() != "" {

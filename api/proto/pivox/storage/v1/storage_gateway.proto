@@ -540,9 +540,6 @@ message GetInstallScriptRequest {
   // Optional. Comma-separated list of hosts that should bypass the proxy.
   string no_proxy = 8 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. Whether to enable telemetry collection.
-  bool telemetry = 9 [(google.api.field_behavior) = OPTIONAL];
-
   // Optional. The role the agent should perform. Defaults to BOTH
   // (HTTP serving + rendition processing). Use SERVE for dedicated
   // request serving or WORKER for dedicated rendering.

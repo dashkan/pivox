@@ -10,7 +10,38 @@ import (
 	"github.com/google/uuid"
 
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
+	"github.com/dashkan/pivox/internal/telemetry/streamtrace"
 )
+
+// setAgentTraceContext stamps a trace-context carrier onto an outgoing
+// AgentMessage. proto generates no setter, so streamtrace.Send takes this
+// one-liner.
+func setAgentTraceContext(m *agentv1.AgentMessage, c map[string]string) { m.TraceContext = c }
+
+// controlMessageName returns a short span-name suffix for an inbound control
+// message's oneof variant.
+func controlMessageName(msg *agentv1.ControlMessage) string {
+	switch msg.GetMessage().(type) {
+	case *agentv1.ControlMessage_HandshakeAck:
+		return "HandshakeAck"
+	case *agentv1.ControlMessage_CertDelivery:
+		return "CertDelivery"
+	case *agentv1.ControlMessage_DrainRequest:
+		return "DrainRequest"
+	case *agentv1.ControlMessage_UpgradeRequest:
+		return "UpgradeRequest"
+	case *agentv1.ControlMessage_ConfigUpdate:
+		return "ConfigUpdate"
+	case *agentv1.ControlMessage_ServerHeartbeat:
+		return "ServerHeartbeat"
+	case *agentv1.ControlMessage_SessionGrant:
+		return "SessionGrant"
+	case *agentv1.ControlMessage_SessionRevoke:
+		return "SessionRevoke"
+	default:
+		return "Unknown"
+	}
+}
 
 // Stream wraps a bidirectional gRPC stream with typed send methods and
 // request/response correlation. Fire-and-forget messages (heartbeat,
@@ -97,7 +128,7 @@ func (s *Stream) Handshake(ctx context.Context, h *agentv1.Handshake) (*agentv1.
 		Message: &agentv1.AgentMessage_Handshake{Handshake: h},
 	}
 
-	resp, err := s.roundTrip(ctx, msg)
+	resp, err := s.roundTrip(ctx, "AgentService/Handshake", msg)
 	if err != nil {
 		return nil, fmt.Errorf("handshake: %w", err)
 	}
@@ -112,37 +143,27 @@ func (s *Stream) Handshake(ctx context.Context, h *agentv1.Handshake) (*agentv1.
 
 // SendHeartbeat sends a fire-and-forget heartbeat to the control plane.
 func (s *Stream) SendHeartbeat(ctx context.Context, h *agentv1.Heartbeat) error {
-	return s.send(&agentv1.AgentMessage{
-		Message: &agentv1.AgentMessage_Heartbeat{Heartbeat: h},
-	})
-}
-
-// SendTelemetry sends a fire-and-forget telemetry report to the control plane.
-func (s *Stream) SendTelemetry(ctx context.Context, t *agentv1.Telemetry) error {
-	return s.send(&agentv1.AgentMessage{
-		Message: &agentv1.AgentMessage_Telemetry{Telemetry: t},
-	})
+	msg := &agentv1.AgentMessage{Message: &agentv1.AgentMessage_Heartbeat{Heartbeat: h}}
+	return streamtrace.Send(ctx, "AgentService/Heartbeat", msg, setAgentTraceContext, s.send)
 }
 
 // SendEndpointHealth sends a fire-and-forget endpoint health report.
 func (s *Stream) SendEndpointHealth(ctx context.Context, eh *agentv1.EndpointHealth) error {
-	return s.send(&agentv1.AgentMessage{
-		Message: &agentv1.AgentMessage_EndpointHealth{EndpointHealth: eh},
-	})
+	msg := &agentv1.AgentMessage{Message: &agentv1.AgentMessage_EndpointHealth{EndpointHealth: eh}}
+	return streamtrace.Send(ctx, "AgentService/EndpointHealth", msg, setAgentTraceContext, s.send)
 }
 
 // SendUpgradeStatus sends a fire-and-forget upgrade status report.
 func (s *Stream) SendUpgradeStatus(ctx context.Context, us *agentv1.UpgradeStatus) error {
-	return s.send(&agentv1.AgentMessage{
-		Message: &agentv1.AgentMessage_UpgradeStatus{UpgradeStatus: us},
-	})
+	msg := &agentv1.AgentMessage{Message: &agentv1.AgentMessage_UpgradeStatus{UpgradeStatus: us}}
+	return streamtrace.Send(ctx, "AgentService/UpgradeStatus", msg, setAgentTraceContext, s.send)
 }
 
 // roundTrip sends a message with a generated correlation id, waits for the
 // matching response from the receive loop, and returns it. If the context
 // deadline or the stream timeout is exceeded, the pending entry is cleaned
 // up and an error is returned.
-func (s *Stream) roundTrip(ctx context.Context, msg *agentv1.AgentMessage) (*agentv1.ControlMessage, error) {
+func (s *Stream) roundTrip(ctx context.Context, name string, msg *agentv1.AgentMessage) (*agentv1.ControlMessage, error) {
 	id := uuid.New().String()
 	msg.Id = id
 
@@ -158,8 +179,11 @@ func (s *Stream) roundTrip(ctx context.Context, msg *agentv1.AgentMessage) (*age
 		s.mu.Unlock()
 	}()
 
-	if err := s.stream.Send(msg); err != nil {
-		return nil, fmt.Errorf("send: %w", err)
+	// Pending entry is registered before the send so a fast response can't
+	// race us. streamtrace.Send opens a producer span + stamps trace context
+	// into msg so the control plane's handler joins this trace.
+	if err := streamtrace.Send(ctx, name, msg, setAgentTraceContext, s.send); err != nil {
+		return nil, err
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, s.timeout)
@@ -224,6 +248,12 @@ func (s *Stream) ReceiveLoop(ctx context.Context) error {
 // through any persistent writes (Grant/Revoke against the SQLite
 // store).
 func (s *Stream) handleServerMessage(ctx context.Context, msg *agentv1.ControlMessage) {
+	// Per-message consumer span continuing the control-plane operation that
+	// produced this message (trace context carried in msg.TraceContext). Work
+	// done below (SQLite writes via sessions/denied/endpoints) nests under it.
+	ctx, span := streamtrace.Receive(ctx, "AgentService/"+controlMessageName(msg), msg.GetTraceContext())
+	defer span.End()
+
 	switch m := msg.GetMessage().(type) {
 	case *agentv1.ControlMessage_ConfigUpdate:
 		update := m.ConfigUpdate

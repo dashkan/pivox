@@ -415,9 +415,6 @@ func (s *StorageGatewaysServer) GetInstallScript(ctx context.Context, req *stora
 	if req.GetNoProxy() != "" {
 		flags = append(flags, fmt.Sprintf("--no-proxy %s", req.GetNoProxy()))
 	}
-	if req.GetTelemetry() {
-		flags = append(flags, "--telemetry")
-	}
 
 	script := fmt.Sprintf("curl -sSL https://get.pivox.app/agent | bash -s -- --token %s", gw.RegistrationToken)
 	if len(flags) > 0 {
@@ -649,7 +646,10 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 			},
 		},
 	}
-	s.conns.SendToOrg(orgID, grant)
+	// SendToOrg stamps this request's trace context into the grant so the
+	// agent's SessionGrant handling joins the CreateStorageSession trace
+	// (cloud -> agent causal link). No-op when tracing is disabled.
+	s.conns.SendToOrg(ctx, orgID, grant)
 
 	// Mint JWT. Claims include the caller's Pivox identity UUID
 	// (sub) and the target org's slug (org) so gateway-side audit

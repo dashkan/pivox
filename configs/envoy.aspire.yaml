@@ -13,6 +13,9 @@
 #      the sed below). Aspire's keycloak integration serves HTTPS on its :8082
 #      endpoint, unlike the plain-HTTP compose keycloak — so envoy must speak
 #      TLS to it. Re-add this block by hand after regenerating.
+#   5. OpenTelemetry tracing (NOT in envoy.yaml): the HCM `tracing:` provider +
+#      the `otel_collector` cluster -> the CommunityToolkit otel-collector
+#      (otel-collector:4317, plaintext h2c). Re-add by hand on regen.
 # Regenerate after editing envoy.yaml:
 #   sed -E -e '/port_value: 9901/!s/address: 127\.0\.0\.1/address: host.docker.internal/g' \
 #          -e 's/      type: STATIC/      type: STRICT_DNS\n      dns_lookup_family: V4_ONLY/' \
@@ -77,6 +80,21 @@ static_resources:
                 codec_type: AUTO
                 use_remote_address: false
                 xff_num_trusted_hops: 1
+                # ASPIRE-ONLY: OpenTelemetry tracing — one ingress span per
+                # request, exported to the CommunityToolkit otel-collector
+                # (otel_collector cluster below), which forwards to the Aspire
+                # dashboard (handling its dynamic endpoint + API key). NOT in
+                # envoy.yaml.
+                tracing:
+                  provider:
+                    name: envoy.tracers.opentelemetry
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: otel_collector
+                        timeout: 1s
+                      service_name: envoy
                 upgrade_configs:
                   - upgrade_type: websocket
                 http_filters:
@@ -422,3 +440,24 @@ static_resources:
                     # resolution flipped IPv6->IPv4 and the dev server
                     # moved to 127.0.0.1.
                     socket_address: { address: host.docker.internal, port_value: 3000 }
+
+    # ASPIRE-ONLY: the CommunityToolkit otel-collector's OTLP gRPC receiver.
+    # Container-to-container over the Aspire network (alias `otel-collector`,
+    # internal port 4317), plaintext h2c — forceNonSecureReceiver makes the
+    # collector accept non-TLS, so no transport_socket/key here.
+    - name: otel_collector
+      type: STRICT_DNS
+      dns_lookup_family: V4_ONLY
+      connect_timeout: 1s
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: otel_collector
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: otel-collector, port_value: 4317 }

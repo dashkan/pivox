@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"go.opentelemetry.io/otel/codes"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/dashkan/pivox/internal/agentstream"
@@ -18,7 +19,27 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	"github.com/dashkan/pivox/internal/server"
+	"github.com/dashkan/pivox/internal/telemetry/streamtrace"
 )
+
+// agentMessageName returns a short span-name suffix for an inbound agent
+// message's oneof variant.
+func agentMessageName(msg *agentv1.AgentMessage) string {
+	switch msg.GetMessage().(type) {
+	case *agentv1.AgentMessage_Handshake:
+		return "Handshake"
+	case *agentv1.AgentMessage_Heartbeat:
+		return "Heartbeat"
+	case *agentv1.AgentMessage_EndpointHealth:
+		return "EndpointHealth"
+	case *agentv1.AgentMessage_SyncStatus:
+		return "SyncStatus"
+	case *agentv1.AgentMessage_UpgradeStatus:
+		return "UpgradeStatus"
+	default:
+		return "Unknown"
+	}
+}
 
 // AgentServiceServer implements the bidirectional streaming AgentService for
 // storage gateway agents connecting to the control plane.
@@ -125,6 +146,27 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	if hs == nil {
 		return apierr.BadRequest("first message must be handshake")
 	}
+
+	// Per-message span for the handshake, continuing the agent's producer
+	// trace carried in firstMsg.TraceContext. Rebinding ctx to the span's
+	// context means the handshake DB tx, audits, and ack below nest under it
+	// (no per-statement renames needed); ctx is reset to the base stream
+	// context after the ack so the long-lived receive loop's per-message
+	// spans aren't children of this one-time handshake span.
+	hsCtx, hsSpan := streamtrace.Receive(ctx, "AgentService/Handshake", firstMsg.GetTraceContext())
+	ctx = hsCtx
+
+	// The span is ended explicitly on the success path (before the receive
+	// loop). This guard ends it on the early-return error paths in between
+	// (DB tx, endpoint list, ack send) so a failed handshake still exports its
+	// span — marked Error — instead of silently dropping the trace.
+	handshakeSpanEnded := false
+	defer func() {
+		if !handshakeSpanEnded {
+			hsSpan.SetStatus(codes.Error, "handshake failed")
+			hsSpan.End()
+		}
+	}()
 
 	// -----------------------------------------------------------------------
 	// 3. Create or update agent record AND flip gateway to ACTIVE.
@@ -258,6 +300,9 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	// -----------------------------------------------------------------------
 	// 6. Send HandshakeAck.
 	// -----------------------------------------------------------------------
+	// Stamp the handshake span's context into the ack so the agent's response
+	// handling can correlate back to this trace.
+	ack.TraceContext = streamtrace.Inject(ctx)
 	if err := stream.Send(ack); err != nil {
 		s.logger.ErrorContext(ctx, "failed to send handshake ack", "error", err)
 		return apierr.Internal("failed to send handshake ack")
@@ -267,6 +312,13 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	// 7. Audit the handshake_ack (outbound).
 	// -----------------------------------------------------------------------
 	s.auditMessage(ctx, gateway.ID, agent.ID, firstMsg.GetId(), "outbound", "handshake_ack", ack)
+
+	// Handshake done: close its span and reset ctx to the base stream context
+	// so the receive loop's per-message spans are independent, not nested
+	// under (and kept alive by) the one-time handshake span.
+	hsSpan.End()
+	handshakeSpanEnded = true
+	ctx = stream.Context()
 
 	// -----------------------------------------------------------------------
 	// 8. Register connection and defer unregister on disconnect.
@@ -301,48 +353,52 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 			break
 		}
 
-		switch m := msg.GetMessage().(type) {
-		case *agentv1.AgentMessage_Heartbeat:
-			if err := s.queries.UpdateStorageAgentHeartbeat(ctx, agent.ID); err != nil {
-				s.logger.ErrorContext(ctx, "failed to update agent heartbeat", "error", err)
+		func() {
+			// Per-message consumer span continuing the agent's producer trace
+			// (msg.TraceContext); the DB writes + audits below nest under it and
+			// export immediately, instead of hanging off one stream-lifetime span.
+			ctx, span := streamtrace.Receive(ctx, "AgentService/"+agentMessageName(msg), msg.GetTraceContext())
+			defer span.End()
+
+			switch m := msg.GetMessage().(type) {
+			case *agentv1.AgentMessage_Heartbeat:
+				if err := s.queries.UpdateStorageAgentHeartbeat(ctx, agent.ID); err != nil {
+					s.logger.ErrorContext(ctx, "failed to update agent heartbeat", "error", err)
+				}
+				s.auditMessage(ctx, gateway.ID, agent.ID, msg.GetId(), "inbound", "heartbeat", msg)
+
+			case *agentv1.AgentMessage_EndpointHealth:
+				// Audit and log.
+				s.auditMessage(ctx, gateway.ID, agent.ID, msg.GetId(), "inbound", "endpoint_health", msg)
+				s.logger.InfoContext(ctx, "endpoint health report",
+					"gateway", gateway.Name,
+					"agent_ip", agent.IpAddress,
+					"endpoint", m.EndpointHealth.GetEndpointName(),
+					"reachable", m.EndpointHealth.GetReachable(),
+					"latency_ms", m.EndpointHealth.GetLatencyMs(),
+				)
+
+			case *agentv1.AgentMessage_UpgradeStatus:
+				// Audit and log.
+				s.auditMessage(ctx, gateway.ID, agent.ID, msg.GetId(), "inbound", "upgrade_status", msg)
+				s.logger.InfoContext(ctx, "upgrade status",
+					"gateway", gateway.Name,
+					"agent_ip", agent.IpAddress,
+					"phase", m.UpgradeStatus.GetPhase().String(),
+					"version", m.UpgradeStatus.GetVersion(),
+				)
+
+			case *agentv1.AgentMessage_SyncStatus:
+				// Audit and log.
+				s.auditMessage(ctx, gateway.ID, agent.ID, msg.GetId(), "inbound", "sync_status", msg)
+				s.logger.InfoContext(ctx, "sync status",
+					"gateway", gateway.Name,
+					"agent_ip", agent.IpAddress,
+					"pending_writes", m.SyncStatus.GetPendingWrites(),
+					"synced_writes", m.SyncStatus.GetSyncedWrites(),
+				)
 			}
-			s.auditMessage(ctx, gateway.ID, agent.ID, msg.GetId(), "inbound", "heartbeat", msg)
-
-		case *agentv1.AgentMessage_EndpointHealth:
-			// Audit and log.
-			s.auditMessage(ctx, gateway.ID, agent.ID, msg.GetId(), "inbound", "endpoint_health", msg)
-			s.logger.InfoContext(ctx, "endpoint health report",
-				"gateway", gateway.Name,
-				"agent_ip", agent.IpAddress,
-				"endpoint", m.EndpointHealth.GetEndpointName(),
-				"reachable", m.EndpointHealth.GetReachable(),
-				"latency_ms", m.EndpointHealth.GetLatencyMs(),
-			)
-
-		case *agentv1.AgentMessage_Telemetry:
-			// DO NOT audit (too noisy).
-			_ = m
-
-		case *agentv1.AgentMessage_UpgradeStatus:
-			// Audit and log.
-			s.auditMessage(ctx, gateway.ID, agent.ID, msg.GetId(), "inbound", "upgrade_status", msg)
-			s.logger.InfoContext(ctx, "upgrade status",
-				"gateway", gateway.Name,
-				"agent_ip", agent.IpAddress,
-				"phase", m.UpgradeStatus.GetPhase().String(),
-				"version", m.UpgradeStatus.GetVersion(),
-			)
-
-		case *agentv1.AgentMessage_SyncStatus:
-			// Audit and log.
-			s.auditMessage(ctx, gateway.ID, agent.ID, msg.GetId(), "inbound", "sync_status", msg)
-			s.logger.InfoContext(ctx, "sync status",
-				"gateway", gateway.Name,
-				"agent_ip", agent.IpAddress,
-				"pending_writes", m.SyncStatus.GetPendingWrites(),
-				"synced_writes", m.SyncStatus.GetSyncedWrites(),
-			)
-		}
+		}()
 	}
 
 	// -----------------------------------------------------------------------

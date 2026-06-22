@@ -124,7 +124,6 @@ Organization
    - Bind address (default: 0.0.0.0)
    - HTTP/HTTPS proxy (for reaching Pivox Cloud through corporate proxy)
    - No-proxy list (bypass proxy for local S3 endpoints)
-   - Telemetry (default: enabled)
 
 3. UI updates the install command live. Admin copies and runs:
 
@@ -174,7 +173,6 @@ Every parameter is available as both a CLI argument and an environment variable.
 | HTTP proxy | `--http-proxy` | `HTTP_PROXY` | (none) |
 | HTTPS proxy | `--https-proxy` | `HTTPS_PROXY` | (none) |
 | No-proxy list | `--no-proxy` | `NO_PROXY` | (none) |
-| Telemetry | `--telemetry` | `PIVOX_TELEMETRY` | `true` |
 
 Parameters are persisted in the systemd unit file as `Environment=` directives. To change after install, edit with `systemctl edit pivox-agent` or re-run the install script.
 
@@ -252,21 +250,20 @@ Agent starts → dials api.pivox.app → sends Handshake (token, version, IP, ho
 Cloud Controller validates token → creates Agent resource → sends HandshakeAck
   (includes: TLS cert, endpoint configs, cache config)
   ↓
-Steady state: agent sends heartbeats, telemetry; Cloud Controller sends config updates, cert renewals
+Steady state: agent sends heartbeats; Cloud Controller sends config updates, cert renewals
   ↓
 Disconnect: agent retries with exponential backoff, serves from cached config
 ```
 
 ### Agent → Cloud Controller Messages
 
-| Message | When Sent | Gated by Telemetry |
-|---|---|---|
-| **Handshake** | First message after connecting | No |
-| **Heartbeat** | Periodic (every 30s) | No |
-| **EndpointHealth** | On health check interval per endpoint | No |
-| **SyncStatus** | When offline writes are pending sync | No |
-| **UpgradeStatus** | During upgrade phases | No |
-| **Telemetry** | Periodic metrics envelope | Yes |
+| Message | When Sent |
+|---|---|
+| **Handshake** | First message after connecting |
+| **Heartbeat** | Periodic (every 30s) |
+| **EndpointHealth** | On health check interval per endpoint |
+| **SyncStatus** | When offline writes are pending sync |
+| **UpgradeStatus** | During upgrade phases |
 
 ### Cloud Controller → Agent Messages
 
@@ -278,16 +275,6 @@ Disconnect: agent retries with exponential backoff, serves from cached config
 | **UpgradeRequest** | Download or apply new agent version |
 | **ConfigUpdate** | Endpoint or cache config changes |
 | **Heartbeat** | Keep-alive |
-
-### Telemetry
-
-Telemetry is opt-in by default (`--telemetry=true`). When enabled, the agent sends a `Telemetry` envelope containing one of:
-
-- **CacheStats** — cache used GB, hit/miss/eviction counts
-- **RequestMetrics** — total requests, bytes served, error count, latency percentiles (p50, p99)
-- **SystemMetrics** — CPU%, memory, disk I/O, network I/O
-
-When telemetry is disabled (`--telemetry=false`), these metrics are not sent. Heartbeat, endpoint health, sync status, and upgrade status always flow regardless of the telemetry setting — they are required for operational management.
 
 ---
 
@@ -714,7 +701,7 @@ No human ever needs to SSH into a server to manage credentials.
 Storage sessions and agent messages are audited:
 
 - **Session creation** — logged when `CreateStorageSession` is called (user, org, access patterns granted)
-- **Agent bidi messages** — handshake, config updates, drain/upgrade commands, endpoint health logged to `storage_agent_audit` table (heartbeats and telemetry included, secrets redacted)
+- **Agent bidi messages** — handshake, config updates, drain/upgrade commands, endpoint health logged to `storage_agent_audit` table (heartbeats included, secrets redacted)
 - **Upload presigned URLs** — logged when generated (user, org, space, asset, operation, TTL)
 
 ### Encryption

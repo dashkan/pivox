@@ -13270,8 +13270,6 @@ export interface operations {
                 httpsProxy?: string;
                 /** @description Optional. Comma-separated list of hosts that should bypass the proxy. */
                 noProxy?: string;
-                /** @description Optional. Whether to enable telemetry collection. */
-                telemetry?: boolean;
                 /**
                  * @description Optional. The role the agent should perform. Defaults to BOTH
                  *     (HTTP serving + rendition processing). Use SERVE for dedicated

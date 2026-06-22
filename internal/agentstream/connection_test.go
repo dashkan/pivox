@@ -1,6 +1,7 @@
 package agentstream
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -8,6 +9,10 @@ import (
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/grpc"
 )
 
@@ -60,14 +65,14 @@ func TestRegisterAndUnregister(t *testing.T) {
 
 	// Verify agent is tracked by sending a message to its gateway.
 	msg := &agentv1.ControlMessage{Id: "test-1"}
-	sent := mgr.SendToGateway(gatewayID, msg)
+	sent := mgr.SendToGateway(context.Background(), gatewayID, msg)
 	assert.Equal(t, 1, sent, "expected 1 agent to receive message after register")
 
 	// Unregister the agent.
 	mgr.Unregister(agentID)
 
 	// Verify agent is removed.
-	sent = mgr.SendToGateway(gatewayID, msg)
+	sent = mgr.SendToGateway(context.Background(), gatewayID, msg)
 	assert.Equal(t, 0, sent, "expected 0 agents after unregister")
 }
 
@@ -89,7 +94,7 @@ func TestSendToGateway(t *testing.T) {
 	msg := &agentv1.ControlMessage{Id: "gw-msg"}
 
 	// Send to gw1 only.
-	sent := mgr.SendToGateway(gw1, msg)
+	sent := mgr.SendToGateway(context.Background(), gw1, msg)
 	assert.Equal(t, 2, sent, "expected 2 agents on gw1")
 
 	// stream3 (gw2) should have received nothing.
@@ -112,7 +117,7 @@ func TestSendToGateway_ErrorStream(t *testing.T) {
 	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: gw, Stream: broken})
 
 	msg := &agentv1.ControlMessage{Id: "err-msg"}
-	sent := mgr.SendToGateway(gw, msg)
+	sent := mgr.SendToGateway(context.Background(), gw, msg)
 
 	// Only the healthy stream counts as sent.
 	assert.Equal(t, 1, sent, "broken stream should not count as sent")
@@ -139,7 +144,7 @@ func TestSendToOrg(t *testing.T) {
 	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: orgB, Stream: streamB})
 
 	msg := &agentv1.ControlMessage{Id: "org-a-grant"}
-	sent := mgr.SendToOrg(orgA, msg)
+	sent := mgr.SendToOrg(context.Background(), orgA, msg)
 	assert.Equal(t, 2, sent, "exactly the two orgA agents must have received the message")
 
 	assert.Len(t, streamA1.sentMessages(), 1)
@@ -148,11 +153,57 @@ func TestSendToOrg(t *testing.T) {
 		"orgB agent must NOT receive an orgA-scoped message — cross-org leakage closed")
 }
 
+// TestSendToOrg_InjectsTraceContext verifies the fan-out helpers stamp the
+// caller's active trace context into the message so the recipient agent's
+// handler continues the trace — and that they do so for EVERY caller (the
+// injection lives in the helper, not at one call site), the same message
+// carrying it to all matched agents.
+func TestSendToOrg_InjectsTraceContext(t *testing.T) {
+	prevTP := otel.GetTracerProvider()
+	prevProp := otel.GetTextMapPropagator()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.AlwaysSample())))
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() {
+		otel.SetTracerProvider(prevTP)
+		otel.SetTextMapPropagator(prevProp)
+	})
+
+	mgr := NewConnectionManager()
+	org := uuid.New()
+	stream := &mockStream{}
+	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: org, Stream: stream})
+
+	ctx, span := otel.Tracer("test").Start(context.Background(), "CreateStorageSession")
+	defer span.End()
+
+	msg := &agentv1.ControlMessage{Id: "grant"}
+	sent := mgr.SendToOrg(ctx, org, msg)
+	assert.Equal(t, 1, sent)
+
+	got := stream.sentMessages()
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0].GetTraceContext(), "traceparent",
+		"fan-out must inject the caller's trace context into the message")
+}
+
+// With no active span, the helper must not stamp anything (no junk carrier).
+func TestSendToOrg_NoActiveSpan_NoTraceContext(t *testing.T) {
+	mgr := NewConnectionManager()
+	org := uuid.New()
+	stream := &mockStream{}
+	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: org, Stream: stream})
+
+	mgr.SendToOrg(context.Background(), org, &agentv1.ControlMessage{Id: "grant"})
+	got := stream.sentMessages()
+	require.Len(t, got, 1)
+	assert.Empty(t, got[0].GetTraceContext())
+}
+
 func TestSendToOrg_NoAgentsForOrg(t *testing.T) {
 	mgr := NewConnectionManager()
 	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: uuid.New(), Stream: &mockStream{}})
 
-	sent := mgr.SendToOrg(uuid.New(), &agentv1.ControlMessage{Id: "nobody-in-this-org"})
+	sent := mgr.SendToOrg(context.Background(), uuid.New(), &agentv1.ControlMessage{Id: "nobody-in-this-org"})
 	assert.Equal(t, 0, sent, "no agents in target org → 0 sent (not an error)")
 }
 
@@ -166,7 +217,7 @@ func TestSendToOrg_ErrorStream(t *testing.T) {
 	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: org, Stream: healthy})
 	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: org, Stream: broken})
 
-	sent := mgr.SendToOrg(org, &agentv1.ControlMessage{Id: "err-msg"})
+	sent := mgr.SendToOrg(context.Background(), org, &agentv1.ControlMessage{Id: "err-msg"})
 	assert.Equal(t, 1, sent, "broken stream should not count as sent")
 	assert.Len(t, healthy.sentMessages(), 1)
 }
@@ -198,10 +249,10 @@ func TestConcurrentAccess(t *testing.T) {
 
 				// Interleave sends.
 				if i%3 == 0 {
-					mgr.SendToGateway(gw, &agentv1.ControlMessage{Id: "concurrent"})
+					mgr.SendToGateway(context.Background(), gw, &agentv1.ControlMessage{Id: "concurrent"})
 				}
 				if i%5 == 0 {
-					mgr.SendToOrg(uuid.New(), &agentv1.ControlMessage{Id: "org-scoped"})
+					mgr.SendToOrg(context.Background(), uuid.New(), &agentv1.ControlMessage{Id: "org-scoped"})
 				}
 
 				// Unregister half to exercise deletion under contention.
@@ -217,6 +268,6 @@ func TestConcurrentAccess(t *testing.T) {
 	// If we get here without a race detector complaint, the test passes.
 	// Verify the manager is in a consistent state: SendToGateway should
 	// not panic against the post-test state.
-	sent := mgr.SendToGateway(gw, &agentv1.ControlMessage{Id: "final"})
+	sent := mgr.SendToGateway(context.Background(), gw, &agentv1.ControlMessage{Id: "final"})
 	assert.GreaterOrEqual(t, sent, 0, "sent count should be non-negative")
 }

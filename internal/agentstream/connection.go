@@ -1,10 +1,12 @@
 package agentstream
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
+	"github.com/dashkan/pivox/internal/telemetry/streamtrace"
 	"github.com/google/uuid"
 )
 
@@ -53,8 +55,11 @@ func (m *ConnectionManager) Unregister(agentID uuid.UUID) {
 }
 
 // SendToGateway sends a ControlMessage to all agents connected to the given gateway.
-// Returns the number of agents the message was sent to.
-func (m *ConnectionManager) SendToGateway(gatewayID uuid.UUID, msg *agentv1.ControlMessage) int {
+// Returns the number of agents the message was sent to. ctx carries the trace
+// context stamped into the message (see SendToOrg).
+func (m *ConnectionManager) SendToGateway(ctx context.Context, gatewayID uuid.UUID, msg *agentv1.ControlMessage) int {
+	injectTraceContext(ctx, msg)
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -93,11 +98,13 @@ func (m *ConnectionManager) SendToGateway(gatewayID uuid.UUID, msg *agentv1.Cont
 // scope SessionGrant routing to the target organization, replacing
 // the cross-org SendToAll broadcast that was the original gap
 // motivating #27.
-func (m *ConnectionManager) SendToOrg(orgID uuid.UUID, msg *agentv1.ControlMessage) int {
+func (m *ConnectionManager) SendToOrg(ctx context.Context, orgID uuid.UUID, msg *agentv1.ControlMessage) int {
 	if orgID == uuid.Nil {
 		slog.Warn("agentstream: SendToOrg called with uuid.Nil orgID; skipping (programmer error)")
 		return 0
 	}
+
+	injectTraceContext(ctx, msg)
 
 	// Snapshot under RLock, send outside.
 	m.mu.RLock()
@@ -116,4 +123,16 @@ func (m *ConnectionManager) SendToOrg(orgID uuid.UUID, msg *agentv1.ControlMessa
 		}
 	}
 	return sent
+}
+
+// injectTraceContext stamps the active trace context from ctx into the
+// control message once, before fan-out, so every recipient agent's handler
+// continues this trace. Set once (read-only during the subsequent sends) — no
+// per-recipient mutation, so fanning one message to N streams is race-free.
+// No-op when there's no active span (tracing disabled). Centralizing it here
+// means every send path is traced; callers can't forget to inject.
+func injectTraceContext(ctx context.Context, msg *agentv1.ControlMessage) {
+	if tc := streamtrace.Inject(ctx); tc != nil {
+		msg.TraceContext = tc
+	}
 }

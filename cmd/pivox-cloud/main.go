@@ -15,6 +15,7 @@ import (
 
 	"buf.build/go/protovalidate"
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
+	"github.com/exaring/otelpgx"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,6 +24,8 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	sloghttp "github.com/samber/slog-http"
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -48,6 +51,8 @@ import (
 	"github.com/dashkan/pivox/internal/service/spaces"
 	"github.com/dashkan/pivox/internal/service/storage"
 	"github.com/dashkan/pivox/internal/service/tags"
+	"github.com/dashkan/pivox/internal/telemetry"
+	"github.com/dashkan/pivox/internal/telemetry/rivertrace"
 
 	"github.com/dashkan/pivox/internal/service/aichat"
 	"github.com/dashkan/pivox/internal/service/aichat/model"
@@ -201,6 +206,21 @@ func serve(cmd *cobra.Command, args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	// OpenTelemetry (traces + metrics). No-op unless an OTLP endpoint is
+	// configured in the environment (the Aspire AppHost injects it).
+	otelShutdown, err := telemetry.Setup(ctx, telemetry.Config{
+		ServiceName: "pivox-cloud",
+		Logger:      logger,
+	})
+	if err != nil {
+		return fmt.Errorf("setup telemetry: %w", err)
+	}
+	defer func() {
+		if err := otelShutdown(context.Background()); err != nil {
+			logger.Warn("telemetry shutdown", "error", err)
+		}
+	}()
+
 	// Database. Register pgvector types per-connection so the
 	// scanner can decode `vector` columns (currently `assets.embedding`).
 	// Without this, the first read of a row containing a `vector` column
@@ -212,6 +232,8 @@ func serve(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("parse pool config: %w", err)
 	}
+	// Emit a span per query (no-op when OTel export is disabled).
+	poolCfg.ConnConfig.Tracer = otelpgx.NewTracer()
 	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		return pgxvector.RegisterTypes(ctx, conn)
 	}
@@ -257,6 +279,11 @@ func serve(cmd *cobra.Command, args []string) error {
 	riverClient, err := river.NewClient(riverDriver, &river.Config{
 		Logger: logger,
 		Schema: "river",
+		// otelriver emits river.insert_many spans + metrics; rivertrace
+		// (outer) injects the enqueuing request's trace context into job
+		// metadata so the worker's river.work joins this trace. The ordering
+		// is load-bearing, so the slice is built in one place.
+		Middleware: rivertrace.Middlewares(),
 	})
 	if err != nil {
 		return fmt.Errorf("river client: %w", err)
@@ -331,6 +358,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	)
 
 	grpcServer := grpc.NewServer(
+		// OTel: server span per RPC + trace-context extraction from gRPC
+		// metadata (no-op when export is disabled).
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		// Logging is FIRST so it sees every RPC including the ones
 		// auth/validate reject — those would otherwise fail silently
 		// from the operator's perspective.
@@ -540,6 +570,12 @@ func serve(cmd *cobra.Command, args []string) error {
 	//
 	// Not exposed via grpc-gateway — REST is for public clients only.
 	// ----------------------------------------------------------------------
+	// No otelgrpc StatsHandler here: this server hosts only the long-lived
+	// AgentService.Connect bidi stream, where a per-RPC span would stay open
+	// for the entire connection (hours) — never exporting while healthy and
+	// rooting all in-stream work under one unbounded span. The handler
+	// instead opens a short span per stream message via streamtrace, which
+	// also carries trace context across the stream boundary.
 	serviceGRPCServer := grpc.NewServer(
 		grpc.ChainStreamInterceptor(
 			server.LoggingStreamInterceptor(logger),
@@ -749,8 +785,12 @@ func serve(cmd *cobra.Command, args []string) error {
 	})
 
 	restServer := &http.Server{
-		Addr:    cfg.RESTPort,
-		Handler: requestLogMW(httpMux),
+		Addr: cfg.RESTPort,
+		// otelhttp is the OUTERMOST wrapper so it extracts the incoming
+		// W3C traceparent (set by the web apps' fetch instrumentation)
+		// and opens the server span before request logging runs — making
+		// the browser→BE→gRPC→pgx trace a single connected trace.
+		Handler: otelhttp.NewHandler(requestLogMW(httpMux), "pivox-cloud"),
 	}
 	go func() {
 		logger.Info("REST gateway listening", "addr", cfg.RESTPort)
