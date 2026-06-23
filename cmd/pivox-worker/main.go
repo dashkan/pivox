@@ -15,16 +15,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/exaring/otelpgx"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	pgxvector "github.com/pgvector/pgvector-go/pgx"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
@@ -88,28 +83,15 @@ func serve(cmd *cobra.Command, _ []string) error {
 	databaseURL := mustString(f.GetString("database-url"))
 	logLevel := mustString(f.GetString("log-level"))
 
-	var level slog.Level
-	switch logLevel {
-	case "debug":
-		level = slog.LevelDebug
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	default:
-		level = slog.LevelInfo
-	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
-	slog.SetDefault(logger)
-
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// OpenTelemetry (traces + metrics). No-op unless an OTLP endpoint is
-	// configured in the environment (the Aspire AppHost injects it).
-	otelShutdown, err := telemetry.Setup(ctx, telemetry.Config{
+	// Logger + OpenTelemetry (traces + metrics + logs) in one bootstrap. OTel
+	// is a no-op unless an OTLP endpoint is configured (the Aspire AppHost
+	// injects it); the logger always writes JSON to stdout.
+	logger, otelShutdown, err := telemetry.Setup(ctx, telemetry.Config{
 		ServiceName: "pivox-worker",
-		Logger:      logger,
+		LogLevel:    logLevel,
 	})
 	if err != nil {
 		return fmt.Errorf("setup telemetry: %w", err)
@@ -120,28 +102,14 @@ func serve(cmd *cobra.Command, _ []string) error {
 		}
 	}()
 
-	// Register pgvector types per-connection so the scanner can
-	// decode `vector` columns (currently `assets.embedding`).
-	// Worker jobs that touch assets (purge, etc.) hit the same
-	// codec gap as the API server otherwise — see equivalent
-	// wiring in cmd/pivox-cloud/main.go.
-	poolCfg, err := pgxpool.ParseConfig(databaseURL)
+	// db.NewPool wires the otelpgx query tracer + pgvector per-connection type
+	// registration (required to decode `vector` columns like assets.embedding,
+	// which worker jobs touch) — shared with cloud + the test harness.
+	pool, err := db.NewPool(ctx, databaseURL)
 	if err != nil {
-		return fmt.Errorf("parse pool config: %w", err)
-	}
-	// Emit a span per query (no-op when OTel export is disabled).
-	poolCfg.ConnConfig.Tracer = otelpgx.NewTracer()
-	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		return pgxvector.RegisterTypes(ctx, conn)
-	}
-	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
-	if err != nil {
-		return fmt.Errorf("connect to database: %w", err)
+		return err
 	}
 	defer pool.Close()
-	if err := pool.Ping(ctx); err != nil {
-		return fmt.Errorf("ping database: %w", err)
-	}
 	logger.Info("connected to database")
 
 	driver := riverpgxv5.New(pool)

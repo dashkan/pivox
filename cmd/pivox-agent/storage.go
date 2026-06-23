@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -68,19 +66,23 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	logLevel, _ := f.GetString("log-level")
 	plaintext, _ := f.GetBool("plaintext")
 
-	var level slog.Level
-	switch logLevel {
-	case "debug":
-		level = slog.LevelDebug
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	default:
-		level = slog.LevelInfo
+	// Logger + OpenTelemetry (traces + metrics + logs) in one bootstrap, up
+	// front so the logger is available for the boot work below (OpenAgentState).
+	// context.Background(): telemetry setup is boot work, not cancellable
+	// mid-init — the signal context created later governs operations. OTel is a
+	// no-op unless an OTLP endpoint is configured (the Aspire AppHost injects it).
+	logger, otelShutdown, err := telemetry.Setup(context.Background(), telemetry.Config{
+		ServiceName: "pivox-agent",
+		LogLevel:    logLevel,
+	})
+	if err != nil {
+		return fmt.Errorf("setup telemetry: %w", err)
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
-	slog.SetDefault(logger)
+	defer func() {
+		if err := otelShutdown(context.Background()); err != nil {
+			logger.Warn("telemetry shutdown", "error", err)
+		}
+	}()
 
 	logger.Info("starting storage agent",
 		"server", cloudHost,
@@ -138,21 +140,6 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	// reconnect loop. Boot has already completed by this point.
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-
-	// OpenTelemetry (traces + metrics). No-op unless an OTLP endpoint is
-	// configured in the environment (the Aspire AppHost injects it).
-	otelShutdown, err := telemetry.Setup(ctx, telemetry.Config{
-		ServiceName: "pivox-agent",
-		Logger:      logger,
-	})
-	if err != nil {
-		return fmt.Errorf("setup telemetry: %w", err)
-	}
-	defer func() {
-		if err := otelShutdown(context.Background()); err != nil {
-			logger.Warn("telemetry shutdown", "error", err)
-		}
-	}()
 
 	go state.Sessions.StartCleanup(ctx, 1*time.Minute)
 

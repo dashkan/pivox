@@ -17,7 +17,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	pgxvector "github.com/pgvector/pgvector-go/pgx"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
 
@@ -244,15 +243,12 @@ func cloneTemplateInto(ctx context.Context, dbName string) error {
 // schema so rivertest helpers that read river.river_job by short
 // name resolve correctly.
 func openPerTestPool(ctx context.Context, dbName string) (*pgxpool.Pool, error) {
-	cfg, err := pgxpool.ParseConfig(dsnFor(dbName))
-	if err != nil {
-		return nil, fmt.Errorf("parse pool config: %w", err)
-	}
-	cfg.ConnConfig.RuntimeParams["search_path"] = "public, river"
-	cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		return pgxvector.RegisterTypes(ctx, conn)
-	}
-	return pgxpool.NewWithConfig(ctx, cfg)
+	// Share the production pool builder (otelpgx tracer + pgvector type
+	// registration) so test pools can't drift from prod; add the test-only
+	// search_path (river schema for rivertest short-name lookups) via the hook.
+	return db.NewPool(ctx, dsnFor(dbName), func(cfg *pgxpool.Config) {
+		cfg.ConnConfig.RuntimeParams["search_path"] = "public, river"
+	})
 }
 
 // dsnFor returns a DSN connecting to a specific database on the

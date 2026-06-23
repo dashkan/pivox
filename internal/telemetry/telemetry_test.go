@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,16 +60,36 @@ func TestEnabled(t *testing.T) {
 	}
 }
 
-// When no OTLP endpoint is configured, Setup must not error and must
-// return a non-nil shutdown that is safe to defer — so every binary can
-// `defer shutdown(ctx)` unconditionally without a nil check.
-func TestSetupDisabledReturnsSafeNoopShutdown(t *testing.T) {
+// When no OTLP endpoint is configured, Setup must not error and must return a
+// usable JSON logger plus a non-nil shutdown that is safe to defer — so every
+// binary gets a logger and can `defer shutdown(ctx)` unconditionally without a
+// nil check.
+func TestSetupDisabledReturnsLoggerAndNoopShutdown(t *testing.T) {
 	for _, k := range otelEnvKeys {
 		t.Setenv(k, "")
 	}
 
-	shutdown, err := Setup(context.Background(), Config{ServiceName: "pivox-test"})
+	logger, shutdown, err := Setup(context.Background(), Config{ServiceName: "pivox-test", LogLevel: "debug"})
 	require.NoError(t, err)
+	require.NotNil(t, logger, "Setup must always return a usable logger")
 	require.NotNil(t, shutdown)
+	logger.Info("smoke") // must not panic
 	assert.NoError(t, shutdown(context.Background()))
+}
+
+func TestParseLevel(t *testing.T) {
+	tests := map[string]slog.Level{
+		"debug":   slog.LevelDebug,
+		"DEBUG":   slog.LevelDebug,
+		" warn ":  slog.LevelWarn,
+		"error":   slog.LevelError,
+		"info":    slog.LevelInfo,
+		"":        slog.LevelInfo,
+		"verbose": slog.LevelInfo, // unrecognized falls back to info
+	}
+	for in, want := range tests {
+		t.Run(in, func(t *testing.T) {
+			assert.Equal(t, want, parseLevel(in))
+		})
+	}
 }
