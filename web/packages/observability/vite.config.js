@@ -38,7 +38,7 @@ const config = defineConfig({
 export default mergeConfig(
   config,
   pivoxViteConfig({
-    entry: ['./src/index.ts'],
+    entry: ['./src/index.ts', './src/node-tracing.ts'],
     srcDir: './src',
   }),
 );

@@ -103,8 +103,9 @@ async function setupWebTracing(config: WebTracingConfig): Promise<void> {
       instrumentations: getWebAutoInstrumentations({
         '@opentelemetry/instrumentation-fetch': {
           propagateTraceHeaderCorsUrls: propagateUrls,
-          // Rename the span from the generic "HTTP GET" to "GET /path" so the
-          // route is visible in the trace list without opening each span.
+          // Rename "HTTP GET" -> "CSR GET /path" so the route is visible in the
+          // trace list and browser (CSR) spans are distinguishable from the
+          // server (SSR) undici spans that share the `start` resource.
           applyCustomAttributesOnSpan: (span, request, result) => {
             const url =
               result instanceof Response
@@ -117,7 +118,7 @@ async function setupWebTracing(config: WebTracingConfig): Promise<void> {
                 ? request.method
                 : (request.method ?? 'GET');
             const name = httpSpanName(url, method);
-            if (name) span.updateName(name);
+            if (name) span.updateName(`CSR ${name}`);
           },
         },
         '@opentelemetry/instrumentation-xml-http-request': {
@@ -125,7 +126,7 @@ async function setupWebTracing(config: WebTracingConfig): Promise<void> {
           applyCustomAttributesOnSpan: (span, xhr) => {
             // XHR exposes the resolved URL but not the method; path-only name.
             const name = httpSpanName(xhr.responseURL);
-            if (name) span.updateName(name);
+            if (name) span.updateName(`CSR ${name}`);
           },
         },
         // Click/keypress spans are noise for backend correlation.

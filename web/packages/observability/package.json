@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/esm/index.d.ts",
       "import": "./dist/esm/index.js"
+    },
+    "./node": {
+      "types": "./dist/esm/node-tracing.d.ts",
+      "import": "./dist/esm/node-tracing.js"
     }
   },
   "files": [
@@ -25,13 +29,18 @@
     "test:types": "tsc"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "vite": "catalog:"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-web": "^0.64.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.219.0",
     "@opentelemetry/instrumentation": "^0.219.0",
+    "@opentelemetry/instrumentation-undici": "^0.29.0",
     "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-node": "^0.219.0",
     "@opentelemetry/sdk-trace-web": "^2.8.0",
     "@opentelemetry/semantic-conventions": "^1.41.1"
   }

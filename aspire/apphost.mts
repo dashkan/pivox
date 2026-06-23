@@ -1,11 +1,38 @@
 // Aspire TypeScript AppHost
 // For more information, see: https://aspire.dev
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import {
   createBuilder,
   EndpointProperty,
   refExpr,
 } from "./.aspire/modules/aspire.mjs";
+
+function isTruthy(value: string | undefined): boolean {
+  return value != null && (value.toLowerCase() === "true" || value === "1");
+}
+
+// Generate the effective envoy config and return its mount-relative path. The
+// OTel tracing block in configs/envoy.aspire.yaml (between the BEGIN/END
+// envoy-otel-tracing markers) is STRIPPED unless ASPIRE_OTEL_ENVOY_ENABLED is
+// set. envoy's static YAML can't read env, so the apphost does it — letting you
+// toggle envoy's (noisy) per-request ingress spans via direnv. Output goes to
+// the gitignored .data dir and is regenerated on every `aspire start`.
+function writeEffectiveEnvoyConfig(): string {
+  const here = import.meta.dirname;
+  let yaml = readFileSync(join(here, "../configs/envoy.aspire.yaml"), "utf8");
+  if (!isTruthy(process.env.ASPIRE_OTEL_ENVOY_ENABLED)) {
+    yaml = yaml.replace(
+      /^[ \t]*# BEGIN envoy-otel-tracing\n[\s\S]*?# END envoy-otel-tracing[ \t]*\r?\n/m,
+      "",
+    );
+  }
+  mkdirSync(join(here, ".data"), { recursive: true });
+  writeFileSync(join(here, ".data/envoy.effective.yaml"), yaml);
+  return "./.data/envoy.effective.yaml";
+}
 
 const builder = await createBuilder();
 
@@ -109,7 +136,7 @@ const otelCollector = await builder
 // (scripts/seeds/10_storage_gateways.sql endpoint_uri http://localhost:9000).
 // Note: the seeded buckets (pivox-dev, meridian-*, ...) are NOT auto-created;
 // the storage agent errors on a missing bucket. Create them on first run.
-await builder
+let rustfs = builder
   .addContainer("rustfs", "rustfs/rustfs:latest")
   .withEnvironment("RUSTFS_ROOT_USER", "rustfsadmin")
   .withEnvironment("RUSTFS_ROOT_PASSWORD", "rustfsadmin")
@@ -126,17 +153,22 @@ await builder
   // which forwards to the dashboard (handling the rotating api key); the
   // collector's container alias makes otel-collector:4318 resolvable, and its
   // forceNonSecureReceiver accepts plaintext — so no key/TLS needed on this hop.
-  .withEnvironment("RUSTFS_OBS_ENDPOINT", "http://otel-collector:4318")
-  // OFF by default (left commented). RustFS's S3/object-path spans in
-  // crates/ecstore are `#[tracing::instrument(level="debug")]`, and the OTLP
-  // trace layer is gated by the EnvFilter built from this level — so at the
-  // default `warn` rustfs exports metrics but NO server spans. Uncomment to set
-  // `debug` and un-gate full server-side tracing (agent HTTP GET -> rustfs
-  // ec/disk internals); it's very noisy, so it's opt-in. Never `debug` in prod.
-  // .withEnvironment("RUSTFS_OBS_LOGGER_LEVEL", "debug")
-  // Start after the collector so otel-collector:4318 resolves on first export
-  // (same explicit dependency envoy has) — no dropped spans in the cold-start window.
-  .waitFor(otelCollector);
+  .withEnvironment("RUSTFS_OBS_ENDPOINT", "http://otel-collector:4318");
+
+// RUSTFS_OBS_LOGGER_LEVEL gates rustfs's server-side spans: its S3/object-path
+// spans in crates/ecstore are `#[tracing::instrument(level="debug")]`, and the
+// OTLP trace layer is gated by the EnvFilter built from this level — so at the
+// default `warn` rustfs exports metrics but NO server spans. Set
+// ASPIRE_OTEL_RUSTFS_LOG_LEVEL=debug in direnv to un-gate full server-side
+// tracing (agent HTTP GET -> rustfs ec/disk internals); very noisy, so it's
+// opt-in and only applied when the env var is set. Never `debug` in prod.
+const rustfsLogLevel = process.env.ASPIRE_OTEL_RUSTFS_LOG_LEVEL;
+if (rustfsLogLevel) {
+  rustfs = rustfs.withEnvironment("RUSTFS_OBS_LOGGER_LEVEL", rustfsLogLevel);
+}
+// Start after the collector so otel-collector:4318 resolves on first export
+// (same explicit dependency envoy has) — no dropped spans in the cold-start window.
+await rustfs.waitFor(otelCollector);
 
 // --- keycloak (dev IDP) ---
 // Pinned to host :8082 to match envoy's keycloak cluster. Data persisted.
@@ -238,6 +270,17 @@ await builder
   // which envoy routes to the otel-collector (-> dashboard). Relative so it
   // resolves against whatever origin serves the app (pivox.ngrok.app).
   .withEnvironment("VITE_OTEL_TRACES_URL", "/v1/traces")
+  // Server-side (SSR) OpenTelemetry. --import loads the Node OTel SDK before the
+  // Nitro/TanStack server (no server-entry hook in 1.168). It exports to the
+  // envoy /v1/traces route on the host (plaintext) instead of the Aspire-injected
+  // dashboard OTLP endpoint, because that endpoint is TLS with a dev cert Node
+  // won't trust (Go trusts it via the system store; Node's TLS/grpc-js doesn't).
+  // envoy forwards to the collector, which handles the dashboard key + TLS.
+  .withEnvironment("NODE_OPTIONS", "--import ./instrumentation.node.mjs")
+  .withEnvironment(
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "http://localhost:8081/v1/traces",
+  )
   .waitForCompletion(webBuild);
 
 // --- envoy (L7 ingress) ---
@@ -245,9 +288,11 @@ await builder
 // the gitignored proto descriptor for grpc_json_transcoder. Pinned to host
 // :8081 so ngrok can reach it. Its OTel tracer exports to the collector above
 // (otel-collector:4317). TODO: verify/bump the envoy image tag.
+// apphost-generated config: tracing block stripped unless ASPIRE_OTEL_ENVOY_ENABLED.
+const envoyConfigMount = writeEffectiveEnvoyConfig();
 const envoy = await builder
   .addContainer("envoy", "envoyproxy/envoy:v1.31-latest")
-  .withBindMount("../configs/envoy.aspire.yaml", "/etc/envoy/envoy.yaml", {
+  .withBindMount(envoyConfigMount, "/etc/envoy/envoy.yaml", {
     isReadOnly: true,
   })
   .withBindMount("../configs/pivox.pb", "/etc/envoy/pivox.pb", {

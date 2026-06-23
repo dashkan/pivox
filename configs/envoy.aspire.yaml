@@ -17,7 +17,11 @@
 #      `otel_collector` cluster -> the CommunityToolkit otel-collector
 #      (otel-collector:4317, plaintext h2c) for envoy's own ingress spans; and
 #      (b) the `/v1/traces` route + `otel_collector_http` cluster (:4318) for
-#      BROWSER OTLP export from the start/electron apps. Re-add by hand on regen.
+#      BROWSER/SSR OTLP export from the start/electron apps. Re-add by hand on
+#      regen. NOTE: apphost.mts does NOT mount this file directly — it reads it,
+#      strips the `# BEGIN/END envoy-otel-tracing` block unless
+#      ASPIRE_OTEL_ENVOY_ENABLED is set, and mounts .data/envoy.effective.yaml.
+#      Keep those markers intact around the `tracing:` block.
 # Regenerate after editing envoy.yaml:
 #   sed -E -e '/port_value: 9901/!s/address: 127\.0\.0\.1/address: host.docker.internal/g' \
 #          -e 's/      type: STATIC/      type: STRICT_DNS\n      dns_lookup_family: V4_ONLY/' \
@@ -83,10 +87,15 @@ static_resources:
                 use_remote_address: false
                 xff_num_trusted_hops: 1
                 # ASPIRE-ONLY: OpenTelemetry tracing — one ingress span per
-                # request, exported to the CommunityToolkit otel-collector
-                # (otel_collector cluster below), which forwards to the Aspire
-                # dashboard (handling its dynamic endpoint + API key). NOT in
-                # envoy.yaml.
+                # request, exported to the otel-collector (otel_collector cluster
+                # below). The block between the markers is STRIPPED by apphost.mts
+                # unless ASPIRE_OTEL_ENVOY_ENABLED is set (toggle via direnv) — an
+                # ingress span per request (incl. every static asset) is noisy.
+                # When off, browser + SSR still connect to api: envoy forwards the
+                # incoming traceparent and api continues it (one fewer hop span).
+                # Keep the markers on their own lines — the apphost regex relies
+                # on them. The otel_collector cluster below is kept for both modes.
+                # BEGIN envoy-otel-tracing
                 tracing:
                   provider:
                     name: envoy.tracers.opentelemetry
@@ -97,6 +106,7 @@ static_resources:
                           cluster_name: otel_collector
                         timeout: 1s
                       service_name: envoy
+                # END envoy-otel-tracing
                 upgrade_configs:
                   - upgrade_type: websocket
                 http_filters:
