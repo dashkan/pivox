@@ -133,7 +133,7 @@ await builder
   // exports no spans. `debug` un-gates full server-side distributed tracing
   // (agent HTTP GET -> rustfs ec/disk internals). Noisy by design; fine for the
   // local dev loop. Drop this (back to default `warn`) for any prod-like run.
-  .withEnvironment("RUSTFS_OBS_LOGGER_LEVEL", "debug")
+  // .withEnvironment("RUSTFS_OBS_LOGGER_LEVEL", "debug")
   // Start after the collector so otel-collector:4318 resolves on first export
   // (same explicit dependency envoy has) — no dropped spans in the cold-start window.
   .waitFor(otelCollector);
@@ -211,7 +211,10 @@ const webBuild = await builder.addExecutable("web-build", "pnpm", "../web", [
 
 // --- web libraries watcher (the `packages` leg of `make dev`) ---
 await builder
-  .addExecutable("web-build-watch", "pnpm", "../web", ["run", "web:build:watch"])
+  .addExecutable("web-build-watch", "pnpm", "../web", [
+    "run",
+    "web:build:watch",
+  ])
   .waitForCompletion(webBuild);
 
 // --- start (TanStack Start / Vite dev server) — the `start` leg of dev ---
@@ -225,7 +228,12 @@ await builder
   // isProxied:false → the dev server binds :3000 directly (no DCP proxy). A
   // non-container resource can't be proxied when port === targetPort, and we
   // want vite on the real :3000 so envoy's web_app cluster reaches it.
-  .withHttpEndpoint({ name: "http", port: 3000, targetPort: 3000, isProxied: false })
+  .withHttpEndpoint({
+    name: "http",
+    port: 3000,
+    targetPort: 3000,
+    isProxied: false,
+  })
   .waitForCompletion(webBuild);
 
 // --- envoy (L7 ingress) ---
@@ -254,7 +262,12 @@ const envoy = await builder
 await builder
   .addContainer("ngrok", "ngrok/ngrok:latest")
   .withEnvironment("NGROK_AUTHTOKEN", process.env.NGROK_AUTHTOKEN ?? "")
-  .withArgs(["http", "host.docker.internal:8081", "--domain", "pivox.ngrok.app"])
+  .withArgs([
+    "http",
+    "host.docker.internal:8081",
+    "--domain",
+    "pivox.ngrok.app",
+  ])
   .waitFor(envoy);
 
 await builder.build().run();
