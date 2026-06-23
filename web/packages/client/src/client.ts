@@ -31,7 +31,17 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 export function createApiClient(config: ApiClientConfig) {
   const client = createOpenApiClient<paths>({
     baseUrl: config.baseUrl,
-    fetch: config.fetch,
+    // Resolve globalThis.fetch at CALL time, not at client-creation time.
+    // openapi-fetch captures `fetch` when the client is built (which happens at
+    // module load), but OpenTelemetry's FetchInstrumentation patches
+    // window.fetch later — so a captured reference would permanently bypass
+    // tracing (no spans for any API call). This thunk always calls the
+    // currently-installed (instrumented) fetch. Tests still override via
+    // config.fetch.
+    fetch:
+      config.fetch ??
+      ((input: RequestInfo | URL, init?: RequestInit) =>
+        globalThis.fetch(input, init)),
   });
 
   if (config.getAuthToken) {
