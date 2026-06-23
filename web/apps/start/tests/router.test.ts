@@ -18,6 +18,7 @@ vi.mock('../src/routeTree.gen', () => ({
 }));
 vi.mock('@pivox/observability', () => ({
   installErrorReporters: () => undefined,
+  installWebTracing: () => undefined,
 }));
 vi.mock('@tanstack/react-router', () => ({
   createRouter: createRouterSpy,

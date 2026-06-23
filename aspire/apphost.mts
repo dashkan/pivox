@@ -127,12 +127,12 @@ await builder
   // collector's container alias makes otel-collector:4318 resolvable, and its
   // forceNonSecureReceiver accepts plaintext — so no key/TLS needed on this hop.
   .withEnvironment("RUSTFS_OBS_ENDPOINT", "http://otel-collector:4318")
-  // Dev-only: RustFS's S3/object-path spans in crates/ecstore are
-  // `#[tracing::instrument(level="debug")]`, and the OTLP trace layer is gated
-  // by the EnvFilter built from this level — at the default `warn` rustfs
-  // exports no spans. `debug` un-gates full server-side distributed tracing
-  // (agent HTTP GET -> rustfs ec/disk internals). Noisy by design; fine for the
-  // local dev loop. Drop this (back to default `warn`) for any prod-like run.
+  // OFF by default (left commented). RustFS's S3/object-path spans in
+  // crates/ecstore are `#[tracing::instrument(level="debug")]`, and the OTLP
+  // trace layer is gated by the EnvFilter built from this level — so at the
+  // default `warn` rustfs exports metrics but NO server spans. Uncomment to set
+  // `debug` and un-gate full server-side tracing (agent HTTP GET -> rustfs
+  // ec/disk internals); it's very noisy, so it's opt-in. Never `debug` in prod.
   // .withEnvironment("RUSTFS_OBS_LOGGER_LEVEL", "debug")
   // Start after the collector so otel-collector:4318 resolves on first export
   // (same explicit dependency envoy has) — no dropped spans in the cold-start window.
@@ -234,6 +234,10 @@ await builder
     targetPort: 3000,
     isProxied: false,
   })
+  // Browser OpenTelemetry: the app exports spans to this same-origin path,
+  // which envoy routes to the otel-collector (-> dashboard). Relative so it
+  // resolves against whatever origin serves the app (pivox.ngrok.app).
+  .withEnvironment("VITE_OTEL_TRACES_URL", "/v1/traces")
   .waitForCompletion(webBuild);
 
 // --- envoy (L7 ingress) ---

@@ -1,4 +1,4 @@
-import { installErrorReporters } from '@pivox/observability';
+import { installErrorReporters, installWebTracing } from '@pivox/observability';
 import { QueryClient } from '@tanstack/react-query';
 import { createRouter as createTanStackRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
@@ -10,6 +10,18 @@ import { routeTree } from './routeTree.gen';
 // is SSR-guarded (no-ops without `window`), so this is a client-only
 // effect in practice even though router.tsx is imported on the server too.
 installErrorReporters();
+
+// Browser OpenTelemetry tracing. SSR-guarded + no-op unless VITE_OTEL_TRACES_URL
+// is set. The API client is same-origin (window.location.origin, fronted by
+// envoy), so fetch instrumentation auto-propagates traceparent to the backend —
+// no propagateTraceHeaderCorsUrls needed.
+installWebTracing({
+  // Matches the Aspire resource name ("start") so the dashboard shows one
+  // consistent name. The Go services get theirs from OTEL_SERVICE_NAME (Aspire-
+  // injected); the browser has no env injection, so it's set here.
+  serviceName: 'start',
+  otlpTracesUrl: import.meta.env.VITE_OTEL_TRACES_URL,
+});
 
 /**
  * Build a router with a fresh, per-call QueryClient wired into

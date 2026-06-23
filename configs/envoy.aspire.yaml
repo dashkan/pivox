@@ -13,9 +13,11 @@
 #      the sed below). Aspire's keycloak integration serves HTTPS on its :8082
 #      endpoint, unlike the plain-HTTP compose keycloak — so envoy must speak
 #      TLS to it. Re-add this block by hand after regenerating.
-#   5. OpenTelemetry tracing (NOT in envoy.yaml): the HCM `tracing:` provider +
-#      the `otel_collector` cluster -> the CommunityToolkit otel-collector
-#      (otel-collector:4317, plaintext h2c). Re-add by hand on regen.
+#   5. OpenTelemetry (NOT in envoy.yaml): (a) the HCM `tracing:` provider + the
+#      `otel_collector` cluster -> the CommunityToolkit otel-collector
+#      (otel-collector:4317, plaintext h2c) for envoy's own ingress spans; and
+#      (b) the `/v1/traces` route + `otel_collector_http` cluster (:4318) for
+#      BROWSER OTLP export from the start/electron apps. Re-add by hand on regen.
 # Regenerate after editing envoy.yaml:
 #   sed -E -e '/port_value: 9901/!s/address: 127\.0\.0\.1/address: host.docker.internal/g' \
 #          -e 's/      type: STATIC/      type: STRICT_DNS\n      dns_lookup_family: V4_ONLY/' \
@@ -187,7 +189,7 @@ static_resources:
                                 - safe_regex: { regex: '^https?://127\.0\.0\.1(:[0-9]+)?$' }
                                 - exact: "null"
                               allow_methods: "POST, OPTIONS"
-                              allow_headers: "content-type, x-grpc-web, x-user-agent, grpc-timeout, authorization"
+                              allow_headers: "content-type, x-grpc-web, x-user-agent, grpc-timeout, authorization, traceparent, tracestate"
                               expose_headers: "grpc-status, grpc-message, grpc-status-details-bin"
                               max_age: "86400"
                               allow_credentials: true
@@ -243,9 +245,27 @@ static_resources:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
                               allow_origin_string_match: *cors_origins
                               allow_methods: "POST, OPTIONS"
-                              allow_headers: "Authorization, Content-Type"
+                              allow_headers: "Authorization, Content-Type, traceparent, tracestate"
                               max_age: "86400"
                               allow_credentials: true
+
+                        # --- Browser OTLP traces -> otel-collector (4318) ----
+                        # ASPIRE-ONLY (no such cluster in envoy.yaml): the start +
+                        # electron apps export browser spans here; envoy forwards
+                        # to the collector's HTTP receiver, which fans out to the
+                        # dashboard. MUST precede /v1/ (the transcoder route) so an
+                        # exact /v1/traces isn't swallowed by it. CORS reuses the
+                        # localhost/null origins (start same-origin, electron-dev
+                        # localhost, electron-prod null).
+                        #
+                        # ⚠ DEV ONLY — this is an UNAUTHENTICATED OTLP ingest. It's
+                        # fine behind the local dev tunnel, but NEVER add this route
+                        # (or otel_collector_http) to a prod/public ingress: it would
+                        # be an open span sink (dashboard pollution / DoS).
+                        - match: { path: "/v1/traces" }
+                          route: { cluster: otel_collector_http, timeout: 0s }
+                          typed_per_filter_config:
+                            envoy.filters.http.cors: *grpc_web_cors
 
                         # --- REST -> gRPC TRANSCODED -> grpc_main (50051) ----
                         # The 13 services above. Envoy turns JSON into gRPC and
@@ -260,7 +280,7 @@ static_resources:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
                               allow_origin_string_match: *cors_origins
                               allow_methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-                              allow_headers: "Authorization, Content-Type"
+                              allow_headers: "Authorization, Content-Type, traceparent, tracestate"
                               max_age: "86400"
                               allow_credentials: true
 
@@ -461,3 +481,19 @@ static_resources:
               - endpoint:
                   address:
                     socket_address: { address: otel-collector, port_value: 4317 }
+
+    # HTTP/1.1 view of the collector for BROWSER OTLP export (start + electron).
+    # Separate from otel_collector (which is h2c :4317 for envoy's own span
+    # export) — the browser exporter speaks OTLP/HTTP to :4318. No
+    # http2_protocol_options => HTTP/1.1. ASPIRE-ONLY (re-add on regen).
+    - name: otel_collector_http
+      type: STRICT_DNS
+      dns_lookup_family: V4_ONLY
+      connect_timeout: 1s
+      load_assignment:
+        cluster_name: otel_collector_http
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: otel-collector, port_value: 4318 }

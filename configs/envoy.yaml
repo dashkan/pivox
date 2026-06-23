@@ -148,7 +148,7 @@ static_resources:
                                 - safe_regex: { regex: '^https?://127\.0\.0\.1(:[0-9]+)?$' }
                                 - exact: "null"
                               allow_methods: "POST, OPTIONS"
-                              allow_headers: "content-type, x-grpc-web, x-user-agent, grpc-timeout, authorization"
+                              allow_headers: "content-type, x-grpc-web, x-user-agent, grpc-timeout, authorization, traceparent, tracestate"
                               expose_headers: "grpc-status, grpc-message, grpc-status-details-bin"
                               max_age: "86400"
                               allow_credentials: true
@@ -204,7 +204,7 @@ static_resources:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
                               allow_origin_string_match: *cors_origins
                               allow_methods: "POST, OPTIONS"
-                              allow_headers: "Authorization, Content-Type"
+                              allow_headers: "Authorization, Content-Type, traceparent, tracestate"
                               max_age: "86400"
                               allow_credentials: true
 
@@ -221,7 +221,7 @@ static_resources:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
                               allow_origin_string_match: *cors_origins
                               allow_methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-                              allow_headers: "Authorization, Content-Type"
+                              allow_headers: "Authorization, Content-Type, traceparent, tracestate"
                               max_age: "86400"
                               allow_credentials: true
 

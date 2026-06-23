@@ -1,6 +1,6 @@
 import './assets/main.css';
 
-import { installErrorReporters } from '@pivox/observability';
+import { installErrorReporters, installWebTracing } from '@pivox/observability';
 import { QueryClient } from '@tanstack/react-query';
 import {
   RouterProvider,
@@ -14,6 +14,26 @@ import { ensureFirebase } from './lib/firebase';
 import { routeTree } from './routeTree.gen';
 
 installErrorReporters();
+
+// Browser OpenTelemetry tracing. Unlike the `start` app, no Aspire resource
+// injects VITE_OTEL_TRACES_URL here, and the renderer origin (localhost:5173 in
+// dev) is cross-origin to the backend — relative URLs can't resolve. So in DEV
+// default the OTLP endpoint to the backend ingress's /v1/traces (envoy routes it
+// to the collector). VITE_OTEL_TRACES_URL always wins; a PRODUCTION build with
+// no override stays a no-op, so packaged apps never auto-ship spans to a dev
+// tunnel.
+const backendBaseUrl = import.meta.env.VITE_BASE_URL || 'https://pivox.ngrok.app';
+installWebTracing({
+  // Electron isn't an Aspire resource, but keep the bare-name convention
+  // (start / electron) consistent with the Aspire-named services.
+  serviceName: 'electron',
+  otlpTracesUrl:
+    import.meta.env.VITE_OTEL_TRACES_URL ??
+    (import.meta.env.DEV ? `${backendBaseUrl}/v1/traces` : undefined),
+  // Cross-origin to the backend → propagate traceparent (CORS must allow it).
+  propagateTraceHeaderCorsUrls: [backendBaseUrl],
+});
+
 ensureFirebase();
 const hashHistory = createHashHistory();
 
