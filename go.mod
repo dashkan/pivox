@@ -7,7 +7,7 @@ require (
 	buf.build/go/protovalidate v1.2.0
 	cloud.google.com/go/auth v0.20.0
 	cloud.google.com/go/kms v1.31.0
-	cloud.google.com/go/longrunning v1.0.0
+	cloud.google.com/go/longrunning v1.1.0
 	firebase.google.com/go/v4 v4.20.0
 	github.com/MicahParks/keyfunc/v3 v3.8.0
 	github.com/exaring/otelpgx v0.11.1
@@ -16,8 +16,8 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/minio/minio-go/v7 v7.2.0
-	github.com/ollama/ollama v0.30.10
+	github.com/minio/minio-go/v7 v7.2.1
+	github.com/ollama/ollama v0.30.11
 	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/pgvector/pgvector-go v0.4.0
 	github.com/pgvector/pgvector-go/pgx v0.4.0
@@ -157,7 +157,7 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/appengine/v2 v2.0.6 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
-	modernc.org/libc v1.73.4 // indirect
+	modernc.org/libc v1.73.5 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )

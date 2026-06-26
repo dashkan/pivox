@@ -37,8 +37,8 @@ allowBuilds:
 # stays in the catalog) once `react-jsx-parser` ships a release with
 # @types/react ^19. Upstream: https://github.com/TroyAlford/react-jsx-parser/releases
 catalog:
-  "@assistant-ui/react": "0.14.23"
-  "@assistant-ui/react-ai-sdk": "1.3.37"
+  "@assistant-ui/react": "0.14.24"
+  "@assistant-ui/react-ai-sdk": "1.3.38"
   "@eslint/js": "9.39.4"
   "@fontsource-variable/roboto": "5.2.10"
   "@tailwindcss/vite": "4.3.1"
@@ -56,7 +56,7 @@ catalog:
   "@types/react": "19.2.17"
   "@types/react-dom": "19.2.3"
   "@vitejs/plugin-react": "6.0.3"
-  "ai": "6.0.209"
+  "ai": "6.0.211"
   "electron": "42.5.0"
   "electron-builder": "26.15.3"
   "electron-vite": "6.0.0-beta.1"
@@ -76,3 +76,5 @@ ignoredOptionalDependencies:
 cleanupUnusedCatalogs: true
 linkWorkspacePackages: true
 preferWorkspacePackages: true
+minimumReleaseAgeExclude:
+  - '@shadcn/react@0.1.0'
