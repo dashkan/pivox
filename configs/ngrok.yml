@@ -4,4 +4,4 @@ tunnels:
   proxy:
     proto: http
     addr: 8081
-    domain: pivox.ngrok.app
+    url: pivox.ngrok.app
