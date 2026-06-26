@@ -39,14 +39,14 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.3",
     "eslint-plugin-unused-imports": "4.4.1",
-    "globals": "17.6.0",
+    "globals": "17.7.0",
     "premove": "4.0.0",
     "prettier": "catalog:",
     "publint": "0.3.21",
     "typescript": "catalog:",
-    "typescript-eslint": "8.61.1",
+    "typescript-eslint": "8.62.0",
     "vite": "catalog:",
-    "vite-plugin-dts": "5.0.2",
+    "vite-plugin-dts": "5.0.3",
     "vitest": "catalog:"
   }
 }
