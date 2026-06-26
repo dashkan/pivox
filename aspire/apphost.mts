@@ -311,12 +311,7 @@ const envoy = await builder
 await builder
   .addContainer("ngrok", "ngrok/ngrok:latest")
   .withEnvironment("NGROK_AUTHTOKEN", process.env.NGROK_AUTHTOKEN ?? "")
-  .withArgs([
-    "http",
-    "host.docker.internal:8081",
-    "--domain",
-    "pivox.ngrok.app",
-  ])
+  .withArgs(["http", "host.docker.internal:8081", "--url", "pivox.ngrok.app"])
   .waitFor(envoy);
 
 await builder.build().run();
