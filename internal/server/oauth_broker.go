@@ -434,60 +434,65 @@ func (b *OAuthBroker) start(w http.ResponseWriter, r *http.Request) {
 	// `redirect_uri` / `state` / `nonce` / `scope` / `response_type`
 	// in its extras can't override what the broker decided.
 	q := authURL.Query()
+	applyAuthorizeParams(q, cfg, b.callbackURL(providerID), state, payload.N,
+		r.URL.Query().Get("login_hint"))
+	authURL.RawQuery = q.Encode()
+
+	http.Redirect(w, r, authURL.String(), http.StatusFound)
+}
+
+// applyAuthorizeParams sets the IdP authorize-endpoint query parameters for a
+// provider onto q. Pure (no I/O) so the prompt/nonce/scope decisions are
+// unit-testable without the DB + OIDC-discovery round-trips that
+// resolveProviderConfig needs. callbackURL is the broker's redirect_uri,
+// rawNonce the UNhashed nonce (only used for OIDC id-token providers), and
+// loginHint the optional caller-supplied login_hint ("" = omit).
+func applyAuthorizeParams(q url.Values, cfg *providerConfig, callbackURL, state, rawNonce, loginHint string) {
+	// extraAuthorizeParams FIRST so the security-critical params below
+	// always win — a provider config that mistakenly sets client_id /
+	// redirect_uri / state / nonce / scope / response_type in its extras
+	// can't override what the broker decided.
 	for k, v := range cfg.extraAuthorizeParams {
 		q.Set(k, v)
 	}
 	q.Set("client_id", cfg.clientID)
-	q.Set("redirect_uri", b.callbackURL(providerID))
+	q.Set("redirect_uri", callbackURL)
 	q.Set("response_type", "code")
 	q.Set("scope", strings.Join(cfg.scopes, " "))
 	q.Set("state", state)
-	// Forward `login_hint` if the caller supplied one. Keycloak,
-	// Okta, Google, etc. all honor this OIDC-standard param to
-	// pre-fill the username/email field on the IdP login page —
-	// saves the user one re-type when our own SSO entry already
-	// asked for the email. Empty value falls through (no hint).
-	if hint := r.URL.Query().Get("login_hint"); hint != "" {
-		q.Set("login_hint", hint)
+	// Forward `login_hint` if supplied. Keycloak, Okta, Google, etc. all
+	// honor this OIDC-standard param to pre-fill the username/email field,
+	// saving the user a re-type when our own SSO entry already asked.
+	if loginHint != "" {
+		q.Set("login_hint", loginHint)
 	}
-	// Static providers declare their authorize-time `prompt`
-	// explicitly (Google → select_account). OIDC SSO providers leave
-	// it empty and get prompt=login forced in the block below.
+	// Static providers declare their authorize-time `prompt` explicitly
+	// (Google → select_account). OIDC SSO providers set it below.
 	if cfg.prompt != "" {
 		q.Set("prompt", cfg.prompt)
 	}
-	// OIDC nonce convention (matches Firebase's Apple-Sign-In and
-	// generic OIDC contract): the value sent to the IdP in the
-	// authorize request is `SHA256(rawNonce)` (hex); the IdP echoes
-	// that hash back as the id_token's `nonce` claim; native passes
-	// `rawNonce` (UNhashed) into OAuthProvider.credential, and
-	// Firebase re-computes SHA256(rawNonce) and compares with the
-	// id_token's claim. Both sides must use the same encoding —
-	// hex(SHA256(utf8(rawNonce))) is what FB expects.
-	//
-	// We reuse `payload.N` as the rawNonce (16 random bytes encoded
-	// base64url) — it's already bound to this flow's signed state,
-	// so we don't need a second source of randomness. The callback
-	// echoes payload.N to native untouched; the broker is the only
-	// thing that hashes.
+	// OIDC nonce convention (matches Firebase's Apple-Sign-In and generic
+	// OIDC contract): the value sent to the IdP is SHA256(rawNonce) (hex);
+	// the IdP echoes that hash back as the id_token's `nonce` claim; native
+	// passes rawNonce (UNhashed) into OAuthProvider.credential, and Firebase
+	// re-computes SHA256(rawNonce) and compares. Both sides must use the same
+	// encoding — hex(SHA256(utf8(rawNonce))). rawNonce is `payload.N`, already
+	// bound to this flow's signed state.
 	if cfg.kind == kindOIDCIDToken {
-		sum := sha256.Sum256([]byte(payload.N))
+		sum := sha256.Sum256([]byte(rawNonce))
 		q.Set("nonce", hex.EncodeToString(sum[:]))
-		// Force re-authentication at the IdP. Without this an already-
-		// signed-in IdP session lets the user through immediately,
-		// which is the wrong default for an explicit "Sign in"
-		// click — the user pressed sign-in to assert "this is me,
-		// right now," not to silently re-use whatever session their
-		// browser happens to have. RFC 6749 §3.1.2.1 / OIDC Core
-		// §3.1.2.1 — `prompt=login` is the standard verb every
-		// compliant IdP (Keycloak, Okta, Auth0, Google, Apple, etc.)
-		// honors. Use `prompt=select_account` instead when "switch
-		// account" semantics are wanted.
+		// `prompt=login` forces credential entry: an explicit "Sign in" must
+		// not silently reuse whatever IdP session the browser happens to hold.
+		// `prompt=select_account` was tried and is WORSE here — with a single
+		// existing session the IdP logs the user straight in, no password at
+		// all. Account-switching is NOT solved by the prompt param: while the
+		// IdP session outlives our app's sign-out, `login` re-auths the
+		// existing user and `select_account` silently reuses it. The real lever
+		// is ending the IdP session at logout (RP-initiated logout); until
+		// then the IdP's restart-login affordance is the switch path.
+		// RFC 6749 / OIDC Core §3.1.2.1.
 		q.Set("prompt", "login")
 	}
-	authURL.RawQuery = q.Encode()
-
-	http.Redirect(w, r, authURL.String(), http.StatusFound)
 }
 
 // callback handles GET /api/oauth/{provider}/callback?code=…&state=….

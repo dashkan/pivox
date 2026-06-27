@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"log/slog"
 	"net/http"
@@ -251,5 +253,104 @@ func TestOAuthBroker_start_google(t *testing.T) {
 		t.Parallel()
 		rec := callStart(t, "facebook", "return="+url.QueryEscape("pivox://auth-complete"))
 		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+}
+
+func TestApplyAuthorizeParams(t *testing.T) {
+	t.Parallel()
+
+	const (
+		callbackURL = "https://pivox.test/internal/v1/auth/oidc.acme/callback"
+		state       = "signed-state"
+		rawNonce    = "raw-nonce-payload"
+		loginHint   = "user@acme.com"
+	)
+
+	t.Run("oidc sso forces login and a hashed nonce", func(t *testing.T) {
+		t.Parallel()
+		is := assert.New(t)
+		cfg := &providerConfig{
+			id:       "oidc.acme",
+			clientID: "pivox",
+			scopes:   []string{"openid", "email", "profile"},
+			kind:     kindOIDCIDToken,
+		}
+		q := url.Values{}
+		applyAuthorizeParams(q, cfg, callbackURL, state, rawNonce, loginHint)
+
+		// prompt=login: an explicit "Sign in" must require credentials, not
+		// silently reuse an existing IdP session (which prompt=select_account
+		// would do when only one session exists).
+		is.Equal("login", q.Get("prompt"))
+		sum := sha256.Sum256([]byte(rawNonce))
+		is.Equal(hex.EncodeToString(sum[:]), q.Get("nonce"))
+		is.Equal("pivox", q.Get("client_id"))
+		is.Equal(callbackURL, q.Get("redirect_uri"))
+		is.Equal("code", q.Get("response_type"))
+		is.Equal("openid email profile", q.Get("scope"))
+		is.Equal(state, q.Get("state"))
+		is.Equal(loginHint, q.Get("login_hint"))
+	})
+
+	t.Run("static provider keeps its declared prompt and sends no nonce", func(t *testing.T) {
+		t.Parallel()
+		is := assert.New(t)
+		cfg := &providerConfig{
+			id:       "google",
+			clientID: "goog",
+			scopes:   []string{"openid", "email", "profile"},
+			prompt:   "select_account",
+			kind:     kindGoogleIDToken,
+		}
+		q := url.Values{}
+		applyAuthorizeParams(q, cfg, callbackURL, state, rawNonce, "")
+
+		is.Equal("select_account", q.Get("prompt"))
+		// GoogleAuthProvider.credential takes no rawNonce — a nonce claim
+		// would be unverifiable, so none is sent.
+		is.Empty(q.Get("nonce"))
+		// No login_hint supplied -> omitted, not set to empty.
+		is.False(q.Has("login_hint"))
+	})
+
+	t.Run("access-token provider sets no prompt and no nonce", func(t *testing.T) {
+		t.Parallel()
+		is := assert.New(t)
+		cfg := &providerConfig{
+			id:                   "github",
+			clientID:             "gh",
+			scopes:               []string{"read:user", "user:email"},
+			extraAuthorizeParams: map[string]string{"allow_signup": "true"},
+			kind:                 kindGitHubAccessToken,
+		}
+		q := url.Values{}
+		applyAuthorizeParams(q, cfg, callbackURL, state, rawNonce, "")
+
+		is.False(q.Has("prompt"))
+		is.Empty(q.Get("nonce"))
+		is.Equal("true", q.Get("allow_signup"))
+	})
+
+	t.Run("broker params override provider-supplied extras", func(t *testing.T) {
+		t.Parallel()
+		is := assert.New(t)
+		cfg := &providerConfig{
+			id:       "evil",
+			clientID: "real-client",
+			scopes:   []string{"openid"},
+			// A misconfigured provider must not clobber broker-decided params.
+			extraAuthorizeParams: map[string]string{
+				"client_id":    "attacker",
+				"redirect_uri": "https://evil.test/cb",
+				"state":        "forged",
+			},
+			kind: kindGitHubAccessToken,
+		}
+		q := url.Values{}
+		applyAuthorizeParams(q, cfg, callbackURL, state, rawNonce, "")
+
+		is.Equal("real-client", q.Get("client_id"))
+		is.Equal(callbackURL, q.Get("redirect_uri"))
+		is.Equal(state, q.Get("state"))
 	})
 }
