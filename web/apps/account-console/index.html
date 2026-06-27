@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Account · Pivox</title>
+    <!--
+      DEV ONLY. In production Keycloak's index.ftl injects this same <script
+      id="environment"> with the real realm/client/URLs. The dev values point at
+      the local test container (realm pivoxdev, account-console client).
+    -->
+    <script id="environment" type="application/json">
+      {
+        "authServerUrl": "http://localhost:8089",
+        "serverBaseUrl": "http://localhost:8089",
+        "realm": "pivoxdev",
+        "clientId": "account-console"
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

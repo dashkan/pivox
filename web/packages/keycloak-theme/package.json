@@ -1,0 +1,15 @@
+{
+  "name": "@pivox/keycloak-theme",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pivox-branded Keycloak login + account themes (FreeMarker + Tailwind v4)",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:watch": "node build.mjs --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.1",
+    "tailwindcss": "catalog:"
+  }
+}

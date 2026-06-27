@@ -3,6 +3,7 @@ packages:
   - ./apps/*
 allowBuilds:
   "@firebase/util": true
+  "@parcel/watcher": true
   electron: true
   electron-winstaller: true
   esbuild: true

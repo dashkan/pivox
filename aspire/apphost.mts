@@ -182,14 +182,37 @@ await rustfs.waitFor(otelCollector);
 // requireSecureIssuer rejects it. No KC_HOSTNAME — derived from forwarded host.
 await builder
   .addKeycloak("keycloak", { port: 8082 })
+  // Pin the Keycloak server image. Keeps the running server in lockstep with
+  // the theme jar / account-ui library version we build against.
   .withEnvironment("KC_PROXY_HEADERS", "xforwarded")
   .withEnvironment("KC_HOSTNAME_STRICT", "false")
   .withEnvironment("KC_HTTP_ENABLED", "true")
+  // No-cache the theme's static assets (login CSS + account-console JS/CSS/fonts)
+  // so a `kc:build` shows up on a normal page refresh — no KC bounce, no hard
+  // refresh. start-dev already disables theme/template caching (so .ftl +
+  // theme.properties hot-reload), but it leaves static assets on a 30-day
+  // cache; -1 makes KC send Cache-Control: no-cache instead. Dev-only apphost.
+  .withEnvironment("KC_SPI_THEME_STATIC_MAX_AGE", "-1")
   // Imports the `acme` realm (exported from the docker-compose keycloak) on
   // startup. The integration mounts this dir at /opt/keycloak/data/import and
   // runs --import-realm. Realms already present in the persisted data are
   // skipped, so this is a no-op once acme exists in ./.data/keycloak.
   .withRealmImport("../configs/keycloak")
+  // Pivox-branded login + account themes (@pivox/keycloak-theme). Mounted
+  // read-only into the container's themes dir so a realm can select
+  // loginTheme/accountTheme "pivox". Dark mode honors Keycloak's native
+  // realm-level "Dark mode" toggle (Realm Settings → Themes).
+  //
+  // Built by the web-build / web-build-watch executables below (web:build now
+  // compiles the login CSS via @pivox/keycloak-theme AND the account-console
+  // SPA into this theme dir). start-dev disables theme/template caching and the
+  // KC_SPI_THEME_STATIC_MAX_AGE=-1 above no-caches the static assets, so edits
+  // picked up by the watcher show on a page refresh — no KC restart.
+  .withBindMount(
+    "../web/packages/keycloak-theme/theme/pivox",
+    "/opt/keycloak/themes/pivox",
+    { isReadOnly: true },
+  )
   .withDataBindMount("./.data/keycloak");
 
 // --- api (pivox-cloud) — host process, binds its own ports ---

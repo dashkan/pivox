@@ -1,0 +1,447 @@
+/*
+ * Shared Keycloak theme styling — design tokens + component layer.
+ *
+ * This file is the single source of the Pivox auth look-and-feel. The
+ * token blocks (:root / .dark / @theme inline) are copied verbatim from
+ * web/packages/primitives/src/index.css so the Keycloak login/account
+ * pages render with the SAME palette, radius, and typography as the app's
+ * React auth cards (@pivox/ui/*-card). Keep them in sync: if the app's
+ * tokens change, re-copy the blocks here and rebuild (pnpm build).
+ *
+ * The component layer (.kc-*) mirrors the shadcn primitives the cards use
+ * (Card, Button, Input, Field, Label, Separator). FreeMarker templates
+ * reference these classes so 40+ Keycloak pages stay visually consistent
+ * without re-deriving utility strings in every .ftl.
+ *
+ * Dark mode is CLASS-driven (.dark on <html>), matching the app's
+ * next-themes convention and Tailwind's `dark:` variant below. template.ftl
+ * sets/clears that class from the `kcColorScheme` theme property
+ * (auto | dark | light), so the pivox-dark / pivox-light variant themes
+ * only need to override that one property.
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+/* ------------------------------------------------------------------ */
+/*  Self-hosted Roboto Variable (on-prem: no CDN). Latin + latin-ext,  */
+/*  normal + italic. woff2 live in ../fonts relative to the compiled   */
+/*  resources/css/theme.css.                                           */
+/* ------------------------------------------------------------------ */
+
+@font-face {
+  font-family: 'Roboto Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/roboto-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Roboto Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/roboto-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Roboto Variable';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/roboto-latin-wght-italic.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Roboto Variable';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/roboto-latin-ext-wght-italic.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Design tokens — copied from @pivox/primitives src/index.css        */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.148 0.004 228.8);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.148 0.004 228.8);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.148 0.004 228.8);
+  --primary: oklch(0.5 0.134 242.749);
+  --primary-foreground: oklch(0.977 0.013 236.62);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.963 0.002 197.1);
+  --muted-foreground: oklch(0.56 0.021 213.5);
+  --accent: oklch(0.963 0.002 197.1);
+  --accent-foreground: oklch(0.218 0.008 223.9);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.925 0.005 214.3);
+  --input: oklch(0.925 0.005 214.3);
+  --ring: oklch(0.723 0.014 214.4);
+  /* Link text color. Same as --primary in light; a brighter blue in dark
+     (below) so primary-colored links stay legible — the dark --primary
+     (0.443) is tuned for button fills, too dark for text on a dark bg. */
+  --link: oklch(0.5 0.134 242.749);
+  --radius: 0.45rem;
+  --sidebar: oklch(0.987 0.002 197.1);
+  --sidebar-foreground: oklch(0.148 0.004 228.8);
+  --sidebar-primary: oklch(0.588 0.158 241.966);
+  --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
+  --sidebar-accent: oklch(0.963 0.002 197.1);
+  --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
+  --sidebar-border: oklch(0.925 0.005 214.3);
+  --sidebar-ring: oklch(0.723 0.014 214.4);
+}
+
+.dark {
+  --background: oklch(0.148 0.004 228.8);
+  --foreground: oklch(0.987 0.002 197.1);
+  --card: oklch(0.218 0.008 223.9);
+  --card-foreground: oklch(0.987 0.002 197.1);
+  --popover: oklch(0.218 0.008 223.9);
+  --popover-foreground: oklch(0.987 0.002 197.1);
+  --primary: oklch(0.443 0.11 240.79);
+  --primary-foreground: oklch(0.977 0.013 236.62);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.275 0.011 216.9);
+  --muted-foreground: oklch(0.723 0.014 214.4);
+  --accent: oklch(0.275 0.011 216.9);
+  --accent-foreground: oklch(0.987 0.002 197.1);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.56 0.021 213.5);
+  --link: oklch(0.685 0.169 237.323);
+  --sidebar: oklch(0.218 0.008 223.9);
+  --sidebar-foreground: oklch(0.987 0.002 197.1);
+  --sidebar-primary: oklch(0.685 0.169 237.323);
+  --sidebar-primary-foreground: oklch(0.293 0.066 243.157);
+  --sidebar-accent: oklch(0.275 0.011 216.9);
+  --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.56 0.021 213.5);
+}
+
+@theme inline {
+  --font-sans: 'Roboto Variable', sans-serif;
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-link: var(--link);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Base                                                               */
+/* ------------------------------------------------------------------ */
+
+@keyframes kc-caret-blink {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  71%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans antialiased;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component layer — mirrors @pivox/ui auth cards / shadcn primitives  */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+  /* Page frame: centered card, full-viewport, matches *CardRoot. */
+  .kc-page {
+    @apply flex min-h-screen items-center justify-center p-4;
+  }
+  .kc-card {
+    @apply w-full max-w-sm overflow-hidden rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10;
+  }
+  /* Inner vertical stack inside the card (the <form> in the cards). */
+  .kc-stack {
+    @apply flex flex-col gap-4 py-4;
+  }
+
+  /* Header — centered title + description (CardHeader/Title/Description). */
+  .kc-header {
+    @apply grid auto-rows-min items-start gap-1 px-4 text-center;
+  }
+  .kc-title {
+    @apply text-xl leading-snug font-medium;
+  }
+  .kc-subtitle {
+    @apply text-sm text-muted-foreground;
+  }
+
+  /* Fields (Field/FieldLabel/Input). */
+  .kc-field {
+    @apply flex w-full flex-col gap-2 px-4;
+  }
+  .kc-label {
+    @apply flex w-fit items-center gap-2 text-sm leading-none font-medium select-none;
+  }
+  /* Label + required-asterisk wrapper (user-profile fields). */
+  .kc-label-row {
+    @apply flex items-center gap-1;
+  }
+  .kc-input {
+    @apply h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30;
+  }
+  .kc-input-error {
+    @apply border-destructive ring-[3px] ring-destructive/20;
+  }
+  /* Readonly input (e.g. the reauth attempted-username): selectable + tabbable
+     but visually fixed, signalling "use the reset button to change this". */
+  .kc-input[readonly] {
+    @apply cursor-default bg-muted/40 text-muted-foreground;
+  }
+  .kc-hint {
+    @apply text-sm text-muted-foreground;
+  }
+  /* Per-field validation message (messagesPerField). */
+  .kc-field-error {
+    @apply text-sm font-normal text-destructive;
+  }
+
+  /* Password field with a reveal toggle (input + button). */
+  .kc-input-group {
+    @apply relative flex w-full items-center;
+  }
+  .kc-input-group .kc-input {
+    @apply pe-9;
+  }
+  .kc-input-toggle {
+    @apply absolute end-1 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none;
+  }
+  .kc-input-toggle svg {
+    @apply size-4;
+  }
+
+  /* Segmented one-time-code input — shadcn input-otp look, vanilla. A single
+     real <input> (transparent text + caret) overlays a row of slot cells that
+     a small script mirrors; the active cell gets the focus ring + a blinking
+     fake caret. See commons.ftl otpInput / otpScript. */
+  .kc-otp {
+    @apply relative flex w-full;
+  }
+  .kc-otp-group {
+    @apply flex w-full items-center;
+  }
+  .kc-otp-slot {
+    @apply relative flex h-10 flex-1 items-center justify-center border-y border-e border-input text-base transition-all first:rounded-s-lg first:border-s last:rounded-e-lg dark:bg-input/30;
+  }
+  .kc-otp-slot.kc-otp-active {
+    @apply z-10 border-ring ring-[3px] ring-ring/50;
+  }
+  .kc-otp-input {
+    @apply absolute inset-0 size-full bg-transparent text-center text-transparent caret-transparent outline-none;
+  }
+  /* Hide the native text-selection highlight (the input text is transparent,
+     but ::selection would otherwise paint a stray block over the slots). */
+  .kc-otp-input::selection {
+    background-color: transparent;
+  }
+  .kc-otp-caret-bar {
+    @apply inline-block h-5 w-px bg-foreground;
+    animation: kc-caret-blink 1.2s steps(1) infinite;
+  }
+
+  /* Actions / buttons (Button). */
+  .kc-actions {
+    @apply flex flex-col gap-4 px-4;
+  }
+  .kc-btn {
+    @apply inline-flex h-8 w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-transparent bg-clip-padding px-2.5 text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .kc-btn svg {
+    @apply size-4 shrink-0;
+  }
+  .kc-btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/80;
+  }
+  .kc-btn-outline {
+    @apply border-border bg-background hover:bg-muted hover:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50;
+  }
+  .kc-btn-destructive {
+    @apply bg-destructive/10 text-destructive hover:bg-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30;
+  }
+
+  /* Links. */
+  .kc-link {
+    @apply text-link underline-offset-4 hover:underline;
+  }
+  .kc-muted-link {
+    @apply text-muted-foreground underline-offset-4 hover:text-link hover:underline;
+  }
+
+  /* "Or" separator (Separator + centered label). */
+  .kc-separator {
+    @apply relative px-4;
+  }
+  .kc-separator-track {
+    @apply absolute inset-x-4 inset-y-0 flex items-center;
+  }
+  .kc-separator-rule {
+    @apply h-px w-full bg-border;
+  }
+  .kc-separator-label {
+    @apply relative flex justify-center text-xs uppercase;
+  }
+  .kc-separator-label span {
+    @apply bg-card px-2 text-muted-foreground;
+  }
+
+  /* Social / identity-provider buttons. */
+  .kc-social-list {
+    @apply flex flex-col gap-2 px-4;
+  }
+
+  /* Inline row (remember-me + forgot link). */
+  .kc-row {
+    @apply flex items-center justify-between px-4;
+  }
+  .kc-check-row {
+    @apply flex items-center gap-2;
+  }
+  .kc-checkbox {
+    @apply size-4 shrink-0 rounded-[4px] border border-input accent-[var(--primary)];
+  }
+  .kc-check-label {
+    @apply text-sm leading-none font-normal select-none;
+  }
+
+  /* Footer band (CardFooter — full-bleed, muted, top border). */
+  .kc-footer {
+    @apply flex items-center justify-center gap-1 border-t bg-muted/50 p-4 text-center text-sm text-muted-foreground;
+  }
+
+  /* Centered prose block (verify-email / success messages). */
+  .kc-prose {
+    @apply px-4 text-center text-sm text-muted-foreground;
+  }
+  /* Lists inside prose (oauth-grant scopes, TOTP setup steps). Left-aligned
+     and centered as a block so they read naturally inside the centered card. */
+  .kc-prose :is(ol, ul) {
+    @apply mx-auto w-fit list-decimal space-y-1 ps-5 text-start;
+  }
+  .kc-prose ul {
+    @apply list-disc;
+  }
+  /* Recovery codes grid — monospace, two columns. The base template already
+     numbers each code via an inline span, so no list marker here. */
+  #kc-recovery-codes-list {
+    @apply grid list-none grid-cols-2 gap-x-8 gap-y-1 px-4 font-mono text-sm text-foreground;
+  }
+
+  /* Alerts (global feedback messages). */
+  .kc-alert {
+    @apply mx-4 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm;
+  }
+  .kc-alert-error {
+    @apply border-destructive/30 bg-destructive/10 text-destructive;
+  }
+  .kc-alert-success {
+    @apply border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400;
+  }
+  .kc-alert-warning {
+    @apply border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400;
+  }
+  .kc-alert-info {
+    @apply border-link/30 bg-link/10 text-link;
+  }
+  .kc-alert-icon {
+    @apply mt-0.5 size-4 shrink-0;
+  }
+
+  /* Select-authenticator list items (and other big choice rows). */
+  .kc-select-item {
+    @apply flex w-full items-center gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:bg-muted;
+  }
+  .kc-select-item-icon {
+    @apply text-muted-foreground;
+  }
+  .kc-select-item-title {
+    @apply text-sm font-medium;
+  }
+
+  /*
+   * Safety net for literal class names that appear in inherited base
+   * templates we don't override (e.g. required asterisks, instruction
+   * paragraphs, form groups, separators). Keeps long-tail pages looking
+   * owned rather than unstyled — we still load zero PatternFly CSS.
+   */
+  .required {
+    @apply ms-0.5 text-destructive;
+  }
+  .instruction {
+    @apply px-4 text-center text-sm text-muted-foreground;
+  }
+  #kc-info-message,
+  #kc-error-message,
+  #kc-terms-text {
+    @apply px-4 text-sm text-foreground;
+  }
+  #kc-terms-text {
+    @apply max-h-64 overflow-y-auto;
+  }
+  .form-group {
+    @apply px-4;
+  }
+  form hr,
+  #kc-content hr {
+    @apply my-0 border-border;
+  }
+
+  /* Locale switcher (top-right language dropdown). */
+  .kc-locale {
+    @apply flex justify-end px-4 pt-1;
+  }
+  .kc-locale-current {
+    @apply cursor-pointer text-sm text-muted-foreground hover:text-foreground;
+  }
+  .kc-locale-menu {
+    @apply absolute end-4 z-10 mt-1 min-w-32 overflow-hidden rounded-lg border bg-popover py-1 text-popover-foreground shadow-md;
+  }
+  .kc-locale-item {
+    @apply block px-3 py-1.5 text-sm hover:bg-muted;
+  }
+}

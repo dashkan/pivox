@@ -1,0 +1,30 @@
+{
+  "name": "@pivox/account-console",
+  "private": true,
+  "type": "module",
+  "description": "Pivox-branded Keycloak account console — a React 19 SPA that replaces Keycloak's PatternFly account-ui, talking to the Account REST API.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:types": "tsc --noEmit",
+    "test:eslint": "eslint ./src"
+  },
+  "dependencies": {
+    "@fontsource-variable/roboto": "catalog:",
+    "@pivox/primitives": "workspace:*",
+    "keycloak-js": "26.2.4",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

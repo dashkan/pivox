@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "@pivox/primitives/theme.css";
+
+/* Compile the classes used by @pivox/primitives components + this app in one
+   Tailwind pass (same pattern as apps/start). */
+@source "../node_modules/@pivox/primitives/src/**/*.tsx";
+@source "./**/*.tsx";
+
+html,
+body,
+#app {
+  height: 100%;
+}

@@ -1,0 +1,13 @@
+/*
+ * Tailwind entry for the `login` theme type. Compiled by the Tailwind CLI
+ * to theme/pivox/login/resources/css/theme.css (see package.json).
+ *
+ * @source globs at the FreeMarker templates so any raw utilities used
+ * directly in the .ftl files (not just the .kc-* component classes) get
+ * generated. The .kc-* component layer in shared.css is plain CSS and is
+ * always emitted regardless of scanning.
+ */
+@import "tailwindcss";
+@import "./shared.css";
+
+@source "../theme/pivox/login/**/*.ftl";
