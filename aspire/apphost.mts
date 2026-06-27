@@ -44,12 +44,14 @@ const pgPassword = await builder.addParameter("postgres-password", {
 });
 
 const postgres = await builder
-  .addPostgres("postgres")
-  // Aspire's default image is plain `postgres`, which has no `vector` type.
-  // Pin the same pgvector image the repo's test stack uses so
-  // `CREATE EXTENSION vector` (000001_init.up.sql) and pgx's RegisterTypes
-  // hook (cmd/pivox-cloud/main.go) both work.
-  .withImage("pgvector/pgvector", { tag: "pg18" })
+  // Pin the host port so you can connect from the host PC (psql / a GUI) at
+  // localhost:5432 — the `pivox` and `keycloak` databases. Change this if a
+  // local Postgres (or the docker-compose test stack) already owns 5432.
+  .addPostgres("postgres", { port: 5432 })
+  // Custom image: pgvector + golang-migrate baked in (aspire/pg/Dockerfile) so
+  // the DB init script runs real migrations. pgvector gives the `vector` type
+  // for CREATE EXTENSION vector (000001_init.up.sql) + pgx RegisterTypes.
+  .withDockerfile("pg")
   .withUserName(pgUsername)
   .withPassword(pgPassword)
   // PG18 images store data in a major-version subdir and expect the mount at
@@ -57,11 +59,21 @@ const postgres = await builder
   // withDataBindMount auto-detects the path from the image tag, but the pgvector
   // tag `pg18` doesn't parse as "18", so it falls back to the PG17 path. Mount
   // explicitly to the PG18 path — matches docker-compose.test.yml.
-  .withBindMount("./.data/pg", "/var/lib/postgresql");
-
-const db = postgres.addDatabase("pivox", {
-  databaseName: "pivox",
-});
+  .withBindMount("./.data/pg", "/var/lib/postgresql")
+  // First-start DB setup: the init script (mounted into the container's
+  // docker-entrypoint-initdb.d) creates the pivox + keycloak databases, runs
+  // real golang-migrate migrations against pivox, and seeds it. migrations +
+  // scripts are bind-mounted (current without an image rebuild); `migrate`
+  // itself is baked into the image (aspire/pg/Dockerfile). The whole scripts
+  // dir is mounted (not just seed.sql) because seed.sql does
+  // `\i scripts/seeds/*.sql` with paths relative to the working dir.
+  .withInitFiles("postgres-init")
+  .withBindMount("../internal/db/migrations", "/migrations", { isReadOnly: true })
+  .withBindMount("../scripts", "/scripts", { isReadOnly: true })
+  // Stable alias so other CONTAINERS (keycloak) can reach postgres over the
+  // Aspire container network at `postgres:5432` — host.docker.internal only
+  // works for host processes.
+  .withContainerNetworkAlias("postgres");
 
 const pgEndpoint = postgres.getEndpoint("tcp");
 const pgHost = await pgEndpoint.property(EndpointProperty.Host);
@@ -69,36 +81,10 @@ const pgPort = await pgEndpoint.property(EndpointProperty.Port);
 
 // pgx (pgxpool.ParseConfig) wants a libpq URL, not Aspire's Npgsql keyword
 // string. Build the postgres:// URL from the server endpoint + the parameters.
+// The pivox + keycloak databases, the schema migrations, and the seed are all
+// created by the pg image's init script (aspire/pg/Dockerfile + initdb/00-init.sh)
+// on first start, so consumers just waitFor(postgres) — no init executables.
 const pivoxDatabaseUrl = refExpr`postgres://${pgUsername}:${pgPassword}@${pgHost}:${pgPort}/pivox?sslmode=disable`;
-
-// One-shot migration step. Shells out to the repo's golang-migrate CLI; the DB
-// URL is a deferred expression (dynamic port) so it's injected as an env var
-// and expanded by `sh -c` at runtime. workingDirectory ".." = repo root.
-// `migrate up` is idempotent, so it's safe on every start.
-const dbMigrate = await builder
-  .addExecutable("db-migrate", "sh", "..", [
-    "-c",
-    'migrate -path internal/db/migrations -database "$PIVOX_DATABASE_URL" up',
-  ])
-  .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
-  .waitFor(db);
-
-// First-use-only seed. seed.sql is not idempotent (straight INSERTs), so guard
-// it: only seed when the `organizations` table is empty. Runs after migrations.
-const dbSeed = await builder
-  .addExecutable("db-seed", "sh", "..", [
-    "-c",
-    [
-      'count=$(psql -tAqc "SELECT count(*) FROM organizations" "$PIVOX_DATABASE_URL")',
-      'if [ "$count" = "0" ]; then',
-      '  psql -v ON_ERROR_STOP=1 "$PIVOX_DATABASE_URL" -f scripts/seed.sql',
-      "else",
-      '  echo "db already seeded ($count orgs), skipping"',
-      "fi",
-    ].join("\n"),
-  ])
-  .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
-  .waitForCompletion(dbMigrate);
 
 // --- otel-collector (CommunityToolkit) ---
 // Receives OTLP and forwards to the Aspire dashboard — crucially it handles the
@@ -180,8 +166,26 @@ await rustfs.waitFor(otelCollector);
 // keycloak only trusts it (+ Host) to build public https issuer/token URLs when
 // this is set; otherwise discovery advertises non-https and the broker's
 // requireSecureIssuer rejects it. No KC_HOSTNAME — derived from forwarded host.
+//
+// Keycloak persists in Postgres (not the dev H2 file) so realms/users/clients
+// are durable + inspectable via SQL — much easier for adding accounts and for
+// the Firebase->KC migration. KC creates its own SCHEMA on boot but NOT the
+// database; the `keycloak` db is created by the pg image's init script.
+//
+// JDBC URL the keycloak CONTAINER uses to reach the postgres CONTAINER. Both
+// are containers on the Aspire network, so connect via postgres's network alias
+// + its INTERNAL port (5432) — NOT host.docker.internal (host processes only).
+// Credentials go in KC_DB_* below.
+const keycloakDbUrl = "jdbc:postgresql://postgres:5432/keycloak";
+
 await builder
   .addKeycloak("keycloak", { port: 8082 })
+  // Use Postgres (KC_DB) instead of the start-dev default H2; the db is created
+  // by the pg init script and KC auto-migrates its schema into it on boot.
+  .withEnvironment("KC_DB", "postgres")
+  .withEnvironment("KC_DB_URL", keycloakDbUrl)
+  .withEnvironment("KC_DB_USERNAME", pgUsername)
+  .withEnvironment("KC_DB_PASSWORD", pgPassword)
   // Pin the Keycloak server image. Keeps the running server in lockstep with
   // the theme jar / account-ui library version we build against.
   .withEnvironment("KC_PROXY_HEADERS", "xforwarded")
@@ -196,7 +200,7 @@ await builder
   // Imports the `acme` realm (exported from the docker-compose keycloak) on
   // startup. The integration mounts this dir at /opt/keycloak/data/import and
   // runs --import-realm. Realms already present in the persisted data are
-  // skipped, so this is a no-op once acme exists in ./.data/keycloak.
+  // skipped, so this is a no-op once acme exists in the keycloak database.
   .withRealmImport("../configs/keycloak")
   // Pivox-branded login + account themes (@pivox/keycloak-theme). Mounted
   // read-only into the container's themes dir so a realm can select
@@ -213,7 +217,9 @@ await builder
     "/opt/keycloak/themes/pivox",
     { isReadOnly: true },
   )
-  .withDataBindMount("./.data/keycloak");
+  // No withDataBindMount: KC state now lives in the `keycloak` Postgres
+  // database (durable via the .data/pg mount), not a local H2 file.
+  .waitFor(postgres);
 
 // --- api (pivox-cloud) — host process, binds its own ports ---
 // Override the service gRPC listener to all-interfaces. The default
@@ -221,21 +227,20 @@ await builder
 // via host.docker.internal (which routes to the host gateway, not loopback).
 await builder
   .addGoApp("api", "../cmd/pivox-cloud")
-  .withReference(db)
   .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
   .withEnvironment("PIVOX_SERVICE_GRPC_PORT", ":50052")
-  // Don't boot until migrations finished (the `vector` type must exist before
-  // pgx's RegisterTypes runs). Waiting on the seed too gives a fully ready DB.
-  .waitForCompletion(dbSeed);
+  // postgres is healthy only after the init script finishes (migrations + seed
+  // run during first-init before it accepts TCP), so the `vector` type exists
+  // before pgx's RegisterTypes runs.
+  .waitFor(postgres);
 
 // --- worker (pivox-worker) — host process, River-backed periodic jobs ---
 // Mirrors the `make air-worker` leg of the dev target. No envoy-facing port;
 // it only needs the DB. River runs its own (idempotent) migrations on start.
 await builder
   .addGoApp("worker", "../cmd/pivox-worker")
-  .withReference(db)
   .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
-  .waitForCompletion(dbSeed);
+  .waitFor(postgres);
 
 // --- agent (pivox-agent) — on-prem storage agent; host process ---
 // Mirrors `make run-agent`. The `storage` subcommand is positional. Dev
@@ -246,13 +251,14 @@ await builder
 //     default is 443).
 // PIVOX_CLOUD_HOST / PIVOX_PLAINTEXT still come from direnv (the agent
 // connects to the cloud AgentService over that). Serves /files/.
-// waitForCompletion(dbSeed) so its gateway/token row exists first.
+// waitFor(postgres) so the seeded gateway/token row exists first (seed runs in
+// the pg init script, which completes before postgres is healthy).
 await builder
   .addGoApp("agent", "../cmd/pivox-agent")
   .withArgs(["storage"])
   .withEnvironment("PIVOX_TOKEN", "dev-token-local")
   .withEnvironment("PIVOX_PORT", "8083")
-  .waitForCompletion(dbSeed);
+  .waitFor(postgres);
 
 // --- web libraries build (mirrors the `web-build` prereq of `make dev`) ---
 // The start app imports from @pivox/* workspace packages at vite config-LOAD
