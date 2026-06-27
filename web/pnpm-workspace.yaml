@@ -1,6 +1,12 @@
 packages:
   - ./packages/*
   - ./apps/*
+updateConfig:
+  ignoreDependencies:
+    - eslint
+    - "@eslint/js"
+    - typescript
+    - ai
 allowBuilds:
   "@firebase/util": true
   "@parcel/watcher": true
@@ -64,7 +70,7 @@ catalog:
   "eslint": "9.39.4"
   "firebase": "12.15.0"
   "lucide-react": "1.21.0"
-  "prettier": "3.8.4"
+  "prettier": "3.8.5"
   "react": "19.2.7"
   "react-dom": "19.2.7"
   "tailwindcss": "4.3.1"
@@ -78,4 +84,4 @@ cleanupUnusedCatalogs: true
 linkWorkspacePackages: true
 preferWorkspacePackages: true
 minimumReleaseAgeExclude:
-  - '@shadcn/react@0.1.0'
+  - "@shadcn/react@0.1.0"
