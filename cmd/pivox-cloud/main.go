@@ -37,6 +37,7 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/firebase"
 	"github.com/dashkan/pivox/internal/lro"
+	"github.com/dashkan/pivox/internal/oidc"
 	"github.com/dashkan/pivox/internal/permission"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/apikeys"
@@ -111,6 +112,13 @@ func main() {
 	f.String("google-client-id", envOrDefault("GOOGLE_CLIENT_ID", ""), "Google OAuth (Web app) client ID (broker)")
 	f.String("google-client-secret", envOrDefault("GOOGLE_CLIENT_SECRET", ""), "Google OAuth (Web app) client secret (broker)")
 
+	// OIDC resource-server verification (Keycloak). The backend validates Bearer
+	// access tokens against the issuer's JWKS; client_id/secret live in the BFF,
+	// not here. Empty issuer leaves OIDC off (Firebase-only) during the migration.
+	f.String("oidc-issuer", envOrDefault("PIVOX_OIDC_ISSUER", ""), "OIDC issuer URL whose access tokens the backend accepts (e.g. https://host/realms/pivox); empty disables OIDC auth")
+	f.String("oidc-audience", envOrDefault("PIVOX_OIDC_AUDIENCE", ""), "Audience the access token's aud must contain (Keycloak audience-mapper value)")
+	f.Bool("disable-oidc-audience-validation", envOrBool("PIVOX_DISABLE_OIDC_AUDIENCE_VALIDATION", false), "Opt out of OIDC audience validation (fail-closed otherwise)")
+
 	addSyncAuthFlags(rootCmd)
 	addSsrAuthFlags(rootCmd)
 
@@ -151,6 +159,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	sessionTTL, _ := f.GetDuration("delegated-auth-session-ttl")
 	pollInterval, _ := f.GetDuration("delegated-auth-poll-interval")
 	enableReflection, _ := f.GetBool("enable-reflection")
+	disableOIDCAud, _ := f.GetBool("disable-oidc-audience-validation")
 	cfg := &config.Config{
 		DatabaseURL:      must(f.GetString("database-url")),
 		GRPCPort:         must(f.GetString("grpc-port")),
@@ -172,6 +181,11 @@ func serve(cmd *cobra.Command, args []string) error {
 			GitHubClientSecret: must(f.GetString("github-client-secret")),
 			GoogleClientID:     must(f.GetString("google-client-id")),
 			GoogleClientSecret: must(f.GetString("google-client-secret")),
+		},
+		OIDC: config.OIDCConfig{
+			Issuer:                    must(f.GetString("oidc-issuer")),
+			Audience:                  must(f.GetString("oidc-audience")),
+			DisableAudienceValidation: disableOIDCAud,
 		},
 	}
 	// SsrAuth audience inherits from SyncAuth's audience when the
@@ -298,6 +312,33 @@ func serve(cmd *cobra.Command, args []string) error {
 			"audience", cfg.SsrAuth.Audience,
 			"allowed_service_accounts", cfg.SsrAuth.AllowedServiceAccounts,
 		)
+	}
+
+	// OIDC (Keycloak) access-token verification. Wrap the chain so KC-issued
+	// tokens route to the OIDC verifier while Firebase + SSR keep working during
+	// the migration; empty issuer leaves the chain unchanged. The verifier's
+	// JWKS load is lazy/tolerant (keyfunc NoErrorReturnFirstHTTPReq), so this
+	// does NOT couple api startup to Keycloak/ngrok readiness — keys are fetched
+	// on the first KC token (when the user logs in through the edge).
+	if cfg.OIDC.Issuer != "" {
+		oidcVerifier, err := oidc.NewVerifier(ctx, oidc.Config{
+			Issuer:                    cfg.OIDC.Issuer,
+			JWKSURL:                   strings.TrimRight(cfg.OIDC.Issuer, "/") + "/protocol/openid-connect/certs",
+			Audience:                  cfg.OIDC.Audience,
+			DisableAudienceValidation: cfg.OIDC.DisableAudienceValidation,
+		})
+		if err != nil {
+			return fmt.Errorf("initialize OIDC verifier: %w", err)
+		}
+		authChainSvc = server.NewOIDCAuthService(authChainSvc, oidcVerifier, cfg.OIDC.Issuer)
+		logger.Info("OIDC auth path enabled",
+			"issuer", cfg.OIDC.Issuer,
+			"audience", cfg.OIDC.Audience,
+			"audience_validation", !cfg.OIDC.DisableAudienceValidation,
+		)
+		if cfg.OIDC.DisableAudienceValidation {
+			logger.Warn("OIDC audience validation DISABLED — any token this realm signs (including ID tokens minted for other clients) will be accepted; set PIVOX_OIDC_AUDIENCE to re-enable")
+		}
 	}
 
 	// gRPC server

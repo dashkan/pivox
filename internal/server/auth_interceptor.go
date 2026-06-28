@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,11 +14,12 @@ import (
 )
 
 // pivoxUserIDKey is the context key for the caller's per-Pivox
-// `identities.id` UUID. Populated by the auth interceptor from the
-// `pivox_user_id` Firebase ID-token custom claim (browser/native
-// clients) or the `actor_uid` claim of an SA-signed JWT (SSR server
-// acting on behalf of a user — see CompositeAuthService in
-// composite_auth.go).
+// `identities.id` UUID. Populated by the auth interceptor from, in order:
+// the `pivox_user_id` Firebase ID-token custom claim (browser/native
+// clients), the `actor_uid` claim of an SA-signed JWT (SSR acting on
+// behalf of a user — see CompositeAuthService in composite_auth.go), or
+// the `sub` of a Keycloak access token (sub == identities.id — see
+// oidc_auth.go).
 //
 // All membership tables (`org_members.principal_id`,
 // `space_members.principal_id`, `group_members.user_id`) reference
@@ -34,10 +36,10 @@ const (
 	errInvalidOrExpiredID = "invalid or expired token"
 )
 
-// PivoxUserID extracts the verified Pivox user UUID
-// (`identities.id`) from the context. Returns the UUID and
-// true when the auth interceptor extracted a `pivox_user_id` claim
-// from the verified ID token.
+// PivoxUserID extracts the verified Pivox user UUID (`identities.id`)
+// from the context. Returns the UUID and true when the auth interceptor
+// resolved the caller — from a `pivox_user_id` claim (Firebase/SSR) or
+// the `sub` of a Keycloak token.
 func PivoxUserID(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(pivoxUserIDKey{}).(uuid.UUID)
 	return id, ok
@@ -51,14 +53,14 @@ func WithPivoxUserID(ctx context.Context, id uuid.UUID) context.Context {
 }
 
 // MustPivoxUserID extracts the verified Pivox user UUID from the
-// context. Panics if the context does not contain one — only call
-// from handlers behind the auth interceptor, which rejects any
-// token without a `pivox_user_id` claim with Unauthenticated, so
-// by the time a handler runs the claim is guaranteed present.
+// context. Panics if the context does not contain one — only call from
+// handlers behind the auth interceptor, which rejects any token it can't
+// resolve to an identity id with Unauthenticated, so by the time a
+// handler runs the id is guaranteed present.
 func MustPivoxUserID(ctx context.Context) uuid.UUID {
 	id, ok := PivoxUserID(ctx)
 	if !ok {
-		panic("server: MustPivoxUserID called without pivox_user_id claim on context")
+		panic("server: MustPivoxUserID called without a pivox identity on context")
 	}
 	return id
 }
@@ -92,20 +94,32 @@ func authenticateBearer(ctx context.Context, auth authn.Service, bearerHeader st
 
 	identity, err := auth.VerifyToken(ctx, idToken)
 	if err != nil {
+		// Keep the detail server-side only (client gets the generic message —
+		// no info leak). Logged at Debug so a misconfigured audience or an
+		// unreachable JWKS during the Keycloak cutover leaves a breadcrumb when
+		// the operator raises the log level, instead of a silent "every KC user
+		// gets invalid token".
+		slog.DebugContext(ctx, "bearer token verification failed", "error", err)
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}
-	// Every authenticated token must carry pivox_user_id. The
-	// Firebase blocking function sets it on Firebase ID tokens; the
-	// SSR composite path sets it explicitly when it mints an
-	// Identity from a verified SA-signed JWT. Reject here with the
-	// same Unauthenticated message used for verification failures
-	// so clients can't probe to distinguish "missing claim" from
-	// "bad signature" — both should trigger a token-refresh path.
-	claim, ok := identity.Claims["pivox_user_id"].(string)
-	if !ok || claim == "" {
+	// Resolve the Pivox identity id. Firebase ID tokens carry it in the
+	// `pivox_user_id` custom claim (set by the blocking function); SSR actor
+	// tokens set it explicitly when the composite mints an Identity. Keycloak
+	// tokens DON'T carry that claim — there the `sub` IS the identity id,
+	// surfaced as identity.UID. Prefer the claim, fall back to UID, so both
+	// Firebase and Keycloak work during the migration. (Firebase's UID is the
+	// firebase_uid, not a UUID, but the claim is always present there, so we
+	// never fall through to it.) Reject with the same Unauthenticated message
+	// used for verification failures so clients can't distinguish "missing id"
+	// from "bad signature" — both should trigger a token refresh.
+	idStr, _ := identity.Claims["pivox_user_id"].(string)
+	if idStr == "" {
+		idStr = identity.UID
+	}
+	if idStr == "" {
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}
-	uid, parseErr := uuid.Parse(claim)
+	uid, parseErr := uuid.Parse(idStr)
 	if parseErr != nil {
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}

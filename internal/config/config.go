@@ -34,6 +34,29 @@ type Config struct {
 	SsrAuth       ServiceAccountAuthConfig
 	DelegatedAuth DelegatedAuthConfig
 	OAuthBroker   OAuthBrokerConfig
+	OIDC          OIDCConfig
+}
+
+// OIDCConfig configures the backend's OIDC access-token verifier (Keycloak).
+// The Cloud Controller is a pure resource server: it validates Bearer access
+// tokens against the issuer's JWKS. There is deliberately no client_id /
+// client_secret here — those belong to the BFF (the `start` server runs the
+// OAuth code exchange), not the resource server.
+type OIDCConfig struct {
+	// Issuer is the exact `iss` accepted tokens must carry
+	// (e.g. https://pivox.ngrok.app/realms/pivox). Empty leaves OIDC auth off
+	// (Firebase-only) during the migration.
+	Issuer string
+
+	// Audience the access token's `aud` must contain — the value of the
+	// Keycloak audience mapper (e.g. pivox-cloud). Required unless
+	// DisableAudienceValidation.
+	Audience string
+
+	// DisableAudienceValidation turns the aud check off (opt-out, wired to
+	// --disable-oidc-audience-validation). Audience validation is fail-closed
+	// otherwise: an empty Audience with OIDC enabled is a startup error.
+	DisableAudienceValidation bool
 }
 
 // OAuthBrokerConfig controls the server-side OAuth/OIDC broker that

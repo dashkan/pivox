@@ -220,16 +220,38 @@ static_resources:
 
                         # --- Keycloak (dev IDP) -> 8082 ----------------------
                         # ASPIRE-ONLY ROUTING (diverges from envoy.yaml): the
-                        # Aspire keycloak serves at ROOT, not /keycloak. Browser
-                        # SSO login hits /realms/ (auth, login-actions) and
-                        # /resources/ (login theme css/js). Admin console
-                        # (/admin, /js) is reached via the Aspire proxy, not here.
+                        # Aspire keycloak serves at ROOT, not /keycloak. The OIDC
+                        # flow + browser SSO login use /realms/ (auth, token, jwks,
+                        # logout, broker, account, .well-known) and /resources/
+                        # (login theme css/js) — these come from envoy.yaml and
+                        # survive the sed regen unchanged.
+                        #
+                        # /admin/ + /js/ are MANUAL dev-only additions (not in
+                        # envoy.yaml); re-apply THESE TWO after regenerating. They
+                        # expose the KC admin console through the public ingress.
+                        # SECURITY: never carry /admin/ to prod (prod reaches the
+                        # console directly at :8082, not via envoy). The backend
+                        # trusts the KC `sub` as identities.id, so realm control =
+                        # impersonation of any user; with no edge rate-limit in the
+                        # ngrok dev flow, an internet-reachable admin login widens
+                        # the blast radius — keep the dev admin password
+                        # non-guessable.
                         - match: { prefix: "/realms/" }
                           route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
                         - match: { prefix: "/resources/" }
+                          route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
+                          request_headers_to_add:
+                            - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                        - match: { prefix: "/admin/" }
+                          route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
+                          request_headers_to_add:
+                            - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                        - match: { prefix: "/js/" }
                           route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }

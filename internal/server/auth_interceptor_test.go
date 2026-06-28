@@ -100,6 +100,38 @@ func TestAuthInterceptor_ValidToken(t *testing.T) {
 	assert.Equal(t, pivoxUID, capturedPivoxUID)
 }
 
+// A Keycloak access token has no pivox_user_id claim — the `sub` (surfaced as
+// Identity.UID) IS the Pivox identity id. The interceptor must fall back to UID
+// and resolve the caller. This pins the core of the Firebase->KC migration.
+func TestAuthInterceptor_KeycloakSubFallback(t *testing.T) {
+	auth := authnmock.NewMockService(t)
+	kcSub := uuid.New()
+	expectVerifyToken(auth, "kc-token", &authn.Identity{
+		UID:    kcSub.String(),
+		Email:  "kc@example.com",
+		Claims: map[string]any{"iss": "https://kc/realms/pivox"}, // no pivox_user_id
+	})
+
+	md := metadata.New(map[string]string{"authorization": "Bearer kc-token"})
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+
+	var captured uuid.UUID
+	handler := func(ctx context.Context, _ any) (any, error) {
+		var ok bool
+		captured, ok = PivoxUserID(ctx)
+		require.True(t, ok)
+		return "ok", nil
+	}
+
+	resp, err := AuthInterceptor(auth)(ctx, nil, &grpc.UnaryServerInfo{
+		FullMethod: "/pivox.api.v1.Spaces/GetSpace",
+	}, handler)
+
+	require.NoError(t, err)
+	assert.Equal(t, "ok", resp)
+	assert.Equal(t, kcSub, captured)
+}
+
 func TestAuthInterceptor_MissingMetadata(t *testing.T) {
 	auth := authnmock.NewMockService(t)
 
