@@ -257,6 +257,16 @@ static_resources:
                             - header: { key: x-forwarded-proto, value: https }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
 
+                        # --- Kafka UI (dev tooling) -> /kafka ----------------
+                        # ASPIRE-ONLY: browse Kafka topics/events. The UI serves
+                        # under /kafka (SERVER_SERVLET_CONTEXT_PATH) so the prefix
+                        # passes through unchanged. dev-only — NEVER expose in prod.
+                        - match: { prefix: "/kafka" }
+                          route: { cluster: kafka_ui, timeout: 0s, idle_timeout: 0s }
+                          request_headers_to_add:
+                            - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+
                         # --- AiChat REST -> Go gateway (8080) ----------------
                         # BOTH verbs stay on Go: streamGenerateContent is SSE,
                         # and generateContent rides along to keep the AI surface
@@ -529,3 +539,19 @@ static_resources:
               - endpoint:
                   address:
                     socket_address: { address: otel-collector, port_value: 4318 }
+
+    # ASPIRE-ONLY (dev): Kafka UI for browsing topics/events, ingressed at /kafka.
+    # Container-to-container over the Aspire network (alias `kafka-ui`, internal
+    # port 8080 — kafka-ui's default server port). HTTP/1.1. Re-add on regen;
+    # dev-only, NEVER ingress this in prod.
+    - name: kafka_ui
+      type: STRICT_DNS
+      dns_lookup_family: V4_ONLY
+      connect_timeout: 1s
+      load_assignment:
+        cluster_name: kafka_ui
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: kafka-ui, port_value: 8080 }

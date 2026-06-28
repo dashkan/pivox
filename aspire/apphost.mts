@@ -178,8 +178,35 @@ await rustfs.waitFor(otelCollector);
 // Credentials go in KC_DB_* below.
 const keycloakDbUrl = "jdbc:postgresql://postgres:5432/keycloak";
 
+// --- kafka — Keycloak event stream for Pivox identity sync ---
+// The keycloak-kafka SPI (baked into the KC image, aspire/keycloak/Dockerfile)
+// produces user + admin events here; a Pivox consumer will sync identities/orgs
+// from them. KC reaches the broker container-to-container via the network alias.
+const kafka = await builder
+  // Host port pinned so the broker is reachable for validation at
+  // localhost:9092 (mirrors postgres on 5432). KC reaches it container-to-
+  // container via the network alias below.
+  .addKafka("kafka", { port: 9092 })
+  // Persist broker data across restarts (KRaft log + topics/messages) — without
+  // this a restart wipes all events.
+  .withDataVolume()
+  // Kafka UI for validation, ingressed by envoy at /kafka. SERVER_SERVLET_CONTEXT_PATH
+  // makes the (Spring Boot) UI serve under /kafka so its asset URLs resolve through
+  // the proxy without a rewrite; envoy reaches it via the container alias.
+  .withKafkaUI({
+    configureContainer: async (ui) => {
+      await ui
+        .withContainerNetworkAlias("kafka-ui")
+        .withEnvironment("SERVER_SERVLET_CONTEXT_PATH", "/kafka");
+    },
+  })
+  .withContainerNetworkAlias("kafka");
+
 await builder
   .addKeycloak("keycloak", { port: 8082 })
+  // Custom image: stock Keycloak + the keycloak-kafka event-listener SPI, built
+  // in (kc build). Version pinned in aspire/keycloak/Dockerfile (KC_VERSION).
+  .withDockerfile("keycloak")
   // Use Postgres (KC_DB) instead of the start-dev default H2; the db is created
   // by the pg init script and KC auto-migrates its schema into it on boot.
   .withEnvironment("KC_DB", "postgres")
@@ -191,12 +218,38 @@ await builder
   .withEnvironment("KC_PROXY_HEADERS", "xforwarded")
   .withEnvironment("KC_HOSTNAME_STRICT", "false")
   .withEnvironment("KC_HTTP_ENABLED", "true")
+  // Secrets/IDs referenced by the realm-import JSON via ${...} placeholders (the
+  // committed realm files carry no plaintext secrets). Forwarded 1:1 from .envrc
+  // into the container so KC can resolve them on --import-realm. The IMPORT_
+  // prefix avoids KC's own KC_*/KEYCLOAK_* config-option parsing. These names
+  // must match the ${...} placeholders in the realm JSONs EXACTLY (all use the
+  // _CLIENT_ID / _CLIENT_SECRET form).
+  .withEnvironment("IMPORT_KC_START_CLIENT_ID", process.env.IMPORT_KC_START_CLIENT_ID ?? "")
+  .withEnvironment("IMPORT_KC_START_CLIENT_SECRET", process.env.IMPORT_KC_START_CLIENT_SECRET ?? "")
+  .withEnvironment("IMPORT_KC_IDP_GITHUB_CLIENT_ID", process.env.IMPORT_KC_IDP_GITHUB_CLIENT_ID ?? "")
+  .withEnvironment("IMPORT_KC_IDP_GITHUB_CLIENT_SECRET", process.env.IMPORT_KC_IDP_GITHUB_CLIENT_SECRET ?? "")
+  .withEnvironment("IMPORT_KC_IDP_GOOGLE_CLIENT_ID", process.env.IMPORT_KC_IDP_GOOGLE_CLIENT_ID ?? "")
+  .withEnvironment("IMPORT_KC_IDP_GOOGLE_CLIENT_SECRET", process.env.IMPORT_KC_IDP_GOOGLE_CLIENT_SECRET ?? "")
+  .withEnvironment("IMPORT_KC_IDP_OIDC_ACME_CLIENT_ID", process.env.IMPORT_KC_IDP_OIDC_ACME_CLIENT_ID ?? "")
+  .withEnvironment("IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET", process.env.IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET ?? "")
   // No-cache the theme's static assets (login CSS + account-console JS/CSS/fonts)
   // so a `kc:build` shows up on a normal page refresh — no KC bounce, no hard
   // refresh. start-dev already disables theme/template caching (so .ftl +
   // theme.properties hot-reload), but it leaves static assets on a 30-day
   // cache; -1 makes KC send Cache-Control: no-cache instead. Dev-only apphost.
   .withEnvironment("KC_SPI_THEME_STATIC_MAX_AGE", "-1")
+  // keycloak-kafka SPI config (read from env by the baked-in provider). The
+  // realm must ALSO list `kafka` as an event listener and enable Admin Events
+  // with representation — configured in-realm and captured in the realm export.
+  // Use the INTERNAL advertised listener (kafka:9093), NOT the host listener on
+  // :9092 — that one advertises localhost:9092 (for host-side validation) which
+  // is unreachable from inside the KC container. kafka:9093 is what kafka-ui
+  // uses too. Topics auto-create on first produce in dev.
+  .withEnvironment("KAFKA_BOOTSTRAP_SERVERS", "kafka:9093")
+  .withEnvironment("KAFKA_CLIENT_ID", "keycloak")
+  .withEnvironment("KAFKA_TOPIC", "keycloak-events")
+  .withEnvironment("KAFKA_ADMIN_TOPIC", "keycloak-admin-events")
+  .withEnvironment("KAFKA_EVENTS", "REGISTER,UPDATE_PROFILE,UPDATE_EMAIL,DELETE_ACCOUNT,LOGIN,LOGOUT")
   // Imports the `acme` realm (exported from the docker-compose keycloak) on
   // startup. The integration mounts this dir at /opt/keycloak/data/import and
   // runs --import-realm. Realms already present in the persisted data are
@@ -219,7 +272,8 @@ await builder
   )
   // No withDataBindMount: KC state now lives in the `keycloak` Postgres
   // database (durable via the .data/pg mount), not a local H2 file.
-  .waitFor(postgres);
+  .waitFor(postgres)
+  .waitFor(kafka);
 
 // --- api (pivox-cloud) — host process, binds its own ports ---
 // Override the service gRPC listener to all-interfaces. The default

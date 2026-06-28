@@ -21,6 +21,7 @@
     "Aspire.Hosting.Go": "13.4.6-preview.1.26319.6",
     "Aspire.Hosting.Keycloak": "13.4.6-preview.1.26319.6",
     "Aspire.Hosting.JavaScript": "13.4.6",
-    "CommunityToolkit.Aspire.Hosting.OpenTelemetryCollector": "13.4.0"
+    "CommunityToolkit.Aspire.Hosting.OpenTelemetryCollector": "13.4.0",
+    "Aspire.Hosting.Kafka": "13.4.6"
   }
 }

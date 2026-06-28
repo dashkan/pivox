@@ -1,0 +1,4 @@
+# Keycloak user exports carry password hashes — never commit them. The realm
+# CONFIG (sanitized via sanitize-realms.sh) is committed; dev users are created
+# out of band (admin console / seed), not from the baseline.
+*-users-*.json
