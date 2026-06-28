@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import * as oidc from 'openid-client'
 
-import { getOidcConfig } from '@/server/oidc/client'
+import { getOidcConfig, publicOrigin } from '@/server/oidc/client'
 import { readSession, sessionClearCookie } from '@/server/oidc/session'
 
 /**
@@ -15,10 +15,11 @@ export const Route = createFileRoute('/auth/logout')({
     handlers: {
       GET: async ({ request }) => {
         const session = readSession(request)
-        const origin = new URL(request.url).origin
-        let location = `${origin}/`
+        let location = '/' // safe relative fallback if origin/end-session is unavailable
 
         try {
+          const origin = publicOrigin(request)
+          location = `${origin}/`
           const config = await getOidcConfig()
           const endSession = oidc.buildEndSessionUrl(config, {
             post_logout_redirect_uri: `${origin}/`,
@@ -26,7 +27,8 @@ export const Route = createFileRoute('/auth/logout')({
           })
           location = endSession.href
         } catch {
-          // Fall back to a local-only logout.
+          // Origin not allowlisted, or discovery/end-session unavailable —
+          // local-only logout to the app root.
         }
 
         return new Response(null, {

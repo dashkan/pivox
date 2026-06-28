@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import * as oidc from 'openid-client'
 
-import { getOidcConfig } from '@/server/oidc/client'
+import { getOidcConfig, publicOrigin } from '@/server/oidc/client'
 import {
   loginTxClearCookie,
   readLoginTx,
@@ -31,7 +31,12 @@ export const Route = createFileRoute('/auth/callback')({
         const config = await getOidcConfig()
         let tokens
         try {
-          const response = await oidc.authorizationCodeGrant(config, new URL(request.url), {
+          // Rebuild the callback URL on the public origin: openid-client derives
+          // the token-exchange redirect_uri from this URL, and it must match the
+          // redirect_uri sign-in sent (the public origin, not start's internal http).
+          const reqUrl = new URL(request.url)
+          const currentUrl = new URL(reqUrl.pathname + reqUrl.search, publicOrigin(request))
+          const response = await oidc.authorizationCodeGrant(config, currentUrl, {
             pkceCodeVerifier: tx.code_verifier,
             expectedState: tx.state,
           })

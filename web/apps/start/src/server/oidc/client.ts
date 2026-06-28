@@ -52,11 +52,55 @@ export function getOidcConfig(): Promise<oidc.Configuration> {
 export const OIDC_SCOPE = 'openid profile email'
 
 /**
- * Builds the redirect_uri from the incoming request's origin, so it matches the
- * host the user actually reached us on (ngrok in dev, the app origin in prod).
- * Every origin used here MUST be a registered Valid Redirect URI on the `start`
- * client.
+ * Allowed public origins (PIVOX_PUBLIC_ORIGINS, comma-separated). When set, the
+ * BFF only builds redirect/logout URLs for these origins — defense-in-depth over
+ * Keycloak's redirect-URI registration, so a spoofed Host (or a future wildcard
+ * KC misconfig) can't turn into a redirect to an attacker origin. Unset = allow
+ * the request's own origin (dev convenience).
+ */
+function allowedOrigins(): string[] | null {
+  const raw = process.env.PIVOX_PUBLIC_ORIGINS
+  if (!raw) return null
+  return raw
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+}
+
+function firstHeaderValue(request: Request, name: string): string | undefined {
+  const value = request.headers.get(name)
+  return value ? value.split(',')[0].trim() : undefined
+}
+
+/**
+ * The public origin the browser actually used. envoy/ngrok terminate TLS and
+ * forward to `start` over http, so the request's own protocol is wrong — the real
+ * scheme comes from x-forwarded-proto, and the public host from x-forwarded-host
+ * (or the preserved Host, since envoy doesn't rewrite it). Falls back to the
+ * request URL for direct access. Validated against PIVOX_PUBLIC_ORIGINS so we
+ * never build a redirect to an unexpected origin.
+ *
+ * This is THE origin that must match the `start` client's registered redirect
+ * URIs — openid-client derives the token-exchange redirect_uri from the callback
+ * URL, so sign-in and callback must agree on it exactly.
+ */
+export function publicOrigin(request: Request): string {
+  const url = new URL(request.url)
+  const proto = firstHeaderValue(request, 'x-forwarded-proto') ?? url.protocol.replace(/:$/, '')
+  const host = firstHeaderValue(request, 'x-forwarded-host') ?? url.host
+  const origin = `${proto}://${host}`
+
+  const allow = allowedOrigins()
+  if (allow && !allow.includes(origin)) {
+    throw new Error(`oidc: request origin ${origin} is not in PIVOX_PUBLIC_ORIGINS`)
+  }
+  return origin
+}
+
+/**
+ * Builds the redirect_uri from the validated public origin. Every origin it can
+ * produce MUST be a registered Valid Redirect URI on the `start` client.
  */
 export function callbackUrl(request: Request): URL {
-  return new URL('/auth/callback', new URL(request.url).origin)
+  return new URL('/auth/callback', publicOrigin(request))
 }
