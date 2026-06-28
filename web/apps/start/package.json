@@ -30,11 +30,13 @@
     "@tanstack/react-router-ssr-query": "catalog:",
     "@tanstack/react-start": "catalog:",
     "@tanstack/router-plugin": "catalog:",
+    "cookie": "2.0.0",
     "firebase": "catalog:",
     "firebase-admin": "14.1.0",
     "google-auth-library": "10.9.0",
     "lucide-react": "catalog:",
     "nitro": "3.0.260610-beta",
+    "openid-client": "6.8.4",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:"
