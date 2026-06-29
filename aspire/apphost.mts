@@ -4,11 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import {
-  createBuilder,
-  EndpointProperty,
-  refExpr,
-} from "./.aspire/modules/aspire.mjs";
+import { createBuilder } from "./.aspire/modules/aspire.mjs";
 
 function isTruthy(value: string | undefined): boolean {
   return value != null && (value.toLowerCase() === "true" || value === "1");
@@ -77,23 +73,36 @@ const postgres = await builder
   // works for host processes.
   .withContainerNetworkAlias("postgres");
 
-const pgEndpoint = postgres.getEndpoint("tcp");
-const pgHost = await pgEndpoint.property(EndpointProperty.Host);
-const pgPort = await pgEndpoint.property(EndpointProperty.Port);
+// Database resources. addDatabase models each DB (dashboard + health + the
+// injected connection strings) AND creates it idempotently on first start
+// (Aspire subscribes to the server's ResourceReadyEvent and runs
+// CREATE DATABASE "<name>", ignoring 42P04 if it already exists):
+//   - pivox is ALSO the POSTGRES_DB default, so it exists at initdb time for the
+//     init script's golang-migrate + seed (addDatabase's post-startup CREATE is
+//     then a harmless no-op for it).
+//   - keycloak + sessions are created here — Keycloak builds its own schema on
+//     boot and the BFF creates web_sessions on first use, so neither needs the
+//     init script.
+// River is deliberately NOT its own database: the LRO workers complete River
+// jobs in the SAME transaction as the app-data mutation (river.JobCompleteTx +
+// the org/space delete + one Commit), which requires River's tables in `pivox`
+// (the `river` schema). Postgres has no cross-database transactions.
+const pivoxDb = await postgres.addDatabase("pivox");
+// Resource name "keycloak-db", not "keycloak": the addKeycloak server resource
+// already owns the name "keycloak" (resource names are unique, case-insensitive).
+// databaseName pins the actual database to "keycloak".
+const keycloakDb = await postgres.addDatabase("keycloak-db", {
+  databaseName: "keycloak",
+});
+const sessionsDb = await postgres.addDatabase("sessions");
 
-// pgx (pgxpool.ParseConfig) wants a libpq URL, not Aspire's Npgsql keyword
-// string. Build the postgres:// URL from the server endpoint + the parameters.
-// The pivox + keycloak databases, the schema migrations, and the seed are all
-// created by the pg image's init script (aspire/pg/Dockerfile + initdb/00-init.sh)
-// on first start, so consumers just waitFor(postgres) — no init executables.
-const pivoxDatabaseUrl = refExpr`postgres://${pgUsername}:${pgPassword}@${pgHost}:${pgPort}/pivox?sslmode=disable`;
-
-// The web BFF's session store lives in its OWN database (`sessions`) on the same
-// Postgres container, NOT the app `pivox` DB — it's BFF-owned, has no Go
-// migrations, and the BFF creates its schema idempotently on first use. The
-// `sessions` database is created by the pg image's init script (postgres-init/
-// 00-init.sh) on first start, same as `pivox` + `keycloak`.
-const sessionsDatabaseUrl = refExpr`postgres://${pgUsername}:${pgPassword}@${pgHost}:${pgPort}/sessions?sslmode=disable`;
+// pgx (pgxpool.ParseConfig) needs a libpq postgres:// URL, not Aspire's Npgsql
+// keyword connection string. uriExpression() yields exactly that, correctly
+// URL-encoded — so the connection strings are no longer hand-built (the old
+// refExpr left the generated password's special chars unencoded: fine for the
+// current value, a latent break the day a password contains @ / : ).
+const pivoxDatabaseUrl = await pivoxDb.uriExpression();
+const sessionsDatabaseUrl = await sessionsDb.uriExpression();
 
 // --- otel-collector (CommunityToolkit) ---
 // Receives OTLP and forwards to the Aspire dashboard — crucially it handles the
@@ -308,7 +317,11 @@ await builder
   )
   // No withDataBindMount: KC state now lives in the `keycloak` Postgres
   // database (durable via the .data/pg mount), not a local H2 file.
-  .waitFor(postgres)
+  // waitFor(keycloakDb): the addDatabase resource is ready only after postgres
+  // is healthy AND its CREATE DATABASE has run, so the `keycloak` DB exists
+  // before KC boots and builds its schema. KC_DB_URL stays the hand-built
+  // container JDBC (postgres:5432) — container-to-container, not the host URI.
+  .waitFor(keycloakDb)
   .waitFor(kafka);
 
 // --- api (pivox-cloud) — host process, binds its own ports ---
@@ -319,10 +332,10 @@ await builder
   .addGoApp("api", "../cmd/pivox-cloud")
   .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
   .withEnvironment("PIVOX_SERVICE_GRPC_PORT", ":50052")
-  // postgres is healthy only after the init script finishes (migrations + seed
-  // run during first-init before it accepts TCP), so the `vector` type exists
-  // before pgx's RegisterTypes runs.
-  .waitFor(postgres);
+  // waitFor(pivoxDb): the DB resource is ready only after postgres is healthy,
+  // which on first init is after the init script's migrate + seed — so the
+  // schema + the `vector` type exist before pgx's RegisterTypes runs.
+  .waitFor(pivoxDb);
 
 // --- worker (pivox-worker) — host process, River-backed periodic jobs ---
 // Mirrors the `make air-worker` leg of the dev target. No envoy-facing port;
@@ -334,7 +347,8 @@ await builder
   // `web_sessions` table, which lives in the separate `sessions` DB — so the
   // worker needs that connection in addition to the app DB.
   .withEnvironment("PIVOX_SESSIONS_DATABASE_URL", sessionsDatabaseUrl)
-  .waitFor(postgres);
+  .waitFor(pivoxDb)
+  .waitFor(sessionsDb);
 
 // --- agent (pivox-agent) — on-prem storage agent; host process ---
 // Mirrors `make run-agent`. The `storage` subcommand is positional. Dev
@@ -352,7 +366,7 @@ await builder
   .withArgs(["storage"])
   .withEnvironment("PIVOX_TOKEN", "dev-token-local")
   .withEnvironment("PIVOX_PORT", "8083")
-  .waitFor(postgres);
+  .waitFor(pivoxDb);
 
 // --- web libraries build (mirrors the `web-build` prereq of `make dev`) ---
 // The start app imports from @pivox/* workspace packages at vite config-LOAD
@@ -411,6 +425,8 @@ await builder
     "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
     "http://localhost:8081/v1/traces",
   )
+  // The BFF reads the sessions DB per request; ensure it exists before boot.
+  .waitFor(sessionsDb)
   .waitForCompletion(webBuild);
 
 // --- envoy (L7 ingress) ---

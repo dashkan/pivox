@@ -3,19 +3,23 @@
 # server listens on the unix socket only (not TCP), so everything below connects
 # over the socket as the superuser (trust auth during init).
 #
-# Owns all dev DB setup so the apphost doesn't need init executables:
-#   1. create the pivox + keycloak + sessions databases
+# Owns the pivox dev DB setup so the apphost doesn't need init executables:
+#   1. ensure the pivox database exists (POSTGRES_DB already creates it; guard)
 #   2. apply real golang-migrate migrations to pivox (binary baked into the image)
 #   3. seed pivox
-# The `sessions` database (web BFF session store) is created here but has NO
-# migrations — the BFF owns + creates its `web_sessions` schema idempotently.
+# Only pivox is handled here — it's the one DB that needs real migrations + a
+# seed, which Aspire's addDatabase can't do. keycloak + sessions are created by
+# addDatabase (idempotent CREATE DATABASE on startup): Keycloak builds its own
+# schema on boot and the BFF creates `web_sessions` on first use, so neither
+# needs anything from this script.
 #
 # migrations + scripts are bind-mounted by the apphost at /migrations and /scripts.
 set -eu
 
-# Create pivox + keycloak + sessions idempotently. Postgres creates POSTGRES_DB (pivox)
-# before running init scripts, so an unconditional CREATE would collide — and
-# CREATE DATABASE has no IF NOT EXISTS. Guard on pg_database.
+# Ensure pivox exists. Postgres creates POSTGRES_DB (pivox) before running init
+# scripts, so an unconditional CREATE would collide — and CREATE DATABASE has no
+# IF NOT EXISTS. Guard on pg_database. (keycloak + sessions are created by Aspire
+# addDatabase, not here.)
 ensure_db() {
 	if [ "$(psql -tAqc "SELECT 1 FROM pg_database WHERE datname = '$1'" --username "$POSTGRES_USER")" = "1" ]; then
 		echo "database $1 already exists, skipping create"
@@ -24,11 +28,6 @@ ensure_db() {
 	fi
 }
 ensure_db pivox
-ensure_db keycloak
-# The web BFF's session store. BFF-owned: no Go migrations run against it; the
-# BFF creates `web_sessions` idempotently on first use. We only ensure the DB
-# itself exists here.
-ensure_db sessions
 
 # golang-migrate over the socket (no TCP yet). The postgres lib/pq driver reads
 # host=<socket dir>; empty host in the URL + the host param keeps it off TCP.
