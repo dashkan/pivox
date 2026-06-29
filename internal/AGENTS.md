@@ -2,7 +2,7 @@
 
 Scope: `cmd/pivox-cloud/`, `internal/`. The Cloud Controller is the
 SaaS management layer for Pivox — gRPC API, REST gateway, Postgres
-persistence, Firebase auth integration.
+persistence, Keycloak (OIDC) auth integration.
 
 Read this before touching Go code under `internal/`.
 
@@ -14,7 +14,8 @@ Read this before touching Go code under `internal/`.
   `internal/db/queries/*.sql` into `internal/db/generated/`.
 - **Migrations**: `internal/db/migrations/` (golang-migrate). Pre-prod
   edits the init migration directly; no migration squashing rituals.
-- **Auth**: Firebase Auth (verified via `firebase-admin-go`),
+- **Auth**: Keycloak (OIDC). Access tokens are verified in
+  `internal/oidc` (JWKS-backed signature + issuer/audience checks).
   Identity tokens for service-to-service.
 - **Errors**: standardized via `internal/apierr`. Always use this
   for gRPC status errors — never `status.Error` directly.
@@ -77,7 +78,7 @@ result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (Foo, error) {
     if err := qtx.UpdateAsset(ctx, ...); err != nil { return zero, err }
     s.cache.Set(key, value)              // doubled on retry
     s.river.Insert(ctx, jobArgs)         // job enqueued twice
-    s.firebase.DeleteUser(uid)           // possibly non-idempotent
+    s.notifier.Send(ctx, msg)            // possibly non-idempotent
     return qtx.GetAsset(ctx, ...)
 })
 
@@ -184,9 +185,10 @@ proto := convert.OrganizationToProto(row, actors)
 ```
 
 The Resolver caches identity lookups in-process (LRU + TTL).
-Mutation handlers (DeleteAccount, syncIdentity webhook, anything
-that mutates `identities`) call `audit.Resolver.Invalidate(id)` to
-drop stale entries. Other instances catch up via TTL.
+Mutation handlers (DeleteAccount, identity provisioning/sync,
+anything that mutates `identities`) call
+`audit.Resolver.Invalidate(id)` to drop stale entries. Other
+instances catch up via TTL.
 
 ## Permission model
 
@@ -194,7 +196,9 @@ drop stale entries. Other instances catch up via TTL.
   `Resolver.HasPermission(ctx, identity, target, permName)` answers
   the IAM check.
 - The auth chain at the gRPC server is: `AuthInterceptor` (verifies
-  Firebase token + sets `pivox_user_id` ctx claim) →
+  the Keycloak access token via `internal/oidc` and sets the
+  `pivox_user_id` ctx claim — the token's `sub` IS the Pivox
+  identity UUID, so no provider-specific custom claim is needed) →
   `MembershipInterceptor` (gates non-allowlisted RPCs on org
   membership) → `PermissionInterceptor` (per-RPC permission via
   registry).

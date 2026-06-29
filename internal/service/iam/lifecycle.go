@@ -179,7 +179,7 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 		return nil, apierr.Internal("DeleteAccount is not configured on this server (lroManager dep missing)")
 	}
 
-	firebaseIdentityID := server.MustPivoxUserID(ctx)
+	identityID := server.MustPivoxUserID(ctx)
 
 	initialMeta := &iampb.DeleteAccountMetadata{
 		Phase:   iampb.DeleteAccountMetadata_VALIDATING,
@@ -188,17 +188,17 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 
 	// River-backed: pivox-cloud enqueues + creates the operations
 	// row in one tx; pivox-worker's DeleteAccountWorker runs the
-	// 4-phase cascade. The Firebase Auth dep moves to the worker
-	// process — pivox-cloud no longer needs it for this LRO.
+	// cascade (sole-owner check, membership revocation, identity
+	// soft-delete).
 	opID := uuid.New()
 	return s.lroManager.NewLro(ctx, req.GetName(), lro.NewLroOpts{
 		OperationID: opID,
 		// Account-scoped op (no org/space). created_by IS the authz
 		// signal here: only the owner of accounts/me can read this op.
-		CreatedBy: convert.PgUUID(firebaseIdentityID),
+		CreatedBy: convert.PgUUID(identityID),
 		JobArgs: workers.DeleteAccountArgs{
-			OperationID:        opID,
-			FirebaseIdentityID: firebaseIdentityID,
+			OperationID: opID,
+			IdentityID:  identityID,
 		},
 		Metadata: initialMeta,
 	})

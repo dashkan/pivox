@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
-	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
@@ -45,31 +44,26 @@ func (s *OrganizationsServer) GetSsoConfig(ctx context.Context, req *apiv1.GetSs
 }
 
 // UpdateSsoConfig is the singleton create-or-update for the
-// per-org SsoConfig. Steps, in order:
+// per-org SsoConfig row. Steps, in order:
 //
 //  1. Validate the request shape (org slug match, exactly one of
-//     OIDC/SAML set, OIDC required fields populated). SAML returns
-//     Unimplemented in v1 — proto-defined for forward compat but
-//     not wired through Firebase yet.
+//     OIDC/SAML set, OIDC required fields populated).
 //  2. KMS-envelope-encrypt the client_secret if the request set
 //     one. Empty string means "leave the existing secret alone";
 //     the SQL upsert preserves it via COALESCE.
-//  3. Look up the existing row to decide create-vs-update on the
-//     Firebase side. The provider id ("oidc.<org-slug>") is stable
-//     across the row's lifetime so a re-Update doesn't change it.
-//  4. Call Firebase Admin SDK CreateOidcProvider on first create,
-//     UpdateOidcProvider thereafter.
-//  5. Upsert the local row (provider_id + display_name + enabled +
+//  3. Look up the existing row to keep a stable provider id
+//     ("oidc.<org-slug>") across the row's lifetime.
+//  4. Upsert the local row (provider_id + display_name + enabled +
 //     oidc_config JSONB + ciphertext).
 //
-// On Firebase failure: returns Internal; the local row is NOT
-// upserted, so the local state stays consistent with what Firebase
-// thinks. Retries pick up where the previous attempt left off.
+// Keycloak does SSO natively now (the realm owns the upstream OIDC/SAML
+// provider), so this handler no longer provisions an upstream provider —
+// it only persists the Pivox-side SsoConfig row.
 //
 // Permission: organizations.ssoConfig.update (interceptor-gated).
 func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.UpdateSsoConfigRequest) (*apiv1.SsoConfig, error) {
-	if s.encryptor == nil || s.auth == nil {
-		return nil, apierr.Internal("UpdateSsoConfig is not configured on this server (encryptor/auth deps missing)")
+	if s.encryptor == nil {
+		return nil, apierr.Internal("UpdateSsoConfig is not configured on this server (encryptor dep missing)")
 	}
 	resolved := server.MustResolvedOrgFromContext(ctx)
 	cfg := req.GetSsoConfig()
@@ -102,11 +96,8 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 		}
 	}
 
-	// Read the existing row so we pick a stable provider_id and to
-	// inform the create-vs-update branch on Firebase. UNIQUE(org_id)
-	// keeps the lookup at most-one-row. The branch is a HINT, not a
-	// race-safe authority — see the AlreadyExists/NotFound fallback
-	// below for the actual race resolution.
+	// Read the existing row so we keep a stable provider_id across
+	// updates. UNIQUE(org_id) keeps the lookup at most-one-row.
 	existing, getErr := s.queries.GetSsoConfigByOrgID(ctx, resolved.ID)
 	creating := errors.Is(getErr, pgx.ErrNoRows)
 	if !creating && getErr != nil {
@@ -123,10 +114,6 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 
 	switch {
 	case oidc != nil:
-		providerID, err := s.applyOidcProvider(ctx, resolved.Slug, cfg, oidc, existing, creating)
-		if err != nil {
-			return nil, err
-		}
 		oidcJSON, err := convert.OidcConfigRowFromProto(oidc)
 		if err != nil {
 			slog.ErrorContext(ctx, "update sso config: marshal oidc config failed", "error", err)
@@ -141,20 +128,16 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 			}
 			ciphertext = ct
 		}
-		upsert.FirebaseProviderID = providerID
+		upsert.FirebaseProviderID = providerID("oidc.", resolved.Slug, existing, creating)
 		upsert.OidcConfig = oidcJSON
 		upsert.ClientSecretCiphertext = ciphertext
 	default: // saml != nil
-		providerID, err := s.applySamlProvider(ctx, resolved.Slug, cfg, saml, existing, creating)
-		if err != nil {
-			return nil, err
-		}
 		samlJSON, err := convert.SamlConfigRowFromProto(saml)
 		if err != nil {
 			slog.ErrorContext(ctx, "update sso config: marshal saml config failed", "error", err)
 			return nil, apierr.Internal("marshal saml config")
 		}
-		upsert.FirebaseProviderID = providerID
+		upsert.FirebaseProviderID = providerID("saml.", resolved.Slug, existing, creating)
 		upsert.SamlConfig = samlJSON
 	}
 
@@ -166,114 +149,17 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 	return convert.SsoConfigToProto(row, resolved.Slug, nil), nil
 }
 
-// applyOidcProvider validates, builds, and applies the OIDC provider
-// config to Firebase. Returns the (server-managed) provider id used
-// for the local upsert. Encapsulates the create-or-update fallback
-// that handles concurrent first-create races.
-func (s *OrganizationsServer) applyOidcProvider(
-	ctx context.Context,
-	orgSlug string,
-	cfg *apiv1.SsoConfig,
-	oidc *apiv1.OidcConfig,
-	existing db.SsoConfig,
-	creating bool,
-) (string, error) {
-	// Validation has already run in UpdateSsoConfig before any I/O —
-	// see the per-config validation block ahead of the DB lookup.
-	providerID := "oidc." + orgSlug
+// providerID returns the stable provider id stored on the SsoConfig
+// row. It's derived from the org slug ("oidc.<slug>" / "saml.<slug>")
+// on first create and preserved from the existing row thereafter so a
+// re-Update never changes it. Vestigial: Keycloak owns the upstream
+// provider now, but the column is retained on the row for forward
+// compatibility.
+func providerID(prefix, orgSlug string, existing db.SsoConfig, creating bool) string {
 	if !creating && existing.FirebaseProviderID != "" {
-		providerID = existing.FirebaseProviderID
+		return existing.FirebaseProviderID
 	}
-	authCfg := authn.OidcProviderConfig{
-		ProviderID:   providerID,
-		DisplayName:  cfg.GetDisplayName(),
-		Enabled:      cfg.GetEnabled(),
-		Issuer:       oidc.GetIssuer(),
-		ClientID:     oidc.GetClientId(),
-		ClientSecret: oidc.GetClientSecret(),
-		CodeFlow:     oidc.GetResponseType().GetCode(),
-		IDTokenFlow:  oidc.GetResponseType().GetIdToken(),
-	}
-	if creating {
-		if err := s.auth.CreateOidcProvider(ctx, authCfg); err != nil {
-			if isAlreadyExistsErr(err) {
-				if err := s.auth.UpdateOidcProvider(ctx, authCfg); err != nil {
-					slog.ErrorContext(ctx, "update sso config: firebase oidc fallback update failed", "provider_id", providerID, "error", err)
-					return "", apierr.Internal("update firebase oidc provider")
-				}
-			} else {
-				slog.ErrorContext(ctx, "update sso config: firebase create oidc provider failed", "provider_id", providerID, "error", err)
-				return "", apierr.Internal("create firebase oidc provider")
-			}
-		}
-		return providerID, nil
-	}
-	if err := s.auth.UpdateOidcProvider(ctx, authCfg); err != nil {
-		if isNotFoundErr(err) {
-			if err := s.auth.CreateOidcProvider(ctx, authCfg); err != nil {
-				slog.ErrorContext(ctx, "update sso config: firebase oidc fallback create failed", "provider_id", providerID, "error", err)
-				return "", apierr.Internal("create firebase oidc provider")
-			}
-		} else {
-			slog.ErrorContext(ctx, "update sso config: firebase update oidc provider failed", "provider_id", providerID, "error", err)
-			return "", apierr.Internal("update firebase oidc provider")
-		}
-	}
-	return providerID, nil
-}
-
-// applySamlProvider is the SAML sibling of applyOidcProvider. Same
-// create-or-update fallback shape; same idempotency semantics.
-func (s *OrganizationsServer) applySamlProvider(
-	ctx context.Context,
-	orgSlug string,
-	cfg *apiv1.SsoConfig,
-	saml *apiv1.SamlConfig,
-	existing db.SsoConfig,
-	creating bool,
-) (string, error) {
-	// Validation has already run in UpdateSsoConfig before any I/O.
-	providerID := "saml." + orgSlug
-	if !creating && existing.FirebaseProviderID != "" {
-		providerID = existing.FirebaseProviderID
-	}
-	authCfg := authn.SamlProviderConfig{
-		ProviderID:            providerID,
-		DisplayName:           cfg.GetDisplayName(),
-		Enabled:               cfg.GetEnabled(),
-		IDPEntityID:           saml.GetIdpEntityId(),
-		SSOURL:                saml.GetSsoUrl(),
-		X509Certificates:      saml.GetX509Certificates(),
-		RequestSigningEnabled: saml.GetRequestSigningEnabled(),
-		RPEntityID:            saml.GetRpEntityId(),
-		CallbackURL:           saml.GetCallbackUrl(),
-	}
-	if creating {
-		if err := s.auth.CreateSamlProvider(ctx, authCfg); err != nil {
-			if isAlreadyExistsErr(err) {
-				if err := s.auth.UpdateSamlProvider(ctx, authCfg); err != nil {
-					slog.ErrorContext(ctx, "update sso config: firebase saml fallback update failed", "provider_id", providerID, "error", err)
-					return "", apierr.Internal("update firebase saml provider")
-				}
-			} else {
-				slog.ErrorContext(ctx, "update sso config: firebase create saml provider failed", "provider_id", providerID, "error", err)
-				return "", apierr.Internal("create firebase saml provider")
-			}
-		}
-		return providerID, nil
-	}
-	if err := s.auth.UpdateSamlProvider(ctx, authCfg); err != nil {
-		if isNotFoundErr(err) {
-			if err := s.auth.CreateSamlProvider(ctx, authCfg); err != nil {
-				slog.ErrorContext(ctx, "update sso config: firebase saml fallback create failed", "provider_id", providerID, "error", err)
-				return "", apierr.Internal("create firebase saml provider")
-			}
-		} else {
-			slog.ErrorContext(ctx, "update sso config: firebase update saml provider failed", "provider_id", providerID, "error", err)
-			return "", apierr.Internal("update firebase saml provider")
-		}
-	}
-	return providerID, nil
+	return prefix + orgSlug
 }
 
 // validateSaml enforces the request-side SAML invariants beyond
@@ -293,16 +179,6 @@ func validateSaml(s *apiv1.SamlConfig) error {
 	}
 	return nil
 }
-
-// isAlreadyExistsErr / isNotFoundErr classify Firebase Admin SDK
-// errors so the create-or-update fallback knows when to flip
-// directions. The Firebase Go SDK exposes typed predicates
-// (auth.IsConfigurationExists, auth.IsConfigurationNotFound). We
-// indirect through the authn package so the organizations service
-// doesn't have to import firebase directly — the boundary's whole
-// purpose is to keep firebase out of the business layer.
-func isAlreadyExistsErr(err error) bool { return authn.IsAlreadyExists(err) }
-func isNotFoundErr(err error) bool      { return authn.IsNotFound(err) }
 
 // assertSsoConfigName validates the resource path shape and matches
 // the org slug against the interceptor-resolved scope. Defense

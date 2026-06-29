@@ -8,7 +8,7 @@ All platforms:
 - **Go** 1.26+
 - **Rust** 1.94+ (stable)
 - **buf** 1.60+ (proto toolchain)
-- **Node.js** 20+ (Firebase tools, optional)
+- **Node.js** 20+ (web app + Aspire AppHost tooling)
 
 macOS additionally:
 - **Xcode** 26+ (Swift 6, Metal, XCTest)

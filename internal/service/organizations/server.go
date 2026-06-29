@@ -12,7 +12,6 @@ import (
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/audit"
-	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -29,7 +28,6 @@ type OrganizationsServer struct {
 	apiv1.UnimplementedOrganizationsServer
 	pool     db.RWPool
 	queries  db.Querier
-	auth     authn.Service
 	filter   *filter.ResourceFilter
 	codec    *appkey.Codec
 	resolver *permission.Resolver
@@ -54,9 +52,6 @@ type Config struct {
 	Pool *pgxpool.Pool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
-	// Auth is the authn service used by the registration / SSO
-	// paths. Required.
-	Auth authn.Service
 	// Codec opaque-encodes resource names. Required.
 	Codec *appkey.Codec
 	// Resolver gates per-resource permission checks. Optional;
@@ -86,16 +81,12 @@ func NewOrganizationsServer(cfg Config) *OrganizationsServer {
 	if cfg.Queries == nil {
 		panic("organizations: Config.Queries is required")
 	}
-	if cfg.Auth == nil {
-		panic("organizations: Config.Auth is required")
-	}
 	if cfg.Codec == nil {
 		panic("organizations: Config.Codec is required")
 	}
 	return &OrganizationsServer{
 		pool:       cfg.Pool,
 		queries:    cfg.Queries,
-		auth:       cfg.Auth,
 		filter:     filter.OrganizationFilter(),
 		codec:      cfg.Codec,
 		resolver:   cfg.Resolver,

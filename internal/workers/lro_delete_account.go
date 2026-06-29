@@ -17,7 +17,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/audit"
-	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
@@ -25,31 +24,28 @@ import (
 // DeleteAccountArgs is the River job input for the DeleteAccount
 // LRO. Multi-phase orchestration runs in the worker's Work():
 // VALIDATING (sole-owner check) → REVOKING_MEMBERSHIPS (drop org +
-// space members) → DELETING_PIVOX_RECORDS (capture firebase_uid,
-// soft-delete identity) → DELETING_FIREBASE_IDENTITY (auth.DeleteUser).
+// space members) → DELETING_PIVOX_RECORDS (soft-delete identity).
 //
-// Multi-tx: the Firebase API call is the last phase and can't run
-// inside a Postgres tx. Each phase does its own short tx; River's
-// retry contract means the whole Work() may run more than once,
-// so each phase is replay-safe (idempotent on already-applied
-// state — see e.g. the soft-delete-already-tombstoned guard in
-// Phase 3).
+// The Keycloak realm user is deleted out-of-band (via Keycloak's own
+// admin flows / account console), so the LRO only owns the Pivox-side
+// records. Each phase does its own short tx; River's retry contract
+// means the whole Work() may run more than once, so each phase is
+// replay-safe (idempotent on already-applied state — see e.g. the
+// soft-delete-already-tombstoned guard in Phase 3).
 type DeleteAccountArgs struct {
-	OperationID        uuid.UUID `json:"operation_id"`
-	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
+	OperationID uuid.UUID `json:"operation_id"`
+	IdentityID  uuid.UUID `json:"identity_id"`
 }
 
 // Kind implements river.JobArgs.
 func (DeleteAccountArgs) Kind() string { return "lro_delete_account" }
 
 // DeleteAccountWorker handles DeleteAccount LROs. Holds a worker
-// slot for the duration of all four phases (typically sub-second);
-// the Firebase API call is the only network IO.
+// slot for the duration of all phases (typically sub-second).
 type DeleteAccountWorker struct {
 	river.WorkerDefaults[DeleteAccountArgs]
 
 	Pool   *pgxpool.Pool
-	Auth   authn.Service
 	Audit  *audit.Resolver
 	Logger *slog.Logger
 }
@@ -64,18 +60,16 @@ type DeleteAccountWorker struct {
 //   - Phase 2 (revoke memberships): DELETEs are naturally idempotent
 //     (no-op if rows already gone).
 //   - Phase 3 (soft-delete identity): tx detects identity.IsDeleted=true
-//     and skips the UPDATE, capturing the preserved firebase_uid.
-//   - Phase 4 (Firebase delete): authn.Service.DeleteUser is documented
-//     idempotent on already-deleted UIDs.
+//     and skips the UPDATE.
 func (w *DeleteAccountWorker) Work(ctx context.Context, job *river.Job[DeleteAccountArgs]) error {
 	args := job.Args
 	queries := db.New(w.Pool)
 
 	// Phase 1 — VALIDATING: sole-owner check across active orgs.
-	soleOwnerOrgs, err := queries.ListSoleOwnerOrgsForIdentity(ctx, convert.PgUUID(args.FirebaseIdentityID))
+	soleOwnerOrgs, err := queries.ListSoleOwnerOrgsForIdentity(ctx, convert.PgUUID(args.IdentityID))
 	if err != nil {
 		w.Logger.ErrorContext(ctx, "lro_delete_account: sole-owner check failed",
-			"identity_id", args.FirebaseIdentityID, "error", err)
+			"identity_id", args.IdentityID, "error", err)
 		return err
 	}
 	if len(soleOwnerOrgs) > 0 {
@@ -91,14 +85,14 @@ func (w *DeleteAccountWorker) Work(ctx context.Context, job *river.Job[DeleteAcc
 	// Phase 2 — REVOKING_MEMBERSHIPS: cross-org drop. Tx-wrapped so
 	// the org + space revocations land atomically.
 	if err := db.RunInTxVoid(ctx, w.Pool, func(qtx db.Querier) error {
-		if err := qtx.DeleteOrgMembersForIdentity(ctx, convert.PgUUID(args.FirebaseIdentityID)); err != nil {
+		if err := qtx.DeleteOrgMembersForIdentity(ctx, convert.PgUUID(args.IdentityID)); err != nil {
 			w.Logger.ErrorContext(ctx, "lro_delete_account: revoke org members failed",
-				"identity_id", args.FirebaseIdentityID, "error", err)
+				"identity_id", args.IdentityID, "error", err)
 			return err
 		}
-		if err := qtx.DeleteSpaceMembersForIdentity(ctx, convert.PgUUID(args.FirebaseIdentityID)); err != nil {
+		if err := qtx.DeleteSpaceMembersForIdentity(ctx, convert.PgUUID(args.IdentityID)); err != nil {
 			w.Logger.ErrorContext(ctx, "lro_delete_account: revoke space members failed",
-				"identity_id", args.FirebaseIdentityID, "error", err)
+				"identity_id", args.IdentityID, "error", err)
 			return err
 		}
 		return nil
@@ -106,48 +100,44 @@ func (w *DeleteAccountWorker) Work(ctx context.Context, job *river.Job[DeleteAcc
 		return err
 	}
 
-	// Phase 3 — DELETING_PIVOX_RECORDS: capture firebase_uid then
-	// soft-delete the identity row. Tx-wrapped lookup-then-update
-	// to close the TOCTOU window. is_deleted=true on the lookup
-	// indicates a previous attempt already soft-deleted; we skip
-	// the UPDATE and proceed (firebase_uid is preserved through
-	// soft delete).
-	identity, err := db.RunInTx(ctx, w.Pool, func(qtx db.Querier) (db.Identity, error) {
-		ident, err := qtx.GetIdentityByID(ctx, args.FirebaseIdentityID)
+	// Phase 3 — DELETING_PIVOX_RECORDS: soft-delete the identity row.
+	// Tx-wrapped lookup-then-update to close the TOCTOU window.
+	// is_deleted=true on the lookup indicates a previous attempt
+	// already soft-deleted; we skip the UPDATE and proceed.
+	if err := db.RunInTxVoid(ctx, w.Pool, func(qtx db.Querier) error {
+		ident, err := qtx.GetIdentityByID(ctx, args.IdentityID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				w.Logger.ErrorContext(ctx, "lro_delete_account: identity row already purged outside the LRO — Firebase Auth account likely orphaned, manual cleanup required",
-					"identity_id", args.FirebaseIdentityID)
-				return db.Identity{}, errIdentityVanished
+				w.Logger.ErrorContext(ctx, "lro_delete_account: identity row already purged outside the LRO",
+					"identity_id", args.IdentityID)
+				return errIdentityVanished
 			}
 			w.Logger.ErrorContext(ctx, "lro_delete_account: lookup identity failed",
-				"id", args.FirebaseIdentityID, "error", err)
-			return db.Identity{}, err
+				"id", args.IdentityID, "error", err)
+			return err
 		}
 		if ident.IsDeleted {
-			// Resumption: previous attempt soft-deleted but didn't
-			// finish Phase 4. firebase_uid preserved through soft
-			// delete; proceed.
+			// Resumption: a previous attempt already soft-deleted; nothing
+			// more to do for this phase.
 			w.Logger.InfoContext(ctx, "lro_delete_account: identity already soft-deleted, resuming",
-				"id", args.FirebaseIdentityID)
-			return ident, nil
+				"id", args.IdentityID)
+			return nil
 		}
-		if _, err := qtx.SoftDeleteIdentity(ctx, args.FirebaseIdentityID); err != nil {
+		if _, err := qtx.SoftDeleteIdentity(ctx, args.IdentityID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				w.Logger.ErrorContext(ctx, "lro_delete_account: soft-delete identity touched zero rows under tx — should be unreachable",
-					"id", args.FirebaseIdentityID)
-				return db.Identity{}, errSoftDeleteRace
+					"id", args.IdentityID)
+				return errSoftDeleteRace
 			}
 			w.Logger.ErrorContext(ctx, "lro_delete_account: soft-delete identity failed",
-				"id", args.FirebaseIdentityID, "error", err)
-			return db.Identity{}, err
+				"id", args.IdentityID, "error", err)
+			return err
 		}
-		return ident, nil
-	})
-	if err != nil {
+		return nil
+	}); err != nil {
 		if errors.Is(err, errIdentityVanished) {
 			return w.failOp(ctx, args.OperationID, codes.Internal,
-				"identity already removed from Pivox but its Firebase Auth UID is unknown; operator must reconcile manually")
+				"identity already removed from Pivox; nothing to delete")
 		}
 		if errors.Is(err, errSoftDeleteRace) {
 			return w.failOp(ctx, args.OperationID, codes.Internal,
@@ -159,21 +149,7 @@ func (w *DeleteAccountWorker) Work(ctx context.Context, job *river.Job[DeleteAcc
 	// Drop any cached Actor for this id so the next read on this
 	// process sees the soft-deleted state immediately.
 	if w.Audit != nil {
-		w.Audit.Invalidate(args.FirebaseIdentityID)
-	}
-
-	// Phase 4 — DELETING_FIREBASE_IDENTITY: last so a failure
-	// leaves Pivox state cleaned up while Firebase is still
-	// recoverable. Idempotent on already-deleted UIDs.
-	if err := w.Auth.DeleteUser(ctx, identity.FirebaseUid); err != nil {
-		w.Logger.ErrorContext(ctx, "lro_delete_account: firebase auth deletion failed",
-			"uid", identity.FirebaseUid, "error", err)
-		// Return err so River retries the whole Work() — Phases 1-3
-		// are replay-safe; we'll re-enter Phase 4 with the same
-		// firebase_uid and try again. If the Firebase error is
-		// permanent the retry budget exhausts and the operation
-		// remains pending; operator reconciles manually.
-		return err
+		w.Audit.Invalidate(args.IdentityID)
 	}
 
 	// Operation complete — empty response, just like the legacy

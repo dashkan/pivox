@@ -8,7 +8,7 @@
 	proto-generate-openapi-v3 proto-generate-typescript api-lint \
 	lint-icons \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
-	docker-up docker-down firebase-deploy clean-fn-revisions \
+	docker-up docker-down \
 	ai-native \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload \
 	proxy-envoy proxy-envoy-validate envoy-descriptor proxy-ngrok \
@@ -222,18 +222,6 @@ docker-up:
 docker-down:
 	docker compose down
 
-# Firebase
-
-firebase-deploy:
-	pnpm --dir ./deployments/firebase/functions run deploy
-
-# Clean up Firebase Functions deployments in Cloud Run:
-#   - delete services orphaned by source-side renames or removals
-#   - prune non-active revisions of surviving services
-# Dry-run by default; set FORCE=1 to actually delete.
-clean-fn-revisions:
-	@scripts/clean-fn-revisions.sh
-
 # build-app-macos builds the macOS app in Debug. No
 # -derivedDataPath flag — this is a CMake-generated Xcode project
 # whose default build location is `native/build-xcode/Debug/Pivox.app`
@@ -290,9 +278,9 @@ ai-native:
 	@dotnet/scripts/build-ai-native.sh
 
 # Native UI Tests (macOS) — image editor only. The auth UI tests
-# previously depended on the Firebase Auth emulator; they are
-# excluded from this target until they're rewritten to run against
-# real Firebase Auth or a hermetic stub.
+# are excluded from this target until they're rewritten to run
+# against the Keycloak-based auth flow (the native app's own
+# Keycloak migration is still pending).
 test-native-ui:
 	@xcodebuild test \
 		-project native/build-xcode/Pivox.xcodeproj \

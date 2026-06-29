@@ -965,7 +965,6 @@ type GroupMember struct {
 
 type Identity struct {
 	ID            uuid.UUID          `json:"id"`
-	FirebaseUid   string             `json:"firebase_uid"`
 	Email         string             `json:"email"`
 	EmailVerified bool               `json:"email_verified"`
 	DisplayName   string             `json:"display_name"`

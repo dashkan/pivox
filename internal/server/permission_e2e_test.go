@@ -272,7 +272,6 @@ func newPermissionHarness(t *testing.T) *grpcharness.Harness {
 		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
 			Pool:       h.Pool,
 			Queries:    h.Queries,
-			Auth:       h.Auth,
 			Codec:      codec,
 			Resolver:   permResolver,
 			LROManager: h.LROManager,
@@ -288,7 +287,6 @@ func newPermissionHarness(t *testing.T) *grpcharness.Harness {
 		iampb.RegisterIamServer(s, iam.NewIamServer(iam.Config{
 			Pool:       h.Pool,
 			Queries:    h.Queries,
-			Auth:       h.Auth,
 			LROManager: h.LROManager,
 		}))
 	}))

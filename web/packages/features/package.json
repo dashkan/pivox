@@ -19,22 +19,6 @@
       "types": "./dist/esm/org-gate.d.ts",
       "import": "./dist/esm/org-gate.js"
     },
-    "./login": {
-      "types": "./dist/esm/login.d.ts",
-      "import": "./dist/esm/login.js"
-    },
-    "./registration": {
-      "types": "./dist/esm/registration.d.ts",
-      "import": "./dist/esm/registration.js"
-    },
-    "./forgot-password": {
-      "types": "./dist/esm/forgot-password.d.ts",
-      "import": "./dist/esm/forgot-password.js"
-    },
-    "./reset-password": {
-      "types": "./dist/esm/reset-password.d.ts",
-      "import": "./dist/esm/reset-password.js"
-    },
     "./auth": {
       "types": "./dist/esm/auth.d.ts",
       "import": "./dist/esm/auth.js"
@@ -42,22 +26,6 @@
     "./auth-gate": {
       "types": "./dist/esm/auth-gate.d.ts",
       "import": "./dist/esm/auth-gate.js"
-    },
-    "./broker": {
-      "types": "./dist/esm/broker.d.ts",
-      "import": "./dist/esm/broker.js"
-    },
-    "./verify-email": {
-      "types": "./dist/esm/verify-email.d.ts",
-      "import": "./dist/esm/verify-email.js"
-    },
-    "./link-account": {
-      "types": "./dist/esm/link-account.d.ts",
-      "import": "./dist/esm/link-account.js"
-    },
-    "./user-profile": {
-      "types": "./dist/esm/user-profile.d.ts",
-      "import": "./dist/esm/user-profile.js"
     },
     "./app-shell": {
       "types": "./dist/esm/app-shell.d.ts",
@@ -108,7 +76,6 @@
     "@pivox/primitives": "workspace:*",
     "@pivox/storage": "workspace:*",
     "@pivox/ui": "workspace:*",
-    "ai": "catalog:",
-    "firebase": "catalog:"
+    "ai": "catalog:"
   }
 }

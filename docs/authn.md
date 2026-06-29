@@ -1,16 +1,22 @@
 # Authentication Architecture
 
-> **Note for future readers.** Earlier revisions of this document
-> described two local-development modes: an emulator-based mode and
-> a `-tags dev` build with a `SHARED_SECRET` Firebase-Functions →
-> Pivox channel. Both have been removed. The current shape:
-> Firebase Functions → Pivox runs only via Google Cloud OIDC
-> identity tokens (validated by `internal/server/internal_hooks_sync_auth.go`),
-> and local development uses production binaries pointed at a real
-> Firebase project (typically through ngrok). The Mode 1 / Mode 2
-> sections below are retained for historical context only — anything
-> referencing `SHARED_SECRET`, `FIREBASE_AUTH_EMULATOR_HOST`, or the
-> `dev` build tag does not reflect the current code.
+> **Current state (Firebase removed).** Cloud-side auth is now
+> **Keycloak-only**. The Firebase Cloud Functions (auth-time
+> blocking hooks) have been deleted, and the Cloud Controller
+> verifies Keycloak (OIDC) access tokens via `internal/oidc`
+> (JWKS-backed; the token's `sub` IS the Pivox identity UUID).
+> Identity provisioning flows from Keycloak (KC→Kafka→Pivox event
+> sync), not Firebase auth hooks. **Everything below describes the
+> legacy Firebase-based architecture and is retained for historical
+> context only.** The web/Electron client still references Firebase
+> and is temporarily broken pending its own Keycloak migration.
+>
+> **Historical note.** Earlier revisions also described two
+> local-development modes: an emulator-based mode and a `-tags dev`
+> build with a `SHARED_SECRET` Firebase-Functions → Pivox channel.
+> Both were removed before Firebase itself was; anything referencing
+> `SHARED_SECRET`, `FIREBASE_AUTH_EMULATOR_HOST`, or the `dev` build
+> tag does not reflect any current code.
 
 ## Overview
 

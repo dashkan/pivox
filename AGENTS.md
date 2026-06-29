@@ -9,8 +9,8 @@ Refer to components by their canonical names, not their tech stack:
 
 - **Cloud Controller** — SaaS management layer. Source of truth.
   Hosts the public gRPC API + REST gateway, owns Postgres
-  persistence, integrates Firebase Auth. Pure RPC — no background
-  workers (those run in the Worker Process).
+  persistence, integrates Keycloak (OIDC) auth. Pure RPC — no
+  background workers (those run in the Worker Process).
 - **Worker Process** — background work runner paired with Cloud
   Controller. Hosts every periodic job (org/space purge, domain
   verification, LRO reaping, auth-artifact cleanup) via River
@@ -23,8 +23,13 @@ Refer to components by their canonical names, not their tech stack:
 - **Storage Agent** — on-prem agent for asset storage, paired with
   Cloud Controller.
 - **Playout Agent** — on-prem agent installed alongside engines.
-- **Cloud Functions** — Firebase blocking functions for auth-time
-  hooks (identity sync into Pivox at sign-up / sign-in).
+
+> **Removed:** Firebase Cloud Functions (auth-time blocking hooks
+> for identity sync) are gone — auth is Keycloak-only on the cloud.
+> Identity provisioning now flows from Keycloak (KC→Kafka→Pivox
+> event sync), not Firebase auth hooks. The Electron app still
+> references Firebase and is temporarily broken pending its own
+> Keycloak migration.
 
 Tech-stack references ("Go backend", "Rust engine") are appropriate
 in build docs / architecture decisions where the technology is the
@@ -70,7 +75,8 @@ internal/             Go application code (Cloud Controller + Storage Agent)
   apierr/             gRPC status-error builders. Always go through this.
   appkey/             Codec for opaque resource-name encoding (HMAC-signed).
   audit/              Identity → Actor resolver with in-process LRU cache.
-  authn/              Firebase Auth verification, identity tokens.
+  authn/              Auth abstraction (Identity, Service interface), identity tokens.
+  oidc/               Keycloak/OIDC access-token verifier (JWKS-backed).
   config/             Server config structs (CLI flags hydrate these).
   convert/            Proto ↔ DB row conversion helpers.
   crypto/             Encryptor interface, KMS implementation, NoOp passthrough for tests.
@@ -102,10 +108,6 @@ internal/             Go application code (Cloud Controller + Storage Agent)
 
 api/                  Proto definitions (source of truth for gRPC API)
 proto/ buf.yaml ...   buf config + dependencies
-
-deployments/firebase/ Cloud Functions
-  AGENTS.md           Cloud Functions conventions
-  functions/          TypeScript source
 
 native/               Native App
   AGENTS.md           Native conventions
@@ -147,7 +149,6 @@ code. It covers:
 Other stacks:
 
 - **`native/AGENTS.md`** — macOS/Windows/shared-core conventions.
-- **`deployments/firebase/AGENTS.md`** — Firebase Functions conventions.
 
 ## Build + run + test
 
@@ -155,9 +156,8 @@ Other stacks:
 
 Single build mode — there is no `-tags dev` variant. Local
 development uses production binaries pointed at a local Postgres
-and (optionally) an ngrok tunnel for Firebase Functions to reach
-the API. Tests run against the shared docker-compose stack defined
-in `docker-compose.test.yml`.
+and a local Keycloak (the dev IDP). Tests run against the shared
+docker-compose stack defined in `docker-compose.test.yml`.
 
 ```sh
 # Build / run
@@ -202,10 +202,6 @@ make proto-format                       # buf format -w
 
 # Docker (local pg + adminer)
 make docker-up / docker-down
-
-# Firebase
-make firebase-deploy                    # deploy blocking functions
-make clean-fn-revisions                 # prune old Cloud Run revisions
 ```
 
 All `make` targets that invoke pinned tools route through
@@ -282,11 +278,13 @@ Conventions and gotchas (each was paid for once; don't relearn them):
   Aspire and compose flows — envoy proxies `/realms/` + `/resources/`
   for the browser SSO login; the admin console is reached directly on
   `:8082`, not through envoy. The acme SSO issuer is
-  `https://pivox.ngrok.app/realms/acme`. This issuer lives in **three**
-  places that must agree: `scripts/seeds/02_acme_sso.sql`, the
-  **Firebase console** `oidc.acme` provider (not in-repo), and the live
+  `https://pivox.ngrok.app/realms/acme`. This issuer lives in **two**
+  places that must agree: `scripts/seeds/02_acme_sso.sql` and the live
   `sso_configs.oidc_config` row (re-seed an empty DB, or `UPDATE` in
-  place — the seed only runs on first use).
+  place — the seed only runs on first use). (Pre-Firebase-removal a
+  third place — the Firebase console `oidc.acme` provider — also had
+  to agree; that federation is gone now that the cloud verifies
+  Keycloak tokens directly.)
 - **ngrok** claims `pivox.ngrok.app`; only one agent session per domain,
   so stop `make proxy-ngrok` before `aspire start`.
 
@@ -303,21 +301,6 @@ xcodebuild build -project build-xcode/Pivox.xcodeproj -scheme Pivox \
 xcodebuild test -scheme PivoxTests                     # unit tests
 make test-native-ui                                    # UI tests (XCUITest)
 ```
-
-### Cloud Functions
-
-```sh
-cd deployments/firebase
-# Build/deploy is wrapped at repo root:
-make firebase-deploy                    # production deploy
-```
-
-The Firebase Auth emulator is intentionally not wired into our
-local loop — Firebase Functions blocking triggers don't fire under
-the emulator anyway, and our auth path needs real OIDC tokens.
-Develop against a real Firebase project; expose the local
-pivox-cloud via ngrok (or equivalent) and point the Cloud Function
-at it via the `PIVOX_API_URL` parameter.
 
 ## Skills (`.agents/skills/golang-*`)
 

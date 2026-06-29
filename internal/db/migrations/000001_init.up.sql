@@ -483,12 +483,11 @@ CREATE INDEX idx_api_keys_key_string ON api_keys (key_string) WHERE delete_time 
 -- identities (global Firebase Auth cache — internal, no proto)
 -- ============================================================================
 CREATE TABLE identities (
+    -- id IS the Keycloak `sub` (a UUID) for KC-provisioned principals,
+    -- passed in by the KC event-sync upsert rather than generated. The
+    -- uuidv7() default covers any row created without an explicit id.
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
-    -- identity (Firebase, for now — column name kept because it
-    -- specifically holds the Firebase UID; future non-Firebase
-    -- principal sources will get their own typed column).
-    firebase_uid    TEXT NOT NULL UNIQUE,
-    -- domain (synced from Firebase). Soft-delete blanks these out;
+    -- domain (synced from Keycloak). Soft-delete blanks these out;
     -- only `id` is durably preserved so historical *_by audit
     -- references remain stable.
     email           TEXT NOT NULL DEFAULT '',

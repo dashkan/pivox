@@ -108,10 +108,10 @@ func New(t *testing.T, opts ...Option) *Harness {
 	pool, queries := testutil.SetupTestDB(t)
 
 	if cfg.auth == nil {
-		// Default authn looks identities up via queries to populate the
-		// `pivox_user_id` claim — matches the production interceptor's
-		// post-Phase-7 contract.
-		cfg.auth = testAuthService{queries: queries}
+		// Default authn trusts the bearer token as the identity UUID —
+		// matches production, where the Keycloak token's `sub` IS
+		// `identities.id`.
+		cfg.auth = testAuthService{}
 	}
 
 	// Tests use a deterministic round-tripping encryptor. KMS would

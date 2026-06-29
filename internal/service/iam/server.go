@@ -17,7 +17,6 @@ import (
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/audit"
-	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
@@ -33,7 +32,6 @@ type IamServer struct {
 	iampb.UnimplementedIamServer
 	pool       db.TxBeginner
 	queries    db.Querier
-	auth       authn.Service
 	lroManager *lro.Manager
 	// audit is non-nil when the resolver wants invalidation
 	// callbacks on identity mutations (DeleteAccount soft-delete).
@@ -41,11 +39,10 @@ type IamServer struct {
 	audit *audit.Resolver
 }
 
-// Config is the constructor input for IamServer. The auth + LROManager
-// deps are required by DeleteUser (a global LRO that ends with a
-// Firebase Auth deletion); read-only handlers (ListPermissions,
-// GetRole, ListRoles) ignore them. Unit tests that exercise only
-// reads build an IamServer struct literal directly.
+// Config is the constructor input for IamServer. The LROManager dep is
+// required by DeleteAccount (a global LRO); read-only handlers
+// (ListPermissions, GetRole, ListRoles) ignore it. Unit tests that
+// exercise only reads build an IamServer struct literal directly.
 type Config struct {
 	// Pool is the database pool used for transactional handlers
 	// (DeleteUser sole-owner check + cascade; DeleteAccount per-phase
@@ -53,9 +50,7 @@ type Config struct {
 	Pool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
-	// Auth is the authn service. Required.
-	Auth authn.Service
-	// LROManager drives DeleteUser. Required.
+	// LROManager drives DeleteAccount. Required.
 	LROManager *lro.Manager
 	// AuditResolver receives Invalidate() calls when identities
 	// mutate (DeleteAccount blanks PII + flips is_deleted). Optional;
@@ -74,16 +69,12 @@ func NewIamServer(cfg Config) *IamServer {
 	if cfg.Queries == nil {
 		panic("iam: Config.Queries is required")
 	}
-	if cfg.Auth == nil {
-		panic("iam: Config.Auth is required")
-	}
 	if cfg.LROManager == nil {
 		panic("iam: Config.LROManager is required")
 	}
 	return &IamServer{
 		pool:       cfg.Pool,
 		queries:    cfg.Queries,
-		auth:       cfg.Auth,
 		lroManager: cfg.LROManager,
 		audit:      cfg.AuditResolver,
 	}

@@ -287,7 +287,6 @@ func newDomainsHarness(t *testing.T) *grpcharness.Harness {
 		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
 			Pool:       h.Pool,
 			Queries:    h.Queries,
-			Auth:       h.Auth,
 			Codec:      codec,
 			LROManager: h.LROManager,
 			Encryptor:  h.Encryptor,

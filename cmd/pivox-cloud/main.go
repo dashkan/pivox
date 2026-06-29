@@ -35,7 +35,6 @@ import (
 	"github.com/dashkan/pivox/internal/config"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
-	"github.com/dashkan/pivox/internal/firebase"
 	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/oidc"
 	"github.com/dashkan/pivox/internal/permission"
@@ -91,35 +90,17 @@ func main() {
 	f.String("debug-port", envOrDefault("PIVOX_DEBUG_PORT", ":9090"), "Debug/health listen address")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
 	f.Bool("enable-reflection", envOrBool("PIVOX_ENABLE_REFLECTION", false), "Register gRPC server reflection for dev tooling (grpcurl, buf curl). OFF by default — never enable in production; it exposes the full API surface to unauthenticated callers.")
-	// Firebase credentials AND space ID resolve entirely through
-	// Google's standard ADC chain (service-account JSON → metadata
-	// server → gcloud user identity + quota space). No Pivox-named
-	// credential flag — operators set the standard env var.
-	f.Duration("delegated-auth-session-ttl", envOrDuration("PIVOX_DELEGATED_AUTH_SESSION_TTL", 5*time.Minute), "How long a delegated auth session code remains valid")
-	f.Duration("delegated-auth-poll-interval", envOrDuration("PIVOX_DELEGATED_AUTH_POLL_INTERVAL", 5*time.Second), "Poll interval returned to delegated auth clients")
 	f.Duration("storage-session-max-ttl", envOrDuration("PIVOX_STORAGE_SESSION_MAX_TTL", 8*time.Hour), "Cap on CreateStorageSession TTL; caller-requested values above this are silently clamped")
 	f.String("storage-session-cookie-domain", envOrDefault("PIVOX_STORAGE_SESSION_COOKIE_DOMAIN", ""), "Domain attribute for the storage-session Set-Cookie header (e.g. \".pivox.app\"). Empty omits Domain= so the cookie scopes to the response origin only — right default for self-hosted; SaaS deployments configure per-tenant subdomain.")
 	f.String("ollama-url", envOrDefault("PIVOX_OLLAMA_URL", "http://localhost:11434"), "Ollama API base URL")
 	f.String("ollama-model", envOrDefault("PIVOX_OLLAMA_MODEL", "qwen3-vl"), "Ollama model to use for AI chat")
 
-	// OAuth broker (federated sign-in for native + web). The app
-	// key signs the broker's `state` token; base URL is the public
-	// origin used to construct the IdP-facing redirect_uri.
-	f.String("oauth-broker-base-url", envOrDefault("PIVOX_OAUTH_BROKER_BASE_URL", "https://pivox.ngrok.app"), "Public origin used to build OAuth broker callback URLs")
-	f.String("oauth-broker-app-key", envOrDefault("PIVOX_APP_KEY", ""), "HMAC key for OAuth broker state token (≥32 bytes)")
-	f.String("github-client-id", envOrDefault("GITHUB_CLIENT_ID", ""), "GitHub OAuth app client ID (broker)")
-	f.String("github-client-secret", envOrDefault("GITHUB_CLIENT_SECRET", ""), "GitHub OAuth app client secret (broker)")
-	f.String("google-client-id", envOrDefault("GOOGLE_CLIENT_ID", ""), "Google OAuth (Web app) client ID (broker)")
-	f.String("google-client-secret", envOrDefault("GOOGLE_CLIENT_SECRET", ""), "Google OAuth (Web app) client secret (broker)")
-
 	// OIDC resource-server verification (Keycloak). The backend validates Bearer
 	// access tokens against the issuer's JWKS; client_id/secret live in the BFF,
-	// not here. Empty issuer leaves OIDC off (Firebase-only) during the migration.
-	f.String("oidc-issuer", envOrDefault("PIVOX_OIDC_ISSUER", ""), "OIDC issuer URL whose access tokens the backend accepts (e.g. https://host/realms/pivox); empty disables OIDC auth")
+	// not here. Keycloak is the sole auth provider — the issuer is required.
+	f.String("oidc-issuer", envOrDefault("PIVOX_OIDC_ISSUER", ""), "OIDC issuer URL whose access tokens the backend accepts (e.g. https://host/realms/pivox); required")
 	f.String("oidc-audience", envOrDefault("PIVOX_OIDC_AUDIENCE", ""), "Audience the access token's aud must contain (Keycloak audience-mapper value)")
 	f.Bool("disable-oidc-audience-validation", envOrBool("PIVOX_DISABLE_OIDC_AUDIENCE_VALIDATION", false), "Opt out of OIDC audience validation (fail-closed otherwise)")
-
-	addSyncAuthFlags(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -155,8 +136,6 @@ func must(s string, _ error) string { return s }
 
 func serve(cmd *cobra.Command, args []string) error {
 	f := cmd.Flags()
-	sessionTTL, _ := f.GetDuration("delegated-auth-session-ttl")
-	pollInterval, _ := f.GetDuration("delegated-auth-poll-interval")
 	enableReflection, _ := f.GetBool("enable-reflection")
 	disableOIDCAud, _ := f.GetBool("disable-oidc-audience-validation")
 	cfg := &config.Config{
@@ -167,19 +146,6 @@ func serve(cmd *cobra.Command, args []string) error {
 		DebugPort:        must(f.GetString("debug-port")),
 		LogLevel:         must(f.GetString("log-level")),
 		EnableReflection: enableReflection,
-		SyncAuth:         loadSyncAuthConfig(cmd),
-		DelegatedAuth: config.DelegatedAuthConfig{
-			SessionTTL:   sessionTTL,
-			PollInterval: pollInterval,
-		},
-		OAuthBroker: config.OAuthBrokerConfig{
-			AppKey:             must(f.GetString("oauth-broker-app-key")),
-			BaseURL:            must(f.GetString("oauth-broker-base-url")),
-			GitHubClientID:     must(f.GetString("github-client-id")),
-			GitHubClientSecret: must(f.GetString("github-client-secret")),
-			GoogleClientID:     must(f.GetString("google-client-id")),
-			GoogleClientSecret: must(f.GetString("google-client-secret")),
-		},
 		OIDC: config.OIDCConfig{
 			Issuer:                    must(f.GetString("oidc-issuer")),
 			Audience:                  must(f.GetString("oidc-audience")),
@@ -269,50 +235,34 @@ func serve(cmd *cobra.Command, args []string) error {
 		logger.Error("failed to recover pending operations", "error", err)
 	}
 
-	// Firebase auth service. Verifies Firebase ID tokens from
-	// browser/native clients via Firebase Admin SDK. Stays the bare
-	// service for InternalHooks (delegated-auth flow expects real
-	// Firebase UIDs from identity.UID).
-	authSvc, err := firebase.NewAuthService(ctx)
-	if err != nil {
-		return fmt.Errorf("initialize Firebase auth: %w", err)
+	// Keycloak (OIDC) is the sole auth provider. The backend is a pure
+	// resource server: it validates Bearer access tokens against the
+	// realm's JWKS. The token's `sub` IS the Pivox identity id, so the
+	// verifier directly satisfies authn.Service — no provider-routing
+	// wrapper. The verifier's JWKS load is lazy/tolerant, so startup is
+	// NOT coupled to Keycloak readiness — keys are fetched on the first
+	// token (when a user logs in through the edge).
+	if cfg.OIDC.Issuer == "" {
+		return fmt.Errorf("PIVOX_OIDC_ISSUER is required (Keycloak is the sole auth provider)")
 	}
-
-	// authChainSvc is what the gRPC AuthInterceptor / HTTP RequireAuth
-	// see — the bare Firebase service by default, wrapped below by the
-	// OIDC verifier when a Keycloak issuer is configured.
-	//
-	// Firebase-specific surfaces (InternalHooks delegated-auth,
-	// service Config.Auth fields that call CreateCustomToken / SSO
-	// provider methods / DeleteUser) keep the bare authSvc — those
-	// operations only make sense for Firebase identities.
-	var authChainSvc authn.Service = authSvc
-
-	// OIDC (Keycloak) access-token verification. Wrap the chain so KC-issued
-	// tokens route to the OIDC verifier while Firebase keeps working during
-	// the migration; empty issuer leaves the chain unchanged. The verifier's
-	// JWKS load is lazy/tolerant (keyfunc NoErrorReturnFirstHTTPReq), so this
-	// does NOT couple api startup to Keycloak/ngrok readiness — keys are fetched
-	// on the first KC token (when the user logs in through the edge).
-	if cfg.OIDC.Issuer != "" {
-		oidcVerifier, err := oidc.NewVerifier(ctx, oidc.Config{
-			Issuer:                    cfg.OIDC.Issuer,
-			JWKSURL:                   strings.TrimRight(cfg.OIDC.Issuer, "/") + "/protocol/openid-connect/certs",
-			Audience:                  cfg.OIDC.Audience,
-			DisableAudienceValidation: cfg.OIDC.DisableAudienceValidation,
-		})
-		if err != nil {
-			return fmt.Errorf("initialize OIDC verifier: %w", err)
-		}
-		authChainSvc = server.NewOIDCAuthService(authChainSvc, oidcVerifier, cfg.OIDC.Issuer)
-		logger.Info("OIDC auth path enabled",
-			"issuer", cfg.OIDC.Issuer,
-			"audience", cfg.OIDC.Audience,
-			"audience_validation", !cfg.OIDC.DisableAudienceValidation,
-		)
-		if cfg.OIDC.DisableAudienceValidation {
-			logger.Warn("OIDC audience validation DISABLED — any token this realm signs (including ID tokens minted for other clients) will be accepted; set PIVOX_OIDC_AUDIENCE to re-enable")
-		}
+	oidcVerifier, err := oidc.NewVerifier(ctx, oidc.Config{
+		Issuer:                    cfg.OIDC.Issuer,
+		JWKSURL:                   strings.TrimRight(cfg.OIDC.Issuer, "/") + "/protocol/openid-connect/certs",
+		Audience:                  cfg.OIDC.Audience,
+		DisableAudienceValidation: cfg.OIDC.DisableAudienceValidation,
+	})
+	if err != nil {
+		return fmt.Errorf("initialize OIDC verifier: %w", err)
+	}
+	// authChainSvc is what the gRPC AuthInterceptor / HTTP RequireAuth see.
+	var authChainSvc authn.Service = oidcVerifier
+	logger.Info("OIDC auth enabled",
+		"issuer", cfg.OIDC.Issuer,
+		"audience", cfg.OIDC.Audience,
+		"audience_validation", !cfg.OIDC.DisableAudienceValidation,
+	)
+	if cfg.OIDC.DisableAudienceValidation {
+		logger.Warn("OIDC audience validation DISABLED — any token this realm signs (including ID tokens minted for other clients) will be accepted; set PIVOX_OIDC_AUDIENCE to re-enable")
 	}
 
 	// gRPC server
@@ -410,7 +360,6 @@ func serve(cmd *cobra.Command, args []string) error {
 	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(organizations.Config{
 		Pool:          pool,
 		Queries:       queries,
-		Auth:          authSvc,
 		Codec:         appCodec,
 		Resolver:      permResolver,
 		AuditResolver: auditResolver,
@@ -444,7 +393,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// ops (Member CRUD, TransferOwnership, TestIamPermissions) live
 	// on the scope-owning Organizations / Spaces services above.
 	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(iam.Config{
-		Pool: pool, Queries: queries, Auth: authSvc,
+		Pool: pool, Queries: queries,
 		LROManager: lroManager, AuditResolver: auditResolver,
 	}))
 
@@ -646,33 +595,11 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 	sseHandler := aichat.NewSSEHandler(aichat.SSEHandlerConfig{Client: aiv1.NewAiChatClient(grpcConn), Logger: logger})
 
-	// HTTP mux: internal hooks + gRPC gateway (fallback)
+	// HTTP mux: gRPC gateway (fallback) + River UI. Auth flows
+	// (sign-in, federation, identity sync) live in the Keycloak BFF
+	// (web/start) and the keycloak-events sync path — the backend is a
+	// pure resource server.
 	httpMux := http.NewServeMux()
-	hooks, err := server.NewInternalHooks(server.InternalHooksConfig{
-		Pool:          pool,
-		Queries:       queries,
-		SyncAuth:      cfg.SyncAuth,
-		DelegatedAuth: cfg.DelegatedAuth,
-		Logger:        logger,
-		Auth:          authSvc,
-		AuditResolver: auditResolver,
-	})
-	if err != nil {
-		return fmt.Errorf("initialize internal hooks: %w", err)
-	}
-	hooks.Register(httpMux)
-
-	// OAuth broker for federated sign-in (GitHub, OIDC SSO).
-	// Migrated server-side from the TanStack `start` /api/oauth/*
-	// routes so auth machinery (DB-backed SsoConfig + KMS-encrypted
-	// client_secret) lives next to syncIdentity et al.
-	oauthBroker := server.NewOAuthBroker(server.OAuthBrokerConfig{
-		Queries:   queries,
-		Encryptor: enc,
-		Broker:    cfg.OAuthBroker,
-		Logger:    logger,
-	})
-	oauthBroker.Register(httpMux)
 
 	// River UI — admin web UI for inspecting/cancelling/retrying
 	// background jobs in the river schema. Prefix "/river" must

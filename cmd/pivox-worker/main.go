@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dashkan/pivox/internal/audit"
-	"github.com/dashkan/pivox/internal/firebase"
 	"github.com/dashkan/pivox/internal/telemetry"
 	"github.com/dashkan/pivox/internal/telemetry/rivertrace"
 	"github.com/dashkan/pivox/internal/workers"
@@ -157,14 +156,6 @@ func serve(cmd *cobra.Command, _ []string) error {
 	// jobs in this process.
 	auditResolver := audit.NewResolver(audit.Config{Queries: queries})
 
-	// Firebase Auth — required by DeleteAccountWorker for the final
-	// phase (auth.DeleteUser). Same Application Default Credentials
-	// chain pivox-cloud uses; no Pivox-named config knobs.
-	firebaseAuth, err := firebase.NewAuthService(ctx)
-	if err != nil {
-		return fmt.Errorf("init firebase auth: %w", err)
-	}
-
 	// Worker registry. Each tick worker we used to host inline in
 	// pivox-cloud becomes a river.Worker registered here; River's
 	// scheduler drives invocation via the periodic-job table. The
@@ -188,7 +179,7 @@ func serve(cmd *cobra.Command, _ []string) error {
 	river.AddWorker(riverWorkers, &workers.UndeleteSpaceWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.DeleteSpaceWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.DeleteOrgWorker{Pool: pool, Audit: auditResolver, Logger: logger})
-	river.AddWorker(riverWorkers, &workers.DeleteAccountWorker{Pool: pool, Auth: firebaseAuth, Audit: auditResolver, Logger: logger})
+	river.AddWorker(riverWorkers, &workers.DeleteAccountWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.VerifyDomainWorker{Pool: pool, Logger: logger})
 
 	// Periodic job registrations. RunOnStart=true so a freshly-booted

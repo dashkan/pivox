@@ -270,7 +270,6 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
 			Pool:       h.Pool,
 			Queries:    h.Queries,
-			Auth:       h.Auth,
 			Codec:      codec,
 			LROManager: h.LROManager,
 			Encryptor:  h.Encryptor,
@@ -278,7 +277,6 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 		iampb.RegisterIamServer(s, iam.NewIamServer(iam.Config{
 			Pool:       h.Pool,
 			Queries:    h.Queries,
-			Auth:       h.Auth,
 			LROManager: h.LROManager,
 		}))
 	}))
@@ -294,7 +292,7 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 func startIamLifecycleWorkers(t *testing.T, h *grpcharness.Harness) {
 	t.Helper()
 	h.StartRiverWorkers(t, func(rw *river.Workers) {
-		river.AddWorker(rw, &workers.DeleteAccountWorker{Pool: h.Pool, Auth: h.Auth, Logger: grpcharness.SilentLogger()})
+		river.AddWorker(rw, &workers.DeleteAccountWorker{Pool: h.Pool, Logger: grpcharness.SilentLogger()})
 		river.AddWorker(rw, &workers.DeleteOrgWorker{Pool: h.Pool, Logger: grpcharness.SilentLogger()})
 		river.AddWorker(rw, &workers.UndeleteOrgWorker{Pool: h.Pool, Logger: grpcharness.SilentLogger()})
 	})

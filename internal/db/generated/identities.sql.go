@@ -9,11 +9,10 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getIdentitiesByIDs = `-- name: GetIdentitiesByIDs :many
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE id = ANY($1::uuid[])
+SELECT id, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE id = ANY($1::uuid[])
 `
 
 // GetIdentitiesByIDs is the batched lookup used by the audit
@@ -33,7 +32,6 @@ func (q *Queries) GetIdentitiesByIDs(ctx context.Context, ids []uuid.UUID) ([]Id
 		var i Identity
 		if err := rows.Scan(
 			&i.ID,
-			&i.FirebaseUid,
 			&i.Email,
 			&i.EmailVerified,
 			&i.DisplayName,
@@ -56,54 +54,16 @@ func (q *Queries) GetIdentitiesByIDs(ctx context.Context, ids []uuid.UUID) ([]Id
 }
 
 const getIdentityByEmail = `-- name: GetIdentityByEmail :one
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE email = $1 AND is_deleted = false
+SELECT id, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE email = $1 AND is_deleted = false
 `
 
 // GetIdentityByEmail resolves a live identity (is_deleted=false) by
-// email. Used by the syncIdentity defensive tombstone path: when an
-// UpsertIdentity attempt hits the partial unique email index
-// (`idx_identities_email_unique`), the handler looks up the colliding
-// row by email, verifies via Firebase Admin SDK whether the existing
-// row's firebase_uid is still active, and either rejects (still
-// active) or tombstones + retries (confirmed orphan from an
-// out-of-band Firebase delete).
-//
-// Returns ErrNoRows if no live identity has this email — shouldn't
-// happen if called right after a 23505 on the email index, but
-// callers handle it defensively.
+// email. Returns ErrNoRows if no live identity has this email.
 func (q *Queries) GetIdentityByEmail(ctx context.Context, email string) (Identity, error) {
 	row := q.db.QueryRow(ctx, getIdentityByEmail, email)
 	var i Identity
 	err := row.Scan(
 		&i.ID,
-		&i.FirebaseUid,
-		&i.Email,
-		&i.EmailVerified,
-		&i.DisplayName,
-		&i.PhotoUrl,
-		&i.Disabled,
-		&i.IsDeleted,
-		&i.CreateTime,
-		&i.UpdateTime,
-		&i.LastLoginTime,
-		&i.DeleteTime,
-	)
-	return i, err
-}
-
-const getIdentityByFirebaseUID = `-- name: GetIdentityByFirebaseUID :one
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE firebase_uid = $1 AND is_deleted = false
-`
-
-// GetIdentityByFirebaseUID is the active-sign-in lookup — soft-deleted
-// rows are excluded so a recycled Firebase UID can't accidentally
-// resolve to a tombstoned identity.
-func (q *Queries) GetIdentityByFirebaseUID(ctx context.Context, firebaseUid string) (Identity, error) {
-	row := q.db.QueryRow(ctx, getIdentityByFirebaseUID, firebaseUid)
-	var i Identity
-	err := row.Scan(
-		&i.ID,
-		&i.FirebaseUid,
 		&i.Email,
 		&i.EmailVerified,
 		&i.DisplayName,
@@ -119,21 +79,18 @@ func (q *Queries) GetIdentityByFirebaseUID(ctx context.Context, firebaseUid stri
 }
 
 const getIdentityByID = `-- name: GetIdentityByID :one
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE id = $1
+SELECT id, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE id = $1
 `
 
-// GetIdentityByID looks up by primary key. Used by DeleteUser's
-// DELETING_PIVOX_RECORDS phase to capture the firebase_uid before
-// the row is soft-deleted, so the subsequent
-// DELETING_FIREBASE_IDENTITY phase can call auth.DeleteUser(uid).
-// Returns soft-deleted rows too (callers like the resolver need them
-// to render is_deleted=true Actor placeholders).
+// GetIdentityByID looks up by primary key. Used by the DeleteAccount
+// LRO's DELETING_PIVOX_RECORDS phase to read the row before it is
+// soft-deleted. Returns soft-deleted rows too (callers like the audit
+// resolver need them to render is_deleted=true Actor placeholders).
 func (q *Queries) GetIdentityByID(ctx context.Context, id uuid.UUID) (Identity, error) {
 	row := q.db.QueryRow(ctx, getIdentityByID, id)
 	var i Identity
 	err := row.Scan(
 		&i.ID,
-		&i.FirebaseUid,
 		&i.Email,
 		&i.EmailVerified,
 		&i.DisplayName,
@@ -146,53 +103,6 @@ func (q *Queries) GetIdentityByID(ctx context.Context, id uuid.UUID) (Identity, 
 		&i.DeleteTime,
 	)
 	return i, err
-}
-
-const listLiveIdentityFirebaseUIDs = `-- name: ListLiveIdentityFirebaseUIDs :many
-SELECT id, firebase_uid
-  FROM identities
- WHERE is_deleted = false
-   AND firebase_uid <> ''
-   AND id > $1::uuid
- ORDER BY id ASC
- LIMIT $2::int
-`
-
-type ListLiveIdentityFirebaseUIDsParams struct {
-	AfterID uuid.UUID `json:"after_id"`
-	Limit   int32     `json:"limit"`
-}
-
-type ListLiveIdentityFirebaseUIDsRow struct {
-	ID          uuid.UUID `json:"id"`
-	FirebaseUid string    `json:"firebase_uid"`
-}
-
-// ListLiveIdentityFirebaseUIDs pages through live identities
-// ordered by `id` (uuidv7, monotonic-ish), returning batches of
-// (id, firebase_uid) for the identity-reconciliation worker to
-// bulk-check against the auth provider. `after_id` is the last id
-// from the previous page; pass `uuid.Nil` (or '00000000-...') for
-// the first page. `limit` caps the batch size — the worker batches
-// at 100 to match the Firebase Admin SDK's GetUsers per-call cap.
-func (q *Queries) ListLiveIdentityFirebaseUIDs(ctx context.Context, arg ListLiveIdentityFirebaseUIDsParams) ([]ListLiveIdentityFirebaseUIDsRow, error) {
-	rows, err := q.db.Query(ctx, listLiveIdentityFirebaseUIDs, arg.AfterID, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListLiveIdentityFirebaseUIDsRow{}
-	for rows.Next() {
-		var i ListLiveIdentityFirebaseUIDsRow
-		if err := rows.Scan(&i.ID, &i.FirebaseUid); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const softDeleteIdentity = `-- name: SoftDeleteIdentity :one
@@ -230,70 +140,51 @@ func (q *Queries) SoftDeleteIdentity(ctx context.Context, id uuid.UUID) (uuid.UU
 
 const upsertIdentity = `-- name: UpsertIdentity :one
 INSERT INTO identities (
-    firebase_uid,
+    id,
     email,
     email_verified,
-    display_name,
-    photo_url,
-    disabled,
-    last_login_time
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (firebase_uid) DO UPDATE SET
+    display_name
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE SET
     email          = EXCLUDED.email,
     email_verified = EXCLUDED.email_verified,
-    display_name   = EXCLUDED.display_name,
-    photo_url      = EXCLUDED.photo_url,
-    disabled       = EXCLUDED.disabled,
-    last_login_time = COALESCE(EXCLUDED.last_login_time, identities.last_login_time),
+    display_name   = CASE WHEN EXCLUDED.display_name <> '' THEN EXCLUDED.display_name
+                          ELSE identities.display_name END,
     is_deleted     = false,
     delete_time    = NULL,
     update_time    = now()
-RETURNING id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time
+RETURNING id, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time
 `
 
 type UpsertIdentityParams struct {
-	FirebaseUid   string             `json:"firebase_uid"`
-	Email         string             `json:"email"`
-	EmailVerified bool               `json:"email_verified"`
-	DisplayName   string             `json:"display_name"`
-	PhotoUrl      string             `json:"photo_url"`
-	Disabled      bool               `json:"disabled"`
-	LastLoginTime pgtype.Timestamptz `json:"last_login_time"`
+	ID            uuid.UUID `json:"id"`
+	Email         string    `json:"email"`
+	EmailVerified bool      `json:"email_verified"`
+	DisplayName   string    `json:"display_name"`
 }
 
-// Upserts an identity row synced from the upstream auth provider
-// (currently Firebase). On conflict (same firebase_uid), updates all
-// mutable fields. The `firebase_uid` column name is kept because it
-// still specifically holds a Firebase UID — the table name dropped
-// the prefix because identities will eventually carry non-Firebase
-// principal sources too.
+// Provisions / syncs a Keycloak-authenticated identity from a KC event
+// (keycloak-events topic). The row's `id` IS the Keycloak `sub` (passed in,
+// not generated by the uuidv7 default). REGISTER inserts; UPDATE_EMAIL /
+// UPDATE_PROFILE re-delivery updates. Idempotent.
 //
-// Soft-delete revival: if the existing row is `is_deleted = true`
-// (the same Firebase UID is being recycled — e.g. after a prior
-// DeleteAccount + Firebase re-signup with a reused UID), the
-// conflict path resets `is_deleted` to false and clears
-// `delete_time`. Without this the row would stay tombstoned, the
-// new user could not sign in via `GetIdentityByFirebaseUID` (which
-// excludes tombstones), AND the new user's PII would be written
-// onto a row whose `id` is still referenced by the previous
-// identity's audit trail — leaking that PII through every cached
-// *_by Actor lookup. UID recycling is rare in production (Firebase
-// normally issues a fresh UID on re-signup) but the constraint
-// forces this to be defensible regardless.
+// display_name is overwritten only when the incoming value is non-empty:
+// REGISTER(broker) carries no name, so it must not blank an existing one
+// (set later by an UPDATE_PROFILE event or the token's name claim).
+//
+// Soft-delete revival: a recycled sub (is_deleted=true row) means the same
+// principal is back — reset the tombstone rather than lock them out or write
+// new PII onto a row whose id the audit trail still references.
 func (q *Queries) UpsertIdentity(ctx context.Context, arg UpsertIdentityParams) (Identity, error) {
 	row := q.db.QueryRow(ctx, upsertIdentity,
-		arg.FirebaseUid,
+		arg.ID,
 		arg.Email,
 		arg.EmailVerified,
 		arg.DisplayName,
-		arg.PhotoUrl,
-		arg.Disabled,
-		arg.LastLoginTime,
 	)
 	var i Identity
 	err := row.Scan(
 		&i.ID,
-		&i.FirebaseUid,
 		&i.Email,
 		&i.EmailVerified,
 		&i.DisplayName,
