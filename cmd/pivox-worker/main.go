@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
@@ -50,6 +51,10 @@ const (
 	verifyDomainsInterval  = 2 * time.Minute
 	reapOperationsInterval = 5 * time.Minute
 	cleanupAuthInterval    = 1 * time.Minute
+	// Web sessions lazy-expire on read, so this is pure GC of rows for
+	// sessions never read again before their 30-day horizon — hourly is
+	// ample; a tighter cadence would only churn the table.
+	purgeWebSessionsInterval = 1 * time.Hour
 )
 
 var version = "dev"
@@ -63,6 +68,7 @@ func main() {
 	}
 	f := rootCmd.Flags()
 	f.String("database-url", envOrDefault("PIVOX_DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"), "PostgreSQL connection URL")
+	f.String("sessions-database-url", envOrDefault("PIVOX_SESSIONS_DATABASE_URL", "postgres://localhost:5432/sessions?sslmode=disable"), "PostgreSQL connection URL for the BFF-owned web_sessions store (purge_web_sessions job)")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -81,6 +87,7 @@ func mustString(s string, _ error) string { return s }
 func serve(cmd *cobra.Command, _ []string) error {
 	f := cmd.Flags()
 	databaseURL := mustString(f.GetString("database-url"))
+	sessionsURL := mustString(f.GetString("sessions-database-url"))
 	logLevel := mustString(f.GetString("log-level"))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -111,6 +118,18 @@ func serve(cmd *cobra.Command, _ []string) error {
 	}
 	defer pool.Close()
 	logger.Info("connected to database")
+
+	// Separate pool for the BFF-owned `sessions` database (web_sessions store),
+	// which the purge_web_sessions job GCs. Plain pgxpool.New — NOT db.NewPool —
+	// because that DB has no pgvector/`vector` columns, so the per-connection
+	// pgvector type registration db.NewPool does would be pointless here. The
+	// BFF owns + creates this schema; the worker only deletes from it.
+	sessionsPool, err := pgxpool.New(ctx, sessionsURL)
+	if err != nil {
+		return fmt.Errorf("connect sessions database: %w", err)
+	}
+	defer sessionsPool.Close()
+	logger.Info("connected to sessions database")
 
 	driver := riverpgxv5.New(pool)
 
@@ -160,6 +179,7 @@ func serve(cmd *cobra.Command, _ []string) error {
 	river.AddWorker(riverWorkers, &workers.VerifyDomainsWorker{Queries: queries, Resolver: dnsResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.ReapOperationsWorker{Queries: queries, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.CleanupAuthWorker{Queries: queries, Logger: logger})
+	river.AddWorker(riverWorkers, &workers.PurgeWebSessionsWorker{Pool: sessionsPool, Logger: logger})
 	// LRO (on-demand) workers — invoked by lro.Manager.NewLro from
 	// pivox-cloud's RPC handlers. Each handles one logical step;
 	// multi-step LROs (DeleteOrganization, etc.) are single workers
@@ -199,6 +219,11 @@ func serve(cmd *cobra.Command, _ []string) error {
 		river.NewPeriodicJob(
 			river.PeriodicInterval(cleanupAuthInterval),
 			func() (river.JobArgs, *river.InsertOpts) { return workers.CleanupAuthArgs{}, nil },
+			&river.PeriodicJobOpts{RunOnStart: true},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(purgeWebSessionsInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return workers.PurgeWebSessionsArgs{}, nil },
 			&river.PeriodicJobOpts{RunOnStart: true},
 		),
 	}

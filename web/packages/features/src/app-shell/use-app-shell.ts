@@ -36,6 +36,12 @@ export function useAppShell(input: {
   $api: ReactQueryApi;
   /** Invoked by OrgPicker's "Create Organization" CTA. */
   onCreateOrganization: () => void;
+  /**
+   * Optional handler for the nav-user "Manage Account" action. When provided,
+   * nav-user calls this instead of opening the built-in profile dialog — the
+   * web BFF wires it to the Keycloak account console.
+   */
+  onOpenAccount?: () => void;
   /** Top-level nav items. Empty placeholder works for the moment. */
   navMain?: NavMainItem[];
   /**
@@ -62,6 +68,7 @@ export function useAppShell(input: {
   const {
     $api,
     onCreateOrganization,
+    onOpenAccount,
     navMain = [],
     initialUser,
     initialActiveOrganization,
@@ -210,6 +217,7 @@ export function useAppShell(input: {
     actions: {
       setActiveOrganization,
       createOrganization: onCreateOrganization,
+      openAccount: onOpenAccount,
       setProfileOpen,
       signOut: async () => {
         setProfileOpen(false);

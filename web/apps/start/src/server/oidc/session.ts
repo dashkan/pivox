@@ -2,6 +2,7 @@ import { parseCookie, stringifySetCookie } from 'cookie'
 import * as oidc from 'openid-client'
 
 import { getOidcConfig } from './client'
+import { updateSession, getSession } from './session-store'
 
 import type { TokenEndpointResponse } from 'openid-client'
 
@@ -9,9 +10,12 @@ import type { TokenEndpointResponse } from 'openid-client'
  * BFF session + login-transaction cookies for the OIDC (Keycloak) flow.
  *
  * Two httpOnly cookies:
- *  - SESSION_COOKIE holds the token set (access + refresh + id + expiry). The
- *    proxy reads the access token to inject the Bearer; /auth/refresh and
- *    /auth/logout read the refresh/id tokens.
+ *  - SESSION_COOKIE holds an OPAQUE session id (32 random bytes, base64url). The
+ *    token set lives server-side in the `web_sessions` table (see
+ *    `./session-store`); the id is the only thing the browser carries, and it IS
+ *    the session secret. The proxy resolves the id to the token set to inject the
+ *    Bearer (refreshing the row when near expiry); /auth/logout resolves it for
+ *    the RP-initiated end-session id-token hint, then deletes the row.
  *  - TX_COOKIE holds the short-lived login transaction (PKCE verifier + state +
  *    return-to) between /auth/sign-in and /auth/callback.
  *
@@ -21,17 +25,17 @@ import type { TokenEndpointResponse } from 'openid-client'
  * from the request's Cookie header and written as Set-Cookie on the Response the
  * handler returns — explicit, not via ambient request context.
  *
- * Size note: the token set lives in a single cookie. Keycloak access+refresh+id
- * tokens are typically under the ~4KB per-cookie limit; if a deployment inflates
- * them with many roles/claims and overflows, the browser silently drops the
- * cookie — split the access token into its own cookie at that point.
+ * Because only the opaque id rides the cookie, the prior per-cookie size limit
+ * on the token set no longer applies, and revocation is now a server-side row
+ * delete rather than something the browser has to cooperate with.
  */
 
-const SESSION_COOKIE = '__pivox_oidc'
+export const SESSION_COOKIE = '__pivox_oidc'
 const TX_COOKIE = '__pivox_oidc_tx'
 
-// Bounded by the Keycloak refresh-token lifetime; refreshed on every successful
-// token refresh, so this is just the idle ceiling.
+// Idle ceiling for the id cookie. The server-side row carries its own sliding
+// purge horizon (bumped on each active use); this just bounds how long the
+// browser will keep presenting the id.
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30 // 30 days
 const TX_MAX_AGE_SECONDS = 60 * 10 // 10 minutes to complete a login
 
@@ -83,14 +87,15 @@ function buildSetCookie(name: string, value: string, maxAge: number, secure: boo
   return stringifySetCookie({ name, value, httpOnly: true, secure, sameSite: 'lax', path: '/', maxAge })
 }
 
-// --- session token set ---
+// --- session id cookie ---
 
-export function readSession(request: Request): SessionTokens | undefined {
-  return readJsonCookie(request, SESSION_COOKIE) as SessionTokens | undefined
+/** Reads the opaque session id from the cookie (no DB hit). */
+export function readSessionId(request: Request): string | undefined {
+  return readCookie(request, SESSION_COOKIE)
 }
 
-export function sessionSetCookie(request: Request, tokens: SessionTokens): string {
-  return buildSetCookie(SESSION_COOKIE, JSON.stringify(tokens), SESSION_MAX_AGE_SECONDS, isSecure(request))
+export function sessionSetCookie(request: Request, id: string): string {
+  return buildSetCookie(SESSION_COOKIE, id, SESSION_MAX_AGE_SECONDS, isSecure(request))
 }
 
 export function sessionClearCookie(request: Request): string {
@@ -108,36 +113,64 @@ export function tokensFromResponse(response: TokenEndpointResponse): SessionToke
   }
 }
 
-// --- token refresh (single-flighted) ---
+// --- token refresh (single-flighted per session) ---
+
+/** Refresh the access token when it's within this window of expiry. */
+export const EXPIRY_SKEW_MS = 30_000
 
 const inflightRefresh = new Map<string, Promise<SessionTokens>>()
 
 /**
- * Refreshes the session for a refresh token, single-flighting concurrent callers.
- * A browser fires many API calls at once; without this each in-flight proxy
+ * Rotates the access/refresh tokens for a session and persists the new set back
+ * to its row, single-flighting concurrent callers on the SESSION ID.
+ *
+ * A browser fires many API calls at once; without single-flight each in-flight
  * request would spend the SAME refresh token, and with Keycloak refresh-token
  * rotation the later ones trip reuse-detection and revoke the whole token family,
- * forcing a mid-session logout. Per process only — multi-replica deployments
- * still race across instances, so keep IdP refresh-token reuse tolerant or accept
- * the skew there.
+ * forcing a mid-session logout. Keying on the session id (rather than the
+ * refresh-token value) also guarantees exactly ONE {@link updateSession} write
+ * per burst — the persistence is folded into the single flight so concurrent
+ * SSR + proxy callers can't double-write or race a stale set over a fresh one.
+ *
+ * The current set is re-read from the row INSIDE the flight, never taken from the
+ * caller: a flight that starts just after a PRIOR flight rotated the tokens (and
+ * cleared the in-flight entry) must spend the row's current refresh token, not the
+ * now-rotated value the caller captured before that flight. If the re-read row
+ * already holds a still-valid access token, it's returned as-is — no second spend.
+ * That closes the sequential A-then-B reuse window structurally, not just the
+ * concurrent one. Throws when the row is gone or has no refresh token, which the
+ * callers treat as a dead session.
+ *
+ * Per process only — multi-replica deployments still race across instances, so
+ * keep IdP refresh-token reuse tolerant or accept the skew there.
  */
-export async function refreshSession(refreshToken: string): Promise<SessionTokens> {
-  const existing = inflightRefresh.get(refreshToken)
+export async function refreshSession(id: string): Promise<SessionTokens> {
+  const existing = inflightRefresh.get(id)
   if (existing) return existing
 
   const promise = (async () => {
+    const current = await getSession(id)
+    if (!current) throw new Error('refreshSession: no live session row')
+    // A concurrent flight may have just rotated the set; reuse it rather than
+    // spending the (now stale) refresh token a second time.
+    if (current.expires_at - Date.now() >= EXPIRY_SKEW_MS) return current
+    if (!current.refresh_token) throw new Error('refreshSession: session has no refresh token')
+
     const config = await getOidcConfig()
-    const tokens = tokensFromResponse(await oidc.refreshTokenGrant(config, refreshToken))
+    const tokens = tokensFromResponse(await oidc.refreshTokenGrant(config, current.refresh_token))
     // Keycloak rotates refresh tokens; if a deployment doesn't, keep the old one.
-    if (!tokens.refresh_token) tokens.refresh_token = refreshToken
+    if (!tokens.refresh_token) tokens.refresh_token = current.refresh_token
+    // Persist inside the single flight: the cookie (the id) never changes, so the
+    // row is the only place the rotated set lives.
+    await updateSession(id, tokens)
     return tokens
   })()
 
-  inflightRefresh.set(refreshToken, promise)
+  inflightRefresh.set(id, promise)
   try {
     return await promise
   } finally {
-    inflightRefresh.delete(refreshToken)
+    inflightRefresh.delete(id)
   }
 }
 

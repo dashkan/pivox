@@ -1,4 +1,4 @@
-import { useAuth } from '@pivox/features/auth';
+import { useFirebaseUser } from '@pivox/features/auth';
 import { buildBrokerCredential } from '@pivox/features/broker';
 import { useUserProfile } from '@pivox/features/user-profile';
 import { UserProfileCard } from '@pivox/ui/user-profile-card';
@@ -30,7 +30,7 @@ export function ElectronUserProfileFeature({
   children: ReactNode;
 }) {
   const value = useUserProfile(onClose, { open, providers });
-  const { refreshUser } = useAuth();
+  const { refreshUser } = useFirebaseUser();
 
   const overridden = {
     ...value,

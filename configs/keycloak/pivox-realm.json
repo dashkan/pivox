@@ -834,35 +834,22 @@
         "decisionStrategy": "UNANIMOUS",
         "authorizationSchema": {
           "resourceTypes": {
-            "Clients": {
-              "type": "Clients",
-              "scopes": [
-                "manage",
-                "map-roles-composite",
-                "view",
-                "map-roles-client-scope",
-                "map-roles"
-              ],
-              "scopeAliases": {}
-            },
             "Roles": {
               "type": "Roles",
               "scopes": [
                 "map-role-client-scope",
-                "map-role",
-                "map-role-composite"
+                "map-role-composite",
+                "map-role"
               ],
               "scopeAliases": {}
             },
-            "Groups": {
-              "type": "Groups",
+            "Clients": {
+              "type": "Clients",
               "scopes": [
-                "impersonate-members",
-                "manage-members",
-                "manage-membership-of-members",
+                "map-roles-composite",
                 "manage",
-                "manage-membership",
-                "view-members",
+                "map-roles",
+                "map-roles-client-scope",
                 "view"
               ],
               "scopeAliases": {}
@@ -870,28 +857,41 @@
             "Users": {
               "type": "Users",
               "scopes": [
-                "manage",
-                "map-roles",
                 "impersonate",
-                "view",
+                "map-roles",
+                "manage",
+                "manage-group-membership",
                 "reset-password",
-                "manage-group-membership"
+                "view"
               ],
               "scopeAliases": {
-                "manage": [
-                  "manage-members"
-                ],
                 "view": [
                   "view-members"
                 ],
-                "manage-group-membership": [
-                  "manage-membership-of-members"
+                "manage": [
+                  "manage-members"
                 ],
                 "impersonate": [
                   "impersonate-members"
+                ],
+                "manage-group-membership": [
+                  "manage-membership-of-members"
                 ]
               },
               "groupType": "Groups"
+            },
+            "Groups": {
+              "type": "Groups",
+              "scopes": [
+                "manage-membership",
+                "manage",
+                "manage-membership-of-members",
+                "manage-members",
+                "impersonate-members",
+                "view",
+                "view-members"
+              ],
+              "scopeAliases": {}
             }
           }
         }
@@ -2126,7 +2126,7 @@
       "internalId": "573a54c8-c17e-4b6a-9b74-03bedcd72244",
       "providerId": "keycloak-oidc",
       "enabled": true,
-      "trustEmail": false,
+      "trustEmail": true,
       "storeToken": false,
       "addReadTokenRoleOnCreate": false,
       "linkOnly": false,
@@ -2143,7 +2143,7 @@
         "caseSensitiveOriginalUsername": "false",
         "issuer": "https://pivox.ngrok.app/realms/acme",
         "pkceMethod": "S256",
-        "loginHint": "false",
+        "loginHint": "true",
         "clientAuthMethod": "client_secret_post",
         "syncMode": "IMPORT",
         "supportsClientAssertions": "false",
@@ -2154,7 +2154,7 @@
         "userInfoUrl": "https://pivox.ngrok.app/realms/acme/protocol/openid-connect/userinfo",
         "validateSignature": "true",
         "clientId": "${IMPORT_KC_IDP_OIDC_ACME_CLIENT_ID}",
-        "uiLocales": "false",
+        "uiLocales": "true",
         "disableNonce": "false",
         "useJwksUrl": "true",
         "kc.org.domain": "acme.com",
@@ -3160,7 +3160,7 @@
   "organizations": [
     {
       "id": "065af7bc-0475-49fa-805e-420424fec6dc",
-      "name": "oidc.acme",
+      "name": "acme",
       "alias": "Acme",
       "enabled": true,
       "description": "",
@@ -3169,6 +3169,12 @@
         {
           "name": "acme.com",
           "verified": false
+        }
+      ],
+      "members": [
+        {
+          "username": "ashkan@acme.com",
+          "membershipType": "MANAGED"
         }
       ],
       "identityProviders": [

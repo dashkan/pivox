@@ -31,7 +31,6 @@ type Config struct {
 	// abuse defenses live in single-use codes, TTLs, response-shape
 	// uniformity, and the auth chain.
 	SyncAuth      ServiceAccountAuthConfig
-	SsrAuth       ServiceAccountAuthConfig
 	DelegatedAuth DelegatedAuthConfig
 	OAuthBroker   OAuthBrokerConfig
 	OIDC          OIDCConfig

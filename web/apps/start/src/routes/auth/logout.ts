@@ -1,20 +1,46 @@
+import { ACTIVE_ORG } from '@pivox/storage'
 import { createFileRoute } from '@tanstack/react-router'
+import { stringifySetCookie } from 'cookie'
 import * as oidc from 'openid-client'
 
 import { getOidcConfig, publicOrigin } from '@/server/oidc/client'
-import { readSession, sessionClearCookie } from '@/server/oidc/session'
+import { readSessionId, sessionClearCookie } from '@/server/oidc/session'
+import { deleteSession, getSession } from '@/server/oidc/session-store'
 
 /**
- * Logout: clears the local session cookie and redirects to Keycloak's
- * RP-initiated end-session endpoint (so the IdP session is terminated too),
- * which returns the browser to the app root. If discovery/end-session is
- * unavailable we still clear the local session and land on the app root.
+ * Logout: deletes the server-side session row (revocation), clears the local id
+ * cookie, and redirects to Keycloak's RP-initiated end-session endpoint (so the
+ * IdP session is terminated too), which returns the browser to the app root. If
+ * discovery/end-session is unavailable we still delete the row + clear the cookie
+ * and land on the app root.
+ *
+ * POST-only + same-origin checked: logout is state-changing (it deletes the
+ * session row), so exposing it on GET would let any cross-site navigation
+ * (a link, window.open, meta-refresh) force-logout the user — CSRF. The client
+ * submits a same-origin form POST; this handler rejects anything not same-origin,
+ * mirroring the /api/v1 proxy's CSRF guard. The POST still 302s through Keycloak
+ * end-session, which the browser follows as a normal top-level navigation.
  */
 export const Route = createFileRoute('/auth/logout')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
-        const session = readSession(request)
+      POST: async ({ request }) => {
+        // CSRF: logout deletes the session row, so reject cross-site requests. A
+        // same-origin form POST sends Origin; Sec-Fetch-Site is a browser-set,
+        // cross-site-unforgeable secondary signal (and covers the proxy case where
+        // Origin != the internal request URL). SameSite=Lax already withholds the
+        // session cookie on cross-site POST, so this is defense-in-depth.
+        const self = new URL(request.url).origin
+        const origin = request.headers.get('origin')
+        const sameOrigin = origin === self || request.headers.get('sec-fetch-site') === 'same-origin'
+        if (!sameOrigin) return new Response('forbidden', { status: 403 })
+
+        // Resolve the row for the id_token end-session hint, THEN delete it so
+        // the session is revoked even if end-session URL building throws below.
+        const sessionId = readSessionId(request)
+        const session = sessionId ? await getSession(sessionId) : undefined
+        if (sessionId) await deleteSession(sessionId)
+
         let location = '/' // safe relative fallback if origin/end-session is unavailable
 
         try {
@@ -31,10 +57,24 @@ export const Route = createFileRoute('/auth/logout')({
           // local-only logout to the app root.
         }
 
-        return new Response(null, {
-          status: 302,
-          headers: { location, 'set-cookie': sessionClearCookie(request) },
-        })
+        const headers = new Headers({ location })
+        headers.append('set-cookie', sessionClearCookie(request))
+        // Also drop user-scoped cookies on logout. Without this, the next user
+        // on a shared browser keeps the previous user's ACTIVE_ORG: the `_app`
+        // SSR prefetch would then fetch that org's spaces with the NEW user's
+        // token — leaking the prior user's org slug + a wrong-org first paint
+        // (and a 403 for non-members). The former Firebase clearSession cleared
+        // this too; preserve that. Add any future user-scoped cookies here.
+        headers.append(
+          'set-cookie',
+          stringifySetCookie({
+            name: ACTIVE_ORG.name,
+            value: '',
+            path: ACTIVE_ORG.path,
+            maxAge: 0,
+          }),
+        )
+        return new Response(null, { status: 302, headers })
       },
     },
   },

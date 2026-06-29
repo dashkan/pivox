@@ -62,12 +62,15 @@ DECLARE
     -- blocking-fn-populated fields.
     _ashkan_firebase_uid CONSTANT TEXT := 'ScQytJWi2ycF3jiiBlRazncbfQB3';
 
-    -- Pinned identity UUID — matches the value the live Firebase ID
-    -- token's `pivox_user_id` custom claim already carries (was
-    -- minted by uuidv7() in a previous seed, now frozen here).
-    -- DO NOT regenerate — every change here forces a sign-out + back
-    -- in across every dev environment using this seed.
-    _ashkan_id CONSTANT UUID := '019e7201-8080-7575-8057-8d49db577952';
+    -- Pinned identity UUID. Under Keycloak this IS the user's `sub`
+    -- (identities.id == KC sub), so it's frozen to the real KC login
+    -- for ashkan.daie@gmail.com — a fresh seed then maps straight to
+    -- that login with no manual remap. (Electron still resolves via
+    -- _ashkan_firebase_uid above: the blocking fn stamps this id as the
+    -- Firebase token's pivox_user_id, so both logins hit one identity.)
+    -- DO NOT regenerate — every change forces re-matching the live KC
+    -- user across every dev environment using this seed.
+    _ashkan_id CONSTANT UUID := '4814ec27-5e21-4756-ad98-e17f69c5a166';
 
     -- Dev orgs ashkan gets bound to. Mirror the set seeded with
     -- roles in 12_dev_org_roles.sql. acme is intentionally absent

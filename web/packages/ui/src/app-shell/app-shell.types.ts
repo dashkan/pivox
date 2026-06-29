@@ -28,6 +28,13 @@ export interface AppShellActions {
    * lives in the route layer (`router.navigate({ to: '/auth/create-org' })`).
    */
   createOrganization: () => void;
+  /**
+   * Open account management. When provided (web BFF → Keycloak account
+   * console), nav-user calls this for "Manage Account". When omitted
+   * (Electron), nav-user falls back to opening the in-app profile dialog via
+   * `setProfileOpen`.
+   */
+  openAccount?: () => void;
   setProfileOpen: (open: boolean) => void;
   signOut: () => void | Promise<void>;
 }

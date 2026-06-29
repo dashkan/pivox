@@ -11,20 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AuthVerifySessionRouteImport } from './routes/auth/verify-session'
-import { Route as AuthVerifyEmailRouteImport } from './routes/auth/verify-email'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
-import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
-import { Route as AuthRegisterRouteImport } from './routes/auth/register'
-import { Route as AuthRefreshRouteImport } from './routes/auth/refresh'
 import { Route as AuthLogoutRouteImport } from './routes/auth/logout'
-import { Route as AuthLoginRouteImport } from './routes/auth/login'
-import { Route as AuthLinkAccountRouteImport } from './routes/auth/link-account'
-import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
-import { Route as AuthBrokerCallbackRouteImport } from './routes/auth/broker-callback'
-import { Route as AuthActionRouteImport } from './routes/auth/action'
 import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
@@ -38,54 +28,14 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AuthVerifySessionRoute = AuthVerifySessionRouteImport.update({
-  id: '/auth/verify-session',
-  path: '/auth/verify-session',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthVerifyEmailRoute = AuthVerifyEmailRouteImport.update({
-  id: '/auth/verify-email',
-  path: '/auth/verify-email',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthSignInRoute = AuthSignInRouteImport.update({
   id: '/auth/sign-in',
   path: '/auth/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
-  id: '/auth/reset-password',
-  path: '/auth/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRegisterRoute = AuthRegisterRouteImport.update({
-  id: '/auth/register',
-  path: '/auth/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRefreshRoute = AuthRefreshRouteImport.update({
-  id: '/auth/refresh',
-  path: '/auth/refresh',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthLogoutRoute = AuthLogoutRouteImport.update({
   id: '/auth/logout',
   path: '/auth/logout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthLoginRoute = AuthLoginRouteImport.update({
-  id: '/auth/login',
-  path: '/auth/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthLinkAccountRoute = AuthLinkAccountRouteImport.update({
-  id: '/auth/link-account',
-  path: '/auth/link-account',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
-  id: '/auth/forgot-password',
-  path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthCreateOrgRoute = AuthCreateOrgRouteImport.update({
@@ -96,16 +46,6 @@ const AuthCreateOrgRoute = AuthCreateOrgRouteImport.update({
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthBrokerCallbackRoute = AuthBrokerCallbackRouteImport.update({
-  id: '/auth/broker-callback',
-  path: '/auth/broker-callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthActionRoute = AuthActionRouteImport.update({
-  id: '/auth/action',
-  path: '/auth/action',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppImageEditorRoute = AppImageEditorRouteImport.update({
@@ -128,39 +68,19 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/about': typeof AppAboutRoute
   '/image-editor': typeof AppImageEditorRoute
-  '/auth/action': typeof AuthActionRoute
-  '/auth/broker-callback': typeof AuthBrokerCallbackRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/create-org': typeof AuthCreateOrgRoute
-  '/auth/forgot-password': typeof AuthForgotPasswordRoute
-  '/auth/link-account': typeof AuthLinkAccountRoute
-  '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
-  '/auth/refresh': typeof AuthRefreshRoute
-  '/auth/register': typeof AuthRegisterRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/sign-in': typeof AuthSignInRoute
-  '/auth/verify-email': typeof AuthVerifyEmailRoute
-  '/auth/verify-session': typeof AuthVerifySessionRoute
   '/api/v1/$': typeof ApiV1SplatRoute
 }
 export interface FileRoutesByTo {
   '/about': typeof AppAboutRoute
   '/image-editor': typeof AppImageEditorRoute
-  '/auth/action': typeof AuthActionRoute
-  '/auth/broker-callback': typeof AuthBrokerCallbackRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/create-org': typeof AuthCreateOrgRoute
-  '/auth/forgot-password': typeof AuthForgotPasswordRoute
-  '/auth/link-account': typeof AuthLinkAccountRoute
-  '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
-  '/auth/refresh': typeof AuthRefreshRoute
-  '/auth/register': typeof AuthRegisterRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/sign-in': typeof AuthSignInRoute
-  '/auth/verify-email': typeof AuthVerifyEmailRoute
-  '/auth/verify-session': typeof AuthVerifySessionRoute
   '/': typeof AppIndexRoute
   '/api/v1/$': typeof ApiV1SplatRoute
 }
@@ -169,20 +89,10 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_app/about': typeof AppAboutRoute
   '/_app/image-editor': typeof AppImageEditorRoute
-  '/auth/action': typeof AuthActionRoute
-  '/auth/broker-callback': typeof AuthBrokerCallbackRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/create-org': typeof AuthCreateOrgRoute
-  '/auth/forgot-password': typeof AuthForgotPasswordRoute
-  '/auth/link-account': typeof AuthLinkAccountRoute
-  '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
-  '/auth/refresh': typeof AuthRefreshRoute
-  '/auth/register': typeof AuthRegisterRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/sign-in': typeof AuthSignInRoute
-  '/auth/verify-email': typeof AuthVerifyEmailRoute
-  '/auth/verify-session': typeof AuthVerifySessionRoute
   '/_app/': typeof AppIndexRoute
   '/api/v1/$': typeof ApiV1SplatRoute
 }
@@ -192,39 +102,19 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/image-editor'
-    | '/auth/action'
-    | '/auth/broker-callback'
     | '/auth/callback'
     | '/auth/create-org'
-    | '/auth/forgot-password'
-    | '/auth/link-account'
-    | '/auth/login'
     | '/auth/logout'
-    | '/auth/refresh'
-    | '/auth/register'
-    | '/auth/reset-password'
     | '/auth/sign-in'
-    | '/auth/verify-email'
-    | '/auth/verify-session'
     | '/api/v1/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/about'
     | '/image-editor'
-    | '/auth/action'
-    | '/auth/broker-callback'
     | '/auth/callback'
     | '/auth/create-org'
-    | '/auth/forgot-password'
-    | '/auth/link-account'
-    | '/auth/login'
     | '/auth/logout'
-    | '/auth/refresh'
-    | '/auth/register'
-    | '/auth/reset-password'
     | '/auth/sign-in'
-    | '/auth/verify-email'
-    | '/auth/verify-session'
     | '/'
     | '/api/v1/$'
   id:
@@ -232,40 +122,20 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_app/about'
     | '/_app/image-editor'
-    | '/auth/action'
-    | '/auth/broker-callback'
     | '/auth/callback'
     | '/auth/create-org'
-    | '/auth/forgot-password'
-    | '/auth/link-account'
-    | '/auth/login'
     | '/auth/logout'
-    | '/auth/refresh'
-    | '/auth/register'
-    | '/auth/reset-password'
     | '/auth/sign-in'
-    | '/auth/verify-email'
-    | '/auth/verify-session'
     | '/_app/'
     | '/api/v1/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
-  AuthActionRoute: typeof AuthActionRoute
-  AuthBrokerCallbackRoute: typeof AuthBrokerCallbackRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthCreateOrgRoute: typeof AuthCreateOrgRoute
-  AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
-  AuthLinkAccountRoute: typeof AuthLinkAccountRoute
-  AuthLoginRoute: typeof AuthLoginRoute
   AuthLogoutRoute: typeof AuthLogoutRoute
-  AuthRefreshRoute: typeof AuthRefreshRoute
-  AuthRegisterRoute: typeof AuthRegisterRoute
-  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   AuthSignInRoute: typeof AuthSignInRoute
-  AuthVerifyEmailRoute: typeof AuthVerifyEmailRoute
-  AuthVerifySessionRoute: typeof AuthVerifySessionRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
 }
 
@@ -285,20 +155,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/auth/verify-session': {
-      id: '/auth/verify-session'
-      path: '/auth/verify-session'
-      fullPath: '/auth/verify-session'
-      preLoaderRoute: typeof AuthVerifySessionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/verify-email': {
-      id: '/auth/verify-email'
-      path: '/auth/verify-email'
-      fullPath: '/auth/verify-email'
-      preLoaderRoute: typeof AuthVerifyEmailRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth/sign-in': {
       id: '/auth/sign-in'
       path: '/auth/sign-in'
@@ -306,53 +162,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignInRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/reset-password': {
-      id: '/auth/reset-password'
-      path: '/auth/reset-password'
-      fullPath: '/auth/reset-password'
-      preLoaderRoute: typeof AuthResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/register': {
-      id: '/auth/register'
-      path: '/auth/register'
-      fullPath: '/auth/register'
-      preLoaderRoute: typeof AuthRegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/refresh': {
-      id: '/auth/refresh'
-      path: '/auth/refresh'
-      fullPath: '/auth/refresh'
-      preLoaderRoute: typeof AuthRefreshRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth/logout': {
       id: '/auth/logout'
       path: '/auth/logout'
       fullPath: '/auth/logout'
       preLoaderRoute: typeof AuthLogoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/login': {
-      id: '/auth/login'
-      path: '/auth/login'
-      fullPath: '/auth/login'
-      preLoaderRoute: typeof AuthLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/link-account': {
-      id: '/auth/link-account'
-      path: '/auth/link-account'
-      fullPath: '/auth/link-account'
-      preLoaderRoute: typeof AuthLinkAccountRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/forgot-password': {
-      id: '/auth/forgot-password'
-      path: '/auth/forgot-password'
-      fullPath: '/auth/forgot-password'
-      preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/create-org': {
@@ -367,20 +181,6 @@ declare module '@tanstack/react-router' {
       path: '/auth/callback'
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/broker-callback': {
-      id: '/auth/broker-callback'
-      path: '/auth/broker-callback'
-      fullPath: '/auth/broker-callback'
-      preLoaderRoute: typeof AuthBrokerCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/action': {
-      id: '/auth/action'
-      path: '/auth/action'
-      fullPath: '/auth/action'
-      preLoaderRoute: typeof AuthActionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/image-editor': {
@@ -423,20 +223,10 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
-  AuthActionRoute: AuthActionRoute,
-  AuthBrokerCallbackRoute: AuthBrokerCallbackRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthCreateOrgRoute: AuthCreateOrgRoute,
-  AuthForgotPasswordRoute: AuthForgotPasswordRoute,
-  AuthLinkAccountRoute: AuthLinkAccountRoute,
-  AuthLoginRoute: AuthLoginRoute,
   AuthLogoutRoute: AuthLogoutRoute,
-  AuthRefreshRoute: AuthRefreshRoute,
-  AuthRegisterRoute: AuthRegisterRoute,
-  AuthResetPasswordRoute: AuthResetPasswordRoute,
   AuthSignInRoute: AuthSignInRoute,
-  AuthVerifyEmailRoute: AuthVerifyEmailRoute,
-  AuthVerifySessionRoute: AuthVerifySessionRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
 }
 export const routeTree = rootRouteImport

@@ -36,6 +36,7 @@ export interface InitialAppShellUser {
 export function AppShellFeature({
   $api,
   onCreateOrganization,
+  onOpenAccount,
   navMain,
   initialUser,
   initialActiveOrganization,
@@ -43,6 +44,12 @@ export function AppShellFeature({
 }: {
   $api: ReactQueryApi;
   onCreateOrganization: () => void;
+  /**
+   * Optional handler for the nav-user "Manage Account" action. When set, it
+   * replaces the built-in profile dialog — the web BFF passes this to open the
+   * Keycloak account console. When omitted (Electron), the dialog is used.
+   */
+  onOpenAccount?: () => void;
   navMain?: NavMainItem[];
   initialUser?: InitialAppShellUser;
   /**
@@ -60,6 +67,7 @@ export function AppShellFeature({
   const value: AppShellContextValue = useAppShell({
     $api,
     onCreateOrganization,
+    onOpenAccount,
     navMain,
     initialUser,
     initialActiveOrganization,

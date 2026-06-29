@@ -16,10 +16,8 @@ import (
 // pivoxUserIDKey is the context key for the caller's per-Pivox
 // `identities.id` UUID. Populated by the auth interceptor from, in order:
 // the `pivox_user_id` Firebase ID-token custom claim (browser/native
-// clients), the `actor_uid` claim of an SA-signed JWT (SSR acting on
-// behalf of a user — see CompositeAuthService in composite_auth.go), or
-// the `sub` of a Keycloak access token (sub == identities.id — see
-// oidc_auth.go).
+// clients), or the `sub` of a Keycloak access token (sub == identities.id
+// — see oidc_auth.go).
 //
 // All membership tables (`org_members.principal_id`,
 // `space_members.principal_id`, `group_members.user_id`) reference
@@ -38,7 +36,7 @@ const (
 
 // PivoxUserID extracts the verified Pivox user UUID (`identities.id`)
 // from the context. Returns the UUID and true when the auth interceptor
-// resolved the caller — from a `pivox_user_id` claim (Firebase/SSR) or
+// resolved the caller — from a `pivox_user_id` claim (Firebase) or
 // the `sub` of a Keycloak token.
 func PivoxUserID(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(pivoxUserIDKey{}).(uuid.UUID)
@@ -72,13 +70,14 @@ func MustPivoxUserID(ctx context.Context) uuid.UUID {
 // an apierr.Unauthenticated error.
 //
 // The interceptor doesn't know or care which kind of token this is
-// (Firebase ID token, SA-signed SSR JWT, anything else we add) —
+// (Firebase ID token, Keycloak access token, anything else we add) —
 // it asks `auth.VerifyToken` and trusts whatever Identity comes back.
 // Routing across token shapes lives in the authn.Service
-// implementation; in production that's CompositeAuthService, which
-// inspects the JWT issuer and dispatches accordingly. Tests can pass
-// a bare Firebase service or a composite — the interceptor doesn't
-// change either way.
+// implementation; in production that's the OIDC wrapper (oidcAuthService),
+// which inspects the JWT issuer and dispatches Keycloak tokens to the
+// OIDC verifier and everything else to the wrapped Firebase service.
+// Tests can pass a bare Firebase service or the wrapper — the
+// interceptor doesn't change either way.
 //
 // This is the single source of truth for "bearer auth" across the
 // codebase — gRPC unary/stream interceptors and the HTTP middleware
@@ -103,8 +102,7 @@ func authenticateBearer(ctx context.Context, auth authn.Service, bearerHeader st
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}
 	// Resolve the Pivox identity id. Firebase ID tokens carry it in the
-	// `pivox_user_id` custom claim (set by the blocking function); SSR actor
-	// tokens set it explicitly when the composite mints an Identity. Keycloak
+	// `pivox_user_id` custom claim (set by the blocking function). Keycloak
 	// tokens DON'T carry that claim — there the `sub` IS the identity id,
 	// surfaced as identity.UID. Prefer the claim, fall back to UID, so both
 	// Firebase and Keycloak work during the migration. (Firebase's UID is the
@@ -145,8 +143,7 @@ func authenticate(ctx context.Context, auth authn.Service) (context.Context, err
 // AuthInterceptor returns a gRPC unary server interceptor that
 // verifies bearer tokens via the provided authn.Service. The service
 // is responsible for any token-type routing internally — production
-// wires CompositeAuthService (Firebase + SSR-SA-signed); tests can
-// pass either.
+// wires the OIDC wrapper (Keycloak + Firebase); tests can pass either.
 //
 // Scope: this interceptor is registered on the public gRPC server only.
 // Service-to-service traffic (e.g. AgentService) lives on a separate

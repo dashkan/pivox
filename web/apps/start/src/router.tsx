@@ -3,7 +3,6 @@ import { QueryClient } from '@tanstack/react-query';
 import { createRouter as createTanStackRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 
-import { ensureFirebase } from './lib/firebase';
 import { routeTree } from './routeTree.gen';
 
 // Install global error reporters at module load. installErrorReporters
@@ -47,7 +46,6 @@ installWebTracing({
  * another the moment a loader starts prefetching.
  */
 export function getRouter() {
-  ensureFirebase();
   // Default `staleTime` of 1 minute on every query.
   //
   // Per the TanStack Query SSR docs: with SSR, set a default

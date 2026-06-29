@@ -1,5 +1,4 @@
 import { Badge } from '@pivox/primitives/badge';
-import { Button } from '@pivox/primitives/button';
 import {
   Card,
   CardContent,
@@ -7,7 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@pivox/primitives/card';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_app/')({ component: HomePage });
 
@@ -27,14 +26,6 @@ function HomePage() {
             Shared UI components working across Next.js, Electron, and TanStack
             Start.
           </p>
-          <div className="flex gap-2">
-            <Button asChild>
-              <Link to="/auth/login">Sign in</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/auth/register">Sign up</Link>
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>

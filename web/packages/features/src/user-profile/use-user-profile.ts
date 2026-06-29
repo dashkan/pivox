@@ -28,6 +28,7 @@ import type {
 } from '@pivox/ui/user-profile-card';
 import type { AuthProvider, TotpSecret, User } from 'firebase/auth';
 
+import { useFirebaseUser } from '@/auth/firebase-user';
 import { useAuth } from '@/auth/use-auth';
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 
@@ -65,7 +66,10 @@ export function useUserProfile(
   onClose?: () => void,
   options?: { open?: boolean; providers?: Array<PivoxAuthProvider> },
 ): UserProfileContextValue {
-  const { user, signOut, refreshUser } = useAuth();
+  // Account management is Firebase-only (Electron): it needs the reactive raw
+  // Firebase user + refresh. `signOut` stays on the neutral context.
+  const { signOut } = useAuth();
+  const { user, refreshUser } = useFirebaseUser();
 
   // Refresh user data each time the profile opens to pick up cross-session
   // changes (e.g., provider unlinked on another device). Runs in the feature

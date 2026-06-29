@@ -8,12 +8,15 @@ import {
   sessionSetCookie,
   tokensFromResponse,
 } from '@/server/oidc/session'
+import { createSession } from '@/server/oidc/session-store'
+import { decodeIdTokenClaims } from '@/server/oidc-session'
 
 /**
  * OAuth callback: Keycloak redirects the browser here with `code` + `state`.
  * We complete the code+PKCE exchange (which also validates `state` against the
- * value stashed at /auth/sign-in), store the token set in the session cookie,
- * clear the transaction cookie, and redirect to the original destination.
+ * value stashed at /auth/sign-in), persist the token set server-side keyed on a
+ * fresh opaque session id, set that id as the session cookie, clear the
+ * transaction cookie, and redirect to the original destination.
  */
 export const Route = createFileRoute('/auth/callback')({
   server: {
@@ -49,9 +52,22 @@ export const Route = createFileRoute('/auth/callback')({
           })
         }
 
+        // The id_token's `sub` is the Keycloak subject (== Pivox identity id) we
+        // index the session row by. A token set with no sub is unusable — treat
+        // it as a failed login and restart rather than persisting an orphan row.
+        const sub = (tokens.id_token ? decodeIdTokenClaims(tokens.id_token) : undefined)?.sub
+        if (!sub) {
+          return new Response(null, {
+            status: 302,
+            headers: { location: '/auth/sign-in', 'set-cookie': loginTxClearCookie(request) },
+          })
+        }
+
+        const sessionId = await createSession(tokens, sub)
+
         // return_to was sanitized to a same-origin path at /auth/sign-in.
         const headers = new Headers({ location: tx.return_to })
-        headers.append('set-cookie', sessionSetCookie(request, tokens))
+        headers.append('set-cookie', sessionSetCookie(request, sessionId))
         headers.append('set-cookie', loginTxClearCookie(request))
         return new Response(null, { status: 302, headers })
       },

@@ -10,9 +10,6 @@ const { createRouterSpy, ssrSetupSpy } = vi.hoisted(() => ({
   ssrSetupSpy: vi.fn(),
 }));
 
-vi.mock('../src/lib/firebase', () => ({
-  ensureFirebase: () => undefined,
-}));
 vi.mock('../src/routeTree.gen', () => ({
   routeTree: { stub: true },
 }));

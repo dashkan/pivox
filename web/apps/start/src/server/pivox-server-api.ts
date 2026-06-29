@@ -1,27 +1,16 @@
 /**
  * Server-side Pivox API client for SSR data prefetch.
  *
- * The browser uses `apps/start/src/lib/api-client.ts` to call the
- * backend with Firebase ID tokens. The SSR server can't reach the
- * Firebase JS SDK and needs a different auth path: it mints
- * SA-signed JWTs via `pivox-actor-token.ts` and uses them as Bearer
- * when calling the backend on behalf of an authenticated user.
+ * The browser calls the backend through the BFF proxy (`/api/v1/*`), which
+ * injects the Keycloak access token from the httpOnly session cookie. The SSR
+ * server can't go through that proxy (it IS the server), so it calls the
+ * backend directly and forwards the SAME user access token as the Bearer —
+ * resolved from the session cookie by `oidc/ssr-token.ts`. The cloud backend
+ * verifies Keycloak access tokens natively, so this is the user acting as
+ * themselves, not a service-account impersonation.
  *
- * This module wires those pieces:
- *  - Reads env-var config (SA email + audience + backend URL)
- *  - Lazily constructs a process-singleton actor token source
- *  - Builds per-request `apiClient` + react-query bindings keyed on
- *    the user's Pivox UUID
- *
- * Per-request because the actor token is per-user — handlers in
- * SSR's `beforeLoad` call `createServerApi(session.user.pivoxUserId)`,
- * use the result for `queryClient.prefetchQuery(...)`, then drop it.
- * The underlying actor token source caches per uid across requests
- * so successive prefetches for the same user share one mint.
- *
- * SSR-only. Importing this from client code is a bug (it pulls in
- * `google-auth-library`, which is bundling-hostile per the Nitro
- * externals config).
+ * SSR-only. The browser never imports this; client data flows through
+ * `lib/api-client.ts` → the proxy.
  */
 
 import { createApiClient, type ApiClient } from '@pivox/client';
@@ -30,69 +19,13 @@ import {
   type ReactQueryApi,
 } from '@pivox/client/react-query';
 
-import {
-  createActorTokenSource,
-  createGcpActorTokenMint,
-  type ActorTokenSource,
-} from './pivox-actor-token';
-
 /**
- * SSR backend URL — the address the SSR Node process uses to reach
- * the Pivox API. Typically the same public URL the browser uses
- * when both are behind the same edge proxy (nginx fans `/v1/*` to
- * pivox-cloud). Operators MAY point this at a different internal
- * endpoint for SSR-only deployments (e.g., a private VPC URL).
+ * SSR backend URL — the address the SSR Node process uses to reach the Pivox
+ * API. Same value the BFF proxy forwards to; typically the public API URL.
  */
 const ENV_API_URL = 'PIVOX_API_URL';
 
-/**
- * SSR server's own service-account email. The Pivox backend's
- * `PIVOX_SSR_ALLOWED_SERVICE_ACCOUNTS` must include this value or
- * every minted JWT will be rejected at the issuer-allowlist check.
- */
-const ENV_SA_EMAIL = 'PIVOX_SSR_SA_EMAIL';
-
-/**
- * Audience expected on minted SA-signed JWTs. Mirrors the backend
- * shape: `PIVOX_SSR_AUDIENCE` is the override, `PIVOX_AUDIENCE` is
- * the default. Most deployments target a single backend URL and
- * only need to set `PIVOX_AUDIENCE`.
- */
-const ENV_AUDIENCE_OVERRIDE = 'PIVOX_SSR_AUDIENCE';
-const ENV_AUDIENCE_DEFAULT = 'PIVOX_AUDIENCE';
-
-/**
- * Cached server-API state. Built on first use so module import
- * doesn't trigger GoogleAuth construction — useful for tests that
- * import this file but never call its functions.
- *
- * All three env-driven knobs (token source, API URL) cache together
- * so behavior is consistent: once validated on the first request,
- * later calls reuse the same values even if process.env mutates.
- * Inconsistent caching across knobs would give the illusion of
- * runtime reconfiguration without delivering it (the singleton
- * token source is already locked to its SA+audience).
- */
-interface CachedConfig {
-  tokenSource: ActorTokenSource;
-  baseUrl: string;
-}
-
-let _cached: CachedConfig | null = null;
-
-function getConfig(): CachedConfig {
-  if (_cached) return _cached;
-  const saEmail = process.env[ENV_SA_EMAIL];
-  // Override-then-default: PIVOX_SSR_AUDIENCE wins when set;
-  // otherwise inherit from PIVOX_AUDIENCE (which the backend also
-  // uses for its primary audience config). Single-backend
-  // deployments only set PIVOX_AUDIENCE.
-  // `||` (not `??`): an empty-string PIVOX_SSR_AUDIENCE is treated
-  // as 'unset' and falls through to PIVOX_AUDIENCE. Matches how
-  // operators clear a single env var without exporting it as
-  // unset.
-  const audience =
-    process.env[ENV_AUDIENCE_OVERRIDE] || process.env[ENV_AUDIENCE_DEFAULT];
+function backendBaseUrl(): string {
   const baseUrl = process.env[ENV_API_URL];
   if (!baseUrl) {
     throw new Error(
@@ -100,86 +33,30 @@ function getConfig(): CachedConfig {
         `Set it to the backend's public URL (e.g., https://api.pivox.app).`,
     );
   }
-  if (!saEmail) {
-    throw new Error(
-      `${ENV_SA_EMAIL} not set; SSR server cannot mint actor tokens. ` +
-        `Set it to the email of the service account hosting the SSR process.`,
-    );
-  }
-  if (!audience) {
-    throw new Error(
-      `${ENV_AUDIENCE_OVERRIDE} (or ${ENV_AUDIENCE_DEFAULT}) not set; ` +
-        `SSR server cannot mint actor tokens. Set the expected JWT ` +
-        `audience (typically the API URL).`,
-    );
-  }
-  _cached = {
-    tokenSource: createActorTokenSource(
-      createGcpActorTokenMint({ serviceAccountEmail: saEmail, audience }),
-    ),
-    baseUrl,
-  };
-  return _cached;
+  return baseUrl;
 }
 
 /**
- * Resets the cached server-api state. Tests reach for this to
- * exercise env-var validation paths without leaking cached state
- * across test cases. Not for production use.
- *
- * @internal
+ * createServerApiClient builds the openapi-fetch client used for direct
+ * (non-react-query) server-side calls. Server functions that fetch on behalf of
+ * a user and hand the result to `queryClient.setQueryData(...)` use this
+ * directly. The `accessToken` is the user's Keycloak access token, read from the
+ * session cookie via `getSsrAccessToken()`.
  */
-export function _resetServerApiForTests(): void {
-  _cached = null;
-}
-
-/**
- * createServerApi builds a typed Pivox API client + react-query
- * bindings that authenticate as the given user via an SA-signed
- * actor JWT. The returned ReactQueryApi has the same shape as the
- * client-side `$api` (from `apps/start/src/lib/api-client.ts`), so
- * `queryOptions(...)` produces queryKeys that match the client's
- * `useQuery` calls — SSR-prefetched data hydrates the client's
- * QueryClient cache without explicit handoff.
- *
- * Usage in `beforeLoad`:
- *   const session = await getServerSession();
- *   if (!session.user?.pivoxUserId) throw redirect({ to: '/auth/login' });
- *   const api = createServerApi(session.user.pivoxUserId);
- *   await context.queryClient.prefetchQuery(
- *     api.queryOptions('get', '/v1/accounts/me/organizations', { ... }),
- *   );
- *
- * Throws on missing env-var config — the SSR server can't proceed
- * without a way to mint tokens, and silently degrading would mean
- * every API call fails at the gateway instead of at boot.
- */
-/**
- * createServerApiClient builds the openapi-fetch client used for
- * direct (non-react-query) server-side calls. Server functions that
- * fetch on behalf of a user and hand the result to
- * `queryClient.setQueryData(...)` use this directly — react-query
- * machinery isn't needed when the caller already has a queryClient
- * to push results into.
- *
- * Same actor-token + base URL as `createServerApi`; just exposes the
- * lower layer.
- */
-export function createServerApiClient(pivoxUserId: string): ApiClient {
-  if (!pivoxUserId) {
-    throw new Error(
-      'createServerApiClient: pivoxUserId is required. The Firebase ' +
-        'blocking function may not have fired yet — surface as a ' +
-        'recoverable error and refresh the ID token.',
-    );
+export function createServerApiClient(accessToken: string): ApiClient {
+  if (!accessToken) {
+    throw new Error('createServerApiClient: accessToken is required');
   }
-  const cfg = getConfig();
   return createApiClient({
-    baseUrl: cfg.baseUrl,
-    getAuthToken: () => cfg.tokenSource(pivoxUserId),
+    baseUrl: backendBaseUrl(),
+    getAuthToken: () => Promise.resolve(accessToken),
   });
 }
 
-export function createServerApi(pivoxUserId: string): ReactQueryApi {
-  return createReactQueryApi(createServerApiClient(pivoxUserId));
+/**
+ * createServerApi builds the react-query-bound variant. Same auth + base URL as
+ * `createServerApiClient`; just exposes the higher layer.
+ */
+export function createServerApi(accessToken: string): ReactQueryApi {
+  return createReactQueryApi(createServerApiClient(accessToken));
 }

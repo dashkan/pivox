@@ -3,18 +3,18 @@
  *
  * `_app.tsx`'s `beforeLoad` runs once on the SSR pass to populate
  * the route's QueryClient before React render. Each helper here
- * encapsulates one prefetch: read the verified session, mint an
- * actor token, fetch the underlying API, and return the response
- * shape the client's `useQuery` expects. `beforeLoad` calls
- * `queryClient.setQueryData(...)` with the result, keyed by the
- * same key the client-side `$api.queryOptions(...)` produces — so
- * the client's hooks render with hot data on first paint.
+ * encapsulates one prefetch: resolve the user's Keycloak access
+ * token from the session cookie, fetch the underlying API as that
+ * user, and return the response shape the client's `useQuery`
+ * expects. `beforeLoad` calls `queryClient.setQueryData(...)` with
+ * the result, keyed by the same key the client-side
+ * `$api.queryOptions(...)` produces — so the client's hooks render
+ * with hot data on first paint.
  *
  * createServerFn-wrapped so the bundler keeps these out of the
- * client build. The actor-token machinery (google-auth-library,
- * iamcredentials) only ever runs server-side; importing
- * `prefetchOrgsForCurrentUser` from a route file is safe because
- * the client sees an RPC stub, not the actual server code.
+ * client build. Importing `prefetchOrgsForCurrentUser` from a route
+ * file is safe because the client sees an RPC stub, not the actual
+ * server code.
  *
  * Errors are caught and returned as `null`. A failed prefetch must
  * NOT fail the SSR render — the client-side `useQuery` will retry
@@ -27,7 +27,7 @@ import { ACTIVE_ORG } from '@pivox/storage';
 import { createServerFn } from '@tanstack/react-start';
 import { getCookie } from '@tanstack/react-start/server';
 
-import { getServerSession } from './auth-session';
+import { getSsrAccessToken } from './oidc/ssr-token';
 import { createServerApiClient } from './pivox-server-api';
 
 import type { components } from '@pivox/client/types';
@@ -80,32 +80,23 @@ export const getActiveOrgCookie = createServerFn({ method: 'GET' }).handler(
 
 /**
  * prefetchOrgsForCurrentUser server-fn: fetches the caller's org
- * list using an SSR-minted actor JWT. Returns the response body on
- * success, `null` on any failure (no session, no pivox_user_id
- * claim, gateway error). `null` is the signal to skip cache
- * priming — client-side useQuery will pick up.
+ * list using the user's Keycloak access token (from the session
+ * cookie). Returns the response body on success, `null` on any
+ * failure (no session, gateway error). `null` is the signal to skip
+ * cache priming — client-side useQuery will pick up.
  */
 export const prefetchOrgsForCurrentUser = createServerFn({
   method: 'GET',
 }).handler(async (): Promise<ListAccountOrganizationsResponse | null> => {
-  const session = await getServerSession();
-  if (!session.user) {
-    // No session → unauthed visit. Auth gate redirects; nothing
-    // to log.
-    return null;
-  }
-  if (!session.user.pivoxUserId) {
-    // Cookie verifies but blocking function hasn't synced the
-    // `pivox_user_id` claim. Client recovers via token refresh.
-    console.warn(
-      '[ssr-prefetch] orgs: session has no pivox_user_id claim ' +
-        '(Firebase blocking function not yet synced); skipping',
-    );
+  const accessToken = await getSsrAccessToken();
+  if (!accessToken) {
+    // No usable session → unauthed visit (auth gate redirects) or a
+    // refresh that couldn't complete. Nothing to prime.
     return null;
   }
 
   try {
-    const client = createServerApiClient(session.user.pivoxUserId);
+    const client = createServerApiClient(accessToken);
     const { data, response } = await client.GET(
       '/v1/accounts/me/organizations',
       { params: { path: { parent: 'accounts/me' } } },
@@ -121,10 +112,9 @@ export const prefetchOrgsForCurrentUser = createServerFn({
     }
     return data;
   } catch (err) {
-    // Most likely: env vars missing (PIVOX_API_URL,
-    // PIVOX_SSR_SA_EMAIL, PIVOX_SSR_AUDIENCE) so
-    // createServerApiClient throws. Surface the message so the
-    // operator can see why SSR prefetch is degrading to CSR.
+    // Most likely: PIVOX_API_URL missing so createServerApiClient
+    // throws. Surface the message so the operator can see why SSR
+    // prefetch is degrading to CSR.
     console.warn('[ssr-prefetch] orgs: threw', {
       message: err instanceof Error ? err.message : String(err),
     });
@@ -162,12 +152,8 @@ export interface PrefetchedSpaces {
 export const prefetchSpacesForActiveOrg = createServerFn({
   method: 'GET',
 }).handler(async (): Promise<PrefetchedSpaces | null> => {
-  const session = await getServerSession();
-  if (!session.user) return null;
-  if (!session.user.pivoxUserId) {
-    console.warn('[ssr-prefetch] spaces: session has no pivox_user_id claim');
-    return null;
-  }
+  const accessToken = await getSsrAccessToken();
+  if (!accessToken) return null;
 
   const activeOrg = getCookie(ACTIVE_ORG.name);
   if (!activeOrg) return null;
@@ -181,7 +167,7 @@ export const prefetchSpacesForActiveOrg = createServerFn({
       return null;
     }
 
-    const client = createServerApiClient(session.user.pivoxUserId);
+    const client = createServerApiClient(accessToken);
     const { data, response } = await client.GET(
       '/v1/organizations/{organization}/spaces',
       { params: { path: { organization: orgSlug } } },

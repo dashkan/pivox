@@ -68,7 +68,9 @@ const postgres = await builder
   // dir is mounted (not just seed.sql) because seed.sql does
   // `\i scripts/seeds/*.sql` with paths relative to the working dir.
   .withInitFiles("postgres-init")
-  .withBindMount("../internal/db/migrations", "/migrations", { isReadOnly: true })
+  .withBindMount("../internal/db/migrations", "/migrations", {
+    isReadOnly: true,
+  })
   .withBindMount("../scripts", "/scripts", { isReadOnly: true })
   // Stable alias so other CONTAINERS (keycloak) can reach postgres over the
   // Aspire container network at `postgres:5432` — host.docker.internal only
@@ -85,6 +87,13 @@ const pgPort = await pgEndpoint.property(EndpointProperty.Port);
 // created by the pg image's init script (aspire/pg/Dockerfile + initdb/00-init.sh)
 // on first start, so consumers just waitFor(postgres) — no init executables.
 const pivoxDatabaseUrl = refExpr`postgres://${pgUsername}:${pgPassword}@${pgHost}:${pgPort}/pivox?sslmode=disable`;
+
+// The web BFF's session store lives in its OWN database (`sessions`) on the same
+// Postgres container, NOT the app `pivox` DB — it's BFF-owned, has no Go
+// migrations, and the BFF creates its schema idempotently on first use. The
+// `sessions` database is created by the pg image's init script (postgres-init/
+// 00-init.sh) on first start, same as `pivox` + `keycloak`.
+const sessionsDatabaseUrl = refExpr`postgres://${pgUsername}:${pgPassword}@${pgHost}:${pgPort}/sessions?sslmode=disable`;
 
 // --- otel-collector (CommunityToolkit) ---
 // Receives OTLP and forwards to the Aspire dashboard — crucially it handles the
@@ -224,14 +233,38 @@ await builder
   // prefix avoids KC's own KC_*/KEYCLOAK_* config-option parsing. These names
   // must match the ${...} placeholders in the realm JSONs EXACTLY (all use the
   // _CLIENT_ID / _CLIENT_SECRET form).
-  .withEnvironment("IMPORT_KC_START_CLIENT_ID", process.env.IMPORT_KC_START_CLIENT_ID ?? "")
-  .withEnvironment("IMPORT_KC_START_CLIENT_SECRET", process.env.IMPORT_KC_START_CLIENT_SECRET ?? "")
-  .withEnvironment("IMPORT_KC_IDP_GITHUB_CLIENT_ID", process.env.IMPORT_KC_IDP_GITHUB_CLIENT_ID ?? "")
-  .withEnvironment("IMPORT_KC_IDP_GITHUB_CLIENT_SECRET", process.env.IMPORT_KC_IDP_GITHUB_CLIENT_SECRET ?? "")
-  .withEnvironment("IMPORT_KC_IDP_GOOGLE_CLIENT_ID", process.env.IMPORT_KC_IDP_GOOGLE_CLIENT_ID ?? "")
-  .withEnvironment("IMPORT_KC_IDP_GOOGLE_CLIENT_SECRET", process.env.IMPORT_KC_IDP_GOOGLE_CLIENT_SECRET ?? "")
-  .withEnvironment("IMPORT_KC_IDP_OIDC_ACME_CLIENT_ID", process.env.IMPORT_KC_IDP_OIDC_ACME_CLIENT_ID ?? "")
-  .withEnvironment("IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET", process.env.IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET ?? "")
+  .withEnvironment(
+    "IMPORT_KC_START_CLIENT_ID",
+    process.env.IMPORT_KC_START_CLIENT_ID ?? "",
+  )
+  .withEnvironment(
+    "IMPORT_KC_START_CLIENT_SECRET",
+    process.env.IMPORT_KC_START_CLIENT_SECRET ?? "",
+  )
+  .withEnvironment(
+    "IMPORT_KC_IDP_GITHUB_CLIENT_ID",
+    process.env.IMPORT_KC_IDP_GITHUB_CLIENT_ID ?? "",
+  )
+  .withEnvironment(
+    "IMPORT_KC_IDP_GITHUB_CLIENT_SECRET",
+    process.env.IMPORT_KC_IDP_GITHUB_CLIENT_SECRET ?? "",
+  )
+  .withEnvironment(
+    "IMPORT_KC_IDP_GOOGLE_CLIENT_ID",
+    process.env.IMPORT_KC_IDP_GOOGLE_CLIENT_ID ?? "",
+  )
+  .withEnvironment(
+    "IMPORT_KC_IDP_GOOGLE_CLIENT_SECRET",
+    process.env.IMPORT_KC_IDP_GOOGLE_CLIENT_SECRET ?? "",
+  )
+  .withEnvironment(
+    "IMPORT_KC_IDP_OIDC_ACME_CLIENT_ID",
+    process.env.IMPORT_KC_IDP_OIDC_ACME_CLIENT_ID ?? "",
+  )
+  .withEnvironment(
+    "IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET",
+    process.env.IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET ?? "",
+  )
   // No-cache the theme's static assets (login CSS + account-console JS/CSS/fonts)
   // so a `kc:build` shows up on a normal page refresh — no KC bounce, no hard
   // refresh. start-dev already disables theme/template caching (so .ftl +
@@ -249,7 +282,10 @@ await builder
   .withEnvironment("KAFKA_CLIENT_ID", "keycloak")
   .withEnvironment("KAFKA_TOPIC", "keycloak-events")
   .withEnvironment("KAFKA_ADMIN_TOPIC", "keycloak-admin-events")
-  .withEnvironment("KAFKA_EVENTS", "REGISTER,UPDATE_PROFILE,UPDATE_EMAIL,DELETE_ACCOUNT,LOGIN,LOGOUT")
+  .withEnvironment(
+    "KAFKA_EVENTS",
+    "REGISTER,UPDATE_PROFILE,UPDATE_EMAIL,DELETE_ACCOUNT,LOGIN,LOGOUT",
+  )
   // Imports the `acme` realm (exported from the docker-compose keycloak) on
   // startup. The integration mounts this dir at /opt/keycloak/data/import and
   // runs --import-realm. Realms already present in the persisted data are
@@ -294,6 +330,10 @@ await builder
 await builder
   .addGoApp("worker", "../cmd/pivox-worker")
   .withEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
+  // The purge_web_sessions periodic job GCs expired rows from the BFF-owned
+  // `web_sessions` table, which lives in the separate `sessions` DB — so the
+  // worker needs that connection in addition to the app DB.
+  .withEnvironment("PIVOX_SESSIONS_DATABASE_URL", sessionsDatabaseUrl)
   .waitFor(postgres);
 
 // --- agent (pivox-agent) — on-prem storage agent; host process ---
@@ -349,6 +389,13 @@ await builder
     targetPort: 3000,
     isProxied: false,
   })
+  // The BFF stores OIDC sessions server-side in Postgres (web_sessions),
+  // reading one per request. That table lives in the BFF-owned `sessions` DB —
+  // NOT the app `pivox` DB — so the BFF only needs the sessions connection. The
+  // start app is a host process and could inherit this from direnv, but the URL
+  // is built here from the Postgres endpoint (not in .envrc), so forward it
+  // explicitly.
+  .withEnvironment("PIVOX_SESSIONS_DATABASE_URL", sessionsDatabaseUrl)
   // Browser OpenTelemetry: the app exports spans to this same-origin path,
   // which envoy routes to the otel-collector (-> dashboard). Relative so it
   // resolves against whatever origin serves the app (pivox.ngrok.app).

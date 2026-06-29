@@ -8,7 +8,7 @@ import type {
   VerifyEmailState,
 } from '@pivox/ui/verify-email-card';
 
-import { useAuth } from '@/auth/use-auth';
+import { useFirebaseUser } from '@/auth/firebase-user';
 import { firebaseErrorMessage } from '@/shared/firebase-error';
 
 /**
@@ -31,7 +31,9 @@ export function useVerifyEmail(): VerifyEmailContextValue {
   // `getAuth()` at render — Firebase is client-only (initializeApp
   // is guarded by `typeof window`), and `getAuth()` during SSR
   // throws "No Firebase App '[DEFAULT]'".
-  const { user } = useAuth();
+  // Firebase-only (Electron): email verification is handled by Keycloak's
+  // account console on the web. Reads the raw Firebase user.
+  const { user } = useFirebaseUser();
   const [resent, setResent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

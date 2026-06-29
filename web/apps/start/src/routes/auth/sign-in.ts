@@ -33,7 +33,7 @@ export const Route = createFileRoute('/auth/sign-in')({
         const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier)
         const state = oidc.randomState()
         const requestUrl = new URL(request.url)
-        const returnTo = sanitizeReturnTo(requestUrl.searchParams.get('return_to'), requestUrl.origin)
+        const returnTo = sanitizeReturnTo(requestUrl.searchParams.get('return'), requestUrl.origin)
 
         const authUrl = oidc.buildAuthorizationUrl(config, {
           redirect_uri: callbackUrl(request).href,

@@ -123,7 +123,13 @@ export function AppShellNavUser() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
-            actions.setProfileOpen(true);
+            // Prefer the injected handler (web → Keycloak account console);
+            // otherwise open the in-app profile dialog (Electron).
+            if (actions.openAccount) {
+              actions.openAccount();
+            } else {
+              actions.setProfileOpen(true);
+            }
           }}
         >
           <UserIcon />

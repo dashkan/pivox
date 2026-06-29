@@ -1,29 +1,20 @@
 import robotoLatin from '@fontsource-variable/roboto/files/roboto-latin-wght-normal.woff2?url';
-import { AuthProvider, recoverClientSession } from '@pivox/features/auth';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
 // Importing @pivox/storage at the top of __root.tsx ensures all item
 // definitions in @pivox/storage/items have been evaluated (each
 // `defineItem` self-registers) BEFORE buildBootScript() reads the
 // registry. The route module is the earliest point in the load
 // graph where the bootstrap script gets serialized.
-import { buildBootScript, clearUserScopedItems } from '@pivox/storage';
-import { QueryClient, useQueryClient } from '@tanstack/react-query';
+import { buildBootScript } from '@pivox/storage';
+import { QueryClient } from '@tanstack/react-query';
 import {
   HeadContent,
   Outlet,
   Scripts,
   createRootRouteWithContext,
-  useRouter,
 } from '@tanstack/react-router';
-import { getAuth, signInWithCustomToken } from 'firebase/auth';
 
 import appCss from '../styles.css?url';
-
-import {
-  clearSession,
-  createSession,
-  recoverSession,
-} from '@/server/auth-session';
 
 /**
  * Root route declares the router-context shape — the per-request
@@ -60,8 +51,6 @@ export const Route = createRootRouteWithContext<{
 });
 
 function RootComponent() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
   return (
     // TooltipProvider at the root so Radix Tooltip consumers
     // (currently SidebarMenuButton's tooltip prop in @pivox/ui/
@@ -69,56 +58,13 @@ function RootComponent() {
     // delayDuration={0} matches shadcn's recommended sidebar shape —
     // the icon-collapsed sidebar relies on instant tooltips to be
     // navigable; the default 700ms feels broken.
+    //
+    // Auth context is NOT here: under the Keycloak BFF the user is
+    // resolved server-side by the `_app` (and `/auth/create-org`)
+    // gates, which wrap their subtree in `KeycloakAuthProvider`. The
+    // root has no auth SDK and no client session to manage.
     <TooltipProvider delayDuration={0}>
-      <AuthProvider
-        // Drop the outgoing user's state before Firebase tears down auth:
-        // user-scoped storage (selected org) + the React Query cache, so the
-        // next user can't see the previous user's org/org-list. Client clears
-        // run first (can't throw out the await) then the server session clear.
-        onBeforeSignOut={async () => {
-          clearUserScopedItems();
-          queryClient.clear();
-          await clearSession();
-        }}
-        // Proactive cookie refresh — Firebase rotates the ID token
-        // every ~55 min while the app is open; each rotation re-mints
-        // the cookie so the 14-day window slides forward continuously.
-        // An actively-used app never sees cookie expiry; inactivity
-        // beyond 14 days falls through to the verify-session interim
-        // recovery flow on the next visit.
-        onTokenRefresh={(idToken) => createSession({ data: { idToken } })}
-        // Post-sign-out redirect. `_app`'s `beforeLoad` only runs on
-        // navigation events, so without an explicit navigate the user
-        // stays on the current authenticated route with a null user
-        // and the SSR-rendered content still on screen. Electron uses
-        // AuthGateFeature for the same purpose; start uses this hook
-        // since the server-side gate replaces AuthGateFeature.
-        onSignedOut={() => router.navigate({ to: '/auth/login' })}
-        // Desync recovery: the cookie gate let us render, but the
-        // Firebase client SDK came up with no user (e.g. its auth
-        // IndexedDB was evicted). Silently re-establish the client
-        // session from the still-valid cookie via a custom token, or
-        // fall back to a real re-login if there's no recoverable
-        // server session. Skipped on /auth/* routes (no authed session
-        // to recover there). See @pivox/features `recoverClientSession`
-        // and the server-side `recoverSession`.
-        onSessionMissing={async () => {
-          if (router.state.location.pathname.startsWith('/auth')) return;
-          await recoverClientSession({
-            getCurrentUserId: () => getAuth().currentUser?.uid ?? null,
-            mintRecoveryToken: async () =>
-              (await recoverSession())?.customToken ?? null,
-            signInWithToken: async (token) => {
-              await signInWithCustomToken(getAuth(), token);
-            },
-            redirectToLogin: () => {
-              void router.navigate({ to: '/auth/login' });
-            },
-          });
-        }}
-      >
-        <Outlet />
-      </AuthProvider>
+      <Outlet />
     </TooltipProvider>
   );
 }

@@ -72,12 +72,12 @@ DECLARE
     -- binding. Sourced from `firebase auth:export` (see file header).
     _ashkan_firebase_uid CONSTANT TEXT := '2YCxpX5nmQXT5fmjri30SA3ra8t2';
 
-    -- Pinned identity UUID for ashkan@acme.com — matches the value
-    -- the live Firebase ID token's `pivox_user_id` custom claim
-    -- already carries. See 15_dev_user_membership.sql header for
-    -- the full motivation; DO NOT regenerate without forcing every
-    -- dev to sign out + back in.
-    _ashkan_id CONSTANT UUID := '019e7201-8066-73a9-947d-96d1039d99ab';
+    -- Pinned identity UUID for ashkan@acme.com. Under Keycloak this is
+    -- the pivox-realm `sub` minted when the acme user is brokered in via
+    -- the oidc.acme IdP (identities.id == KC sub). Frozen to the real
+    -- brokered login. See 15_dev_user_membership.sql header for the full
+    -- motivation; DO NOT regenerate without forcing a re-match.
+    _ashkan_id CONSTANT UUID := 'b8913e86-52ef-4a1d-8d80-f85e244d6529';
 
     -- Tier 0001 org UUID for acme. The dev orgs in
     -- 01_organizations.sql occupy suffixes 0001..000a; local-corp

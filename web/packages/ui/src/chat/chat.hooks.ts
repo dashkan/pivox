@@ -58,8 +58,13 @@ export interface UseChatStateOptions {
 
   /**
    * Resolves the bearer token. See `GetAuthToken` for caching guidance.
+   *
+   * Optional: omit it when the request carries auth out-of-band — e.g. the web
+   * BFF, where chat goes through the same-origin `/api` proxy that injects the
+   * Keycloak access token from the httpOnly cookie, so the browser holds no
+   * bearer of its own. When omitted, no `Authorization` header is sent.
    */
-  getAuthToken: GetAuthToken;
+  getAuthToken?: GetAuthToken;
 }
 
 /**
@@ -105,7 +110,7 @@ export function useChatState(opts: UseChatStateOptions): ChatContextValue {
   // useEffect below has run, so the ref always holds the most recent
   // consumer-supplied getter. Avoids the lint rule against ref
   // writes during render.
-  const getAuthTokenRef = useRef<GetAuthToken>(getAuthToken);
+  const getAuthTokenRef = useRef<GetAuthToken | undefined>(getAuthToken);
   useEffect(() => {
     getAuthTokenRef.current = getAuthToken;
   });
@@ -121,9 +126,13 @@ export function useChatState(opts: UseChatStateOptions): ChatContextValue {
     // eslint-disable-next-line react-hooks/refs
     return new DefaultChatTransport<PivoxUIMessage>({
       api: `${apiBase}/v1/${parent}:streamGenerateContent`,
-      headers: async () => ({
-        Authorization: `Bearer ${await getAuthTokenRef.current()}`,
-      }),
+      headers: async (): Promise<Record<string, string>> => {
+        // No getter → auth travels out-of-band (BFF proxy injects the
+        // Bearer from the session cookie); send no Authorization header.
+        const getToken = getAuthTokenRef.current;
+        if (!getToken) return {};
+        return { Authorization: `Bearer ${await getToken()}` };
+      },
       // When `conversation` is set, the server has the full prior
       // history in its DB — re-sending it from the client wastes
       // bandwidth, blows up tokens, and re-opens the "client claims

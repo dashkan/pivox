@@ -1,6 +1,6 @@
 import { organizationId } from '@pivox/client';
 import { AppShellFeature } from '@pivox/features/app-shell';
-import { useAuth, usePivoxUserId } from '@pivox/features/auth';
+import { useFirebaseUser, usePivoxUserId } from '@pivox/features/auth';
 import { AuthGateFeature } from '@pivox/features/auth-gate';
 import { ChatModalFeature } from '@pivox/features/chat';
 import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
@@ -68,7 +68,7 @@ const CHAT_BASE_URL =
  */
 function ChatFab() {
   const { state: shellState } = useAppShellContext();
-  const { user: firebaseUser } = useAuth();
+  const { user: firebaseUser } = useFirebaseUser();
   const pivoxUserId = usePivoxUserId();
   const activeOrg = shellState.activeOrganization;
 

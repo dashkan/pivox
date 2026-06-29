@@ -120,7 +120,6 @@ func main() {
 	f.Bool("disable-oidc-audience-validation", envOrBool("PIVOX_DISABLE_OIDC_AUDIENCE_VALIDATION", false), "Opt out of OIDC audience validation (fail-closed otherwise)")
 
 	addSyncAuthFlags(rootCmd)
-	addSsrAuthFlags(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -169,7 +168,6 @@ func serve(cmd *cobra.Command, args []string) error {
 		LogLevel:         must(f.GetString("log-level")),
 		EnableReflection: enableReflection,
 		SyncAuth:         loadSyncAuthConfig(cmd),
-		SsrAuth:          loadSsrAuthConfig(cmd),
 		DelegatedAuth: config.DelegatedAuthConfig{
 			SessionTTL:   sessionTTL,
 			PollInterval: pollInterval,
@@ -187,16 +185,6 @@ func serve(cmd *cobra.Command, args []string) error {
 			Audience:                  must(f.GetString("oidc-audience")),
 			DisableAudienceValidation: disableOIDCAud,
 		},
-	}
-	// SsrAuth audience inherits from SyncAuth's audience when the
-	// SSR-specific flag isn't set. Most deployments target a single
-	// backend URL so duplicating the flag would be busywork; this
-	// fallback lets `--audience` cover both surfaces with the
-	// override available when an operator wants distinct audiences.
-	// Applied here (post-load) so loadSsrAuthConfig doesn't reach
-	// into addSyncAuthFlags' registration.
-	if cfg.SsrAuth.Audience == "" {
-		cfg.SsrAuth.Audience = cfg.SyncAuth.Audience
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -291,31 +279,17 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 
 	// authChainSvc is what the gRPC AuthInterceptor / HTTP RequireAuth
-	// see — the same authSvc when SSR is disabled, or a composite
-	// (Firebase + SA-signed JWT verifier) when configured. The
-	// composite routes by JWT `iss` claim; tokens from SSR's service
-	// account go to keyfunc-backed verification, everything else
-	// falls through to Firebase. See internal/server/composite_auth.go.
+	// see — the bare Firebase service by default, wrapped below by the
+	// OIDC verifier when a Keycloak issuer is configured.
 	//
 	// Firebase-specific surfaces (InternalHooks delegated-auth,
 	// service Config.Auth fields that call CreateCustomToken / SSO
 	// provider methods / DeleteUser) keep the bare authSvc — those
 	// operations only make sense for Firebase identities.
 	var authChainSvc authn.Service = authSvc
-	if cfg.SsrAuth.Enabled() {
-		ssrVerify, err := server.NewKeyfuncSsrVerifier(ctx, cfg.SsrAuth)
-		if err != nil {
-			return fmt.Errorf("initialize SSR verifier: %w", err)
-		}
-		authChainSvc = server.NewCompositeAuthService(authSvc, ssrVerify)
-		logger.Info("SSR auth path enabled",
-			"audience", cfg.SsrAuth.Audience,
-			"allowed_service_accounts", cfg.SsrAuth.AllowedServiceAccounts,
-		)
-	}
 
 	// OIDC (Keycloak) access-token verification. Wrap the chain so KC-issued
-	// tokens route to the OIDC verifier while Firebase + SSR keep working during
+	// tokens route to the OIDC verifier while Firebase keeps working during
 	// the migration; empty issuer leaves the chain unchanged. The verifier's
 	// JWKS load is lazy/tolerant (keyfunc NoErrorReturnFirstHTTPReq), so this
 	// does NOT couple api startup to Keycloak/ngrok readiness — keys are fetched

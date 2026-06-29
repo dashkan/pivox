@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/auth/use-auth';
+import { useFirebaseUser } from '@/auth/firebase-user';
 
 /**
  * Soft nag link rendered in the app shell when the signed-in user
@@ -19,7 +19,7 @@ export function VerifyEmailLink({
   onClick: () => void;
   className?: string;
 }) {
-  const { user } = useAuth();
+  const { user } = useFirebaseUser();
   if (!user || user.emailVerified) return null;
   return (
     <button

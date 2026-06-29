@@ -1,17 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import {
-  readSession,
-  refreshSession,
-  sessionClearCookie,
-  sessionSetCookie,
-} from '@/server/oidc/session'
+import { EXPIRY_SKEW_MS, readSessionId, refreshSession, sessionClearCookie } from '@/server/oidc/session'
+import { deleteSession, getSession } from '@/server/oidc/session-store'
 
 /** Backend origin the BFF forwards to (e.g. https://pivox.ngrok.app). */
 const BACKEND = process.env.PIVOX_API_URL
-
-/** Refresh the access token if it expires within this window. */
-const EXPIRY_SKEW_MS = 30_000
 
 // Client-spoofable / hop-by-hop request headers we never forward upstream. Envoy
 // stays the sole authority on x-forwarded-*; the cookie/host/length are wrong for
@@ -59,9 +52,10 @@ function json(status: number, body: unknown, extraHeaders?: Record<string, strin
  * BFF reverse proxy: /api/v1/* -> <PIVOX_API_URL>/v1/* with the session's access
  * token injected as a Bearer. The token is refreshed proactively within a skew
  * window before forwarding (a backend 401 is still passed through — clients treat
- * 401 as "re-authenticate"). The response is streamed through and the session
- * cookie is rewritten when the token rotates. Only /v1/* is reachable by
- * construction — /internal/* is never proxied.
+ * 401 as "re-authenticate"). On rotation only the server-side row changes; the
+ * cookie holds a stable opaque id, so there is no Set-Cookie on the happy path.
+ * A dead/unrefreshable session deletes the row and clears the cookie. Only /v1/*
+ * is reachable by construction — /internal/* is never proxied.
  */
 export const Route = createFileRoute('/api/v1/$')({
   server: {
@@ -80,16 +74,21 @@ export const Route = createFileRoute('/api/v1/$')({
           if (!sameOrigin) return json(403, { error: 'csrf' })
         }
 
-        let session = readSession(request)
+        const sessionId = readSessionId(request)
+        if (!sessionId) return json(401, { error: 'unauthenticated' })
+        let session = await getSession(sessionId)
         if (!session) return json(401, { error: 'unauthenticated' })
 
-        // Transparent refresh before forwarding (single-flighted in refreshSession).
-        let refreshedCookie: string | undefined
+        // Transparent refresh before forwarding (single-flighted in refreshSession,
+        // which also persists the rotated set back to the row — the cookie/id is
+        // stable, so nothing is written back to the browser on success).
         if (session.expires_at - Date.now() < EXPIRY_SKEW_MS && session.refresh_token) {
           try {
-            session = await refreshSession(session.refresh_token)
-            refreshedCookie = sessionSetCookie(request, session)
+            session = await refreshSession(sessionId)
           } catch {
+            // Refresh failed → the session is dead. Drop the row so the spent id
+            // can't be retried, and clear the cookie.
+            await deleteSession(sessionId)
             return json(401, { error: 'session_expired' }, { 'set-cookie': sessionClearCookie(request) })
           }
         }
@@ -127,7 +126,6 @@ export const Route = createFileRoute('/api/v1/$')({
 
         const responseHeaders = new Headers(upstream.headers)
         for (const name of STRIP_RESPONSE_HEADERS) responseHeaders.delete(name)
-        if (refreshedCookie) responseHeaders.append('set-cookie', refreshedCookie)
         return new Response(upstream.body, {
           status: upstream.status,
           statusText: upstream.statusText,

@@ -1,21 +1,16 @@
 import { organizationId } from '@pivox/client';
 import { AppShellFeature } from '@pivox/features/app-shell';
-import { useAuth, usePivoxUserId } from '@pivox/features/auth';
+import { usePivoxUserId } from '@pivox/features/auth';
 import { ChatModalFeature } from '@pivox/features/chat';
 import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
 import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
 import { SidebarProvider } from '@pivox/ui/sidebar-provider';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
-import {
-  Outlet,
-  createFileRoute,
-  redirect,
-  useRouter,
-} from '@tanstack/react-router';
-import { Suspense, lazy, useCallback } from 'react';
+import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
 
 import { $api } from '@/lib/api-client';
-import { getServerSession } from '@/server/auth-session';
+import { requireKcSession } from '@/lib/auth-gate';
+import { KeycloakAuthProvider } from '@/lib/kc-auth-provider';
 import {
   getActiveOrgCookie,
   prefetchOrgsForCurrentUser,
@@ -27,41 +22,27 @@ import {
   type Theme,
 } from '@/server/prefs';
 
-// Lazy-load the profile dialog so it's client-only — it depends on
-// AuthContext (Firebase user) which isn't available during SSR.
-const ProfileDialog = lazy(() => import('./_app/-profile-dialog'));
-
 export const Route = createFileRoute('/_app')({
   /**
    * Server-side auth gate + SSR prefetch. Runs on both SSR and
    * client-side navigations.
    *
-   * Auth: three outcomes per the cookie-state matrix:
-   *   1. Valid session     → continue, pass user via route context
-   *   2. Invalid cookie    → redirect /auth/verify-session for the
-   *      (expired / revoked)  silent-recovery flow (client-side
-   *                           Firebase JS likely still has a valid
-   *                           refresh token)
-   *   3. No cookie at all  → redirect /auth/login (cold visit — no
-   *                          recovery to attempt)
+   * Auth: `requireKcSession` reads the Keycloak BFF session. No
+   * session → full-page navigation to the `/auth/sign-in` server
+   * handler (SSR 302 / client `window.location`), preserving the
+   * return path. Otherwise the resolved user + account-console URL
+   * flow into route context.
    *
    * Prefetch: on the SSR pass only (typeof window === 'undefined'),
-   * fetch the caller's orgs via an SA-signed actor JWT and prime
-   * the route's QueryClient. The client's useQuery hits the cached
-   * entry on hydration — no skeleton flash for the nav picker on
-   * cold loads. Client-side navigations skip this; the client's
-   * own useQuery handles fetching once mounted.
+   * fetch the caller's orgs with the user's Keycloak access token
+   * (from the session cookie) and prime the route's QueryClient. The
+   * client's useQuery hits the cached entry on hydration — no
+   * skeleton flash for the nav picker on cold loads. Client-side
+   * navigations skip this; the client's own useQuery handles
+   * fetching once mounted.
    */
   beforeLoad: async ({ context, location }) => {
-    const { user, cookiePresent } = await getServerSession();
-    if (!user) {
-      // eslint-disable-next-line @typescript-eslint/only-throw-error
-      throw redirect({
-        to: cookiePresent ? '/auth/verify-session' : '/auth/login',
-        search: { return: location.pathname + location.searchStr },
-        replace: true,
-      });
-    }
+    const { user, accountConsoleUrl } = await requireKcSession(location);
 
     // SSR-only prefetch. typeof window is the standard guard for
     // server-pass detection in TanStack Start. On the client side,
@@ -80,7 +61,7 @@ export const Route = createFileRoute('/_app')({
     let initialActiveOrganization: string | null = null;
     let initialTheme: Theme | null = null;
     let initialSidebarOpen: boolean | null = null;
-    if (typeof window === 'undefined' && user.pivoxUserId) {
+    if (typeof window === 'undefined') {
       // Fire the cookie reads alongside the prefetches — same request,
       // server-fn dispatch is in-process so this is effectively a
       // single batch with no extra round-trips.
@@ -121,6 +102,7 @@ export const Route = createFileRoute('/_app')({
 
     return {
       user,
+      accountConsoleUrl,
       initialActiveOrganization,
       initialTheme,
       initialSidebarOpen,
@@ -131,81 +113,87 @@ export const Route = createFileRoute('/_app')({
 
 function AppLayoutRoute() {
   const router = useRouter();
-  const { user, initialActiveOrganization, initialTheme, initialSidebarOpen } =
-    Route.useRouteContext();
+  const {
+    user,
+    accountConsoleUrl,
+    initialActiveOrganization,
+    initialTheme,
+    initialSidebarOpen,
+  } = Route.useRouteContext();
   return (
-    <AppShellFeature
-      $api={$api}
-      // Seed the shell with the server-verified user so the nav-
-      // user menu paints with name + photo on first SSR render,
-      // not a half-rendered avatar that pops in after Firebase JS
-      // resolves on hydration.
-      initialUser={{
-        displayName: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL,
-      }}
-      // SSR-resolved active org from the cookie. Without this, the
-      // hook's lazy-state init would see `null` during SSR (no
-      // document.cookie on the server), producing an HTML payload
-      // that doesn't match the client's first paint.
-      initialActiveOrganization={initialActiveOrganization}
-      onCreateOrganization={() => {
-        void router.navigate({ to: '/auth/create-org' });
-      }}
-    >
-      {/* SSR-resolved sidebar open state from the cookie. Without
-          this, the wrapper's useState lazy initializer would see
-          `null` during SSR and use the default `true`, producing
-          HTML that doesn't match the client's first paint when the
-          user had previously collapsed the sidebar. */}
-      <SidebarProvider initialOpen={initialSidebarOpen ?? undefined}>
-        <AppShell.Sidebar />
-        <SidebarInset>
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <div className="ms-auto">
-              {/* SSR-resolved theme from the cookie. Without this,
-                  useSyncExternalStore's server snapshot would return
-                  the 'system' default and the icon would flicker to
-                  the user's actual saved theme on hydration. */}
-              <ThemeSwitcher initialTheme={initialTheme ?? undefined} />
-            </div>
-          </header>
-          <Outlet />
-        </SidebarInset>
-      </SidebarProvider>
-      <Suspense>
-        <ProfileDialog />
-      </Suspense>
-      <ChatFab />
-    </AppShellFeature>
+    <KeycloakAuthProvider user={user}>
+      <AppShellFeature
+        $api={$api}
+        // Seed the shell with the server-verified user so the nav-
+        // user menu paints with name + photo on first SSR render,
+        // not a half-rendered avatar that pops in after the client
+        // resolves auth.
+        initialUser={{
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+        }}
+        // SSR-resolved active org from the cookie. Without this, the
+        // hook's lazy-state init would see `null` during SSR (no
+        // document.cookie on the server), producing an HTML payload
+        // that doesn't match the client's first paint.
+        initialActiveOrganization={initialActiveOrganization}
+        onCreateOrganization={() => {
+          void router.navigate({ to: '/auth/create-org' });
+        }}
+        // "Manage Account" opens the Keycloak account console in a new
+        // tab (the BFF has no in-app profile UI — account management
+        // lives in Keycloak). `undefined` when the issuer isn't
+        // configured; nav-user then falls back to its no-op default.
+        onOpenAccount={
+          accountConsoleUrl
+            ? () => {
+                window.open(accountConsoleUrl, '_blank', 'noopener');
+              }
+            : undefined
+        }
+      >
+        {/* SSR-resolved sidebar open state from the cookie. Without
+            this, the wrapper's useState lazy initializer would see
+            `null` during SSR and use the default `true`, producing
+            HTML that doesn't match the client's first paint when the
+            user had previously collapsed the sidebar. */}
+        <SidebarProvider initialOpen={initialSidebarOpen ?? undefined}>
+          <AppShell.Sidebar />
+          <SidebarInset>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+              <SidebarTrigger className="-ml-1" />
+              <div className="ms-auto">
+                {/* SSR-resolved theme from the cookie. Without this,
+                    useSyncExternalStore's server snapshot would return
+                    the 'system' default and the icon would flicker to
+                    the user's actual saved theme on hydration. */}
+                <ThemeSwitcher initialTheme={initialTheme ?? undefined} />
+              </div>
+            </header>
+            <Outlet />
+          </SidebarInset>
+        </SidebarProvider>
+        <ChatFab />
+      </AppShellFeature>
+    </KeycloakAuthProvider>
   );
 }
 
 /**
  * Floating chat FAB, mounted in the authed shell so chat is reachable
- * on every route (replaces the old standalone /chat route). Builds the
- * chat `parent` + Firebase-token getter the same way that route did.
- * Renders nothing until an org is selected — chat is scoped to an org.
+ * on every route (replaces the old standalone /chat route). Renders
+ * nothing until an org is selected — chat is scoped to an org.
  *
- * Uses the same `usePivoxUserId` hook as the Electron renderer, seeded
- * with the server-verified id from `_app` route context so the FAB
- * server-renders; the hook then re-resolves from the live client claim.
+ * Under the BFF the browser holds no bearer, so chat goes through the
+ * same-origin `/api` proxy (`baseUrl="/api"`), which injects the
+ * Keycloak access token from the httpOnly cookie. `usePivoxUserId()`
+ * reads the id from the KeycloakAuthProvider (== KC `sub`).
  */
 function ChatFab() {
   const { state: shellState } = useAppShellContext();
-  const { user: firebaseUser } = useAuth();
-  const { user } = Route.useRouteContext();
   const activeOrg = shellState.activeOrganization;
-  const pivoxUserId = usePivoxUserId(user.pivoxUserId);
-
-  const getAuthToken = useCallback(async () => {
-    if (!firebaseUser) {
-      throw new Error('Firebase user not available');
-    }
-    return firebaseUser.getIdToken();
-  }, [firebaseUser]);
+  const pivoxUserId = usePivoxUserId();
 
   if (!activeOrg || !pivoxUserId) return null;
 
@@ -214,11 +202,5 @@ function ChatFab() {
   // FAB is mounted shell-wide (persists across navigation), so without
   // this an org switch would keep the previous org's conversation id in
   // the runtime's state and smuggle it into the new org's next turn.
-  return (
-    <ChatModalFeature
-      key={parent}
-      parent={parent}
-      getAuthToken={getAuthToken}
-    />
-  );
+  return <ChatModalFeature key={parent} parent={parent} baseUrl="/api" />;
 }

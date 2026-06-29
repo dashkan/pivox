@@ -4,14 +4,16 @@
 # over the socket as the superuser (trust auth during init).
 #
 # Owns all dev DB setup so the apphost doesn't need init executables:
-#   1. create the pivox + keycloak databases
+#   1. create the pivox + keycloak + sessions databases
 #   2. apply real golang-migrate migrations to pivox (binary baked into the image)
 #   3. seed pivox
+# The `sessions` database (web BFF session store) is created here but has NO
+# migrations — the BFF owns + creates its `web_sessions` schema idempotently.
 #
 # migrations + scripts are bind-mounted by the apphost at /migrations and /scripts.
 set -eu
 
-# Create pivox + keycloak idempotently. Postgres creates POSTGRES_DB (pivox)
+# Create pivox + keycloak + sessions idempotently. Postgres creates POSTGRES_DB (pivox)
 # before running init scripts, so an unconditional CREATE would collide — and
 # CREATE DATABASE has no IF NOT EXISTS. Guard on pg_database.
 ensure_db() {
@@ -23,6 +25,10 @@ ensure_db() {
 }
 ensure_db pivox
 ensure_db keycloak
+# The web BFF's session store. BFF-owned: no Go migrations run against it; the
+# BFF creates `web_sessions` idempotently on first use. We only ensure the DB
+# itself exists here.
+ensure_db sessions
 
 # golang-migrate over the socket (no TCP yet). The postgres lib/pq driver reads
 # host=<socket dir>; empty host in the URL + the host param keeps it off TCP.
