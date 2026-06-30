@@ -87,14 +87,19 @@ const postgres = await builder
 // jobs in the SAME transaction as the app-data mutation (river.JobCompleteTx +
 // the org/space delete + one Commit), which requires River's tables in `pivox`
 // (the `river` schema). Postgres has no cross-database transactions.
-const pivoxDb = await postgres.addDatabase("pivox");
+const pivoxDb = await postgres.addDatabase("pivox-db", {
+  databaseName: "pivox",
+});
 // Resource name "keycloak-db", not "keycloak": the addKeycloak server resource
 // already owns the name "keycloak" (resource names are unique, case-insensitive).
 // databaseName pins the actual database to "keycloak".
 const keycloakDb = await postgres.addDatabase("keycloak-db", {
   databaseName: "keycloak",
 });
-const sessionsDb = await postgres.addDatabase("sessions");
+
+const sessionsDb = await postgres.addDatabase("sessions-db", {
+  databaseName: "sessions",
+});
 
 // pgx (pgxpool.ParseConfig) needs a libpq postgres:// URL, not Aspire's Npgsql
 // keyword connection string. uriExpression() yields exactly that, correctly
@@ -347,8 +352,14 @@ await builder
   // `web_sessions` table, which lives in the separate `sessions` DB — so the
   // worker needs that connection in addition to the app DB.
   .withEnvironment("PIVOX_SESSIONS_DATABASE_URL", sessionsDatabaseUrl)
+  // identity-sync consumer reads the keycloak-events topic to provision
+  // `identities` rows (replaces the removed Firebase syncIdentity fn). The
+  // worker is a host process, so it reaches the kafka container on the host
+  // listener (:9092), not the internal kafka:9093 advertised to containers.
+  .withEnvironment("PIVOX_KAFKA_BROKERS", "localhost:9092")
   .waitFor(pivoxDb)
-  .waitFor(sessionsDb);
+  .waitFor(sessionsDb)
+  .waitFor(kafka);
 
 // --- agent (pivox-agent) — on-prem storage agent; host process ---
 // Mirrors `make run-agent`. The `storage` subcommand is positional. Dev

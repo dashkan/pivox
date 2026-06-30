@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dashkan/pivox/internal/audit"
+	"github.com/dashkan/pivox/internal/identitysync"
 	"github.com/dashkan/pivox/internal/telemetry"
 	"github.com/dashkan/pivox/internal/telemetry/rivertrace"
 	"github.com/dashkan/pivox/internal/workers"
@@ -68,6 +70,8 @@ func main() {
 	f := rootCmd.Flags()
 	f.String("database-url", envOrDefault("PIVOX_DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"), "PostgreSQL connection URL")
 	f.String("sessions-database-url", envOrDefault("PIVOX_SESSIONS_DATABASE_URL", "postgres://localhost:5432/sessions?sslmode=disable"), "PostgreSQL connection URL for the BFF-owned web_sessions store (purge_web_sessions job)")
+	f.String("kafka-brokers", envOrDefault("PIVOX_KAFKA_BROKERS", "localhost:9092"), "Comma-separated Kafka seed brokers for the Keycloak identity-sync consumer")
+	f.String("kc-realm", envOrDefault("PIVOX_KC_REALM", "pivox"), "Keycloak realm whose events the identity-sync consumer provisions")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -87,6 +91,8 @@ func serve(cmd *cobra.Command, _ []string) error {
 	f := cmd.Flags()
 	databaseURL := mustString(f.GetString("database-url"))
 	sessionsURL := mustString(f.GetString("sessions-database-url"))
+	kafkaBrokers := mustString(f.GetString("kafka-brokers"))
+	kcRealm := mustString(f.GetString("kc-realm"))
 	logLevel := mustString(f.GetString("log-level"))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -242,6 +248,33 @@ func serve(cmd *cobra.Command, _ []string) error {
 	}
 	logger.Info("pivox-worker running", "queues", []string{river.QueueDefault}, "periodic_jobs", len(periodic))
 
+	// Keycloak → Pivox identity-sync consumer. Provisions / tombstones
+	// `identities` rows from the keycloak-events Kafka topic (the
+	// replacement for the removed Firebase syncIdentity blocking fn).
+	// Runs on the pivox pool; shuts down when ctx cancels (it polls with
+	// ctx and closes its kgo client on return).
+	brokers := strings.Split(kafkaBrokers, ",")
+	identityConsumer, err := identitysync.NewConsumer(identitysync.ConsumerConfig{
+		Brokers: brokers,
+		Handler: identitysync.NewHandler(identitysync.HandlerConfig{
+			Queries: queries,
+			Realm:   kcRealm,
+			Logger:  logger,
+		}),
+		Logger: logger,
+	})
+	if err != nil {
+		return fmt.Errorf("identity-sync consumer: %w", err)
+	}
+	identitySyncDone := make(chan struct{})
+	go func() {
+		defer close(identitySyncDone)
+		if err := identityConsumer.Run(ctx); err != nil {
+			logger.Error("identity-sync consumer exited with error", "error", err)
+		}
+	}()
+	logger.Info("identity-sync consumer running", "brokers", brokers, "realm", kcRealm, "topic", "keycloak-events")
+
 	// Block until signal. River's Start goroutine runs until the
 	// context cancels or Stop is called.
 	<-ctx.Done()
@@ -252,6 +285,15 @@ func serve(cmd *cobra.Command, _ []string) error {
 	if err := client.Stop(stopCtx); err != nil {
 		logger.Warn("river stop returned error", "error", err)
 	}
+
+	// Wait for the identity-sync consumer to drain its current poll and
+	// close its kgo client (ctx is already cancelled, so Run returns).
+	select {
+	case <-identitySyncDone:
+	case <-stopCtx.Done():
+		logger.Warn("identity-sync consumer did not stop within shutdown deadline")
+	}
+
 	logger.Info("pivox-worker stopped")
 	return nil
 }
