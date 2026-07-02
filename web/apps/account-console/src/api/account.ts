@@ -9,6 +9,8 @@ export type UserRepresentation = {
   firstName?: string;
   lastName?: string;
   emailVerified?: boolean;
+  // KC stores custom User-Profile attributes here, each as a string[].
+  attributes?: Record<string, string[]>;
   userProfileMetadata?: unknown;
 };
 
@@ -89,8 +91,8 @@ export type CredentialContainer = {
 export const getCredentials = () =>
   request<CredentialContainer[]>("/credentials");
 
-export const deleteCredential = (id: string) =>
-  request<void>(`/credentials/${id}`, { method: "DELETE" });
+// Credential setup/update/removal are kcActions (keycloak.login({action})), not
+// REST — see account-security.tsx. There is intentionally no deleteCredential.
 
 /* ---- Applications ---- */
 export type Application = {
@@ -128,15 +130,10 @@ export type LinkedAccount = {
 export const getLinkedAccounts = () =>
   request<LinkedAccount[]>("/linked-accounts");
 
-export const linkAccount = (alias: string) => {
-  const redirectUri = window.location.href;
-  return request<{ accountLinkUri: string }>(
-    `/linked-accounts/${encodeURIComponent(alias)}?providerId=${encodeURIComponent(alias)}&redirectUri=${encodeURIComponent(redirectUri)}`,
-  );
-};
-
-export const unLinkAccount = (alias: string) =>
-  request<void>(`/linked-accounts/${encodeURIComponent(alias)}`, {
+// Linking is a kcAction (`keycloak.login({action: "idp_link:<alias>"})`), not a
+// REST call — see linked-accounts.tsx. Only unlink is REST.
+export const unLinkAccount = (providerName: string) =>
+  request<void>(`/linked-accounts/${encodeURIComponent(providerName)}`, {
     method: "DELETE",
   });
 
@@ -144,17 +141,3 @@ export const unLinkAccount = (alias: string) =>
 export type Group = { id?: string; name?: string; path?: string };
 
 export const getGroups = () => request<Group[]>("/groups");
-
-/* Keycloak returns client names as i18n keys like `${client_account-console}`
- * (its own UI resolves them via a message bundle we don't load). Prettify the
- * common `${client_*}` keys to a Title-Cased label; fall back for other keys. */
-export function resolveLabel(name: string | undefined, fallback: string): string {
-  if (!name) return fallback;
-  const clientKey = /^\$\{client_(.+)\}$/.exec(name);
-  if (clientKey) {
-    return clientKey[1]
-      .replace(/[-_]/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-  return /^\$\{.*\}$/.test(name) ? fallback : name;
-}

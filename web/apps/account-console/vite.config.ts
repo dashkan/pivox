@@ -5,7 +5,7 @@ import { defineConfig } from "vite";
 // Builds the account console into the Keycloak theme's account resources.
 // Keycloak serves these from a hashed, version-dependent resourceUrl, so:
 //   - base "./" keeps any asset URLs relative (no hardcoded absolute paths),
-//   - inlineDynamicImports emits a SINGLE js file (no chunk fetches whose URLs
+//   - codeSplitting: false emits a SINGLE js file (no chunk fetches whose URLs
 //     would need the unknowable resourceUrl prefix),
 //   - fixed entry/asset names let theme/index.ftl reference them deterministically
 //     via ${resourceUrl}/app/index.js and ${resourceUrl}/app/assets/index.css.
@@ -20,7 +20,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        inlineDynamicImports: true,
+        codeSplitting: false,
         entryFileNames: "index.js",
         assetFileNames: "assets/[name][extname]",
       },

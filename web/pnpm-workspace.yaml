@@ -33,7 +33,7 @@ allowBuilds:
 # resolve to v19 via the catalog. (Verified: removing it reintroduces
 # the @18 orphan; with it, `@types/react@18` resolves nowhere.)
 #
-# We previously ALSO had `overrides: { "@types/react": "catalog:" }`
+# We previously ALSO had `overrides: { "@types/react": "catalog:react-19" }`
 # as belt-and-suspenders — but it was redundant (ignored deps already
 # block the only v18 source) AND broke `pnpm update`, which can't
 # round-trip a catalog-referenced override and ejected the `catalog:`
@@ -48,6 +48,8 @@ catalog:
   "@assistant-ui/react-ai-sdk": "1.3.38"
   "@eslint/js": "9.39.4"
   "@fontsource-variable/roboto": "5.2.10"
+  "@keycloak/keycloak-account-ui": "^26.6.4"
+  "@keycloak/keycloak-ui-shared": "^26.6.4"
   "@tailwindcss/vite": "4.3.2"
   "@tanstack/devtools-vite": "0.8.1"
   "@tanstack/react-devtools": "0.10.8"
@@ -69,13 +71,14 @@ catalog:
   "electron-vite": "6.0.0-beta.1"
   "eslint": "9.39.4"
   "firebase": "12.15.0"
+  "keycloak-js": "26.2.4"
   "lucide-react": "1.22.0"
   "prettier": "3.9.4"
   "react": "19.2.7"
   "react-dom": "19.2.7"
   "tailwindcss": "4.3.2"
   "typescript": "5.9.3"
-  "vite": "8.1.1"
+  "vite": "8.1.2"
   "vitest": "4.1.9"
 ignoredOptionalDependencies:
   - "@types/react"

@@ -3,55 +3,55 @@ import { cn } from "@pivox/primitives/utils";
 import {
   AppWindow,
   KeyRound,
-  Link2,
   LogOut,
-  MonitorSmartphone,
   User,
   UserRound,
   Users,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { NavLink, Outlet } from "react-router-dom";
 
 import { features } from "./env";
 import { keycloak, logout } from "./keycloak";
-import { AccountSecurity } from "./pages/account-security";
-import { Applications } from "./pages/applications";
-import { DeviceActivity } from "./pages/device-activity";
-import { Groups } from "./pages/groups";
-import { LinkedAccounts } from "./pages/linked-accounts";
-import { PersonalInfo } from "./pages/personal-info";
-import { navigate, useRoute, type RouteId } from "./router";
 
-type NavItem = { id: RouteId; label: string; icon: typeof UserRound };
+import type { ComponentType } from "react";
 
-const NAV: NavItem[] = [
-  { id: "personal-info", label: "Personal info", icon: UserRound },
-  { id: "account-security", label: "Account security", icon: KeyRound },
-  { id: "device-activity", label: "Device activity", icon: MonitorSmartphone },
-  { id: "applications", label: "Applications", icon: AppWindow },
-  ...(features.isLinkedAccountsEnabled
-    ? [{ id: "linked-accounts" as const, label: "Linked accounts", icon: Link2 }]
-    : []),
-  ...(features.isViewGroupsEnabled
-    ? [{ id: "groups" as const, label: "Groups", icon: Users }]
-    : []),
-];
-
-const PAGES: Record<RouteId, () => React.JSX.Element> = {
-  "personal-info": PersonalInfo,
-  "account-security": AccountSecurity,
-  "device-activity": DeviceActivity,
-  applications: Applications,
-  "linked-accounts": LinkedAccounts,
-  groups: Groups,
-};
+function NavItem({
+  to,
+  end,
+  icon: Icon,
+  label,
+}: {
+  to: string;
+  end?: boolean;
+  icon?: ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        cn(
+          "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+          isActive
+            ? "bg-muted font-medium text-foreground"
+            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+        )
+      }
+    >
+      {Icon && <Icon className="size-4" />}
+      {label}
+    </NavLink>
+  );
+}
 
 export function App() {
-  const route = useRoute();
+  const { t } = useTranslation();
   const claims = keycloak.tokenParsed as
     | { name?: string; preferred_username?: string }
     | undefined;
   const displayName = claims?.name ?? claims?.preferred_username ?? "";
-  const Page = PAGES[route];
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -66,38 +66,46 @@ export function App() {
           )}
           <Button variant="outline" size="sm" onClick={logout}>
             <LogOut className="size-4" />
-            Sign out
+            {t("doSignOut")}
           </Button>
         </div>
       </header>
 
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-8 md:flex-row">
-        <nav className="flex shrink-0 flex-row flex-wrap gap-1 md:w-52 md:flex-col md:flex-nowrap">
-          {NAV.map((item) => {
-            const Icon = item.icon;
-            const active = route === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => navigate(item.id)}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                  active
-                    ? "bg-muted font-medium text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                )}
-              >
-                <Icon className="size-4" />
-                {item.label}
-              </button>
-            );
-          })}
+        <nav className="flex shrink-0 flex-col gap-1 md:w-52">
+          <NavItem to="/" end icon={UserRound} label={t("personalInfoSidebarTitle")} />
+
+          <div className="mt-2 flex flex-col gap-1">
+            <span className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground">
+              <KeyRound className="size-4" />
+              {t("accountSecuritySidebarTitle")}
+            </span>
+            <div className="ml-4 flex flex-col gap-1">
+              <NavItem
+                to="/account-security/signing-in"
+                label={t("signingInSidebarTitle")}
+              />
+              <NavItem
+                to="/account-security/device-activity"
+                label={t("deviceActivitySidebarTitle")}
+              />
+              {features.isLinkedAccountsEnabled && (
+                <NavItem
+                  to="/account-security/linked-accounts"
+                  label={t("linkedAccountsSidebarTitle")}
+                />
+              )}
+            </div>
+          </div>
+
+          <NavItem to="/applications" icon={AppWindow} label={t("applications")} />
+          {features.isViewGroupsEnabled && (
+            <NavItem to="/groups" icon={Users} label={t("groups")} />
+          )}
         </nav>
 
         <main className="flex-1">
-          <Page />
+          <Outlet />
         </main>
       </div>
     </div>
