@@ -953,7 +953,7 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "pivox://oidc-callback",
+        "https://pivox.ngrok.app/launch",
         "http://127.0.0.1/oidc/callback"
       ],
       "webOrigins": [

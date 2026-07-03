@@ -11,7 +11,9 @@ import {
   type ConfigProvider,
   type SessionTokens,
 } from '@pivox/oidc';
-import { shell } from 'electron';
+import { app, shell } from 'electron';
+
+import { SCHEME_LANDING_URL } from './oidc-config';
 
 type Configuration = Awaited<ReturnType<ConfigProvider>>;
 
@@ -24,17 +26,27 @@ const FLOW_TIMEOUT_MS = 5 * 60 * 1000;
  *   - loopback (default): an ephemeral 127.0.0.1 HTTP server catches Keycloak's
  *     `?code&state` GET directly (OIDC returns them in the query — no hash bounce
  *     like the old Firebase broker). Works in electron-vite dev + packaged.
- *   - scheme: the pivox://oidc-callback custom scheme. Reliable only in packaged
- *     builds (electron-vite dev on macOS can't register the scheme).
- * Both redirect URIs are registered on the Keycloak `electron` client.
+ *   - scheme: the OIDC redirect_uri is the branded HTTPS landing page
+ *     (SCHEME_LANDING_URL); that page forwards the callback params into the app
+ *     via the pivox://oidc-callback custom scheme (caught by the deep-link
+ *     handler below). Reliable only in packaged builds (electron-vite dev on
+ *     macOS can't register the scheme). Gives a real final screen — not a
+ *     stranded OAuth tab — and keeps the exchange on an https redirect_uri.
+ * The loopback + landing redirect URIs are registered on the Keycloak client.
  */
 type Transport = 'loopback' | 'scheme';
 function selectedTransport(): Transport {
-  return process.env.PIVOX_AUTH_REDIRECT === 'scheme' ? 'scheme' : 'loopback';
+  // An explicit env override wins in either direction (testing / opt-out).
+  const override = process.env.PIVOX_AUTH_REDIRECT;
+  if (override === 'scheme' || override === 'loopback') return override;
+  // Default: the pivox:// custom scheme in PACKAGED builds (a clean deep link,
+  // registered via the app's Info.plist protocol handler), loopback in DEV —
+  // electron-vite dev can't register the scheme on macOS, so it falls back to
+  // the 127.0.0.1 server there.
+  return app.isPackaged ? 'scheme' : 'loopback';
 }
 
 const LOOPBACK_PATH = '/oidc/callback';
-const SCHEME_REDIRECT = 'pivox://oidc-callback';
 
 export type LoginResult =
   | { ok: true; tokens: SessionTokens }
@@ -215,7 +227,9 @@ export async function runLogin(
     };
 
     if (transport === 'scheme') {
-      void begin(SCHEME_REDIRECT);
+      // redirect_uri is the HTTPS landing page; it bounces the params into the
+      // app via pivox://oidc-callback (see handleAuthCallbackDeepLink).
+      void begin(SCHEME_LANDING_URL);
       return;
     }
 

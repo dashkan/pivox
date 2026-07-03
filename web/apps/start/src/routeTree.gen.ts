@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LaunchRouteImport } from './routes/launch'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
@@ -19,6 +20,11 @@ import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 
+const LaunchRoute = LaunchRouteImport.update({
+  id: '/launch',
+  path: '/launch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
@@ -66,6 +72,7 @@ const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/launch': typeof LaunchRoute
   '/about': typeof AppAboutRoute
   '/image-editor': typeof AppImageEditorRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/$': typeof ApiV1SplatRoute
 }
 export interface FileRoutesByTo {
+  '/launch': typeof LaunchRoute
   '/about': typeof AppAboutRoute
   '/image-editor': typeof AppImageEditorRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -87,6 +95,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/launch': typeof LaunchRoute
   '/_app/about': typeof AppAboutRoute
   '/_app/image-editor': typeof AppImageEditorRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/launch'
     | '/about'
     | '/image-editor'
     | '/auth/callback'
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/api/v1/$'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/launch'
     | '/about'
     | '/image-editor'
     | '/auth/callback'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/launch'
     | '/_app/about'
     | '/_app/image-editor'
     | '/auth/callback'
@@ -132,6 +144,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  LaunchRoute: typeof LaunchRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthCreateOrgRoute: typeof AuthCreateOrgRoute
   AuthLogoutRoute: typeof AuthLogoutRoute
@@ -141,6 +154,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/launch': {
+      id: '/launch'
+      path: '/launch'
+      fullPath: '/launch'
+      preLoaderRoute: typeof LaunchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app': {
       id: '/_app'
       path: ''
@@ -223,6 +243,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  LaunchRoute: LaunchRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthCreateOrgRoute: AuthCreateOrgRoute,
   AuthLogoutRoute: AuthLogoutRoute,

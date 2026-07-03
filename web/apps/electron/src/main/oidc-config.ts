@@ -22,6 +22,16 @@ const CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID || 'electron';
  */
 export const OIDC_SCOPE = 'openid profile email offline_access';
 
+/**
+ * OIDC redirect_uri for the scheme transport: a branded HTTPS landing page
+ * (served by the web app at `/launch`) that bounces the callback params into the
+ * desktop app via the pivox:// scheme. Using an HTTPS redirect here — not
+ * pivox:// directly — means the final browser screen is a real page rather than
+ * a stranded OAuth tab, and keeps the token exchange on a standard https
+ * redirect_uri. Must match the registered redirect URI on the Keycloak client.
+ */
+export const SCHEME_LANDING_URL = `${BASE_URL.replace(/\/+$/, '')}/launch`;
+
 let provider: ConfigProvider | undefined;
 
 /** Memoized discovery for the public electron client. */
