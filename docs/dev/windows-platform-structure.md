@@ -1,5 +1,13 @@
 # Windows Platform Structure
 
+> **Status (2026): legacy / reference.** Describes the Native App's
+> Windows structure, whose `WinAuthService` uses Firebase Auth. The
+> Native App is now a legacy/reference target and Firebase is no longer
+> the Pivox auth system (the cloud is Keycloak-only, `internal/oidc`).
+> The structural and build details below remain accurate for the legacy
+> app; only treat the Firebase auth as the abandoned mechanism. See
+> `AGENTS.md` for the current auth model.
+
 ## Why the Restructure
 
 The Pivox Windows platform was restructured from a flat directory into two targets to enable XAML reuse between the WinUI 3 desktop application and an ActiveX control. Shared source files (Views, services, auth) are compiled directly into each target — no shared DLL, no `dllexport`/`dllimport`. Both the app (Pivox.exe) and the ActiveX control (PivoxActiveX.dll) compile the same source files from `shared/`.

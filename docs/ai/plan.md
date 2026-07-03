@@ -1,5 +1,12 @@
 # AIElements — Implementation Plan
 
+> **Auth note (2026): Firebase removed — Keycloak-only.** This is a
+> Native App (macOS/Windows) plan; the Native App is now a
+> legacy/reference target. Any Firebase reference below (e.g. the
+> "Firebase-emulator-style" native test setup) reflects the abandoned
+> native auth — the cloud is Keycloak-only (`internal/oidc`). See
+> `AGENTS.md` for the current auth model.
+
 ## Engineering principles — non-negotiable
 
 **No hacky code. Ever.** Applies to every line of this implementation and every PR.

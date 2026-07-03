@@ -11,7 +11,7 @@
 
 ## Goal
 
-90%+ coverage for every hand-written Go package. Generated code (`internal/db/generated/`, `internal/pkg/gen/`) and external SDK wrappers (`internal/firebase/`) are excluded — they're exercised indirectly through integration tests.
+90%+ coverage for every hand-written Go package. Generated code (`internal/db/generated/`, `internal/pkg/gen/`) is excluded — it's exercised indirectly through integration tests. (This plan predates the Keycloak migration; the external SDK wrapper `internal/firebase/` it also excluded has since been **deleted** — auth is now the `internal/oidc` Keycloak verifier, covered by its own unit tests.)
 
 ## Current State (unit tests only, `-short` mode)
 
@@ -262,7 +262,7 @@ For every function below 90%, write a targeted test hitting the uncovered branch
 | `storageagent.newS3Client` | Needs real S3/minio backend |
 | `storageagent.ListenAndServe` | Binds network port |
 | `storageagent.version` | Returns build-time constant |
-| `firebase.*` | SDK wrapper — tested via authn.Service mock |
+| ~~`firebase.*`~~ | Removed — the Firebase SDK wrapper was deleted in the Keycloak migration; auth is now `internal/oidc` (JWKS-verified), tested directly |
 | `internal/db/generated/*` | sqlc-generated — exercised via integration tests |
 | `internal/pkg/gen/*` | protoc-generated gRPC/proto code |
 

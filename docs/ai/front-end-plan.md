@@ -1,5 +1,15 @@
 # AI Chat — macOS Frontend Implementation Plan
 
+> **Auth note (2026): Firebase removed — Keycloak-only.** This macOS
+> plan describes a `FirebaseAuthInterceptor` attaching a Firebase ID
+> token per RPC. That reflects the legacy Native App, which is now a
+> reference target, not an active migration. The cloud is Keycloak-only
+> and verifies Keycloak OIDC access tokens (`internal/oidc`), so a real
+> client attaches a Keycloak token, not a Firebase one — the interceptor
+> shape (a `grpc-swift-2` `ClientInterceptor` injecting `authorization:
+> Bearer <token>`) still holds; only the token source changes. See
+> `AGENTS.md` for the current auth model.
+
 Scoped to the macOS AI Chat feature: how the native SwiftUI app consumes the Go BE (`docs/ai/backend-plan.md`) via the `PivoxModels` SPM package.
 
 **Not in scope**:

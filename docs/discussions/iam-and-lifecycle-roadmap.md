@@ -8,6 +8,17 @@ plan. Don't add new tasks here — track them in the rollover doc.
 **Started**: 2026-04-26
 **Closed**: 2026-04-30
 
+> **Update (2026): Firebase has since been removed — auth is
+> Keycloak-only.** This roadmap was executed against Firebase Auth
+> (`firebase_identities` table, Firebase blocking triggers, Firebase
+> Admin SDK provider config, `internal/firebase/`). All of that is
+> gone: the cloud verifies Keycloak OIDC access tokens via
+> `internal/oidc`, the identity table is `identities` keyed on the
+> Keycloak `sub`, provisioning flows from Keycloak (KC→Kafka→Pivox
+> event sync, `internal/identitysync`), and Keycloak is the SSO/OAuth
+> broker to customer IdPs. Read the Firebase mechanics below as the
+> historical execution record. See `AGENTS.md` for the current model.
+
 ## Working agreement
 
 - **TDD discipline.** Every behavior change in this roadmap lands test-first. Refactors require updating existing tests in the same change — do not delete tests for behavior that still exists.

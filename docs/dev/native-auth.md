@@ -1,5 +1,16 @@
 # Native App Authentication Architecture
 
+> **Status (2026): legacy / reference.** This entire architecture is
+> built on Firebase Auth (Firebase Apple/C++/Android SDKs, Firebase
+> Identity Platform federation). The Native App is now a legacy/reference
+> target, and Firebase is **no longer the Pivox auth system** — the cloud
+> is Keycloak-only and verifies Keycloak OIDC access tokens via
+> `internal/oidc`, so tokens minted by these Firebase SDKs do not
+> authenticate against the current Cloud Controller. Preserved as a record
+> of the abandoned native-auth design. For the current model (Keycloak BFF
+> for `web/apps/start`, Keycloak public PKCE client for Electron, shared
+> `@pivox/oidc`), see `AGENTS.md` (§ Components).
+
 ## Principle
 
 Use the best native SDK for each platform. No browser hacks, no workarounds. Every platform has production-grade auth SDKs.

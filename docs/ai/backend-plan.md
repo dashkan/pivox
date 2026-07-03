@@ -175,7 +175,7 @@ CREATE TABLE conversations (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     org_id          UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    creator_uid     TEXT NOT NULL,  -- firebase UID of conversation owner
+    creator_uid     TEXT NOT NULL,  -- Pivox identity id (Keycloak `sub`) of conversation owner
     -- identity
     name            TEXT NOT NULL,  -- stable ID used in resource name
     -- domain
@@ -289,7 +289,7 @@ CREATE INDEX idx_artifact_versions_asset ON artifact_versions (asset_version_nam
 - Cascade deletes: deleting a conversation cascades to messages and artifacts; deleting an artifact cascades to versions; deleting an organization cascades to all conversations. Matches the resource hierarchy.
 - `asset_version_name` is a plain string pointer, not a real FK — the asset system is its own table tree and we don't want cross-schema FK coupling. If an upstream asset version is deleted, the artifact version is **orphaned**: fetching its content returns 404 and the client renders a "content unavailable" placeholder. Acceptable for v1; revisit if it becomes a real UX problem.
 - The `idx_artifact_versions_asset` partial index lets the asset system (or a cleanup job) find all artifact versions pointing to a given asset version — useful for cascade cleanup if we ever want to enforce consistency.
-- No `creator` FK to a `users` table — using the raw Firebase UID (same as existing patterns in `organizations`, `projects`).
+- No `creator` FK to a `users` table — using the raw Pivox identity id (the Keycloak `sub`; same as existing patterns in `organizations`, `projects`).
 - **1 MB inline size cap**: enforced via CHECK. Asset-backed versions have no cap here — they use whatever the asset system enforces.
 - Regenerate the migration bundle via Pivox's existing migration regen process (confirm with `make migrate` or equivalent — will verify during implementation).
 
@@ -422,7 +422,7 @@ func buildArtifactVersionName(org, conv, art, ver string) string
 
 **Error handling**: reuse `apierr.HandleResourceError(err, "Conversation", name)` from existing services.
 
-**Auth**: get `identityID := server.MustPivoxUserID(ctx)` (the caller's Pivox `identities.id` UUID — `pivox_user_id` claim on the JWT, set by the Firebase blocking function), look up org membership via existing `iam.Helper`, reject unauthorized requests with `PermissionDenied`. For List operations, filter by `creator_id = identityID` unless the user has an org-admin role.
+**Auth**: get `identityID := server.MustPivoxUserID(ctx)` (the caller's Pivox `identities.id` UUID — for Keycloak tokens the `sub` claim IS the identity id, verified by `internal/oidc`; no provider-specific custom claim needed), look up org membership via existing `iam.Helper`, reject unauthorized requests with `PermissionDenied`. For List operations, filter by `creator_id = identityID` unless the user has an org-admin role.
 
 **Converters** (`internal/convert/aichat.go`):
 

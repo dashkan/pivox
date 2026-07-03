@@ -27,7 +27,7 @@ Decide what bug the test is meant to catch *before* writing it. The wrong layer 
 | **`pgxmock` connection-level mock** | Hard-to-induce DB errors only (`ErrTxClosed` mid-tx, deadlock retry, pool exhaustion) | ~ms | Specific failure modes integration can't reproduce |
 | **`rivertest.RequireInsertedTx`** | Asserting handler enqueued a River job | included with integration | Job enqueue + atomicity with `operations` row |
 
-**Default for service-layer behavior is integration via `grpcharness`.** It runs the real gRPC server with the real interceptor chain (auth, membership, permission, audit) — only the Firebase token verifier is stubbed via `testAuthService`. Tests assert RPC outcomes against the real DB and can pin caller identity via `Harness.SetCaller`.
+**Default for service-layer behavior is integration via `grpcharness`.** It runs the real gRPC server with the real interceptor chain (auth, membership, permission, audit) — only the token verifier (in production, the Keycloak OIDC verifier: `authn.Service` / `internal/oidc`) is stubbed via `testAuthService`. Tests assert RPC outcomes against the real DB and can pin caller identity via `Harness.SetCaller`.
 
 #### Examples
 
@@ -174,6 +174,11 @@ mod tests {
 **Framework:** Google Test (gtest) + Google Mock (gmock)
 **Integration:** CMake `FetchContent` — no manual install
 **Run:** `ctest` or direct binary execution
+
+> The `MockFirebaseAuth` example below is from the legacy Native App
+> (Firebase auth), kept only as a gmock-pattern illustration. Firebase is
+> no longer the Pivox auth system — the cloud is Keycloak-only
+> (`internal/oidc`); the Native App is a reference target.
 
 ```cpp
 TEST(AuthManagerTest, SignInWithEmailSuccess) {

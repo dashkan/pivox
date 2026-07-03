@@ -1,5 +1,14 @@
 # UI Testing Strategy
 
+> **Status (2026): legacy / reference.** This covers UI testing for the
+> Native App (macOS), whose auth is Firebase-based (the `USE_AUTH_EMULATOR`
+> / `SKIP_AUTH` flags below drive the Firebase Auth emulator). The Native
+> App is now a legacy/reference target and Firebase is no longer the Pivox
+> auth system — the cloud is Keycloak-only (`internal/oidc`). These flags
+> and flows remain accurate for building/testing the legacy native app, but
+> its Firebase tokens don't authenticate against the current Cloud
+> Controller. See `AGENTS.md` for the current auth model.
+
 ## Launch Environment Flags
 
 | Flag | Purpose | Requires Emulator | Requires `DebugUITest` config |

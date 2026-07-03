@@ -2,6 +2,15 @@
 
 Last updated: 2026-04-06
 
+> **Status (2026): legacy / reference.** This tracks work in the Native
+> App (macOS/Windows), which is now a legacy/reference target, not an
+> active migration. Its auth references (Firebase Auth, the Firebase
+> emulator in UI tests) reflect the abandoned native auth and are **no
+> longer the Pivox auth system** — the cloud is Keycloak-only
+> (`internal/oidc`), so native Firebase tokens don't authenticate
+> against the current Cloud Controller. Non-auth details (image-editor
+> engine, renderers, build) remain accurate for the legacy app.
+
 ## Current State
 
 The image editor ("Edit" tool) is in the Library section of the Native App. It's a shared C++ core with a SwiftUI renderer on macOS. Windows renderer (Win2D) is not yet started.

@@ -1,5 +1,13 @@
 # WinRT Shared DLL Lessons Learned
 
+> **Status (2026): legacy / reference.** These lessons come from the
+> Native App's Windows build, where `WinAuthService` links the Firebase
+> C++ SDK (the "Firebase static duplication" pitfalls below). The Native
+> App is now a legacy/reference target and Firebase is no longer the
+> Pivox auth system (the cloud is Keycloak-only, `internal/oidc`). The
+> DLL/linking lessons remain technically valid for the legacy app; the
+> Firebase specifics are historical. See `AGENTS.md` for the current model.
+
 This documents the pitfalls encountered when using a shared WinRT component DLL (`PivoxShared.dll`) between a WinUI 3 app and an ActiveX control. We ultimately chose shared source compilation instead, but this reference captures the knowledge for future use.
 
 ## Why We Tried It

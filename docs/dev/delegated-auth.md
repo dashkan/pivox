@@ -1,5 +1,15 @@
 # Delegated Authentication
 
+> **Status (2026): legacy / reference.** This pattern is built on
+> Firebase custom tokens and the Firebase SDK, tied to the Native App
+> and its plugins — a legacy/reference target, not an active migration.
+> Pivox auth is now **Keycloak-only**: the cloud verifies Keycloak OIDC
+> access tokens via `internal/oidc`, and there is no Firebase custom-token
+> minting path anymore. Treat the Firebase mechanics below as the
+> abandoned design; a Keycloak-native delegated-auth flow would use OIDC
+> tokens (e.g. a device/loopback PKCE grant), not Firebase custom tokens.
+> See `AGENTS.md` for the current auth model.
+
 ## Overview
 
 Delegated auth is a cross-process authentication pattern for Pivox plugins that run inside third-party host applications. Instead of authenticating directly, the plugin delegates authentication to the Pivox app and receives a Firebase custom token via the backend.
