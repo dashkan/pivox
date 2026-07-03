@@ -197,7 +197,7 @@ func (s *StorageGatewaysServer) CreateStorageGateway(ctx context.Context, req *s
 		RegistrationToken: registrationToken,
 		Hostname:          hostname,
 		Annotations:       annotationsJSON,
-		CreatedBy:         convert.PgUUID(server.MustPivoxUserID(ctx)),
+		CreatedBy:         convert.PgUUID(server.MustUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "StorageGateway", gwName)
@@ -264,7 +264,7 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 
 	updateParams := db.UpdateStorageGatewayParams{
 		ID:        existing.ID,
-		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
+		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()
@@ -498,7 +498,7 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	// storage-read won't accidentally trigger the org-wide branch.
 	// All four current system roles include storage read, so any
 	// org-member today gets org-wide patterns.
-	identityID := server.MustPivoxUserID(ctx)
+	identityID := server.MustUserID(ctx)
 	orgPerms, err := s.queries.EffectiveOrgPermissions(ctx, db.EffectiveOrgPermissionsParams{
 		OrgID:      orgID,
 		IdentityID: convert.PgUUID(identityID),

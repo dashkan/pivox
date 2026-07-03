@@ -213,7 +213,7 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 		ShortName:      tagValueID,
 		NamespacedName: namespacedName,
 		Description:    tagValue.GetDescription(),
-		CreatedBy:      convert.PgUUID(server.MustPivoxUserID(ctx)),
+		CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", "")
@@ -242,7 +242,7 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 
 	updateParams := db.UpdateTagValueParams{
 		ID:        existing.ID,
-		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
+		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()

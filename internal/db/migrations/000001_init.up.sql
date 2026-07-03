@@ -537,9 +537,8 @@ CREATE UNIQUE INDEX idx_identities_email_unique ON identities (email)
 -- `space_members`/`group_members` rows; the `identities`
 -- row itself is unaffected.
 --
--- Clients learn their own user UUID via the `pivox_user_id` Firebase
--- ID-token custom claim, which the auth blocking function sets from
--- the `/internal/v1/auth:syncFirebaseIdentity` response.
+-- Clients learn their own user UUID from the `sub` of their Keycloak
+-- id_token (sub == identities.id).
 -- ============================================================================
 
 -- Forward-referenced FKs from audit columns → identities(id),
@@ -1298,7 +1297,7 @@ CREATE TABLE ai_conversations (
     -- audit. `created_by` is load-bearing: it doubles as the
     -- conversation owner's identities.id (the resource
     -- path carries it as `users/{user}`), and the handler enforces
-    -- `created_by == caller's pivox_user_id` unless the caller
+    -- `created_by == caller's identity id` unless the caller
     -- holds `ai.conversations.readAll` / `deleteAll`. NOT NULL —
     -- every conversation has a creator. Soft-delete-only on
     -- identities means the FK never dangles.

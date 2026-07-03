@@ -59,7 +59,7 @@ Scanned the existing Go codebase. The following patterns are established and thi
 | Converters | `internal/convert/<domain>.go` | `internal/convert/aichat.go` |
 | Resource name parsing | Inline per-service or `internal/resource/` | Inline in `internal/service/aichat/names.go` |
 | Error mapping | `internal/apierr/apierr.HandleResourceError` | Reuse |
-| Auth | `internal/server/auth_interceptor.go` → `MustPivoxUserID(ctx)` | Reuse via interceptor |
+| Auth | `internal/server/auth_interceptor.go` → `MustUserID(ctx)` | Reuse via interceptor |
 | Validation | `buf/validate` proto annotations, `FieldMaskAwareValidationInterceptor` | Reuse |
 | Test helpers | `internal/testutil` (`SetupTestDB`, `SetupGRPCServer`, mocks) | Reuse |
 | Integration test guard | `//go:build dev` | Same |
@@ -422,7 +422,7 @@ func buildArtifactVersionName(org, conv, art, ver string) string
 
 **Error handling**: reuse `apierr.HandleResourceError(err, "Conversation", name)` from existing services.
 
-**Auth**: get `identityID := server.MustPivoxUserID(ctx)` (the caller's Pivox `identities.id` UUID — for Keycloak tokens the `sub` claim IS the identity id, verified by `internal/oidc`; no provider-specific custom claim needed), look up org membership via existing `iam.Helper`, reject unauthorized requests with `PermissionDenied`. For List operations, filter by `creator_id = identityID` unless the user has an org-admin role.
+**Auth**: get `identityID := server.MustUserID(ctx)` (the caller's Pivox `identities.id` UUID — for Keycloak tokens the `sub` claim IS the identity id, verified by `internal/oidc`; no provider-specific custom claim needed), look up org membership via existing `iam.Helper`, reject unauthorized requests with `PermissionDenied`. For List operations, filter by `creator_id = identityID` unless the user has an org-admin role.
 
 **Converters** (`internal/convert/aichat.go`):
 
@@ -518,7 +518,7 @@ type ModelEvent struct {
 ```go
 func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
     ctx := stream.Context()
-    identityID := server.MustPivoxUserID(ctx)
+    identityID := server.MustUserID(ctx)
     
     // 1. Wait for first ClientEvent — must be UserMessage with conversation name
     firstMsg, err := stream.Recv()

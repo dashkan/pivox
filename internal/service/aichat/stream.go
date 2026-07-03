@@ -121,7 +121,7 @@ func (s *Server) ensureConversationForStream(ctx context.Context, parent string)
 	if err != nil {
 		return "", apierr.InvalidArgument(apierr.FieldViolation("parent", err.Error()))
 	}
-	callerUserID := server.MustPivoxUserID(ctx)
+	callerUserID := server.MustUserID(ctx)
 	if pathUser != callerUserID {
 		return "", apierr.PermissionDenied("conversations may only be created under the caller's own user-uuid")
 	}

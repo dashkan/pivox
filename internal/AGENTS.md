@@ -196,13 +196,13 @@ instances catch up via TTL.
   `Resolver.HasPermission(ctx, identity, target, permName)` answers
   the IAM check.
 - The auth chain at the gRPC server is: `AuthInterceptor` (verifies
-  the Keycloak access token via `internal/oidc` and sets the
-  `pivox_user_id` ctx claim — the token's `sub` IS the Pivox
-  identity UUID, so no provider-specific custom claim is needed) →
-  `MembershipInterceptor` (gates non-allowlisted RPCs on org
+  the Keycloak access token via `internal/oidc` and sets the caller's
+  identity UUID on the context from the token's `sub` — `sub` IS the
+  Pivox `identities.id`, so no provider-specific custom claim is
+  needed) → `MembershipInterceptor` (gates non-allowlisted RPCs on org
   membership) → `PermissionInterceptor` (per-RPC permission via
   registry).
-- Handlers read `server.MustPivoxUserID(ctx)` for the caller's
+- Handlers read `server.MustUserID(ctx)` for the caller's
   identity UUID and `server.MustResolvedOrgFromContext(ctx)` for the
   pre-resolved org row (no re-query in the handler).
 

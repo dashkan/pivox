@@ -80,7 +80,7 @@ func (h *ContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Mirror the gRPC artifact handlers: path-vs-row creator check
 	// plus optional audit-bypass via `ai.conversations.readAll` so
 	// admins/owners can pull a peer's artifact for legal/audit. The
-	// auth interceptor populates the pivox_user_id claim or rejects
+	// auth interceptor populates the caller's identity id or rejects
 	// the request before we get here.
 	conv, err := h.resolver.resolveConversation(ctx, orgName, pathUser, convName, permission.AiConversationsReadAll)
 	if err != nil {

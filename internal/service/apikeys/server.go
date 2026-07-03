@@ -135,7 +135,7 @@ func (s *ApiKeysServer) CreateKey(ctx context.Context, req *apiv1.CreateKeyReque
 		KeyString:    keyString,
 		Annotations:  annotationsJSON,
 		Restrictions: restrictionsBytes,
-		CreatedBy:    convert.PgUUID(server.MustPivoxUserID(ctx)),
+		CreatedBy:    convert.PgUUID(server.MustUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", "")
@@ -265,7 +265,7 @@ func (s *ApiKeysServer) UpdateKey(ctx context.Context, req *apiv1.UpdateKeyReque
 
 	updateParams := db.UpdateApiKeyParams{
 		ID:        existing.ID,
-		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
+		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()
@@ -329,7 +329,7 @@ func (s *ApiKeysServer) DeleteKey(ctx context.Context, req *apiv1.DeleteKeyReque
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
-	result, err := s.queries.SoftDeleteApiKey(ctx, db.SoftDeleteApiKeyParams{ID: existing.ID, DeletedBy: convert.PgUUID(server.MustPivoxUserID(ctx))})
+	result, err := s.queries.SoftDeleteApiKey(ctx, db.SoftDeleteApiKeyParams{ID: existing.ID, DeletedBy: convert.PgUUID(server.MustUserID(ctx))})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
@@ -356,7 +356,7 @@ func (s *ApiKeysServer) UndeleteKey(ctx context.Context, req *apiv1.UndeleteKeyR
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
-	result, err := s.queries.UndeleteApiKey(ctx, db.UndeleteApiKeyParams{ID: existing.ID, UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx))})
+	result, err := s.queries.UndeleteApiKey(ctx, db.UndeleteApiKeyParams{ID: existing.ID, UpdatedBy: convert.PgUUID(server.MustUserID(ctx))})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}

@@ -18,13 +18,6 @@ import (
 	"github.com/dashkan/pivox/internal/testutil/authnmock"
 )
 
-// claimsWithPivoxUserID builds the minimal Claims map that the
-// AuthInterceptor requires — every authenticated request must
-// carry pivox_user_id.
-func claimsWithPivoxUserID(id uuid.UUID) map[string]any {
-	return map[string]any{"pivox_user_id": id.String()}
-}
-
 // mockServerStream is a minimal grpc.ServerStream stand-in: the
 // stream interceptor only ever reads Context() to thread auth
 // claims, so embedding the real interface and overriding that one
@@ -71,54 +64,26 @@ func requireAuthn(t *testing.T, err error, substr string) {
 // (see cmd/pivox-cloud/main.go).
 // ---------------------------------------------------------------------------
 
+// A verified Keycloak access token carries the caller's identity id as its
+// `sub`, surfaced as Identity.UID. The interceptor parses it and resolves the
+// caller onto the context. (sub == identities.id — the whole point of the
+// Firebase->Keycloak cutover; there is no custom claim.)
 func TestAuthInterceptor_ValidToken(t *testing.T) {
 	auth := authnmock.NewMockService(t)
-	pivoxUID := uuid.New()
-	expectVerifyToken(auth, "test-token", &authn.Identity{
-		UID:    "user-789",
-		Email:  "user@example.com",
-		Claims: claimsWithPivoxUserID(pivoxUID),
-	})
-
-	md := metadata.New(map[string]string{"authorization": "Bearer test-token"})
-	ctx := metadata.NewIncomingContext(context.Background(), md)
-
-	var capturedPivoxUID uuid.UUID
-	handler := func(ctx context.Context, req any) (any, error) {
-		var ok bool
-		capturedPivoxUID, ok = PivoxUserID(ctx)
-		require.True(t, ok)
-		return "ok", nil
-	}
-
-	resp, err := AuthInterceptor(auth)(ctx, nil, &grpc.UnaryServerInfo{
-		FullMethod: "/pivox.api.v1.Spaces/GetSpace",
-	}, handler)
-
-	require.NoError(t, err)
-	assert.Equal(t, "ok", resp)
-	assert.Equal(t, pivoxUID, capturedPivoxUID)
-}
-
-// A Keycloak access token has no pivox_user_id claim — the `sub` (surfaced as
-// Identity.UID) IS the Pivox identity id. The interceptor must fall back to UID
-// and resolve the caller. This pins the core of the Firebase->KC migration.
-func TestAuthInterceptor_KeycloakSubFallback(t *testing.T) {
-	auth := authnmock.NewMockService(t)
-	kcSub := uuid.New()
+	sub := uuid.New()
 	expectVerifyToken(auth, "kc-token", &authn.Identity{
-		UID:    kcSub.String(),
+		UID:    sub.String(),
 		Email:  "kc@example.com",
-		Claims: map[string]any{"iss": "https://kc/realms/pivox"}, // no pivox_user_id
+		Claims: map[string]any{"iss": "https://kc/realms/pivox"},
 	})
 
 	md := metadata.New(map[string]string{"authorization": "Bearer kc-token"})
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
 	var captured uuid.UUID
-	handler := func(ctx context.Context, _ any) (any, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		var ok bool
-		captured, ok = PivoxUserID(ctx)
+		captured, ok = UserID(ctx)
 		require.True(t, ok)
 		return "ok", nil
 	}
@@ -129,7 +94,7 @@ func TestAuthInterceptor_KeycloakSubFallback(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "ok", resp)
-	assert.Equal(t, kcSub, captured)
+	assert.Equal(t, sub, captured)
 }
 
 func TestAuthInterceptor_MissingMetadata(t *testing.T) {
@@ -188,19 +153,18 @@ func TestAuthInterceptor_InvalidToken(t *testing.T) {
 
 func TestAuthStreamInterceptor_ValidToken(t *testing.T) {
 	auth := authnmock.NewMockService(t)
-	pivoxUID := uuid.New()
+	sub := uuid.New()
 	expectVerifyToken(auth, "stream-token", &authn.Identity{
-		UID:    "stream-user",
-		Claims: claimsWithPivoxUserID(pivoxUID),
+		UID: sub.String(),
 	})
 
 	md := metadata.New(map[string]string{"authorization": "Bearer stream-token"})
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
-	var capturedPivoxUID uuid.UUID
+	var captured uuid.UUID
 	handler := func(srv any, stream grpc.ServerStream) error {
 		var ok bool
-		capturedPivoxUID, ok = PivoxUserID(stream.Context())
+		captured, ok = UserID(stream.Context())
 		require.True(t, ok)
 		return nil
 	}
@@ -210,69 +174,60 @@ func TestAuthStreamInterceptor_ValidToken(t *testing.T) {
 	}, handler)
 
 	require.NoError(t, err)
-	assert.Equal(t, pivoxUID, capturedPivoxUID)
+	assert.Equal(t, sub, captured)
 }
 
 // ---------------------------------------------------------------------------
-// pivox_user_id claim handling
+// Identity resolution from the token `sub`
 // ---------------------------------------------------------------------------
 
-func TestPivoxUserID_Present(t *testing.T) {
+func TestUserID_Present(t *testing.T) {
 	want := uuid.New()
-	ctx := WithPivoxUserID(context.Background(), want)
-	got, ok := PivoxUserID(ctx)
+	ctx := WithUserID(context.Background(), want)
+	got, ok := UserID(ctx)
 
 	assert.True(t, ok)
 	assert.Equal(t, want, got)
 }
 
-func TestPivoxUserID_Missing(t *testing.T) {
-	_, ok := PivoxUserID(context.Background())
+func TestUserID_Missing(t *testing.T) {
+	_, ok := UserID(context.Background())
 	assert.False(t, ok)
 }
 
-func TestMustPivoxUserID_Present(t *testing.T) {
+func TestMustUserID_Present(t *testing.T) {
 	want := uuid.New()
-	ctx := WithPivoxUserID(context.Background(), want)
-	assert.Equal(t, want, MustPivoxUserID(ctx))
+	ctx := WithUserID(context.Background(), want)
+	assert.Equal(t, want, MustUserID(ctx))
 }
 
-func TestMustPivoxUserID_Panics(t *testing.T) {
+func TestMustUserID_Panics(t *testing.T) {
 	assert.Panics(t, func() {
-		MustPivoxUserID(context.Background())
+		MustUserID(context.Background())
 	})
 }
 
-// TestAuthInterceptor_PivoxUserIDClaim covers every malformed-claim
-// branch through the same table: missing key, empty string, wrong
-// type, malformed UUID. They all need to produce Unauthenticated;
-// the table prevents the per-case copy/paste that the previous
-// shape encouraged.
-func TestAuthInterceptor_PivoxUserIDClaim(t *testing.T) {
+// TestAuthInterceptor_UnresolvableSub covers the identity-resolution reject
+// branches: the token verifies, but its `sub` (Identity.UID) isn't a usable
+// identity id. Both an empty sub and a non-UUID sub must produce Unauthenticated
+// (indistinguishable from a bad signature, so clients just refresh).
+func TestAuthInterceptor_UnresolvableSub(t *testing.T) {
 	t.Parallel()
 
-	// Firebase claims arrive from JSON decode so the value type can
-	// be anything; the interceptor must reject every shape that isn't
-	// a parseable UUID string.
 	cases := []struct {
-		name   string
-		token  string
-		claims map[string]any
+		name  string
+		token string
+		sub   string
 	}{
-		{"missing", "no-claim-token", map[string]any{}},
-		{"empty string", "empty-claim-token", map[string]any{"pivox_user_id": ""}},
-		{"non-string", "wrong-type-token", map[string]any{"pivox_user_id": 12345}},
-		{"invalid uuid", "bad-uuid-token", map[string]any{"pivox_user_id": "not-a-uuid"}},
+		{"empty sub", "empty-sub-token", ""},
+		{"non-uuid sub", "bad-uuid-token", "not-a-uuid"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			auth := authnmock.NewMockService(t)
-			expectVerifyToken(auth, tc.token, &authn.Identity{
-				UID:    "claim-test-user",
-				Claims: tc.claims,
-			})
+			expectVerifyToken(auth, tc.token, &authn.Identity{UID: tc.sub})
 
 			md := metadata.New(map[string]string{"authorization": "Bearer " + tc.token})
 			ctx := metadata.NewIncomingContext(context.Background(), md)

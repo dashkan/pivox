@@ -11,7 +11,7 @@ import (
 
 // RequireAuth returns an HTTP middleware that verifies a bearer
 // token from the Authorization header and augments the request
-// context with the same pivoxUserIDKey claim that the gRPC
+// context with the same userIDKey claim that the gRPC
 // AuthInterceptor sets. Both transports converge on the same
 // authenticateBearer core in auth_interceptor.go so they cannot drift.
 //
@@ -22,7 +22,7 @@ import (
 // On failure: writes 401 with the body "unauthorized" and logs the
 // reason at warn level. The body is intentionally generic so that
 // error messages cannot help an attacker distinguish "no header" from
-// "bad signature" from "missing pivox_user_id claim" — the gRPC
+// "bad signature" from "unresolvable sub" — the gRPC
 // interceptor takes the same approach. The reason is recorded
 // server-side via slog for diagnostics.
 //

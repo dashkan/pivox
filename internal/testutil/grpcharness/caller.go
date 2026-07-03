@@ -43,7 +43,7 @@ type SeedIdentityOpts struct {
 // Production auth flow: Keycloak issues an access token whose `sub`
 // IS the `identities.id` UUID (the realm user id == the Pivox
 // identity id). AuthInterceptor parses `sub` and puts the UUID on the
-// gRPC context — handlers read it via `server.MustPivoxUserID(ctx)`.
+// gRPC context — handlers read it via `server.MustUserID(ctx)`.
 //
 // The harness mirrors this: the row's id is the generated UUID, and
 // the Caller's UID (the bearer token) is that same UUID string, so

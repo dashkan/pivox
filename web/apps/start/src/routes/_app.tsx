@@ -1,6 +1,6 @@
 import { organizationId } from '@pivox/client';
 import { AppShellFeature } from '@pivox/features/app-shell';
-import { usePivoxUserId } from '@pivox/features/auth';
+import { useUserId } from '@pivox/features/auth';
 import { ChatModalFeature } from '@pivox/features/chat';
 import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
 import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
@@ -187,17 +187,17 @@ function AppLayoutRoute() {
  *
  * Under the BFF the browser holds no bearer, so chat goes through the
  * same-origin `/api` proxy (`baseUrl="/api"`), which injects the
- * Keycloak access token from the httpOnly cookie. `usePivoxUserId()`
+ * Keycloak access token from the httpOnly cookie. `useUserId()`
  * reads the id from the KeycloakAuthProvider (== KC `sub`).
  */
 function ChatFab() {
   const { state: shellState } = useAppShellContext();
   const activeOrg = shellState.activeOrganization;
-  const pivoxUserId = usePivoxUserId();
+  const userId = useUserId();
 
-  if (!activeOrg || !pivoxUserId) return null;
+  if (!activeOrg || !userId) return null;
 
-  const parent = `organizations/${organizationId(activeOrg)}/users/${pivoxUserId}`;
+  const parent = `organizations/${organizationId(activeOrg)}/users/${userId}`;
   // key={parent} remounts the runtime when the active org changes. The
   // FAB is mounted shell-wide (persists across navigation), so without
   // this an org switch would keep the previous org's conversation id in

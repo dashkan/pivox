@@ -124,7 +124,7 @@ func (s *Server) CreateConversation(ctx context.Context, req *aiv1.CreateConvers
 	// another user's conversations doesn't need to mint conversations
 	// on their behalf, and allowing it would let the admin frame a
 	// user with manufactured chat history.
-	callerUserID := server.MustPivoxUserID(ctx)
+	callerUserID := server.MustUserID(ctx)
 	if pathUser != callerUserID {
 		return nil, apierr.PermissionDenied("conversations may only be created under the caller's own user-uuid")
 	}
@@ -175,7 +175,7 @@ func (s *Server) UpdateConversation(ctx context.Context, req *aiv1.UpdateConvers
 
 	params := db.UpdateConversationParams{
 		ID:        existing.ID,
-		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
+		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 	for _, path := range mask.GetPaths() {
 		switch path {
@@ -483,7 +483,7 @@ func isLeaseActive(row db.AiConversation) bool {
 //  1. Path's user-uuid must match the row's `created_by` — a
 //     fabricated path with a wrong user segment surfaces NotFound,
 //     not a misleading "wrong owner" leak.
-//  2. The caller's `pivox_user_id` claim must equal the path's
+//  2. The caller's identity id must equal the path's
 //     user-uuid OR the caller must hold `allPerm` (e.g.
 //     `ai.conversations.readAll` or `deleteAll`). Otherwise
 //     NotFound.
@@ -514,7 +514,7 @@ func (s *Server) resolveConversation(ctx context.Context, orgName string, pathUs
 	return conv, nil
 }
 
-// verifyOwnerOrAllPerm: the caller's `pivox_user_id` claim must
+// verifyOwnerOrAllPerm: the caller's identity id must
 // equal the path-bound user-uuid, or the caller must hold `allPerm`
 // (one of the `*All` audit perms). Errors are NotFound-shaped so a
 // peer's existence isn't disclosed via the response code.
@@ -522,7 +522,7 @@ func (s *Server) resolveConversation(ctx context.Context, orgName string, pathUs
 // `allPerm == ""` disables the audit bypass — the call must be the
 // owner's own.
 func (s *Server) verifyOwnerOrAllPerm(ctx context.Context, orgID, pathUser uuid.UUID, allPerm string) error {
-	callerUserID := server.MustPivoxUserID(ctx)
+	callerUserID := server.MustUserID(ctx)
 	if callerUserID == pathUser {
 		return nil
 	}

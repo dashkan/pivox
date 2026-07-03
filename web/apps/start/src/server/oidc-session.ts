@@ -30,8 +30,7 @@ export { decodeIdTokenClaims, type OidcClaims } from '@pivox/oidc';
 /**
  * Wire shape handed to the client (router context / provider hydration). Under
  * Keycloak the user's `id` IS the `sub` — and `sub` == `identities.id` — so there
- * is a single id, not the Firebase-era split of (firebase uid, pivox_user_id
- * claim). `id` here means "the Pivox identity", which is what the backend
+ * is a single id. `id` here means "the Pivox identity", which is what the backend
  * authorizes against.
  */
 export interface ServerSession {

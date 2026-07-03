@@ -104,7 +104,7 @@ func (s *IamServer) ListAccountOrganizations(ctx context.Context, req *iampb.Lis
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("parent",
 			"expected accounts/me; the caller is implicit from authentication context"))
 	}
-	identityID := server.MustPivoxUserID(ctx)
+	identityID := server.MustUserID(ctx)
 	rows, err := s.queries.ListAccountOrganizationsForIdentity(ctx, convert.PgUUID(identityID))
 	if err != nil {
 		slog.ErrorContext(ctx, "iam: list account organizations failed",

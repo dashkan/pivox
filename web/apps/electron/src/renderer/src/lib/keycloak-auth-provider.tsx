@@ -15,7 +15,7 @@ import {
  * is a thin bridge: it reads the auth state over IPC, re-reads on every
  * `auth:changed` event (login / logout / boot restore / token refresh), and maps
  * the result into the platform-neutral `AuthContext` that the app shell, route
- * gate, and `usePivoxUserId` consume. Mirrors the web app's KeycloakAuthProvider,
+ * gate, and `useUserId` consume. Mirrors the web app's KeycloakAuthProvider,
  * but sourced from IPC instead of an SSR-resolved session — so unlike the web
  * app it has a real `loading` phase while the main process restores on boot.
  */

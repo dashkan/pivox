@@ -74,10 +74,10 @@ func requireMembership(ctx context.Context, queries db.Querier, fullMethod strin
 	if membershipExemptMethods[fullMethod] {
 		return nil
 	}
-	identityID, ok := PivoxUserID(ctx)
+	identityID, ok := UserID(ctx)
 	if !ok {
-		// AuthInterceptor rejects any token without a `pivox_user_id`
-		// claim before this interceptor runs, so reaching here without
+		// AuthInterceptor rejects any token it can't resolve to an
+		// identity id before this interceptor runs, so reaching here without
 		// the UUID means the interceptor chain is misconfigured (e.g.,
 		// membership interceptor wired without auth in front of it).
 		// Return Unauthenticated for caller-facing consistency.

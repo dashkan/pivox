@@ -435,7 +435,7 @@ func (x *ListConversationsResponse) GetNextPageToken() string {
 type CreateConversationRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent user. Must be the caller's own per-Pivox
-	// user-uuid (read from the `pivox_user_id` token claim);
+	// user-uuid (read from the token `sub`);
 	// conversations cannot be created on another user's behalf.
 	// Format: `organizations/{organization}/users/{user}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`

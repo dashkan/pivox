@@ -88,7 +88,7 @@ func (s *OperationsServer) authorizeOp(ctx context.Context, name string) (db.Ope
 		return db.Operation{}, apierr.Internal("failed to load operation")
 	}
 
-	allowed, err := s.callerCanSee(ctx, server.MustPivoxUserID(ctx), op)
+	allowed, err := s.callerCanSee(ctx, server.MustUserID(ctx), op)
 	if err != nil {
 		return db.Operation{}, err
 	}
@@ -136,7 +136,7 @@ func (s *OperationsServer) ListOperations(ctx context.Context, req *longrunningp
 	}
 
 	rows, err := s.queries.ListAuthorizedOperations(ctx, db.ListAuthorizedOperationsParams{
-		Caller:   convert.PgUUID(server.MustPivoxUserID(ctx)),
+		Caller:   convert.PgUUID(server.MustUserID(ctx)),
 		PageSize: pageSize,
 	})
 	if err != nil {

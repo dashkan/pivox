@@ -75,12 +75,11 @@ func TestRequireAuth_InvalidToken_Returns401(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rr.Code)
 }
 
-func TestRequireAuth_TokenWithoutPivoxClaim_Returns401(t *testing.T) {
+func TestRequireAuth_NonUUIDSub_Returns401(t *testing.T) {
 	auth := authnmock.NewMockService(t)
-	auth.EXPECT().VerifyToken(mock.Anything, "no-claim-token").
+	auth.EXPECT().VerifyToken(mock.Anything, "bad-sub-token").
 		Return(&authn.Identity{
-			UID:    "fb-uid",
-			Claims: map[string]any{}, // no pivox_user_id claim
+			UID: "not-a-uuid", // sub isn't a parseable identity id
 		}, nil)
 
 	mw := RequireAuth(auth, silentLogger())
@@ -89,7 +88,7 @@ func TestRequireAuth_TokenWithoutPivoxClaim_Returns401(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/protected", nil)
-	req.Header.Set("Authorization", "Bearer no-claim-token")
+	req.Header.Set("Authorization", "Bearer bad-sub-token")
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -101,8 +100,7 @@ func TestRequireAuth_ValidToken_AugmentsContext(t *testing.T) {
 	auth := authnmock.NewMockService(t)
 	auth.EXPECT().VerifyToken(mock.Anything, "good-token").
 		Return(&authn.Identity{
-			UID:    "fb-uid",
-			Claims: map[string]any{"pivox_user_id": uid.String()},
+			UID: uid.String(), // Keycloak sub == identities.id
 		}, nil)
 
 	mw := RequireAuth(auth, silentLogger())
@@ -113,7 +111,7 @@ func TestRequireAuth_ValidToken_AugmentsContext(t *testing.T) {
 		bodyRan  bool
 	)
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPivox, gotPivOK = PivoxUserID(r.Context())
+		gotPivox, gotPivOK = UserID(r.Context())
 		bodyRan = true
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -125,6 +123,6 @@ func TestRequireAuth_ValidToken_AugmentsContext(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	assert.True(t, bodyRan, "downstream handler must run on success")
-	assert.True(t, gotPivOK, "PivoxUserID must be populated for downstream handler")
+	assert.True(t, gotPivOK, "UserID must be populated for downstream handler")
 	assert.Equal(t, uid, gotPivox)
 }

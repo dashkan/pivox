@@ -299,7 +299,7 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 		dueTime = pgtype.Timestamptz{Time: request.GetDueTime().AsTime(), Valid: true}
 	}
 
-	caller := convert.PgUUID(server.MustPivoxUserID(ctx))
+	caller := convert.PgUUID(server.MustUserID(ctx))
 
 	// Tx-wrapped: a single CreateRequest fans out to (1) the request
 	// row, (2) one CreateAsset per line item, and (3) one
@@ -409,7 +409,7 @@ func (s *RequestsServer) UpdateRequest(ctx context.Context, req *assetsv1.Update
 
 	updateParams := db.UpdateRequestParams{
 		ID:        existing.ID,
-		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
+		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()
@@ -566,7 +566,7 @@ func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRe
 		if existing.State != db.RequestStateOPEN {
 			return db.AssetRequest{}, apierr.FailedPrecondition(fmt.Sprintf("can only claim OPEN requests, got %s", existing.State))
 		}
-		// TODO: pass the caller's pivox_user_id through to the
+		// TODO: pass the caller's identity id through to the
 		// `assignee` column once that column also moves to UUID FK
 		// (it's currently TEXT and stores the firebase_uid). For now,
 		// only the audit `updated_by` is populated with the caller's
@@ -575,9 +575,9 @@ func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRe
 		//
 		// Resolved inside the closure (after the precondition check)
 		// so handler-level state-mismatch returns don't trip
-		// MustPivoxUserID's panic in unit tests that exercise the
+		// MustUserID's panic in unit tests that exercise the
 		// FailedPrecondition path without a caller claim.
-		caller := convert.PgUUID(server.MustPivoxUserID(ctx))
+		caller := convert.PgUUID(server.MustUserID(ctx))
 		updated, err := qtx.UpdateRequestAssignee(ctx, db.UpdateRequestAssigneeParams{
 			ID:        existing.ID,
 			Assignee:  "",

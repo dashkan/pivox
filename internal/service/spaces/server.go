@@ -246,7 +246,7 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 			"org slug in parent does not match resolved scope"))
 	}
 
-	callerID := server.MustPivoxUserID(ctx)
+	callerID := server.MustUserID(ctx)
 
 	spaceName := req.GetSpaceId()
 	if spaceName == "" {
@@ -272,7 +272,7 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 	// identity_id — no per-org `users` row to resolve.
 	// `callerID` is the identities.id (the universal user UUID,
 	// set by AuthInterceptor from the verified token's
-	// `pivox_user_id` claim).
+	// `sub`).
 	founderID := callerID
 	createdBy := convert.PgUUID(callerID)
 
@@ -344,7 +344,7 @@ func (s *SpacesServer) UpdateSpace(ctx context.Context, req *apiv1.UpdateSpaceRe
 	// State guard lives at the gate (enforceSpaceSoftDeleteGate); a
 	// non-ACTIVE space is already rejected before the handler runs.
 
-	caller := server.MustPivoxUserID(ctx)
+	caller := server.MustUserID(ctx)
 
 	updateParams := db.UpdateSpaceParams{
 		ID:        resolvedSpace.ID,
@@ -424,7 +424,7 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 			"etag mismatch; refresh the space and retry")
 	}
 
-	caller := server.MustPivoxUserID(ctx)
+	caller := server.MustUserID(ctx)
 
 	spaceRsrc := "organizations/" + resolvedOrg.Slug + "/spaces/" + resolvedSpace.Slug
 	force := req.GetForce()
@@ -481,7 +481,7 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 			"etag mismatch; refresh the space and retry")
 	}
 
-	caller := server.MustPivoxUserID(ctx)
+	caller := server.MustUserID(ctx)
 
 	spaceID := resolvedSpace.ID
 	orgSlug := resolvedOrg.Slug

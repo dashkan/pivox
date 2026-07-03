@@ -212,7 +212,7 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 		return nil, err
 	}
 
-	caller := server.MustPivoxUserID(ctx)
+	caller := server.MustUserID(ctx)
 
 	// Tx-wrapped: role lookup + principal-existence check + insert
 	// run atomically.

@@ -179,7 +179,7 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 		ID:             uuid.New(),
 		ParentResource: req.GetParent(),
 		TagValueID:     tagValue.ID,
-		CreatedBy:      convert.PgUUID(server.MustPivoxUserID(ctx)),
+		CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagBinding", "")

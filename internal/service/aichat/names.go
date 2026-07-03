@@ -13,8 +13,8 @@ import (
 //
 // `{user}` is the Pivox user UUID = `identities.id` — the
 // same identifier the auth interceptor extracts from the
-// `pivox_user_id` token claim and exposes as
-// `server.MustPivoxUserID(ctx)`. Strict UUID parse — no `me`
+// token `sub` and exposes as
+// `server.MustUserID(ctx)`. Strict UUID parse — no `me`
 // sentinel, matches every other user-rooted path.
 
 // parseConversationName parses

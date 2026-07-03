@@ -271,7 +271,7 @@ func (s *Server) CreateDashboard(ctx context.Context, req *apiv1.CreateDashboard
 	}
 
 	resolved := server.MustResolvedSpaceFromContext(ctx)
-	callerID := server.MustPivoxUserID(ctx)
+	callerID := server.MustUserID(ctx)
 
 	// Build a clean Dashboard for marshaling: strip OUTPUT_ONLY
 	// fields the server owns. management_mode is forced to
@@ -357,7 +357,7 @@ func (s *Server) UpdateDashboard(ctx context.Context, req *apiv1.UpdateDashboard
 	}
 
 	resolved := server.MustResolvedSpaceFromContext(ctx)
-	callerID := server.MustPivoxUserID(ctx)
+	callerID := server.MustUserID(ctx)
 
 	updated, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.Dashboard, error) {
 		existing, err := qtx.GetDashboardByNameForUpdate(ctx, db.GetDashboardByNameForUpdateParams{
@@ -457,7 +457,7 @@ func (s *Server) DeleteDashboard(ctx context.Context, req *apiv1.DeleteDashboard
 	}
 
 	resolved := server.MustResolvedSpaceFromContext(ctx)
-	callerID := server.MustPivoxUserID(ctx)
+	callerID := server.MustUserID(ctx)
 
 	deleted, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.Dashboard, error) {
 		existing, err := qtx.GetDashboardByNameForUpdate(ctx, db.GetDashboardByNameForUpdateParams{

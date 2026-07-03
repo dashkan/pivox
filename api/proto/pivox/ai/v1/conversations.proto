@@ -172,7 +172,7 @@ message ListConversationsResponse {
 // Request message for `CreateConversation`.
 message CreateConversationRequest {
   // Required. The parent user. Must be the caller's own per-Pivox
-  // user-uuid (read from the `pivox_user_id` token claim);
+  // user-uuid (read from the token `sub`);
   // conversations cannot be created on another user's behalf.
   // Format: `organizations/{organization}/users/{user}`
   string parent = 1 [

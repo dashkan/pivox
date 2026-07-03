@@ -126,7 +126,7 @@ func ResolvedOrgFromContext(ctx context.Context) (*ResolvedOrg, bool) {
 // resolved the org before they ran; a missing value indicates the
 // handler was reached by a misconfigured chain (no permission
 // interceptor, wrong scope kind in registry) and should never happen
-// at runtime. Mirrors MustPivoxUserID.
+// at runtime. Mirrors MustUserID.
 func MustResolvedOrgFromContext(ctx context.Context) *ResolvedOrg {
 	v, ok := ResolvedOrgFromContext(ctx)
 	if !ok {
@@ -221,9 +221,9 @@ func (g *permissionGate) check(ctx context.Context, fullMethod string, req any) 
 		return nil, apierr.Internal("permission gate not configured for this method")
 	}
 	// AuthInterceptor + MembershipRequiredInterceptor have already run
-	// by the time we reach here, so MustPivoxUserID is safe — a missing
+	// by the time we reach here, so MustUserID is safe — a missing
 	// claim would have failed Unauthenticated upstream.
-	callerID := MustPivoxUserID(ctx)
+	callerID := MustUserID(ctx)
 	scope, err := entry.Extract(req)
 	if err != nil {
 		return nil, err
@@ -435,7 +435,7 @@ func (g *permissionGate) checkSpaceScope(
 //     misconfiguration: forgetting to register a new RPC fails closed
 //     and surfaces loudly to operators).
 //  3. The caller's firebase_identity is resolved via the supplied
-//     MustPivoxUserID from the verified context — by the time the
+//     MustUserID from the verified context — by the time the
 //     gate runs, AuthInterceptor has already populated the claim.
 //  4. The registered ScopeExtractor pulls a ScopeRef from the
 //     request. Extractor errors propagate.
@@ -515,8 +515,8 @@ func PermissionStreamInterceptor(
 		}
 		// Pre-resolve caller identity so unauth callers fail fast
 		// without waiting for the first message. AuthStreamInterceptor
-		// has already run by here, so MustPivoxUserID is safe.
-		callerID := MustPivoxUserID(ss.Context())
+		// has already run by here, so MustUserID is safe.
+		callerID := MustUserID(ss.Context())
 		wrapped := &permissionStream{
 			ServerStream: ss,
 			gate:         gate,

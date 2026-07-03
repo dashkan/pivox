@@ -1,6 +1,6 @@
 import { organizationId } from '@pivox/client';
 import { AppShellFeature } from '@pivox/features/app-shell';
-import { usePivoxUserId } from '@pivox/features/auth';
+import { useUserId } from '@pivox/features/auth';
 import { AuthGateFeature } from '@pivox/features/auth-gate';
 import { ChatModalFeature } from '@pivox/features/chat';
 import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
@@ -65,21 +65,21 @@ const CHAT_BASE_URL =
 /**
  * Floating chat FAB, mounted in the authed shell so chat is reachable
  * on every route (replaces the old standalone /chat route). Sources the
- * Pivox user UUID from the Keycloak id_token `sub` (`usePivoxUserId`, backed by
+ * Pivox user UUID from the Keycloak id_token `sub` (`useUserId`, backed by
  * the IPC auth provider) — Electron has no server session. The chat transport's
  * bearer comes from the main process over IPC. Renders nothing until an org is
  * selected and the id has resolved.
  */
 function ChatFab() {
   const { state: shellState } = useAppShellContext();
-  const pivoxUserId = usePivoxUserId();
+  const userId = useUserId();
   const activeOrg = shellState.activeOrganization;
 
   const getAuthToken = useCallback(() => window.api.getAccessToken(), []);
 
-  if (!activeOrg || !pivoxUserId) return null;
+  if (!activeOrg || !userId) return null;
 
-  const parent = `organizations/${organizationId(activeOrg)}/users/${pivoxUserId}`;
+  const parent = `organizations/${organizationId(activeOrg)}/users/${userId}`;
   // key={parent} remounts the runtime on org switch so the shell-wide
   // mount can't carry an old org's conversation id into a new org's
   // turn (see the start renderer for the full rationale).

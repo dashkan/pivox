@@ -4,7 +4,7 @@
 //
 // The token's standard `sub` claim IS the Pivox identity id (a UUID): when
 // Keycloak is the IdP, the realm user id == identities.id, so no
-// provider-specific custom claim (the old Firebase `pivox_user_id`) is needed.
+// provider-specific custom claim is needed.
 // This is the seam that lets the gRPC interceptor stay provider-agnostic.
 package oidc
 

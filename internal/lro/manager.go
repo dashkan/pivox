@@ -221,7 +221,7 @@ type NewLroOpts struct {
 	// CreatedBy is the identity-uuid of the caller that originated the
 	// LRO. Required for account-scoped operations (the only authz
 	// signal there); audit + a "my operations" filter for the rest.
-	// Handlers set it via server.MustPivoxUserID(ctx).
+	// Handlers set it via server.MustUserID(ctx).
 	CreatedBy pgtype.UUID
 }
 

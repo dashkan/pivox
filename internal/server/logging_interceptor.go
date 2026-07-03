@@ -71,8 +71,8 @@ func logRPC(logger *slog.Logger, method string, start time.Time, ctx context.Con
 		"code", code.String(),
 		"latency_ms", time.Since(start).Milliseconds(),
 	}
-	if id, ok := PivoxUserID(ctx); ok {
-		attrs = append(attrs, "pivox_user_id", id.String())
+	if id, ok := UserID(ctx); ok {
+		attrs = append(attrs, "user_id", id.String())
 	}
 
 	switch code {

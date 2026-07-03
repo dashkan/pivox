@@ -183,7 +183,7 @@ func (s *TagKeysServer) CreateTagKey(ctx context.Context, req *apiv1.CreateTagKe
 		ShortName:      tagKeyID,
 		NamespacedName: orgID.String() + "/" + tagKeyID,
 		Description:    tagKey.GetDescription(),
-		CreatedBy:      convert.PgUUID(server.MustPivoxUserID(ctx)),
+		CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagKey", "")
@@ -216,7 +216,7 @@ func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKe
 
 	updateParams := db.UpdateTagKeyParams{
 		ID:        existing.ID,
-		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
+		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()

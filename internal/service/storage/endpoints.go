@@ -194,7 +194,7 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 		CacheEviction:  cacheEviction,
 		CacheTtlHours:  cacheTtlHours,
 		Annotations:    annotationsJSON,
-		CreatedBy:      convert.PgUUID(server.MustPivoxUserID(ctx)),
+		CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Endpoint", "")
@@ -290,7 +290,7 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 
 	updateParams := db.UpdateStorageEndpointParams{
 		ID:        existing.ID,
-		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
+		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()

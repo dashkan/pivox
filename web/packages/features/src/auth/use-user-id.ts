@@ -17,7 +17,7 @@ import { useAuth } from './use-auth';
  * by the provider's `user` (the web app injects it from the `_app` route
  * context), so there's no separate value to thread through.
  */
-export function usePivoxUserId(
+export function useUserId(
   _deprecatedInitialValue?: string | null,
 ): string | null | undefined {
   const { user, loading } = useAuth();

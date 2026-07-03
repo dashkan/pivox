@@ -30,7 +30,7 @@ import (
 // trust any field on the request to identify the caller. Do not
 // remove the s.caller call without auditing the entire control flow.
 func (s *SpacesServer) TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest) (*iampb.TestIamPermissionsResponse, error) {
-	identity := server.MustPivoxUserID(ctx)
+	identity := server.MustUserID(ctx)
 	target, err := parseSpaceResourceTarget(req.GetResource())
 	if err != nil {
 		return nil, err

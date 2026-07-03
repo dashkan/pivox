@@ -74,7 +74,7 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 		return nil, err
 	}
 
-	caller := server.MustPivoxUserID(ctx)
+	caller := server.MustUserID(ctx)
 
 	// Exactly-one-of validation. The proto's `oneof config` already
 	// enforces at most one, but both unset is a request-shape error

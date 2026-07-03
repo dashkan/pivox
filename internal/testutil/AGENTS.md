@@ -7,7 +7,7 @@ Three packages, one canonical entry point per layer:
   validation) and a real Postgres backend. **The right home for
   every service-layer integration test.** Service handlers depend
   on context values populated by interceptors (`MustResolvedOrgFromContext`,
-  `MustPivoxUserID`); a stub server bypasses those and produces
+  `MustUserID`); a stub server bypasses those and produces
   false-positive coverage.
 - **`fixtures/`** — typed, deterministic factories for `db.X` rows
   used directly against the DB (LRO, filter, anywhere a raw row is

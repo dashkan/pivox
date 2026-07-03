@@ -338,7 +338,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Register all services. permResolver is reused here by service
 	// handlers (TestIamPermissions, etc.). Caller identity comes from
-	// the verified-token `pivox_user_id` claim and is read directly
+	// the verified token's `sub` and is read directly
 	// Operations authorizes each call against the op's scope
 	// (space_id → spaces.read, org_id → organizations.read, else
 	// created_by) via the resolver, and trims ListOperations to the

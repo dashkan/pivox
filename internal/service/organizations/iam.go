@@ -37,7 +37,7 @@ import (
 // the empty set (and OK) if the caller has no role bindings — UI
 // treats that as "no permissions granted" and greys out everything.
 func (s *OrganizationsServer) TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest) (*iampb.TestIamPermissionsResponse, error) {
-	identity := server.MustPivoxUserID(ctx)
+	identity := server.MustUserID(ctx)
 	target, err := parseOrgResourceTarget(req.GetResource())
 	if err != nil {
 		return nil, err

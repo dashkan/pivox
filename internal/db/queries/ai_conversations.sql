@@ -11,7 +11,7 @@ RETURNING *;
 -- `*All`-permission access on top of this. Used by the read/update/
 -- delete handlers as the row-fetch step; they then compare
 -- `created_by` against the path's user-uuid AND the caller's
--- `pivox_user_id` claim before returning.
+-- identity id (`sub`) before returning.
 -- name: GetConversationByName :one
 SELECT * FROM ai_conversations WHERE org_id = $1 AND name = $2;
 

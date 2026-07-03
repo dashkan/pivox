@@ -162,7 +162,7 @@ func (s *OrganizationsServer) resolveOrgActors(ctx context.Context, orgs []db.Or
 // that ceiling, something else is wrong.
 func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.ListOrganizationsRequest) (*apiv1.ListOrganizationsResponse, error) {
 	_ = req // request fields intentionally unused; see method comment
-	identityID := server.MustPivoxUserID(ctx)
+	identityID := server.MustUserID(ctx)
 
 	rows, err := s.queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(identityID))
 	if err != nil {
@@ -184,10 +184,10 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*longrunningpb.Operation, error) {
 	// Caller identity UUID — the universal user UUID post-Phase-7.
 	// AuthInterceptor extracted it from the verified token's
-	// `pivox_user_id` claim. Used as both the immutable founder
+	// `sub` (== identities.id). Used as both the immutable founder
 	// pointer (`created_by_identity_id`) and the principal of the
 	// owner membership seeded below.
-	callerID := server.MustPivoxUserID(ctx)
+	callerID := server.MustUserID(ctx)
 
 	// organization_id is required at the wire boundary —
 	// protovalidate enforces ^[a-z][a-z0-9-]{3,19}$ which rejects

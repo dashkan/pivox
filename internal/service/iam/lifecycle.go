@@ -179,7 +179,7 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 		return nil, apierr.Internal("DeleteAccount is not configured on this server (lroManager dep missing)")
 	}
 
-	identityID := server.MustPivoxUserID(ctx)
+	identityID := server.MustUserID(ctx)
 
 	initialMeta := &iampb.DeleteAccountMetadata{
 		Phase:   iampb.DeleteAccountMetadata_VALIDATING,

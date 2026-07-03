@@ -517,7 +517,7 @@ For every new or migrated Go test, you MUST:
    gRPC service. Constructing a service server directly + calling
    handler methods bypasses the interceptor chain (auth, membership,
    permission) and produces false-positive coverage. The handler will
-   `panic: MustPivoxUserID called without pivox_user_id claim` the
+   `panic: MustUserID called without an identity on context` the
    first time something sweeps the codebase looking for un-authed
    tests; don't be that test.
 2. Use **`internal/testutil/fixtures`** for resource creation

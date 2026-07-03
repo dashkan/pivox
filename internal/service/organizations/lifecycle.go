@@ -72,7 +72,7 @@ func (s *OrganizationsServer) DeleteOrganization(ctx context.Context, req *apiv1
 			"etag mismatch; refresh the organization and retry")
 	}
 
-	caller := server.MustPivoxUserID(ctx)
+	caller := server.MustUserID(ctx)
 
 	orgName := "organizations/" + resolved.Slug
 	force := req.GetForce()
@@ -150,7 +150,7 @@ func (s *OrganizationsServer) UndeleteOrganization(ctx context.Context, req *api
 	// restorer polls their own undelete), consistent with delete.
 	return s.lroManager.NewLro(ctx, orgName, lro.NewLroOpts{
 		OperationID: opID,
-		CreatedBy:   convert.PgUUID(server.MustPivoxUserID(ctx)),
+		CreatedBy:   convert.PgUUID(server.MustUserID(ctx)),
 		JobArgs:     workers.UndeleteOrgArgs{OperationID: opID, OrgID: org.ID},
 		Metadata:    initialMeta,
 	})
