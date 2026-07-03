@@ -1,5 +1,15 @@
 # Native App Architecture
 
+> **Status (2026): legacy / reference.** The Native App (macOS/Windows)
+> is not an active auth-migration target. It still uses **Firebase Auth**
+> (native email/password screens over the Firebase C++ SDK, external
+> browser for social/SSO), which is **no longer the Pivox auth system** —
+> the cloud is Keycloak-only and verifies Keycloak OIDC access tokens via
+> `internal/oidc`, so the native app's Firebase tokens do not authenticate
+> against the current Cloud Controller. Treat the Firebase auth sections
+> below as a record of the abandoned design, not a build target. See
+> `AGENTS.md` (§ Components) for the current auth architecture.
+
 ## Overview
 
 The Pivox operator application is a **native desktop app** built with platform-specific UI frameworks — **SwiftUI on macOS** and **WinUI 3 on Windows**. It replaces the previous Electron-based approach with a native outer shell while retaining CEF for HTML viewport rendering (template preview, design canvas).

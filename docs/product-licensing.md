@@ -198,7 +198,7 @@ The license signing private key is stored in a cloud HSM. It never exists on dis
 
 ## Offline Mode
 
-Licensing is one part of the broader offline mode design. When connectivity is lost, multiple systems are affected: authentication (Firebase), license validation, rundown sync, asset access, and data feeds. The offline mode design must address all of these together.
+Licensing is one part of the broader offline mode design. When connectivity is lost, multiple systems are affected: authentication (Keycloak/OIDC), license validation, rundown sync, asset access, and data feeds. The offline mode design must address all of these together.
 
 See `docs/offline-mode.md` (to be written) for the comprehensive offline operation design covering auth, licensing, caching, and degradation across all connectivity scenarios.
 

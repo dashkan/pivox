@@ -6,10 +6,21 @@
 > verifies Keycloak (OIDC) access tokens via `internal/oidc`
 > (JWKS-backed; the token's `sub` IS the Pivox identity UUID).
 > Identity provisioning flows from Keycloak (KC→Kafka→Pivox event
-> sync), not Firebase auth hooks. **Everything below describes the
-> legacy Firebase-based architecture and is retained for historical
-> context only.** The web/Electron client still references Firebase
-> and is temporarily broken pending its own Keycloak migration.
+> sync via `internal/identitysync`), not Firebase auth hooks.
+> **Everything below describes the legacy Firebase-based architecture
+> and is retained for historical context only.** The web clients have
+> since migrated to Keycloak as well: `web/apps/start` uses a
+> server-side OIDC BFF (openid-client + httpOnly cookie session,
+> `web/apps/start/src/server/oidc/`), and the Electron app is a public
+> PKCE client whose OIDC flow runs in the **main process**
+> (system-browser Authorization Code + PKCE, loopback/`pivox://`
+> redirect capture, tokens in `safeStorage` — `web/apps/electron/src/main/`).
+> Both share the `@pivox/oidc` core (`web/packages/oidc/`: discovery,
+> PKCE, code exchange, refresh, end-session, id-token claims). The
+> custom Go OAuth broker was removed — Keycloak is the broker now and
+> owns the SSO OAuth flow to customer IdPs. The Native app
+> (macOS/Windows) still references Firebase but is legacy/reference,
+> not a migration target.
 >
 > **Historical note.** Earlier revisions also described two
 > local-development modes: an emulator-based mode and a `-tags dev`

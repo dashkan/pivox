@@ -410,14 +410,14 @@ Asset reads go through Storage Gateways using session cookie auth. URLs are stab
 **Session setup flow:**
 
 ```
-1. User authenticates with Pivox Cloud (Firebase ID token)
+1. User authenticates with Pivox Cloud (Keycloak OIDC access token)
 
 2. Browser calls CreateStorageSession RPC on the Cloud Controller,
    scoped to the org the user is currently in:
    POST /v1/{parent=organizations/*}/storageSession
 
 3. Cloud Controller:
-   a. Verifies Firebase token, identifies user
+   a. Verifies the Keycloak OIDC access token (internal/oidc), identifies user
    b. Verifies the caller is a member of `parent` (else 403)
    c. Computes access patterns from the user's space memberships
       WITHIN the requested org:
@@ -677,7 +677,7 @@ Org-level shared assets are readable by every space in the org without explicit 
 
 | Layer | Enforcement |
 |---|---|
-| **API** | Firebase ID token + RBAC. User must have read/write permission for the target space. |
+| **API** | Keycloak OIDC access token + RBAC. User must have read/write permission for the target space. |
 | **Storage session** | Cookie-based JWT (HS256). Opaque token maps to path-scoped access patterns on the gateway. Revocable instantly via bidi. |
 | **Gateway (reads)** | Validates session cookie, glob-matches request path against authorized patterns. |
 | **Gateway (uploads)** | Validates presigned URL signature (for S3) or signed upload token (for filesystem). |

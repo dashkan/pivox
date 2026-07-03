@@ -5,6 +5,14 @@
 **Started**: 2026-04-30
 **Predecessor**: [iam-and-lifecycle-roadmap.md](./iam-and-lifecycle-roadmap.md)
 
+> **Update (2026): Firebase has since been removed — auth is
+> Keycloak-only.** References below to Firebase user-profile fields,
+> Firebase attribute mappings, the `onUserDeleted` Firebase webhook,
+> and "real Firebase project" testing reflect the state when this was
+> written. Keycloak is now the SSO/OAuth broker to customer IdPs, and
+> identity provisioning flows from Keycloak (KC→Kafka→Pivox event sync,
+> `internal/identitysync`). See `AGENTS.md` for the current auth model.
+
 This doc tracks two threads that emerged after the OAuth/OIDC broker
 migration landed:
 

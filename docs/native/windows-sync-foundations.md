@@ -1,5 +1,16 @@
 # Windows Sync — Foundational Plumbing
 
+> **Status (2026): legacy / reference.** This plan assumes a Firebase
+> token-fetch + auth interceptor on Windows. That assumption is stale:
+> Pivox auth is now Keycloak-only (the cloud verifies Keycloak OIDC
+> access tokens via `internal/oidc`), and the Native App is a
+> legacy/reference target, not an active migration. The Firebase
+> mechanics below (`FirebaseAuthInterceptor`, `User::GetIdToken`,
+> `IsReAuthRequired(firebase::auth::Error)`) describe the abandoned
+> design. Any real Windows client would attach a Keycloak OIDC token,
+> not a Firebase one. See `AGENTS.md` (§ Components) for the current
+> architecture.
+
 ## Context
 
 This doc previously described how the Windows side would consume a shared C++ core (`pivox_auth`, `pivox_protos_cpp`) along with a Swift↔C++ interop bridge running on macOS. **That entire shared layer has been retired.** macOS now talks to the cloud via pure-Swift `grpc-swift-2`; the C-ABI token-provider seam and the C++ gRPC interceptor are gone.

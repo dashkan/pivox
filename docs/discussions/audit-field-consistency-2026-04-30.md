@@ -4,6 +4,14 @@
 **Generated against**: dev DB (`postgresql://localhost:5432/pivox`).
 **Identity rows**: 2 (`ashkan.daie@gmail.com`, `ashkan@acme.com`).
 
+> **Update (2026): Firebase has since been removed — auth is
+> Keycloak-only.** This is a dated snapshot; the `firebase_identities`
+> table and `*_firebase_identity_id` columns referenced below have since
+> been renamed/reshaped (the table is now `identities`, keyed on the
+> Keycloak `sub` UUID). Read this as a historical record of the DB state
+> on 2026-04-30, not the current schema. See `AGENTS.md` for the current
+> auth model.
+
 ## TL;DR
 
 The dev DB is in clean shape for the migration. **No firebase_uid strings, no

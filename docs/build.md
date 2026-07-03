@@ -149,6 +149,12 @@ The app requires:
 - Ollama running on `localhost:11434` with `qwen3-vl` model pulled
 - Firebase project configured (for auth)
 
+> **Note:** The native app's Firebase auth is legacy. The macOS/Windows
+> app is kept as reference and has not been migrated to Keycloak, so its
+> Firebase tokens do not authenticate against the current Keycloak-only
+> Cloud Controller (`internal/oidc`). The Firebase SDK download and
+> `Auth/` sources below exist only to build that legacy app.
+
 ### Run tests
 
 **Swift (XCTest):**

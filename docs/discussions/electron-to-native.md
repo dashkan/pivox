@@ -4,6 +4,15 @@
 **Decision:** Replace Electron with native SwiftUI (macOS) + WinUI 3 (Windows) app with shared C++ core.
 **Status:** Decided — POC validated on both platforms.
 
+> **Update (2026): Firebase has since been removed — auth is
+> Keycloak-only.** This decision doc predates the migration and
+> describes the native app's auth in terms of the Firebase C++ SDK and
+> the Firebase-web-SDK Electron flow. The Native App is now a
+> legacy/reference target (its Firebase auth is not a migration target),
+> and the shipping Electron app is a Keycloak public PKCE client whose
+> OIDC flow runs in the main process. See `AGENTS.md` for the current
+> auth model.
+
 ## Context
 
 The Pivox operator UI was originally built as an Electron app (React + TypeScript). We evaluated replacing it with a native desktop application using platform-specific UI frameworks and a shared C++ core.
