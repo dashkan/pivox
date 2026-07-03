@@ -76,7 +76,7 @@ func main() {
 
 	f := rootCmd.Flags()
 	f.String("database-url", envOrDefault("PIVOX_DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"), "PostgreSQL connection URL")
-	f.String("grpc-port", envOrDefault("PIVOX_GRPC_PORT", ":50051"), "Public gRPC listen address (Firebase-authenticated)")
+	f.String("grpc-port", envOrDefault("PIVOX_GRPC_PORT", ":50051"), "Public gRPC listen address (OIDC/Keycloak-authenticated)")
 	// Service-to-service surface defaults to loopback. Production binds via
 	// nginx (configs/nginx.conf maps /pivox.agent.v1.AgentService/ to this
 	// port), so external reach is opt-in by either changing this flag or
@@ -468,9 +468,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	// gateway translation layer and the SSE handler that wraps the
 	// AiChat streaming RPC). The same grpc.Server serves both
 	// listeners — interceptors run identically on either transport,
-	// so AuthInterceptor still validates Firebase bearer tokens on
+	// so AuthInterceptor still validates OIDC bearer tokens on
 	// in-process calls. Avoids TCP loopback for self-dial without
-	// changing the auth boundary. External clients (Native app) keep
+	// changing the auth boundary. External gRPC clients keep
 	// using the TCP listener above.
 	bufLis := bufconn.Listen(1024 * 1024)
 	go func() {
@@ -493,7 +493,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// Distinct from the public server because the auth model is different:
 	// agents present a registration token in initial metadata, validated by
 	// AgentAuthStreamInterceptor. Putting it on its own listener means the
-	// public chain (Firebase auth + membership) never has to special-case
+	// public chain (OIDC auth + membership) never has to special-case
 	// agent traffic, and operators can apply different network policy
 	// (firewall, mTLS termination, separate ingress) to internal-only RPCs
 	// without restructuring the proto surface.
@@ -607,7 +607,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	//
 	// **Pre-prod posture: NO AUTH.** Mounted without auth wrapping
 	// so an operator can click around in a browser without
-	// Firebase-token plumbing. This is a deliberate dev choice —
+	// OIDC-token plumbing. This is a deliberate dev choice —
 	// before any production deploy this MUST be gated (HTTP basic
 	// auth via env-var creds is the recommended next step; see
 	// CLAUDE.md "Pre-prod freedom"). Leaving /river open on a
@@ -628,11 +628,11 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// HTTP auth middleware. Wraps the grpc-gateway mux so every
 	// custom HTTP route mounted on gwMux (today: artifact :content)
-	// gets Firebase bearer verification + ctx augmentation before the
+	// gets OIDC bearer verification + ctx augmentation before the
 	// handler runs. grpc-gateway-translated routes also pass through
 	// this middleware; they pay a redundant verification (gateway
 	// forwards the bearer to the gRPC backend, where AuthInterceptor
-	// re-verifies) but Firebase verify is local + key-cached, so the
+	// re-verifies) but OIDC verify is local + JWKS-cached, so the
 	// cost is ~1ms and worth the "set and forget" simplicity.
 	authMW := server.RequireAuth(authChainSvc, logger)
 	httpMux.Handle("/", authMW(gwMux))

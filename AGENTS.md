@@ -50,7 +50,8 @@ abuse defenses live in:
   `:resolveProvider` collapses "domain not configured", "domain not
   verified", and "SsoConfig disabled" into the same `200 + {}`
   response — empty body is indistinguishable across all three causes)
-- The HMAC-signed OAuth state token + (pending) PKCE on the broker
+- Keycloak brokering the SSO/OAuth flow to customer IdPs — KC owns the
+  OAuth state token + PKCE now; the app-level custom broker was removed
 
 If pivox-cloud is ever deployed without an edge proxy (small
 self-hosted, dev), put `nginx` / `caddy` in front for volumetric
@@ -85,12 +86,11 @@ internal/             Go application code (Cloud Controller + Storage Agent)
     migrations/       golang-migrate files (000001_init.up.sql is THE source)
     generated/        sqlc output — do not edit
   filter/             AIP-160 filter parser + DB-query lowering.
-  firebase/           Firebase Admin SDK wrapper.
   lro/                Long-running operation manager (AIP-151).
   permission/         IAM permission catalog + resolver.
   pkg/gen/            Generated proto code (do not edit).
   resource/           AIP resource-name parser/formatter.
-  server/             gRPC interceptor chain, internal HTTP hooks, OAuth broker.
+  server/             gRPC interceptor chain + internal HTTP hooks.
   service/            One package per gRPC service:
     organizations/    Organizations + IAM Member CRUD at org scope
     spaces/           Spaces + IAM Member CRUD at space scope
@@ -387,7 +387,7 @@ to them. Workarounds:
 | `golang-samber-oops` | No | NEVER | We use `internal/apierr`. Don't replace. |
 | `golang-samber-ro` | No | NEVER | No reactive-streams surface. |
 | `golang-samber-slog` | No | NEVER | We use plain `log/slog`. Don't add a samber slog handler without explicit ask. |
-| `golang-security` | Yes | **ALWAYS** for auth/crypto/I/O/secrets/user-input | Anything in `internal/authn/`, `internal/crypto/`, `internal/server/oauth_broker.go`, `internal/firebase/`, password/token paths, KMS, secret management, file-path handling. Also any new public-internet-facing input. |
+| `golang-security` | Yes | **ALWAYS** for auth/crypto/I/O/secrets/user-input | Anything in `internal/authn/`, `internal/oidc/` (Keycloak token verify), `internal/crypto/`, `internal/server/` (interceptors, HTTP hooks), password/token paths, KMS, secret management, file-path handling. Also any new public-internet-facing input. |
 | `golang-stay-updated` | No | NEVER | Resource list, not a code-review skill. |
 | `golang-stretchr-testify` | Yes | **ALWAYS** for new tests | testify is the test library. `assert` vs `require`, mock argument matchers, `Eventually`, `JSONEq`. The mock package is what `internal/testutil/mocks/querier_mock.go` extends. |
 | `golang-structs-interfaces` | Yes | ALWAYS for new types | Designing a struct/interface; pointer vs value receivers; embedding; composition; `accept interfaces, return structs`. |
