@@ -7,7 +7,16 @@
  * generated. The .kc-* component layer in shared.css is plain CSS and is
  * always emitted regardless of scanning.
  */
-@import "tailwindcss";
+/*
+ * `source(none)` disables Tailwind's automatic content detection so this build
+ * depends ONLY on the explicit @source below (the login .ftl templates). Without
+ * it, `@import "tailwindcss"` auto-scans the whole keycloak-theme package tree —
+ * including the account console's built resources/app/ output — so the login
+ * theme.css absorbed the account bundle's classes and churned every time that
+ * (dep-driven) bundle changed. This mirrors the account console's own Vite build,
+ * which scopes content to its module graph.
+ */
+@import "tailwindcss" source(none);
 @import "./shared.css";
 
 @source "../theme/pivox/login/**/*.ftl";

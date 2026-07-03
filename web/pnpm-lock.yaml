@@ -24,6 +24,9 @@ catalogs:
     '@keycloak/keycloak-ui-shared':
       specifier: ^26.6.4
       version: 26.6.4
+    '@tailwindcss/cli':
+      specifier: 4.3.2
+      version: 4.3.2
     '@tailwindcss/vite':
       specifier: 4.3.2
       version: 4.3.2
@@ -521,7 +524,7 @@ importers:
   packages/keycloak-theme:
     devDependencies:
       '@tailwindcss/cli':
-        specifier: 4.3.2
+        specifier: 'catalog:'
         version: 4.3.2
       tailwindcss:
         specifier: 'catalog:'
