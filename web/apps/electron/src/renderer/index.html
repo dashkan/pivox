@@ -6,29 +6,27 @@
     <!--
       Content Security Policy for the renderer.
 
+      Auth runs in the system browser (the main-process OIDC flow — see
+      main/oidc-login-flow.ts), so the renderer needs no Firebase/Google
+      origins: it only talks to the Pivox cloud and its own bundled assets.
+
       `connect-src` allow-list:
-        - 'self'                      — vite dev server + bundled assets
-        - https://*.googleapis.com    — Firebase Auth identitytoolkit, Google APIs
-        - https://*.firebaseio.com    — Firebase real-time DB
-        - https://pivox.ngrok.app     — Pivox cloud (REST gateway). Matches
-                                        the BASE_URL default in api-client.ts
-                                        + broker-auth.ts so a fresh clone
-                                        without VITE_BASE_URL set still works.
-                                        Search-replace when the production
-                                        origin is provisioned.
-        - %VITE_BASE_URL%             — Vite substitutes from the env at
-                                        build time, letting direnv etc.
-                                        override the default cloud URL.
-                                        Unset → CSP ignores the unknown
-                                        token; the ngrok line above still
-                                        covers the in-code fallback.
-        - http://localhost:* / 127.*  — vite dev server, broker loopback HTTP
+        - 'self'                  — vite dev server + bundled assets (+ HMR ws)
+        - https://pivox.ngrok.app — Pivox cloud (REST + chat SSE + OTLP traces).
+                                    Matches the BASE_URL default in api-client.ts
+                                    so a fresh clone without VITE_BASE_URL set
+                                    still works. Search-replace when the
+                                    production origin is provisioned.
+        - %VITE_BASE_URL%         — Vite substitutes from the env at build time,
+                                    letting direnv etc. override the cloud URL.
+                                    Unset → CSP ignores the unknown token.
+        - http://localhost:* / ws — vite dev server + HMR.
 
       Reference: https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://apis.google.com https://www.gstatic.com; frame-src 'self' https://accounts.google.com https://*.firebaseapp.com http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://pivox.ngrok.app %VITE_BASE_URL% http://localhost:* http://127.0.0.1:*"
+      content="default-src 'self'; script-src 'self'; frame-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://pivox.ngrok.app %VITE_BASE_URL% http://localhost:* ws://localhost:*"
     />
     <!--
       Pre-React storage bootstrap. Loaded synchronously in <head> so

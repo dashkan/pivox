@@ -18,7 +18,10 @@ vi.mock('@tanstack/react-start/server', () => ({
 }));
 
 vi.mock('@/server/oidc/session', () => ({
-  EXPIRY_SKEW_MS: 30_000,
+  // Faithful to @pivox/oidc's isTokenFresh (fresh when the access token outlives
+  // the 30s skew); the tests drive each branch via the row's expires_at.
+  isTokenFresh: (tokens: { expires_at: number }) =>
+    tokens.expires_at - Date.now() >= 30_000,
   readSessionId: readSessionIdMock,
   refreshSession: refreshSessionMock,
 }));

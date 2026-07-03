@@ -1,12 +1,11 @@
+import { exchangeAuthorizationCode } from '@pivox/oidc'
 import { createFileRoute } from '@tanstack/react-router'
-import * as oidc from 'openid-client'
 
 import { getOidcConfig, publicOrigin } from '@/server/oidc/client'
 import {
   loginTxClearCookie,
   readLoginTx,
   sessionSetCookie,
-  tokensFromResponse,
 } from '@/server/oidc/session'
 import { createSession } from '@/server/oidc/session-store'
 import { decodeIdTokenClaims } from '@/server/oidc-session'
@@ -39,11 +38,11 @@ export const Route = createFileRoute('/auth/callback')({
           // redirect_uri sign-in sent (the public origin, not start's internal http).
           const reqUrl = new URL(request.url)
           const currentUrl = new URL(reqUrl.pathname + reqUrl.search, publicOrigin(request))
-          const response = await oidc.authorizationCodeGrant(config, currentUrl, {
-            pkceCodeVerifier: tx.code_verifier,
+          tokens = await exchangeAuthorizationCode(config, {
+            currentUrl,
+            codeVerifier: tx.code_verifier,
             expectedState: tx.state,
           })
-          tokens = tokensFromResponse(response)
         } catch {
           // Exchange / state / PKCE failure — drop the transaction and restart.
           return new Response(null, {

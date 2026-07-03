@@ -1,5 +1,5 @@
+import { buildAuthorizationRequest } from '@pivox/oidc'
 import { createFileRoute } from '@tanstack/react-router'
-import * as oidc from 'openid-client'
 
 import { callbackUrl, getOidcConfig, OIDC_SCOPE } from '@/server/oidc/client'
 import { loginTxSetCookie } from '@/server/oidc/session'
@@ -29,24 +29,18 @@ export const Route = createFileRoute('/auth/sign-in')({
     handlers: {
       GET: async ({ request }) => {
         const config = await getOidcConfig()
-        const codeVerifier = oidc.randomPKCECodeVerifier()
-        const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier)
-        const state = oidc.randomState()
         const requestUrl = new URL(request.url)
         const returnTo = sanitizeReturnTo(requestUrl.searchParams.get('return'), requestUrl.origin)
 
-        const authUrl = oidc.buildAuthorizationUrl(config, {
-          redirect_uri: callbackUrl(request).href,
+        const { authorizationUrl, codeVerifier, state } = await buildAuthorizationRequest(config, {
+          redirectUri: callbackUrl(request).href,
           scope: OIDC_SCOPE,
-          code_challenge: codeChallenge,
-          code_challenge_method: 'S256',
-          state,
         })
 
         return new Response(null, {
           status: 302,
           headers: {
-            location: authUrl.href,
+            location: authorizationUrl,
             'set-cookie': loginTxSetCookie(request, { code_verifier: codeVerifier, state, return_to: returnTo }),
           },
         })

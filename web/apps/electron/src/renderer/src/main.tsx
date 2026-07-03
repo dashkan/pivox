@@ -10,7 +10,6 @@ import {
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { ensureFirebase } from './lib/firebase';
 import { routeTree } from './routeTree.gen';
 
 installErrorReporters();
@@ -34,7 +33,6 @@ installWebTracing({
   propagateTraceHeaderCorsUrls: [backendBaseUrl],
 });
 
-ensureFirebase();
 const hashHistory = createHashHistory();
 
 // One QueryClient per renderer process — Electron has no SSR, so a

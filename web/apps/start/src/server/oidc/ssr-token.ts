@@ -1,6 +1,6 @@
 import { getRequest } from '@tanstack/react-start/server'
 
-import { EXPIRY_SKEW_MS, readSessionId, refreshSession } from './session'
+import { isTokenFresh, readSessionId, refreshSession } from './session'
 import { getSession } from './session-store'
 
 /**
@@ -29,7 +29,7 @@ export async function getSsrAccessToken(): Promise<string | null> {
   const session = await getSession(id)
   if (!session?.access_token) return null
 
-  if (session.expires_at - Date.now() < EXPIRY_SKEW_MS && session.refresh_token) {
+  if (!isTokenFresh(session) && session.refresh_token) {
     try {
       // `_app` beforeLoad fires the org + spaces prefetch concurrently, so two
       // getSsrAccessToken calls can hit this branch at once. refreshSession is

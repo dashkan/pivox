@@ -1,16 +1,14 @@
 import { organizationId } from '@pivox/client';
 import { AppShellFeature } from '@pivox/features/app-shell';
-import { useFirebaseUser, usePivoxUserId } from '@pivox/features/auth';
+import { usePivoxUserId } from '@pivox/features/auth';
 import { AuthGateFeature } from '@pivox/features/auth-gate';
 import { ChatModalFeature } from '@pivox/features/chat';
 import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
 import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
 import { SidebarProvider } from '@pivox/ui/sidebar-provider';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
-import { UserProfileCard } from '@pivox/ui/user-profile-card';
-import { ElectronUserProfileFeature } from '@renderer/components/electron-user-profile-feature';
 import { $api } from '@renderer/lib/api-client';
-import { authProviders } from '@renderer/lib/auth-providers';
+import { ACCOUNT_CONSOLE_URL } from '@renderer/lib/oidc-env';
 import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
 import { useCallback } from 'react';
 
@@ -32,6 +30,12 @@ function AppLayoutRoute() {
         onCreateOrganization={() => {
           void router.navigate({ to: '/auth/create-org' });
         }}
+        // "Manage Account" opens Keycloak's account console in the system
+        // browser (window.open → the main window-open handler → shell.openExternal).
+        // Account management lives in Keycloak, not in-app — same as the web app.
+        onOpenAccount={() => {
+          window.open(ACCOUNT_CONSOLE_URL, '_blank', 'noopener');
+        }}
       >
         <SidebarProvider>
           <AppShell.Sidebar />
@@ -45,7 +49,6 @@ function AppLayoutRoute() {
             <Outlet />
           </SidebarInset>
         </SidebarProvider>
-        <ProfileDialog />
         <ChatFab />
       </AppShellFeature>
     </AuthGateFeature>
@@ -62,22 +65,17 @@ const CHAT_BASE_URL =
 /**
  * Floating chat FAB, mounted in the authed shell so chat is reachable
  * on every route (replaces the old standalone /chat route). Sources the
- * Pivox user UUID from the client Firebase ID-token claim
- * (`usePivoxUserId`) — Electron has no server session. Renders nothing
- * until an org is selected and the claim has resolved.
+ * Pivox user UUID from the Keycloak id_token `sub` (`usePivoxUserId`, backed by
+ * the IPC auth provider) — Electron has no server session. The chat transport's
+ * bearer comes from the main process over IPC. Renders nothing until an org is
+ * selected and the id has resolved.
  */
 function ChatFab() {
   const { state: shellState } = useAppShellContext();
-  const { user: firebaseUser } = useFirebaseUser();
   const pivoxUserId = usePivoxUserId();
   const activeOrg = shellState.activeOrganization;
 
-  const getAuthToken = useCallback(async () => {
-    if (!firebaseUser) {
-      throw new Error('Firebase user not available');
-    }
-    return firebaseUser.getIdToken();
-  }, [firebaseUser]);
+  const getAuthToken = useCallback(() => window.api.getAccessToken(), []);
 
   if (!activeOrg || !pivoxUserId) return null;
 
@@ -92,35 +90,5 @@ function ChatFab() {
       baseUrl={CHAT_BASE_URL}
       getAuthToken={getAuthToken}
     />
-  );
-}
-
-/**
- * Electron-specific profile dialog. Wraps the UserProfileCard
- * primitives in ElectronUserProfileFeature (which provides the
- * Electron-specific provider-link UX). Consumes AppShellContext
- * for the open state + setter — wired in by the AppShell.NavUser's
- * "Manage Account" menu item via actions.setProfileOpen(true).
- */
-function ProfileDialog() {
-  const { state, actions } = useAppShellContext();
-
-  return (
-    <ElectronUserProfileFeature
-      onClose={() => {
-        actions.setProfileOpen(false);
-      }}
-      open={state.profileOpen}
-      providers={authProviders}
-    >
-      <UserProfileCard.Root
-        open={state.profileOpen}
-        onOpenChange={actions.setProfileOpen}
-      >
-        <UserProfileCard.Sidebar />
-        <UserProfileCard.AccountPage />
-        <UserProfileCard.SecurityPage />
-      </UserProfileCard.Root>
-    </ElectronUserProfileFeature>
   );
 }

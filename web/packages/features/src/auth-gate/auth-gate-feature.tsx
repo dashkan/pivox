@@ -5,11 +5,13 @@ import { Navigate } from '@tanstack/react-router';
 import { useAuth } from '@/auth/use-auth';
 
 /**
- * Gates the authenticated app shell on the user having a Firebase
- * session. Wrap any route subtree that should only render for signed-
- * in users; unauthenticated visits redirect to `/auth/login`.
+ * Gates the authenticated app shell on the user having a Keycloak session. Wrap
+ * any route subtree that should only render for signed-in users; unauthenticated
+ * visits redirect to `/auth/login`. Used by the Electron app (whose IPC-backed
+ * provider has a real `loading` phase during boot restore); the web app gates
+ * server-side instead.
  *
- *   - While Firebase auth is settling, renders a tiny "Loading…"
+ *   - While auth is settling (`loading`), renders a tiny "Loading…"
  *     splash so we don't flash content for an unresolved state.
  *   - When there's no user, returns `<Navigate to="/auth/login" />`.
  *     Router primitive is Strict-Mode-safe and avoids the

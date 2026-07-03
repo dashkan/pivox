@@ -77,14 +77,13 @@ function pivoxStorageBootScript(): Plugin {
 export default defineConfig({
   main: {
     build: {
-      // `@pivox/features` is an ESM-only workspace package with no CJS
-      // (`require`) export condition. electron-vite externalizes deps
-      // for the CJS main process by default, which leaves a runtime
-      // `require('@pivox/features/broker')` that fails to resolve.
-      // Exclude it so Vite bundles it into the main process instead —
-      // the intended treatment for first-party workspace packages.
+      // The main process runs the OIDC flow via `@pivox/oidc`, which (and whose
+      // OIDC deps: openid-client → jose, oauth4webapi) is ESM-only with no CJS
+      // `require` export. electron-vite externalizes deps for the CJS main by
+      // default, which would leave a runtime `require('@pivox/oidc')` that fails
+      // to resolve. Exclude the whole ESM-only tree so Vite bundles it into main.
       externalizeDeps: {
-        exclude: ['@pivox/features'],
+        exclude: ['@pivox/oidc', 'openid-client', 'jose', 'oauth4webapi'],
       },
     },
   },
@@ -94,13 +93,7 @@ export default defineConfig({
       alias: {
         '@renderer': resolve('src/renderer/src'),
       },
-      dedupe: [
-        'react',
-        'react-dom',
-        'firebase',
-        'firebase/app',
-        'firebase/auth',
-      ],
+      dedupe: ['react', 'react-dom'],
     },
     plugins: [
       tailwindcss(),

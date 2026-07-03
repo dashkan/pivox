@@ -1,0 +1,34 @@
+{
+  "name": "@pivox/oidc",
+  "version": "1.0.0",
+  "description": "Framework-agnostic OpenID Connect (Keycloak) core — PKCE authorization, code exchange, refresh, and end-session over openid-client. Shared by the start BFF (server) and the Electron main process.",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "clean": "premove ./build ./dist",
+    "test:build": "publint --strict",
+    "test:eslint": "eslint ./src",
+    "test:lib": "vitest --passWithNoTests",
+    "test:lib:dev": "pnpm test:lib --watch",
+    "test:types": "tsc && tsc -p tests/tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vite": "catalog:"
+  },
+  "dependencies": {
+    "openid-client": "6.8.4"
+  }
+}

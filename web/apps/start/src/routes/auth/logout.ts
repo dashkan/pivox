@@ -1,7 +1,7 @@
+import { buildEndSessionUrl } from '@pivox/oidc'
 import { ACTIVE_ORG } from '@pivox/storage'
 import { createFileRoute } from '@tanstack/react-router'
 import { stringifySetCookie } from 'cookie'
-import * as oidc from 'openid-client'
 
 import { getOidcConfig, publicOrigin } from '@/server/oidc/client'
 import { readSessionId, sessionClearCookie } from '@/server/oidc/session'
@@ -47,9 +47,9 @@ export const Route = createFileRoute('/auth/logout')({
           const origin = publicOrigin(request)
           location = `${origin}/`
           const config = await getOidcConfig()
-          const endSession = oidc.buildEndSessionUrl(config, {
-            post_logout_redirect_uri: `${origin}/`,
-            ...(session?.id_token ? { id_token_hint: session.id_token } : {}),
+          const endSession = buildEndSessionUrl(config, {
+            postLogoutRedirectUri: `${origin}/`,
+            ...(session?.id_token ? { idTokenHint: session.id_token } : {}),
           })
           location = endSession.href
         } catch {

@@ -24,12 +24,18 @@ Refer to components by their canonical names, not their tech stack:
   Cloud Controller.
 - **Playout Agent** — on-prem agent installed alongside engines.
 
-> **Removed:** Firebase Cloud Functions (auth-time blocking hooks
-> for identity sync) are gone — auth is Keycloak-only on the cloud.
-> Identity provisioning now flows from Keycloak (KC→Kafka→Pivox
-> event sync), not Firebase auth hooks. The Electron app still
-> references Firebase and is temporarily broken pending its own
-> Keycloak migration.
+> **Removed:** Firebase is gone across the stack — auth is
+> Keycloak-only. Firebase Cloud Functions (auth-time blocking hooks
+> for identity sync) are removed; identity provisioning now flows from
+> Keycloak (KC→Kafka→Pivox event sync), not Firebase auth hooks. Both
+> web apps are Keycloak: `start` via a server-side BFF (openid-client +
+> httpOnly cookie session), and the Electron app via a public PKCE
+> client whose OIDC flow runs in the **main process** (system-browser
+> Authorization Code + PKCE, loopback/`pivox://` redirect capture,
+> tokens in `safeStorage`) — see `web/apps/electron/src/main/`. The
+> shared OIDC core (discovery, PKCE, code exchange, refresh,
+> end-session, id-token claims) lives in `@pivox/oidc`, consumed by
+> both the `start` server and the Electron main process.
 
 Tech-stack references ("Go backend", "Rust engine") are appropriate
 in build docs / architecture decisions where the technology is the

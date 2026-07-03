@@ -6,13 +6,13 @@ import { createContext, use } from 'react';
  * Platform-neutral authenticated user for the app shell + route gates.
  *
  * `id` is the Pivox identity id — the Keycloak `sub` (which equals
- * `identities.id`) for the web BFF, or the `pivox_user_id` claim for Firebase
- * (Electron) — so it means the same thing on both platforms. `null` id means the
- * identity hasn't been provisioned yet (Firebase: claim missing).
+ * `identities.id`) on both platforms: the web BFF resolves it from the
+ * server-side session, and the Electron provider decodes it from the id_token
+ * over IPC. `null` id means the identity hasn't been provisioned yet.
  *
- * This is deliberately free of any Firebase types: the web app is Keycloak-only,
- * and Electron's provider maps its Firebase user into this shape. Firebase-only
- * account management reads the raw user via `useFirebaseUser` instead.
+ * Deliberately transport-agnostic: each app supplies its own provider — the web
+ * app's BFF-backed KeycloakAuthProvider, or Electron's IPC-backed one — that
+ * maps its Keycloak session into this shape.
  */
 export interface AuthUser {
   id: string | null;

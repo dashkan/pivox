@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { EXPIRY_SKEW_MS, readSessionId, refreshSession, sessionClearCookie } from '@/server/oidc/session'
+import { isTokenFresh, readSessionId, refreshSession, sessionClearCookie } from '@/server/oidc/session'
 import { deleteSession, getSession } from '@/server/oidc/session-store'
 
 /** Backend origin the BFF forwards to (e.g. https://pivox.ngrok.app). */
@@ -82,7 +82,7 @@ export const Route = createFileRoute('/api/v1/$')({
         // Transparent refresh before forwarding (single-flighted in refreshSession,
         // which also persists the rotated set back to the row — the cookie/id is
         // stable, so nothing is written back to the browser on success).
-        if (session.expires_at - Date.now() < EXPIRY_SKEW_MS && session.refresh_token) {
+        if (!isTokenFresh(session) && session.refresh_token) {
           try {
             session = await refreshSession(sessionId)
           } catch {

@@ -11,12 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AuthVerifyEmailRouteImport } from './routes/auth/verify-email'
-import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
-import { Route as AuthRegisterRouteImport } from './routes/auth/register'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
-import { Route as AuthLinkAccountRouteImport } from './routes/auth/link-account'
-import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
 
 const AppRoute = AppRouteImport.update({
@@ -28,34 +23,9 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AuthVerifyEmailRoute = AuthVerifyEmailRouteImport.update({
-  id: '/auth/verify-email',
-  path: '/auth/verify-email',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
-  id: '/auth/reset-password',
-  path: '/auth/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRegisterRoute = AuthRegisterRouteImport.update({
-  id: '/auth/register',
-  path: '/auth/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthLinkAccountRoute = AuthLinkAccountRouteImport.update({
-  id: '/auth/link-account',
-  path: '/auth/link-account',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
-  id: '/auth/forgot-password',
-  path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthCreateOrgRoute = AuthCreateOrgRouteImport.update({
@@ -67,78 +37,32 @@ const AuthCreateOrgRoute = AuthCreateOrgRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/auth/create-org': typeof AuthCreateOrgRoute
-  '/auth/forgot-password': typeof AuthForgotPasswordRoute
-  '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
-  '/auth/register': typeof AuthRegisterRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
-  '/auth/verify-email': typeof AuthVerifyEmailRoute
 }
 export interface FileRoutesByTo {
   '/auth/create-org': typeof AuthCreateOrgRoute
-  '/auth/forgot-password': typeof AuthForgotPasswordRoute
-  '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
-  '/auth/register': typeof AuthRegisterRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
-  '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/': typeof AppIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/auth/create-org': typeof AuthCreateOrgRoute
-  '/auth/forgot-password': typeof AuthForgotPasswordRoute
-  '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
-  '/auth/register': typeof AuthRegisterRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
-  '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/_app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/auth/create-org'
-    | '/auth/forgot-password'
-    | '/auth/link-account'
-    | '/auth/login'
-    | '/auth/register'
-    | '/auth/reset-password'
-    | '/auth/verify-email'
+  fullPaths: '/' | '/auth/create-org' | '/auth/login'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/auth/create-org'
-    | '/auth/forgot-password'
-    | '/auth/link-account'
-    | '/auth/login'
-    | '/auth/register'
-    | '/auth/reset-password'
-    | '/auth/verify-email'
-    | '/'
-  id:
-    | '__root__'
-    | '/_app'
-    | '/auth/create-org'
-    | '/auth/forgot-password'
-    | '/auth/link-account'
-    | '/auth/login'
-    | '/auth/register'
-    | '/auth/reset-password'
-    | '/auth/verify-email'
-    | '/_app/'
+  to: '/auth/create-org' | '/auth/login' | '/'
+  id: '__root__' | '/_app' | '/auth/create-org' | '/auth/login' | '/_app/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthCreateOrgRoute: typeof AuthCreateOrgRoute
-  AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
-  AuthLinkAccountRoute: typeof AuthLinkAccountRoute
   AuthLoginRoute: typeof AuthLoginRoute
-  AuthRegisterRoute: typeof AuthRegisterRoute
-  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
-  AuthVerifyEmailRoute: typeof AuthVerifyEmailRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -157,46 +81,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/auth/verify-email': {
-      id: '/auth/verify-email'
-      path: '/auth/verify-email'
-      fullPath: '/auth/verify-email'
-      preLoaderRoute: typeof AuthVerifyEmailRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/reset-password': {
-      id: '/auth/reset-password'
-      path: '/auth/reset-password'
-      fullPath: '/auth/reset-password'
-      preLoaderRoute: typeof AuthResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/register': {
-      id: '/auth/register'
-      path: '/auth/register'
-      fullPath: '/auth/register'
-      preLoaderRoute: typeof AuthRegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth/login': {
       id: '/auth/login'
       path: '/auth/login'
       fullPath: '/auth/login'
       preLoaderRoute: typeof AuthLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/link-account': {
-      id: '/auth/link-account'
-      path: '/auth/link-account'
-      fullPath: '/auth/link-account'
-      preLoaderRoute: typeof AuthLinkAccountRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/forgot-password': {
-      id: '/auth/forgot-password'
-      path: '/auth/forgot-password'
-      fullPath: '/auth/forgot-password'
-      preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/create-org': {
@@ -222,12 +111,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthCreateOrgRoute: AuthCreateOrgRoute,
-  AuthForgotPasswordRoute: AuthForgotPasswordRoute,
-  AuthLinkAccountRoute: AuthLinkAccountRoute,
   AuthLoginRoute: AuthLoginRoute,
-  AuthRegisterRoute: AuthRegisterRoute,
-  AuthResetPasswordRoute: AuthResetPasswordRoute,
-  AuthVerifyEmailRoute: AuthVerifyEmailRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

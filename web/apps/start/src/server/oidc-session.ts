@@ -1,8 +1,13 @@
+import { decodeIdTokenClaims, type OidcClaims } from '@pivox/oidc';
 import { createServerFn } from '@tanstack/react-start';
 import { getCookie } from '@tanstack/react-start/server';
 
 import { SESSION_COOKIE } from './oidc/session';
 import { getSession } from './oidc/session-store';
+
+// Re-exported so callback.ts keeps a single import site even though the decoder
+// now lives in @pivox/oidc (shared with the Electron main process).
+export { decodeIdTokenClaims, type OidcClaims } from '@pivox/oidc';
 
 /**
  * SSR session read for the Keycloak BFF. The `_app` (and `/auth/create-org`)
@@ -21,16 +26,6 @@ import { getSession } from './oidc/session-store';
  * call time (refresh-or-401), so the gate stays "logged in" across the short
  * access-token lifetime rather than bouncing every few minutes.
  */
-
-/** Claims we consume from the Keycloak id_token. */
-export interface OidcClaims {
-  sub?: string;
-  email?: string;
-  email_verified?: boolean;
-  name?: string;
-  preferred_username?: string;
-  picture?: string;
-}
 
 /**
  * Wire shape handed to the client (router context / provider hydration). Under
@@ -68,24 +63,6 @@ function accountConsoleUrl(): string | null {
   const issuer = process.env.PIVOX_OIDC_ISSUER;
   if (!issuer) return null;
   return `${issuer.replace(/\/+$/, '')}/account`;
-}
-
-/**
- * Decode a JWT's payload claims without verifying the signature. Returns
- * undefined for a structurally invalid token (not three segments, or a payload
- * that isn't base64url-encoded JSON).
- */
-export function decodeIdTokenClaims(idToken: string): OidcClaims | undefined {
-  const parts = idToken.split('.');
-  if (parts.length !== 3) return undefined;
-  try {
-    const json = Buffer.from(parts[1], 'base64url').toString('utf8');
-    const claims: unknown = JSON.parse(json);
-    if (typeof claims !== 'object' || claims === null) return undefined;
-    return claims;
-  } catch {
-    return undefined;
-  }
 }
 
 /** Map decoded Keycloak claims to the client-facing session shape. */

@@ -1,10 +1,12 @@
+import { isTokenFresh, refreshTokens, type SessionTokens } from '@pivox/oidc'
 import { parseCookie, stringifySetCookie } from 'cookie'
-import * as oidc from 'openid-client'
 
 import { getOidcConfig } from './client'
 import { updateSession, getSession } from './session-store'
 
-import type { TokenEndpointResponse } from 'openid-client'
+// Re-exported so BFF modules keep a single import site for the session shape and
+// the OIDC token helpers, even though they now live in @pivox/oidc.
+export { EXPIRY_SKEW_MS, isTokenFresh, tokensFromResponse, type SessionTokens } from '@pivox/oidc'
 
 /**
  * BFF session + login-transaction cookies for the OIDC (Keycloak) flow.
@@ -38,14 +40,6 @@ const TX_COOKIE = '__pivox_oidc_tx'
 // browser will keep presenting the id.
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30 // 30 days
 const TX_MAX_AGE_SECONDS = 60 * 10 // 10 minutes to complete a login
-
-export interface SessionTokens {
-  access_token: string
-  refresh_token?: string
-  id_token?: string
-  /** Epoch milliseconds at which the access token expires. */
-  expires_at: number
-}
 
 export interface LoginTx {
   code_verifier: string
@@ -102,21 +96,7 @@ export function sessionClearCookie(request: Request): string {
   return buildSetCookie(SESSION_COOKIE, '', 0, isSecure(request))
 }
 
-/** Maps an openid-client token response to our stored session shape. */
-export function tokensFromResponse(response: TokenEndpointResponse): SessionTokens {
-  const expiresInSeconds = response.expires_in ?? 300
-  return {
-    access_token: response.access_token,
-    refresh_token: response.refresh_token,
-    id_token: response.id_token,
-    expires_at: Date.now() + expiresInSeconds * 1000,
-  }
-}
-
 // --- token refresh (single-flighted per session) ---
-
-/** Refresh the access token when it's within this window of expiry. */
-export const EXPIRY_SKEW_MS = 30_000
 
 const inflightRefresh = new Map<string, Promise<SessionTokens>>()
 
@@ -153,13 +133,13 @@ export async function refreshSession(id: string): Promise<SessionTokens> {
     if (!current) throw new Error('refreshSession: no live session row')
     // A concurrent flight may have just rotated the set; reuse it rather than
     // spending the (now stale) refresh token a second time.
-    if (current.expires_at - Date.now() >= EXPIRY_SKEW_MS) return current
+    if (isTokenFresh(current)) return current
     if (!current.refresh_token) throw new Error('refreshSession: session has no refresh token')
 
     const config = await getOidcConfig()
-    const tokens = tokensFromResponse(await oidc.refreshTokenGrant(config, current.refresh_token))
-    // Keycloak rotates refresh tokens; if a deployment doesn't, keep the old one.
-    if (!tokens.refresh_token) tokens.refresh_token = current.refresh_token
+    // refreshTokens spends the row's CURRENT refresh token and, when Keycloak
+    // doesn't rotate, preserves it so the session stays refreshable.
+    const tokens = await refreshTokens(config, current.refresh_token)
     // Persist inside the single flight: the cookie (the id) never changes, so the
     // row is the only place the rotated set lives.
     await updateSession(id, tokens)

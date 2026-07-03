@@ -1,6 +1,6 @@
-import { AuthProvider } from '@pivox/features/auth';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
 import { clearUserScopedItems } from '@pivox/storage';
+import { KeycloakAuthProvider } from '@renderer/lib/keycloak-auth-provider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Outlet, createRootRouteWithContext } from '@tanstack/react-router';
 
@@ -41,7 +41,7 @@ function RootComponent() {
             doesn't inherit the selected org / cached org-list. No server
             session here (electron has no cookie) — just the client caches:
             user-scoped storage (localStorage) + the React Query cache. */}
-        <AuthProvider
+        <KeycloakAuthProvider
           onBeforeSignOut={() => {
             clearUserScopedItems();
             queryClient.clear();
@@ -50,7 +50,7 @@ function RootComponent() {
           <div className="min-h-screen bg-background font-sans text-foreground antialiased">
             <Outlet />
           </div>
-        </AuthProvider>
+        </KeycloakAuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

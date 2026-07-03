@@ -1,12 +1,15 @@
-import * as oidc from 'openid-client'
+import { createConfigProvider, type ConfigProvider } from '@pivox/oidc'
+
+import type * as oidc from 'openid-client'
 
 /**
  * OIDC (Keycloak) client configuration for the `start` BFF.
  *
  * The BFF runs the OAuth Authorization Code + PKCE flow server-side using the
- * confidential `start` client. Discovery is memoized per process and lazy, so
- * server boot isn't coupled to Keycloak readiness — the first /auth/login pays
- * the discovery cost, by which point the IdP is reachable.
+ * confidential `start` client. The shared {@link createConfigProvider} handles
+ * lazy, per-process memoized discovery (with retry-on-failure) — server boot
+ * isn't coupled to Keycloak readiness; the first /auth/login pays the discovery
+ * cost, by which point the IdP is reachable.
  */
 
 const ISSUER = 'PIVOX_OIDC_ISSUER'
@@ -21,28 +24,22 @@ function required(name: string): string {
   return value
 }
 
-let configPromise: Promise<oidc.Configuration> | undefined
+let provider: ConfigProvider | undefined
 
 /**
- * Discovers and returns the memoized Keycloak {@link oidc.Configuration}. On
- * discovery failure the cached promise is cleared so the next call retries — a
- * transient IdP-down at first login shouldn't poison the process for its whole
- * lifetime.
- *
- * Passing the secret as the third argument is the `client_secret` shorthand and
- * defaults to client_secret_post (openid-client v6), which Keycloak's
- * confidential "Client Id and Secret" authenticator accepts.
+ * Discovers and returns the memoized Keycloak {@link oidc.Configuration} for the
+ * confidential `start` client. Reading the env is deferred to first call (not
+ * module load) so a missing var surfaces at login, not at import.
  */
 export function getOidcConfig(): Promise<oidc.Configuration> {
-  if (!configPromise) {
-    configPromise = oidc
-      .discovery(new URL(required(ISSUER)), required(CLIENT_ID), required(CLIENT_SECRET))
-      .catch((err: unknown) => {
-        configPromise = undefined
-        throw err
-      })
+  if (!provider) {
+    provider = createConfigProvider({
+      issuer: required(ISSUER),
+      clientId: required(CLIENT_ID),
+      clientSecret: required(CLIENT_SECRET),
+    })
   }
-  return configPromise
+  return provider()
 }
 
 /**

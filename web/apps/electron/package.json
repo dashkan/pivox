@@ -10,9 +10,11 @@
     "lint": "eslint --cache .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck:test": "tsc --noEmit -p tests/tsconfig.json --composite false",
     "test:eslint": "pnpm lint",
     "test:types": "pnpm typecheck",
-    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
+    "test:lib": "vitest run",
+    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web && pnpm run typecheck:test",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
     "build": "pnpm run typecheck && electron-vite build",
@@ -28,6 +30,7 @@
     "@electron-toolkit/utils": "4.0.0",
     "@pivox/client": "workspace:*",
     "@pivox/features": "workspace:*",
+    "@pivox/oidc": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/storage": "workspace:*",
@@ -35,7 +38,6 @@
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "electron-updater": "6.8.9",
-    "firebase": "catalog:",
     "lucide-react": "catalog:"
   },
   "devDependencies": {
@@ -53,6 +55,7 @@
     "react-dom": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

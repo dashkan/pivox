@@ -4,9 +4,8 @@ import { useAuth } from './use-auth';
 
 /**
  * The Pivox identity id of the current user (== `identities.id`). Under Keycloak
- * it's the `sub`; under Firebase it's the `pivox_user_id` claim — either way the
- * provider resolves it into `AuthUser.id`, so this is now just a convenience
- * reader over `useAuth().user.id`.
+ * it's the `sub`; the provider (web BFF or Electron IPC) resolves it into
+ * `AuthUser.id`, so this is just a convenience reader over `useAuth().user.id`.
  *
  * Returns:
  *   - `undefined` while auth is still resolving

@@ -1,33 +1,27 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { BrokerRedirectResult } from '@pivox/features/broker';
+import type { PivoxAPI } from './auth-api';
 
-contextBridge.exposeInMainWorld('api', {
-  startBrokerLogin: (input: {
-    provider: string;
-    loginHint?: string;
-    /**
-     * Optional flow identifier. Required only when the caller wants
-     * to be able to cancel via `abortBrokerLogin(flowId)`. Other
-     * callers (e.g., the profile dialog's "link another provider"
-     * action which has no Cancel UI) can omit it and let main
-     * generate one internally.
-     */
-    flowId?: string;
-  }): Promise<BrokerRedirectResult> =>
-    ipcRenderer.invoke('auth:start-broker-login', input),
-  /**
-   * Cancel a specific in-flight broker login flow by id. Main
-   * settles only the matching flow as `{ ok: false, error:
-   * 'popup_closed' }`, tears down its loopback server, and clears
-   * its timeout — other flows (if any) are untouched. Resolves once
-   * main has processed the request.
-   *
-   * No-op if the flow has already settled. Used by the renderer when
-   * the user clicks "Cancel sign-in" during a social/SSO flow; the
-   * renderer remembers the `flowId` it passed to startBrokerLogin
-   * and routes the abort through it.
-   */
-  abortBrokerLogin: (flowId: string): Promise<void> =>
-    ipcRenderer.invoke('auth:abort-broker-login', flowId),
-});
+/**
+ * Auth bridge. Every method is a thin pass-through to a main-process IPC handler
+ * (keycloak-auth.ts) — the OIDC flow, token lifecycle, and secrets all live in
+ * main; the renderer only drives + observes.
+ */
+const api: PivoxAPI = {
+  login: (input) => ipcRenderer.invoke('auth:login', input),
+  cancelLogin: () => ipcRenderer.invoke('auth:cancel-login'),
+  logout: () => ipcRenderer.invoke('auth:logout'),
+  getAuthState: () => ipcRenderer.invoke('auth:get-state'),
+  getAccessToken: () => ipcRenderer.invoke('auth:get-access-token'),
+  onAuthChanged: (callback) => {
+    const listener = (): void => {
+      callback();
+    };
+    ipcRenderer.on('auth:changed', listener);
+    return () => {
+      ipcRenderer.removeListener('auth:changed', listener);
+    };
+  },
+};
+
+contextBridge.exposeInMainWorld('api', api);

@@ -18,6 +18,7 @@
     "@fontsource-variable/roboto": "catalog:",
     "@pivox/client": "workspace:*",
     "@pivox/features": "workspace:*",
+    "@pivox/oidc": "workspace:*",
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/storage": "workspace:*",
