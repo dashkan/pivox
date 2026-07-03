@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // Config holds all server configuration. Populated from cobra flags
 // in cmd/pivox-cloud/main.go, with env var fallbacks.
 type Config struct {
@@ -45,4 +47,11 @@ type OIDCConfig struct {
 	// --disable-oidc-audience-validation). Audience validation is fail-closed
 	// otherwise: an empty Audience with OIDC enabled is a startup error.
 	DisableAudienceValidation bool
+
+	// JWKSRefreshInterval is how often the background goroutine re-fetches the
+	// issuer's JWKS (wired to --oidc-jwks-refresh-interval, default 5m). Keycloak
+	// rotates signing keys only on operator action, so this is just how fast
+	// verifiers converge after a rotation. 0 = fetch once at startup, never
+	// refresh. There is no on-demand refresh (see internal/oidc.Verifier).
+	JWKSRefreshInterval time.Duration
 }

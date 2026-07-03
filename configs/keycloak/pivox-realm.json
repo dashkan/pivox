@@ -834,12 +834,49 @@
         "decisionStrategy": "UNANIMOUS",
         "authorizationSchema": {
           "resourceTypes": {
+            "Users": {
+              "type": "Users",
+              "scopes": [
+                "manage-group-membership",
+                "manage",
+                "map-roles",
+                "impersonate",
+                "view",
+                "reset-password"
+              ],
+              "scopeAliases": {
+                "impersonate": [
+                  "impersonate-members"
+                ],
+                "manage": [
+                  "manage-members"
+                ],
+                "view": [
+                  "view-members"
+                ],
+                "manage-group-membership": [
+                  "manage-membership-of-members"
+                ]
+              },
+              "groupType": "Groups"
+            },
+            "Clients": {
+              "type": "Clients",
+              "scopes": [
+                "manage",
+                "map-roles-composite",
+                "view",
+                "map-roles-client-scope",
+                "map-roles"
+              ],
+              "scopeAliases": {}
+            },
             "Roles": {
               "type": "Roles",
               "scopes": [
+                "map-role-client-scope",
                 "map-role",
-                "map-role-composite",
-                "map-role-client-scope"
+                "map-role-composite"
               ],
               "scopeAliases": {}
             },
@@ -853,43 +890,6 @@
                 "manage-membership",
                 "view-members",
                 "view"
-              ],
-              "scopeAliases": {}
-            },
-            "Users": {
-              "type": "Users",
-              "scopes": [
-                "impersonate",
-                "view",
-                "reset-password",
-                "manage-group-membership",
-                "manage",
-                "map-roles"
-              ],
-              "scopeAliases": {
-                "manage": [
-                  "manage-members"
-                ],
-                "view": [
-                  "view-members"
-                ],
-                "manage-group-membership": [
-                  "manage-membership-of-members"
-                ],
-                "impersonate": [
-                  "impersonate-members"
-                ]
-              },
-              "groupType": "Groups"
-            },
-            "Clients": {
-              "type": "Clients",
-              "scopes": [
-                "view",
-                "map-roles-client-scope",
-                "map-roles",
-                "manage",
-                "map-roles-composite"
               ],
               "scopeAliases": {}
             }
@@ -1359,19 +1359,21 @@
           }
         },
         {
-          "id": "84ccd4f6-d2d4-4314-935f-970e6a7493f5",
-          "name": "photo url",
+          "id": "a3a812ce-d631-45ba-aa1b-70d32a16c86e",
+          "name": "picture",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "consentRequired": false,
           "config": {
+            "aggregate.attrs": "false",
             "introspection.token.claim": "true",
+            "multivalued": "false",
             "userinfo.token.claim": "true",
             "user.attribute": "photoUrl",
             "id.token.claim": "true",
             "lightweight.claim": "false",
             "access.token.claim": "true",
-            "claim.name": "photo_url",
+            "claim.name": "picture",
             "jsonType.label": "String"
           }
         },
@@ -1930,7 +1932,7 @@
   },
   "smtpServer": {},
   "loginTheme": "pivox",
-  "accountTheme": "",
+  "accountTheme": "pivox",
   "adminTheme": "",
   "emailTheme": "",
   "eventsEnabled": true,

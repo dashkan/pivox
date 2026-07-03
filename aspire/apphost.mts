@@ -225,7 +225,7 @@ const kafka = await builder
   })
   .withContainerNetworkAlias("kafka");
 
-await builder
+const keycloak = await builder
   .addKeycloak("keycloak", { port: 8082 })
   // Custom image: stock Keycloak + the keycloak-kafka event-listener SPI, built
   // in (kc build). Version pinned in aspire/keycloak/Dockerfile (KC_VERSION).
@@ -340,7 +340,12 @@ await builder
   // waitFor(pivoxDb): the DB resource is ready only after postgres is healthy,
   // which on first init is after the init script's migrate + seed — so the
   // schema + the `vector` type exist before pgx's RegisterTypes runs.
-  .waitFor(pivoxDb);
+  .waitFor(pivoxDb)
+  // waitFor(keycloak): the OIDC verifier fetches the realm JWKS at startup. If
+  // the API boots before Keycloak is serving, that fetch fails and (with no
+  // on-demand refresh) every token 401s until the next background refresh. Wait
+  // for KC to be healthy so the startup JWKS load succeeds.
+  .waitFor(keycloak);
 
 // --- worker (pivox-worker) — host process, River-backed periodic jobs ---
 // Mirrors the `make air-worker` leg of the dev target. No envoy-facing port;

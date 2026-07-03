@@ -12,8 +12,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
+	"time"
 
+	"github.com/MicahParks/jwkset"
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -41,11 +44,34 @@ type Config struct {
 	// (wired to --disable-oidc-audience-validation), never an accidental empty
 	// config. Use only when a deployment genuinely can't scope token audiences.
 	DisableAudienceValidation bool
+
+	// JWKSRefreshInterval is how often a background goroutine re-fetches the
+	// issuer's JWKS. Keycloak doesn't rotate signing keys on a schedule — keys
+	// change only on an operator-initiated rotation or a fresh realm import — so
+	// this is just how fast every verifier converges on a new key after such an
+	// event (KC publishes new+old keys together, enabling zero-downtime rotation).
+	// 0 disables background refresh entirely (fetch once at startup, never
+	// again). There is NO on-demand refresh on an unknown `kid`: that path is
+	// attacker-triggerable (the `kid` is caller-controlled) and would amplify
+	// forged tokens into JWKS fetches, so recovery rides on this interval only.
+	//
+	// NewVerifier applies NO default: an unset (zero) value means never-refresh.
+	// The 5m production default lives at the flag layer
+	// (--oidc-jwks-refresh-interval / PIVOX_OIDC_JWKS_REFRESH_INTERVAL), so any
+	// caller constructing Config directly (e.g. a test) and relying on refresh
+	// must set this explicitly.
+	JWKSRefreshInterval time.Duration
 }
 
 // Verifier validates OIDC tokens from one issuer and maps them to a Pivox
-// identity. Safe for concurrent use; keyfunc handles JWKS caching + refresh
-// (Cache-Control aware, on-demand refresh on unknown `kid`).
+// identity. Safe for concurrent use.
+//
+// JWKS handling (see NewVerifier): the key set is fetched once at startup and
+// then refreshed by a background goroutine every Config.JWKSRefreshInterval, so
+// an operator-initiated key rotation is picked up without a process restart. We
+// deliberately do NOT use keyfunc's on-demand "refresh on unknown kid" path —
+// the `kid` is caller-controlled, so it would let forged tokens amplify into
+// JWKS fetches against the IdP.
 type Verifier struct {
 	keyfunc    jwt.Keyfunc
 	parser     *jwt.Parser
@@ -67,9 +93,27 @@ func NewVerifier(ctx context.Context, cfg Config) (*Verifier, error) {
 	if !cfg.DisableAudienceValidation && cfg.Audience == "" {
 		return nil, errors.New("oidc: audience validation is enabled but Config.Audience is empty; set Audience or DisableAudienceValidation (--disable-oidc-audience-validation)")
 	}
-	k, err := keyfunc.NewDefaultCtx(ctx, []string{cfg.JWKSURL})
+	// Build the JWKS storage directly (not keyfunc.NewDefault*) so we get a
+	// background-only refresh: the store fetches once now and a goroutine
+	// re-fetches every JWKSRefreshInterval (0 = never). We do NOT wrap it in
+	// jwkset.NewHTTPClient with a RefreshUnknownKID limiter — that on-demand
+	// path is caller-triggerable via the token's `kid` and would let forged
+	// tokens amplify into JWKS fetches. NoErrorReturnFirstHTTPReq is left false
+	// (the default) so an unreachable IdP at startup is a loud, fail-fast boot
+	// error rather than a process that comes up unable to verify anything.
+	storage, err := jwkset.NewStorageFromHTTP(cfg.JWKSURL, jwkset.HTTPClientStorageOptions{
+		Ctx:             ctx,
+		RefreshInterval: cfg.JWKSRefreshInterval,
+		RefreshErrorHandler: func(ctx context.Context, err error) {
+			slog.ErrorContext(ctx, "oidc: JWKS background refresh failed", "url", cfg.JWKSURL, "error", err)
+		},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("oidc: load JWKS: %w", err)
+	}
+	k, err := keyfunc.New(keyfunc.Options{Ctx: ctx, Storage: storage})
+	if err != nil {
+		return nil, fmt.Errorf("oidc: build keyfunc: %w", err)
 	}
 	// `aud` is checked in VerifyToken (must contain cfg.Audience) rather than via
 	// WithAudience, so a string-or-array aud is handled uniformly.

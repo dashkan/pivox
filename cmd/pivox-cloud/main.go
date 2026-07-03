@@ -101,6 +101,7 @@ func main() {
 	f.String("oidc-issuer", envOrDefault("PIVOX_OIDC_ISSUER", ""), "OIDC issuer URL whose access tokens the backend accepts (e.g. https://host/realms/pivox); required")
 	f.String("oidc-audience", envOrDefault("PIVOX_OIDC_AUDIENCE", ""), "Audience the access token's aud must contain (Keycloak audience-mapper value)")
 	f.Bool("disable-oidc-audience-validation", envOrBool("PIVOX_DISABLE_OIDC_AUDIENCE_VALIDATION", false), "Opt out of OIDC audience validation (fail-closed otherwise)")
+	f.Duration("oidc-jwks-refresh-interval", envOrDuration("PIVOX_OIDC_JWKS_REFRESH_INTERVAL", 5*time.Minute), "How often to background-refresh the issuer's JWKS (0 = fetch once at startup, never refresh)")
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -138,6 +139,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	f := cmd.Flags()
 	enableReflection, _ := f.GetBool("enable-reflection")
 	disableOIDCAud, _ := f.GetBool("disable-oidc-audience-validation")
+	jwksRefreshInterval, _ := f.GetDuration("oidc-jwks-refresh-interval")
 	cfg := &config.Config{
 		DatabaseURL:      must(f.GetString("database-url")),
 		GRPCPort:         must(f.GetString("grpc-port")),
@@ -150,6 +152,7 @@ func serve(cmd *cobra.Command, args []string) error {
 			Issuer:                    must(f.GetString("oidc-issuer")),
 			Audience:                  must(f.GetString("oidc-audience")),
 			DisableAudienceValidation: disableOIDCAud,
+			JWKSRefreshInterval:       jwksRefreshInterval,
 		},
 	}
 
@@ -250,6 +253,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		JWKSURL:                   strings.TrimRight(cfg.OIDC.Issuer, "/") + "/protocol/openid-connect/certs",
 		Audience:                  cfg.OIDC.Audience,
 		DisableAudienceValidation: cfg.OIDC.DisableAudienceValidation,
+		JWKSRefreshInterval:       cfg.OIDC.JWKSRefreshInterval,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize OIDC verifier: %w", err)

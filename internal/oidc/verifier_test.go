@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,6 +31,9 @@ type jwksHarness struct {
 	kid     string
 	issuer  string
 	jwksURL string
+	// fetches counts hits to the JWKS endpoint, so tests can assert the
+	// verifier does (or does not) go over the wire.
+	fetches *atomic.Int64
 }
 
 func newJWKSHarness(t *testing.T) *jwksHarness {
@@ -38,8 +42,10 @@ func newJWKSHarness(t *testing.T) *jwksHarness {
 	require.NoError(t, err)
 	const kid = "kc-key-1"
 
+	var fetches atomic.Int64
 	mux := http.NewServeMux()
 	mux.HandleFunc("/realms/pivox/protocol/openid-connect/certs", func(w http.ResponseWriter, _ *http.Request) {
+		fetches.Add(1)
 		jwks := map[string]any{"keys": []map[string]string{{
 			"kid": kid,
 			"kty": "RSA",
@@ -60,6 +66,7 @@ func newJWKSHarness(t *testing.T) *jwksHarness {
 		kid:     kid,
 		issuer:  srv.URL + "/realms/pivox",
 		jwksURL: srv.URL + "/realms/pivox/protocol/openid-connect/certs",
+		fetches: &fetches,
 	}
 }
 
@@ -234,6 +241,54 @@ func TestVerifier_VerifyToken(t *testing.T) {
 		_, err := v.VerifyToken(context.Background(), h.sign(validClaims(h, "not-a-uuid")))
 		assert.Error(t, err)
 	})
+}
+
+// TestVerifier_UnknownKIDDoesNotFetch pins the security-critical property of the
+// background-only refresh design: a token carrying an unknown `kid` (which an
+// unauthenticated caller fully controls) must be rejected WITHOUT triggering a
+// JWKS refetch. Any on-demand refresh here would let forged tokens amplify into
+// requests against the IdP — the exact reason we build the store directly
+// instead of via keyfunc.NewDefault* (which enables RefreshUnknownKID). If
+// someone reverts to the default construction, this test fails.
+func TestVerifier_UnknownKIDDoesNotFetch(t *testing.T) {
+	t.Parallel()
+	h := newJWKSHarness(t)
+	v := newTestVerifier(t, h, "pivox") // one startup fetch
+	afterStartup := h.fetches.Load()
+	require.Equal(t, int64(1), afterStartup, "expected exactly one JWKS fetch at startup")
+
+	// A token signed with the harness key but stamped with a kid the JWKS does
+	// not contain — the shape of a forged / rotated-out token.
+	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, validClaims(h, uuid.NewString()))
+	tok.Header["kid"] = "attacker-controlled-unknown-kid"
+	signed, err := tok.SignedString(h.key)
+	require.NoError(t, err)
+
+	// Hammer it: an on-demand (even rate-limited) refresh would fetch at least
+	// once; background-only must never fetch on the read path.
+	for range 5 {
+		_, err = v.VerifyToken(context.Background(), signed)
+		require.Error(t, err)
+	}
+	assert.Equal(t, afterStartup, h.fetches.Load(),
+		"an unknown kid must not trigger a JWKS fetch (no on-demand refresh)")
+}
+
+// TestNewVerifier_FailsFastOnUnreachableJWKS pins fail-fast startup: if the IdP's
+// JWKS can't be fetched when the verifier is built, construction must error
+// rather than yield a verifier that silently can't validate any token.
+func TestNewVerifier_FailsFastOnUnreachableJWKS(t *testing.T) {
+	t.Parallel()
+	// A server that's already closed → connection refused on the first fetch.
+	srv := httptest.NewServer(http.NewServeMux())
+	srv.Close()
+
+	_, err := NewVerifier(context.Background(), Config{
+		Issuer:   "https://kc.example/realms/pivox",
+		JWKSURL:  srv.URL + "/realms/pivox/protocol/openid-connect/certs",
+		Audience: "pivox",
+	})
+	assert.Error(t, err)
 }
 
 func TestNewVerifier_AudiencePolicy(t *testing.T) {
