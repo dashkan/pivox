@@ -125,6 +125,20 @@ export function PersonalInfo() {
             <Button type="submit" disabled={status === "saving"}>
               {status === "saving" ? "…" : t("doSave")}
             </Button>
+            {/* Reverts the form to the loaded values — KC's account-ui uses a
+                bare reset() (back to the last-loaded profile) behind t("cancel"). */}
+            <Button
+              type="button"
+              variant="link"
+              disabled={status === "saving"}
+              onClick={() => {
+                form.reset();
+                setStatus("idle");
+                setError(null);
+              }}
+            >
+              {t("cancel")}
+            </Button>
           </div>
         </form>
       )}
