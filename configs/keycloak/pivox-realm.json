@@ -837,19 +837,21 @@
             "Roles": {
               "type": "Roles",
               "scopes": [
-                "map-role-client-scope",
+                "map-role",
                 "map-role-composite",
-                "map-role"
+                "map-role-client-scope"
               ],
               "scopeAliases": {}
             },
-            "Clients": {
-              "type": "Clients",
+            "Groups": {
+              "type": "Groups",
               "scopes": [
-                "map-roles-composite",
+                "impersonate-members",
+                "manage-members",
+                "manage-membership-of-members",
                 "manage",
-                "map-roles",
-                "map-roles-client-scope",
+                "manage-membership",
+                "view-members",
                 "view"
               ],
               "scopeAliases": {}
@@ -858,38 +860,36 @@
               "type": "Users",
               "scopes": [
                 "impersonate",
-                "map-roles",
-                "manage",
-                "manage-group-membership",
+                "view",
                 "reset-password",
-                "view"
+                "manage-group-membership",
+                "manage",
+                "map-roles"
               ],
               "scopeAliases": {
-                "view": [
-                  "view-members"
-                ],
                 "manage": [
                   "manage-members"
                 ],
-                "impersonate": [
-                  "impersonate-members"
+                "view": [
+                  "view-members"
                 ],
                 "manage-group-membership": [
                   "manage-membership-of-members"
+                ],
+                "impersonate": [
+                  "impersonate-members"
                 ]
               },
               "groupType": "Groups"
             },
-            "Groups": {
-              "type": "Groups",
+            "Clients": {
+              "type": "Clients",
               "scopes": [
-                "manage",
-                "manage-membership-of-members",
-                "manage-members",
-                "impersonate-members",
                 "view",
-                "view-members",
-                "manage-membership"
+                "map-roles-client-scope",
+                "map-roles",
+                "manage",
+                "map-roles-composite"
               ],
               "scopeAliases": {}
             }
@@ -954,6 +954,7 @@
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
         "https://pivox.ngrok.app/launch",
+        "pivox://oidc-callback",
         "http://127.0.0.1/oidc/callback"
       ],
       "webOrigins": [
@@ -1358,6 +1359,23 @@
           }
         },
         {
+          "id": "84ccd4f6-d2d4-4314-935f-970e6a7493f5",
+          "name": "photo url",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "user.attribute": "photoUrl",
+            "id.token.claim": "true",
+            "lightweight.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "photo_url",
+            "jsonType.label": "String"
+          }
+        },
+        {
           "id": "d106ab37-26ef-43c7-b517-b11a73a734ff",
           "name": "full name",
           "protocol": "openid-connect",
@@ -1447,22 +1465,6 @@
             "id.token.claim": "true",
             "access.token.claim": "true",
             "claim.name": "preferred_username",
-            "jsonType.label": "String"
-          }
-        },
-        {
-          "id": "c64993a6-0e7f-4bf8-9e61-db3dd68f89b1",
-          "name": "picture",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-attribute-mapper",
-          "consentRequired": false,
-          "config": {
-            "introspection.token.claim": "true",
-            "userinfo.token.claim": "true",
-            "user.attribute": "picture",
-            "id.token.claim": "true",
-            "access.token.claim": "true",
-            "claim.name": "picture",
             "jsonType.label": "String"
           }
         },
@@ -2333,7 +2335,7 @@
         "subComponents": {},
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"photoUrl\",\"displayName\":\"Photo Url\",\"validations\":{},\"annotations\":{\"inputType\":\"html5-url\"},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"selector\":{\"scopes\":[\"profile\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"photoUrl\",\"displayName\":\"${photoUrl}\",\"validations\":{\"uri\":{\"allowedSchemes\":[\"https\"],\"allowFragment\":\"false\",\"requireValidUrl\":true}},\"annotations\":{\"inputType\":\"html5-url\"},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"selector\":{\"scopes\":[\"profile\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
           ]
         }
       }
