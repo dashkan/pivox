@@ -75,6 +75,45 @@ export function fieldName(name?: string): string {
   return `${isRootAttribute(name) ? "" : "attributes."}${beerify(name ?? "")}`;
 }
 
+export type ServerFieldError = {
+  field: string;
+  errorMessage: string;
+  params?: unknown[];
+};
+
+/**
+ * Ported from account-ui's `setUserProfileServerError`: maps KC's field-level
+ * validation errors (the `errors` array in a 400 body, or a single error) onto
+ * react-hook-form field errors. Each `errorMessage`/`param` that is a
+ * `${bundle.key}` is unwrapped + translated; the `params` array becomes
+ * positional interpolation ({{0}}, {{1}}, …) so e.g. `error-invalid-uri-scheme`
+ * ("'{{0}}' has invalid URL scheme.") resolves against the field label.
+ */
+export function applyServerErrors(
+  responseData: unknown,
+  setError: (field: string, error: { message: string; type: string }) => void,
+  t: TFunction,
+): void {
+  const errors =
+    (responseData as { errors?: ServerFieldError[] }).errors ??
+    [responseData as ServerFieldError];
+  for (const e of errors) {
+    // KC's `params` array becomes positional interpolation values keyed by
+    // index (0, 1, …); ${bundle.key} params are unwrapped + translated.
+    const params: Record<string, unknown> = {};
+    (e.params ?? []).forEach((p, i) => {
+      params[i] = typeof p === "string" && isBundleKey(p) ? t(unWrap(p)) : p;
+    });
+    const key = isBundleKey(e.errorMessage)
+      ? unWrap(e.errorMessage)
+      : e.errorMessage;
+    setError(fieldName(e.field), {
+      message: t(key, { ...params, defaultValue: e.errorMessage || e.field }),
+      type: "server",
+    });
+  }
+}
+
 /**
  * inputType values that map to an `<input>` (the html5-* set) — the rest have
  * dedicated controls. Mirrors upstream's FIELDS keys.

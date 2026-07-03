@@ -7,13 +7,14 @@ import {
 } from "@pivox/primitives/card";
 import { FieldError } from "@pivox/primitives/field";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type Path, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 
-import { getPersonalInfo, savePersonalInfo } from "@/api/account";
+import { getPersonalInfo, RequestError, savePersonalInfo } from "@/api/account";
 import { keycloak } from "@/keycloak";
 import { UserProfileFields } from "@/user-profile/UserProfileFields";
 import {
+  applyServerErrors,
   beerify,
   debeerify,
   type ProfileMetadata,
@@ -68,6 +69,7 @@ export function PersonalInfo() {
   const onSubmit = form.handleSubmit(async (data) => {
     setStatus("saving");
     setError(null);
+    form.clearErrors();
     try {
       // Re-wrap into KC's string[] shape, un-escaping dotted attribute names.
       const raw = data.attributes ?? {};
@@ -94,7 +96,21 @@ export function PersonalInfo() {
       setStatus("saved");
     } catch (err) {
       setStatus("error");
-      setError(String(err));
+      // KC returns field-level validation errors as JSON on 400 — surface them
+      // under each field (like account-ui) instead of a bare status.
+      const data = err instanceof RequestError ? err.responseData : undefined;
+      if (data && typeof data === "object") {
+        applyServerErrors(
+          data,
+          (field, fieldError) => {
+            // fieldName() returns a string; narrow to RHF's field-path type.
+            form.setError(field as Path<UserProfileFormValues>, fieldError);
+          },
+          t,
+        );
+      } else {
+        setError(String(err));
+      }
     }
   });
 

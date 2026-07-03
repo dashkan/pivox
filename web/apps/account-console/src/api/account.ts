@@ -38,6 +38,22 @@ export type SessionRepresentation = {
   clients?: { clientId: string; clientName?: string }[];
 };
 
+/**
+ * Thrown by request() on a non-2xx response, carrying the parsed JSON body.
+ * KC's account API returns field-level validation errors as JSON on 400
+ * (`{ field, errorMessage, params, errors: [...] }`) — callers surface them.
+ */
+export class RequestError extends Error {
+  constructor(
+    public status: number,
+    statusText: string,
+    public responseData: unknown,
+  ) {
+    super(`${status} ${statusText}`);
+    this.name = "RequestError";
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await freshToken();
   const res = await fetch(accountApiBase + path, {
@@ -46,11 +62,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
+      ...(init?.headers as Record<string, string> | undefined),
     },
   });
   if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText}`);
+    const text = await res.text();
+    let responseData: unknown;
+    try {
+      responseData = text ? JSON.parse(text) : undefined;
+    } catch {
+      responseData = text || undefined;
+    }
+    throw new RequestError(res.status, res.statusText, responseData);
   }
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
@@ -60,13 +83,13 @@ export const getPersonalInfo = () =>
   request<UserRepresentation>("/?userProfileMetadata=true");
 
 export const savePersonalInfo = (data: UserRepresentation) =>
-  request<void>("/", { method: "POST", body: JSON.stringify(data) });
+  request<undefined>("/", { method: "POST", body: JSON.stringify(data) });
 
 export const getDevices = () =>
   request<DeviceRepresentation[]>("/sessions/devices");
 
 export const deleteSession = (id?: string) =>
-  request<void>(id ? `/sessions/${id}` : "/sessions", { method: "DELETE" });
+  request<undefined>(id ? `/sessions/${id}` : "/sessions", { method: "DELETE" });
 
 /* ---- Credentials (account security) ---- */
 export type CredentialMetadata = {
@@ -79,7 +102,7 @@ export type CredentialMetadata = {
 };
 export type CredentialContainer = {
   type: string;
-  category: "basic-authentication" | "two-factor" | "passwordless" | string;
+  category: "basic-authentication" | "two-factor" | "passwordless";
   displayName?: string;
   helptext?: string;
   createAction?: string;
@@ -113,7 +136,7 @@ export type Application = {
 export const getApplications = () => request<Application[]>("/applications");
 
 export const deleteConsent = (clientId: string) =>
-  request<void>(`/applications/${encodeURIComponent(clientId)}/consent`, {
+  request<undefined>(`/applications/${encodeURIComponent(clientId)}/consent`, {
     method: "DELETE",
   });
 
@@ -133,7 +156,7 @@ export const getLinkedAccounts = () =>
 // Linking is a kcAction (`keycloak.login({action: "idp_link:<alias>"})`), not a
 // REST call — see linked-accounts.tsx. Only unlink is REST.
 export const unLinkAccount = (providerName: string) =>
-  request<void>(`/linked-accounts/${encodeURIComponent(providerName)}`, {
+  request<undefined>(`/linked-accounts/${encodeURIComponent(providerName)}`, {
     method: "DELETE",
   });
 
