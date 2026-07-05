@@ -26,7 +26,6 @@ import (
 	"github.com/dashkan/pivox/internal/permission"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/testutil"
-	"github.com/dashkan/pivox/internal/testutil/cryptotest"
 )
 
 // Harness is the canonical end-to-end test scaffold. It owns a
@@ -115,12 +114,15 @@ func New(t *testing.T, opts ...Option) *Harness {
 		cfg.auth = testAuthService{}
 	}
 
-	// Tests use a deterministic round-tripping encryptor. KMS would
-	// require live GCP creds per test for no real security signal,
-	// and the recording variant gives every test a stable Encrypt /
-	// Decrypt contract while keeping plaintext distinguishable from
-	// ciphertext (so accidental plaintext storage shows up).
-	enc := cryptotest.New()
+	// Tests use a real Tink local encryptor with a per-harness generated
+	// keyset — the same code path as production's `local` provider. Using
+	// the real primitive (not a fake) means AES-256-GCM + AAD binding is
+	// exercised, so a handler that binds AAD to the wrong resource id is
+	// caught here rather than only in production.
+	ks, err := crypto.GenerateCleartextKeyset()
+	require.NoError(t, err)
+	enc, err := crypto.NewLocalEncryptor(ks)
+	require.NoError(t, err)
 
 	// River client backing the LROManager. Query/insert-only (no
 	// Workers, no Start) — same shape as pivox-cloud's production
