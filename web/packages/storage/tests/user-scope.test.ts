@@ -102,7 +102,7 @@ describe('clearUserScopedItems', () => {
       parse: (v) => v || null,
     });
     set(deviceItem, 'keep');
-    expect(() => clearUserScopedItems()).not.toThrow();
+    expect(() => { clearUserScopedItems(); }).not.toThrow();
     expect(get(deviceItem)).toBe('keep');
   });
 });

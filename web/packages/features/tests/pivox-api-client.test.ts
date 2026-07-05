@@ -54,7 +54,7 @@ describe('createPivoxApiClient', () => {
 
     const client = createPivoxApiClient({
       baseUrl: 'https://api.pivox.test',
-      getAuthToken: async () => 'kc-refreshed',
+      getAuthToken: () => Promise.resolve('kc-refreshed'),
     });
     await client.GET(GET_ORG_PATH, ORG_PATH_PARAMS);
 

@@ -52,6 +52,16 @@ const ignores = {
     // `.shared` infix on vite.config.shared.js too.
     '**/*.config.{js,ts,mjs,cjs}',
     '**/*.config.*.{js,ts,mjs,cjs}',
+    // Build/bootstrap tooling scripts that live outside any package's
+    // tsconfig `include`, same rationale as the config globs above: they
+    // aren't part of the TypeScript project, so the type-aware ruleset has
+    // no types to analyze them against. `vite-externalize-deps.js` is a
+    // vendored Vite plugin, `build.mjs` a Tailwind build driver, and
+    // `instrumentation.node.mjs` the SSR OTel bootstrap loaded via
+    // `node --import` before the app's module graph exists.
+    '**/vite-externalize-deps.js',
+    '**/keycloak-theme/build.mjs',
+    '**/instrumentation.node.mjs',
     // Static-asset JS served verbatim from a `public/` directory.
     // These run in the browser before any module loads (e.g.,
     // electron's pre-React bootstrap), so they're not part of the
@@ -59,6 +69,10 @@ const ignores = {
     // them. Lint-by-eye + the runtime tests we already have are the
     // signal here.
     '**/public/**',
+    // Committed build output: the account-console Vite SPA compiles into
+    // keycloak-theme's `account/resources/app/` (see the root `web:build`
+    // script). It's minified vendored bundle code, not ours to lint.
+    '**/keycloak-theme/**/account/resources/app/**',
   ],
 };
 

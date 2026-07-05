@@ -80,27 +80,35 @@ export function toServerSession(claims: OidcClaims): ServerSession {
  * reports `cookiePresent: true` (the caller redirects to sign-in either way; the
  * distinction is kept for parity with the Firebase gate and future recovery).
  */
+/**
+ * Handler body for `getServerSession`, extracted so it can be unit tested as a
+ * plain `() => Promise<ServerSessionStatus>` — no `createServerFn` runtime to
+ * stand up and nothing to cast out of the wrapped server fn. The server fn
+ * below just wires it to `.handler(...)`.
+ */
+export async function readServerSession(): Promise<ServerSessionStatus> {
+  const accountUrl = accountConsoleUrl();
+  const id = getCookie(SESSION_COOKIE);
+  if (!id)
+    return { user: null, cookiePresent: false, accountConsoleUrl: accountUrl };
+  // The cookie carries an opaque id; resolve it to the token set (lazy-expiry
+  // applied) before we can read any identity from it.
+  const tokens = await getSession(id);
+  if (!tokens)
+    return { user: null, cookiePresent: true, accountConsoleUrl: accountUrl };
+  const idToken = tokens.id_token;
+  if (!idToken)
+    return { user: null, cookiePresent: true, accountConsoleUrl: accountUrl };
+  const claims = decodeIdTokenClaims(idToken);
+  if (!claims?.sub)
+    return { user: null, cookiePresent: true, accountConsoleUrl: accountUrl };
+  return {
+    user: toServerSession(claims),
+    cookiePresent: true,
+    accountConsoleUrl: accountUrl,
+  };
+}
+
 export const getServerSession = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<ServerSessionStatus> => {
-    const accountUrl = accountConsoleUrl();
-    const id = getCookie(SESSION_COOKIE);
-    if (!id)
-      return { user: null, cookiePresent: false, accountConsoleUrl: accountUrl };
-    // The cookie carries an opaque id; resolve it to the token set (lazy-expiry
-    // applied) before we can read any identity from it.
-    const tokens = await getSession(id);
-    if (!tokens)
-      return { user: null, cookiePresent: true, accountConsoleUrl: accountUrl };
-    const idToken = tokens.id_token;
-    if (!idToken)
-      return { user: null, cookiePresent: true, accountConsoleUrl: accountUrl };
-    const claims = decodeIdTokenClaims(idToken);
-    if (!claims?.sub)
-      return { user: null, cookiePresent: true, accountConsoleUrl: accountUrl };
-    return {
-      user: toServerSession(claims),
-      cookiePresent: true,
-      accountConsoleUrl: accountUrl,
-    };
-  },
+  readServerSession,
 );

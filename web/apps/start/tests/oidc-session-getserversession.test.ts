@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// `getServerSession` is a `createServerFn(...).handler(fn)`. We stub
-// `createServerFn` so `.handler(fn)` hands back the raw handler, letting us call
-// the body directly and assert branch behavior. The runtime inputs are the
-// cookie (the opaque session id) and the store lookup that resolves it to the
-// token set — both mocked per-case.
+// `getServerSession` wraps its body in `createServerFn(...).handler(fn)`; that
+// body is exported as the plain `readServerSession()` for testing, so we call it
+// directly and assert branch behavior — no cast out of the wrapped server fn.
+// The runtime inputs are the cookie (the opaque session id) and the store
+// lookup that resolves it to the token set — both mocked per-case. createServerFn
+// is stubbed only to keep the module's server-fn construction inert at import.
 const { getCookieMock } = vi.hoisted(() => ({ getCookieMock: vi.fn() }));
 const { getSessionMock } = vi.hoisted(() => ({ getSessionMock: vi.fn() }));
 
@@ -20,7 +21,7 @@ vi.mock('@/server/oidc/session-store', () => ({
   getSession: getSessionMock,
 }));
 
-import { getServerSession } from '../src/server/oidc-session';
+import { readServerSession } from '../src/server/oidc-session';
 
 /** Build an unsigned-but-well-formed JWT (header.payload.sig). */
 function makeIdToken(claims: Record<string, unknown>): string {
@@ -29,10 +30,7 @@ function makeIdToken(claims: Record<string, unknown>): string {
   return `${seg({ alg: 'RS256', typ: 'JWT' })}.${seg(claims)}.signature`;
 }
 
-// `getServerSession` is the (now async) handler fn once createServerFn is
-// stubbed; call it as a 0-arg function returning the status promise.
-const call = () =>
-  (getServerSession as unknown as () => Promise<import('../src/server/oidc-session').ServerSessionStatus>)();
+const call = () => readServerSession();
 
 const ISSUER = 'https://idp.example/realms/acme';
 

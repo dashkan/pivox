@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// We test the /auth/logout server handler directly. Mock createFileRoute to
-// identity so the imported `Route` IS the config object, then invoke
-// handlers.POST — the same approach used to unit-test a route handler without
-// the router runtime. All side-effecting deps (store, OIDC client, end-session
-// URL builder) are mocked so we can assert the CSRF guard + revocation behavior.
+// We test the /auth/logout POST handler directly — it's exported as a plain
+// `handleLogout(ctx) => Promise<Response>`, so there's no router runtime to
+// stand up and nothing to cast out of the route object. All side-effecting
+// deps (store, OIDC client, end-session URL builder) are mocked so we can
+// assert the CSRF guard + revocation behavior. createFileRoute is stubbed only
+// to keep the module's route construction inert at import time.
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => (opts: unknown) => opts,
 }));
@@ -37,12 +38,7 @@ vi.mock('openid-client', () => ({
 }));
 vi.mock('@pivox/storage', () => ({ ACTIVE_ORG: { name: 'active_org', path: '/' } }));
 
-import { Route } from '../src/routes/auth/logout';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const handler = (Route as any).server.handlers.POST as (ctx: {
-  request: Request;
-}) => Promise<Response>;
+import { handleLogout as handler } from '../src/routes/auth/logout';
 
 function logoutRequest(headers: Record<string, string>): Request {
   return new Request('http://localhost:3000/auth/logout', { method: 'POST', headers });

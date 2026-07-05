@@ -1,6 +1,6 @@
+import * as oidc from 'openid-client';
 import { describe, expect, it } from 'vitest';
 
-import * as oidc from 'openid-client';
 
 import { buildEndSessionUrl } from '@/logout';
 

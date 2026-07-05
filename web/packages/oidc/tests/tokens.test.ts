@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { TokenEndpointResponse } from 'openid-client';
+
 import { EXPIRY_SKEW_MS, isTokenFresh, tokensFromResponse } from '@/tokens';
 
-import type { TokenEndpointResponse } from 'openid-client';
 
 // tokensFromResponse maps an openid-client token response into our JSON-safe
 // stored shape and stamps an absolute expiry from the relative expires_in.
