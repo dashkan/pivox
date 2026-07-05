@@ -1445,3 +1445,44 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('ai.conversations.readAll', 'Read All Conversations', 'Read any user''s conversations in the organization (audit/compliance)'),
   ('ai.conversations.deleteAll', 'Delete All Conversations', 'Delete any user''s conversations in the organization (departed-employee cleanup)'),
   ('ai.chat.stream', 'Stream Chat', 'Use AI chat streaming');
+
+-- ============================================================================
+-- secrets (encrypted credential vault)
+-- ============================================================================
+-- A Secret holds one opaque, write-only value encrypted at rest by the
+-- platform Encryptor and bound (via AAD) to the row id, so a stored
+-- ciphertext cannot be replayed against a different Secret. Org- or
+-- space-scoped: space_id NULL means org-scoped. Hard-deleted (no
+-- soft-delete) — a removed credential should not linger encrypted.
+CREATE TABLE secrets (
+    id               UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    org_id           UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    space_id         UUID REFERENCES spaces(id) ON DELETE CASCADE,
+    -- identity
+    secret_id        TEXT NOT NULL, -- AIP slug, unique per (org_id, space_id)
+    -- domain
+    display_name     TEXT NOT NULL DEFAULT '',
+    value_ciphertext BYTEA NOT NULL, -- encrypted value; AAD-bound to id
+    annotations      JSONB NOT NULL DEFAULT '{}',
+    -- versioning
+    etag             TEXT NOT NULL DEFAULT md5(now()::text),
+    -- audit
+    created_by       UUID,
+    updated_by       UUID,
+    -- timestamps
+    create_time      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Slug unique per parent. NULLS NOT DISTINCT so two org-scoped rows
+    -- (space_id NULL) still collide on a duplicate secret_id.
+    UNIQUE NULLS NOT DISTINCT (org_id, space_id, secret_id)
+);
+CREATE INDEX idx_secrets_org ON secrets (org_id);
+CREATE INDEX idx_secrets_space ON secrets (space_id) WHERE space_id IS NOT NULL;
+
+-- Secret (vault) permissions
+INSERT INTO permissions (permission_id, display_name, description) VALUES
+  ('secrets.create', 'Create Secret', 'Create secrets in the vault'),
+  ('secrets.read', 'Read Secrets', 'View and list secret metadata (never the value)'),
+  ('secrets.update', 'Update Secret', 'Rotate or modify secrets'),
+  ('secrets.delete', 'Delete Secret', 'Delete secrets from the vault');

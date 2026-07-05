@@ -19,6 +19,10 @@ const (
 	TagsRead                       = "tags.read"
 	TagsUpdate                     = "tags.update"
 	TagsDelete                     = "tags.delete"
+	SecretsCreate                  = "secrets.create"
+	SecretsRead                    = "secrets.read"
+	SecretsUpdate                  = "secrets.update"
+	SecretsDelete                  = "secrets.delete"
 	UsersRead                      = "users.read"
 	UsersDelete                    = "users.delete"
 	GroupsCreate                   = "groups.create"
@@ -111,6 +115,10 @@ var All = []string{
 	TagsRead,
 	TagsUpdate,
 	TagsDelete,
+	SecretsCreate,
+	SecretsRead,
+	SecretsUpdate,
+	SecretsDelete,
 	UsersRead,
 	UsersDelete,
 	GroupsCreate,
@@ -258,6 +266,10 @@ var RoleGrants = map[string][]string{
 		RolesManageMembers,
 		RolesRead,
 		RolesUpdate,
+		SecretsCreate,
+		SecretsDelete,
+		SecretsRead,
+		SecretsUpdate,
 		SpacesCreate,
 		SpacesDelete,
 		SpacesRead,
@@ -342,6 +354,10 @@ var RoleGrants = map[string][]string{
 		RolesManageMembers,
 		RolesRead,
 		RolesUpdate,
+		SecretsCreate,
+		SecretsDelete,
+		SecretsRead,
+		SecretsUpdate,
 		SpacesCreate,
 		SpacesDelete,
 		SpacesRead,
@@ -392,6 +408,7 @@ var RoleGrants = map[string][]string{
 		GroupsRead,
 		OrganizationsRead,
 		RolesRead,
+		SecretsRead,
 		SpacesRead,
 		StorageAgentsRead,
 		StorageEndpointsRead,

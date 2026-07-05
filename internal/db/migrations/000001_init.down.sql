@@ -1,6 +1,9 @@
 -- 000001_init.down.sql
 -- Drop all tables in reverse dependency order.
 
+-- Secrets vault
+DROP TABLE IF EXISTS secrets;
+
 -- AI chat
 DROP TABLE IF EXISTS ai_artifact_versions;
 DROP TABLE IF EXISTS ai_artifacts;

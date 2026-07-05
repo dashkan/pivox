@@ -66,6 +66,22 @@ permissions:
     display_name: Delete Tag
     description: Delete tag keys, values, or bindings
     roles: [owner, admin]
+  - id: secrets.create
+    display_name: Create Secret
+    description: Create secrets in the vault
+    roles: [owner, admin]
+  - id: secrets.read
+    display_name: Read Secrets
+    description: View and list secret metadata (never the value); editors need this to reference secrets from connectors
+    roles: [owner, admin, editor]
+  - id: secrets.update
+    display_name: Update Secret
+    description: Rotate or modify secrets
+    roles: [owner, admin]
+  - id: secrets.delete
+    display_name: Delete Secret
+    description: Delete secrets from the vault
+    roles: [owner, admin]
   - id: users.read
     display_name: Read Users
     description: View and list users

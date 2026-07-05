@@ -160,6 +160,9 @@ type Querier interface {
 	// always pass an explicit id so the caller can FK to it without a
 	// read-back round-trip.
 	CreateRole(ctx context.Context, arg CreateRoleParams) error
+	// id is app-generated (uuid.New) so the caller has it for AAD binding
+	// before the value is encrypted.
+	CreateSecret(ctx context.Context, arg CreateSecretParams) (Secret, error)
 	CreateSpace(ctx context.Context, arg CreateSpaceParams) (Space, error)
 	CreateSpaceGroupMember(ctx context.Context, arg CreateSpaceGroupMemberParams) (CreateSpaceGroupMemberRow, error)
 	CreateSpaceUserMember(ctx context.Context, arg CreateSpaceUserMemberParams) (CreateSpaceUserMemberRow, error)
@@ -215,6 +218,7 @@ type Querier interface {
 	// (0 rows) to gRPC NotFound rather than treating it as success.
 	DeleteOrgUserMember(ctx context.Context, arg DeleteOrgUserMemberParams) (int64, error)
 	DeleteRequest(ctx context.Context, id uuid.UUID) error
+	DeleteSecret(ctx context.Context, id uuid.UUID) error
 	DeleteSpaceGroupMember(ctx context.Context, arg DeleteSpaceGroupMemberParams) (int64, error)
 	// DeleteSpaceMembersForIdentity is the cross-org space-scope
 	// analogue used by DeleteAccount.
@@ -297,7 +301,7 @@ type Querier interface {
 	// `*All`-permission access on top of this. Used by the read/update/
 	// delete handlers as the row-fetch step; they then compare
 	// `created_by` against the path's user-uuid AND the caller's
-	// `pivox_user_id` claim before returning.
+	// identity id (`sub`) before returning.
 	GetConversationByName(ctx context.Context, arg GetConversationByNameParams) (AiConversation, error)
 	// Returns the live (non-soft-deleted) dashboard with the given slug
 	// in the given space. Used by GetDashboard, UpdateDashboard's
@@ -380,6 +384,13 @@ type Querier interface {
 	// post-Approve state.
 	GetRequestByNameForUpdate(ctx context.Context, arg GetRequestByNameForUpdateParams) (AssetRequest, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
+	GetSecret(ctx context.Context, id uuid.UUID) (Secret, error)
+	// Resolves a Secret from its parent + slug. space_id IS NOT DISTINCT FROM
+	// treats NULL (org-scoped) as a matchable value.
+	GetSecretByParent(ctx context.Context, arg GetSecretByParentParams) (Secret, error)
+	// GetSecretForUpdate locks the row for the update/delete tx so the etag
+	// check and the write serialize against a concurrent rotate.
+	GetSecretForUpdate(ctx context.Context, id uuid.UUID) (Secret, error)
 	GetSpace(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceByName(ctx context.Context, arg GetSpaceByNameParams) (Space, error)
 	// GetSpaceByNameForGate looks up a space by (org, slug) regardless of
@@ -583,8 +594,8 @@ type Querier interface {
 	// Phase 7 unified per-org identity with `identities`. The per-org
 	// `users` join table was dropped; queries that used to resolve
 	// "users.id from (org, identity)" now reference `identities.id`
-	// directly. The handler reads it from the `pivox_user_id` ID-token
-	// claim — no DB lookup required.
+	// directly. The handler reads it from the token `sub` — no DB
+	// lookup required.
 	//
 	// Post-principal-split (Phase 3 of the identities rework): the
 	// polymorphic `principal_kind/principal_id` pair on org_members /
@@ -821,6 +832,9 @@ type Querier interface {
 	// ErrNoRows to FailedPrecondition (or NotFound after a re-read to
 	// disambiguate row-missing vs state-mismatch).
 	UpdateRequestStateIfFrom(ctx context.Context, arg UpdateRequestStateIfFromParams) (AssetRequest, error)
+	// Masked update: a nil arg leaves the column unchanged. value_ciphertext is
+	// only passed when `value` is in the field mask (a non-empty new value).
+	UpdateSecret(ctx context.Context, arg UpdateSecretParams) (Secret, error)
 	UpdateSpace(ctx context.Context, arg UpdateSpaceParams) (Space, error)
 	UpdateSpaceGroupMemberRole(ctx context.Context, arg UpdateSpaceGroupMemberRoleParams) (UpdateSpaceGroupMemberRoleRow, error)
 	UpdateSpaceUserMemberRole(ctx context.Context, arg UpdateSpaceUserMemberRoleParams) (UpdateSpaceUserMemberRoleRow, error)

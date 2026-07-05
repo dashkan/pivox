@@ -1082,6 +1082,21 @@ type RolePermission struct {
 	PermissionID uuid.UUID `json:"permission_id"`
 }
 
+type Secret struct {
+	ID              uuid.UUID       `json:"id"`
+	OrgID           uuid.UUID       `json:"org_id"`
+	SpaceID         pgtype.UUID     `json:"space_id"`
+	SecretID        string          `json:"secret_id"`
+	DisplayName     string          `json:"display_name"`
+	ValueCiphertext []byte          `json:"value_ciphertext"`
+	Annotations     json.RawMessage `json:"annotations"`
+	Etag            string          `json:"etag"`
+	CreatedBy       pgtype.UUID     `json:"created_by"`
+	UpdatedBy       pgtype.UUID     `json:"updated_by"`
+	CreateTime      time.Time       `json:"create_time"`
+	UpdateTime      time.Time       `json:"update_time"`
+}
+
 type Space struct {
 	ID          uuid.UUID          `json:"id"`
 	OrgID       uuid.UUID          `json:"org_id"`

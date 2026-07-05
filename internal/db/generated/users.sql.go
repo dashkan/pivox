@@ -294,8 +294,8 @@ SELECT DISTINCT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.
 // Phase 7 unified per-org identity with `identities`. The per-org
 // `users` join table was dropped; queries that used to resolve
 // "users.id from (org, identity)" now reference `identities.id`
-// directly. The handler reads it from the `pivox_user_id` ID-token
-// claim — no DB lookup required.
+// directly. The handler reads it from the token `sub` — no DB
+// lookup required.
 //
 // Post-principal-split (Phase 3 of the identities rework): the
 // polymorphic `principal_kind/principal_id` pair on org_members /

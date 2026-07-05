@@ -19,6 +19,7 @@ tags:
   - name: Assets
   - name: Requests
   - name: Iam
+  - name: Secrets
   - name: Agents
   - name: Endpoints
   - name: StorageGateways
@@ -1952,6 +1953,252 @@ paths:
           type: string
       tags:
         - Iam
+  /v1/organizations/{organization}/secrets:
+    get:
+      summary: Lists Secrets under a parent. The value is never included.
+      operationId: Secrets_ListSecrets
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1ListSecretsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: pageSize
+          description: |-
+            Optional. Maximum number of Secrets to return. Server caps at 1000;
+            defaults to 100 when unspecified.
+          in: query
+          required: false
+          type: integer
+          format: int32
+        - name: pageToken
+          description: Optional. A pagination token from a previous ListSecrets call.
+          in: query
+          required: false
+          type: string
+        - name: filter
+          description: |-
+            Optional. An AIP-160 filter expression. Filterable fields:
+
+            + `displayName`
+
+            For more information, see [AIP-160](https://aip.dev/160).
+          in: query
+          required: false
+          type: string
+        - name: orderBy
+          description: |-
+            Optional. A comma-separated list of fields to order by (append " desc"
+            for descending). Supported: `displayName`, `createTime`. Defaults to
+            `displayName` ascending.
+          in: query
+          required: false
+          type: string
+      tags:
+        - Secrets
+    post:
+      summary: Creates a new Secret. The value is required and is encrypted at rest.
+      operationId: Secrets_CreateSecret
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1Secret'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: secret
+          description: |-
+            Required. The Secret to create. Its `value` is required here and is
+            encrypted at rest.
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1Secret'
+        - name: secretId
+          description: Required. The user-assigned id for the Secret, unique within the parent.
+          in: query
+          required: true
+          type: string
+        - name: validateOnly
+          description: Optional. If true, validate the request but do not create the Secret.
+          in: query
+          required: false
+          type: boolean
+      tags:
+        - Secrets
+  /v1/organizations/{organization}/secrets/{secret}:
+    get:
+      summary: Retrieves a Secret's metadata. The value is never included.
+      operationId: Secrets_GetSecret
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1Secret'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: secret
+          in: path
+          required: true
+          type: string
+      tags:
+        - Secrets
+    delete:
+      summary: |-
+        Deletes a Secret. Returns FAILED_PRECONDITION if any connector still
+        references it — remove the references first. There is no cascade.
+      operationId: Secrets_DeleteSecret
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+            properties: {}
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: secret
+          in: path
+          required: true
+          type: string
+        - name: validateOnly
+          description: Optional. If true, validate the request but do not delete the Secret.
+          in: query
+          required: false
+          type: boolean
+        - name: etag
+          description: Optional. The etag the client expects; used for optimistic concurrency.
+          in: query
+          required: false
+          type: string
+      tags:
+        - Secrets
+    patch:
+      summary: |-
+        Updates a Secret. Rotate the value by naming it in the update mask with
+        a new non-empty value; omit it from the mask to change only metadata.
+      operationId: Secrets_UpdateSecret
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1Secret'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: secret
+          in: path
+          required: true
+          type: string
+        - name: secret
+          description: |-
+            Required. The new state of the Secret. To rotate the value, name `value`
+            in the update mask with a new non-empty value; an empty value in scope
+            is rejected. To change only metadata, omit `value` from the mask and the
+            stored value is untouched. If `etag` is set it must match the stored
+            etag or `ABORTED` is returned.
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+              displayName:
+                type: string
+                description: Optional. Human-readable name. Must not exceed 256 characters.
+              value:
+                type: string
+                format: byte
+                description: |-
+                  Input only. The opaque secret value, encrypted at rest and NEVER
+                  returned in any response. Required (non-empty) on create. On update it
+                  is written only when `value` is named in the update mask, and must be
+                  non-empty then — an empty value in scope is rejected (INVALID_ARGUMENT).
+                  A Secret always holds a value: rotate by sending a new one, and remove
+                  by deleting the Secret; there is no empty/unset state. Store multi-field
+                  credentials (e.g. AWS access+secret keys) as a JSON blob the consuming
+                  connector parses — the vault treats the value as opaque.
+              createdBy:
+                $ref: '#/definitions/typesActor'
+                description: Output only. The identity that created this secret.
+                readOnly: true
+              createTime:
+                type: string
+                format: date-time
+                description: Output only. Creation time.
+                readOnly: true
+              updatedBy:
+                $ref: '#/definitions/typesActor'
+                description: Output only. The identity that last rotated or modified this secret.
+                readOnly: true
+              updateTime:
+                type: string
+                format: date-time
+                description: Output only. Last update (or rotation) time.
+                readOnly: true
+              etag:
+                type: string
+                description: |-
+                  Optional. Entity tag for optimistic concurrency. Always set in server
+                  responses; pass it back on update/delete to guard against a lost write.
+              annotations:
+                type: object
+                additionalProperties:
+                  type: string
+                description: Optional. Labels for organizing and filtering secrets.
+            description: |-
+              Required. The new state of the Secret. To rotate the value, name `value`
+              in the update mask with a new non-empty value; an empty value in scope
+              is rejected. To change only metadata, omit `value` from the mask and the
+              stored value is untouched. If `etag` is set it must match the stored
+              etag or `ABORTED` is returned.
+        - name: allowMissing
+          description: |-
+            Optional. If true and the Secret does not exist, create it (update_mask
+            is then ignored).
+          in: query
+          required: false
+          type: boolean
+        - name: validateOnly
+          description: Optional. If true, validate the request but do not update the Secret.
+          in: query
+          required: false
+          type: boolean
+      tags:
+        - Secrets
   /v1/organizations/{organization}/spaces:
     get:
       summary: |-
@@ -4700,6 +4947,272 @@ paths:
             $ref: '#/definitions/RequestsSubmitRequestBody'
       tags:
         - Requests
+  /v1/organizations/{organization}/spaces/{space}/secrets:
+    get:
+      summary: Lists Secrets under a parent. The value is never included.
+      operationId: Secrets_ListSecrets2
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1ListSecretsResponse'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: space
+          in: path
+          required: true
+          type: string
+        - name: pageSize
+          description: |-
+            Optional. Maximum number of Secrets to return. Server caps at 1000;
+            defaults to 100 when unspecified.
+          in: query
+          required: false
+          type: integer
+          format: int32
+        - name: pageToken
+          description: Optional. A pagination token from a previous ListSecrets call.
+          in: query
+          required: false
+          type: string
+        - name: filter
+          description: |-
+            Optional. An AIP-160 filter expression. Filterable fields:
+
+            + `displayName`
+
+            For more information, see [AIP-160](https://aip.dev/160).
+          in: query
+          required: false
+          type: string
+        - name: orderBy
+          description: |-
+            Optional. A comma-separated list of fields to order by (append " desc"
+            for descending). Supported: `displayName`, `createTime`. Defaults to
+            `displayName` ascending.
+          in: query
+          required: false
+          type: string
+      tags:
+        - Secrets
+    post:
+      summary: Creates a new Secret. The value is required and is encrypted at rest.
+      operationId: Secrets_CreateSecret2
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1Secret'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: space
+          in: path
+          required: true
+          type: string
+        - name: secret
+          description: |-
+            Required. The Secret to create. Its `value` is required here and is
+            encrypted at rest.
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/v1Secret'
+        - name: secretId
+          description: Required. The user-assigned id for the Secret, unique within the parent.
+          in: query
+          required: true
+          type: string
+        - name: validateOnly
+          description: Optional. If true, validate the request but do not create the Secret.
+          in: query
+          required: false
+          type: boolean
+      tags:
+        - Secrets
+  /v1/organizations/{organization}/spaces/{space}/secrets/{secret}:
+    get:
+      summary: Retrieves a Secret's metadata. The value is never included.
+      operationId: Secrets_GetSecret2
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1Secret'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: space
+          in: path
+          required: true
+          type: string
+        - name: secret
+          in: path
+          required: true
+          type: string
+      tags:
+        - Secrets
+    delete:
+      summary: |-
+        Deletes a Secret. Returns FAILED_PRECONDITION if any connector still
+        references it — remove the references first. There is no cascade.
+      operationId: Secrets_DeleteSecret2
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+            properties: {}
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: space
+          in: path
+          required: true
+          type: string
+        - name: secret
+          in: path
+          required: true
+          type: string
+        - name: validateOnly
+          description: Optional. If true, validate the request but do not delete the Secret.
+          in: query
+          required: false
+          type: boolean
+        - name: etag
+          description: Optional. The etag the client expects; used for optimistic concurrency.
+          in: query
+          required: false
+          type: string
+      tags:
+        - Secrets
+    patch:
+      summary: |-
+        Updates a Secret. Rotate the value by naming it in the update mask with
+        a new non-empty value; omit it from the mask to change only metadata.
+      operationId: Secrets_UpdateSecret2
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/v1Secret'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/rpcStatus'
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          type: string
+        - name: space
+          in: path
+          required: true
+          type: string
+        - name: secret
+          in: path
+          required: true
+          type: string
+        - name: secret
+          description: |-
+            Required. The new state of the Secret. To rotate the value, name `value`
+            in the update mask with a new non-empty value; an empty value in scope
+            is rejected. To change only metadata, omit `value` from the mask and the
+            stored value is untouched. If `etag` is set it must match the stored
+            etag or `ABORTED` is returned.
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+              displayName:
+                type: string
+                description: Optional. Human-readable name. Must not exceed 256 characters.
+              value:
+                type: string
+                format: byte
+                description: |-
+                  Input only. The opaque secret value, encrypted at rest and NEVER
+                  returned in any response. Required (non-empty) on create. On update it
+                  is written only when `value` is named in the update mask, and must be
+                  non-empty then — an empty value in scope is rejected (INVALID_ARGUMENT).
+                  A Secret always holds a value: rotate by sending a new one, and remove
+                  by deleting the Secret; there is no empty/unset state. Store multi-field
+                  credentials (e.g. AWS access+secret keys) as a JSON blob the consuming
+                  connector parses — the vault treats the value as opaque.
+              createdBy:
+                $ref: '#/definitions/typesActor'
+                description: Output only. The identity that created this secret.
+                readOnly: true
+              createTime:
+                type: string
+                format: date-time
+                description: Output only. Creation time.
+                readOnly: true
+              updatedBy:
+                $ref: '#/definitions/typesActor'
+                description: Output only. The identity that last rotated or modified this secret.
+                readOnly: true
+              updateTime:
+                type: string
+                format: date-time
+                description: Output only. Last update (or rotation) time.
+                readOnly: true
+              etag:
+                type: string
+                description: |-
+                  Optional. Entity tag for optimistic concurrency. Always set in server
+                  responses; pass it back on update/delete to guard against a lost write.
+              annotations:
+                type: object
+                additionalProperties:
+                  type: string
+                description: Optional. Labels for organizing and filtering secrets.
+            description: |-
+              Required. The new state of the Secret. To rotate the value, name `value`
+              in the update mask with a new non-empty value; an empty value in scope
+              is rejected. To change only metadata, omit `value` from the mask and the
+              stored value is untouched. If `etag` is set it must match the stored
+              etag or `ABORTED` is returned.
+        - name: allowMissing
+          description: |-
+            Optional. If true and the Secret does not exist, create it (update_mask
+            is then ignored).
+          in: query
+          required: false
+          type: boolean
+        - name: validateOnly
+          description: Optional. If true, validate the request but do not update the Secret.
+          in: query
+          required: false
+          type: boolean
+      tags:
+        - Secrets
   /v1/organizations/{organization}/spaces/{space}/tagBindings:
     get:
       summary: |-
@@ -11825,6 +12338,19 @@ definitions:
         type: string
         description: Token for the next page of results.
     description: Response message for `Iam.ListRoles`.
+  v1ListSecretsResponse:
+    type: object
+    properties:
+      secrets:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1Secret'
+        description: The Secrets under the requested parent (values omitted).
+      nextPageToken:
+        type: string
+        description: A pagination token for the next page, empty if there are no more.
+    description: The response message for ListSecrets.
   v1ListSpacesResponse:
     type: object
     properties:
@@ -12862,6 +13388,59 @@ definitions:
       - idpEntityId
       - ssoUrl
       - x509Certificates
+  v1Secret:
+    type: object
+    properties:
+      name:
+        type: string
+        description: |-
+          Immutable. The resource name for a Secret, in the format
+          `organizations/{organization}/secrets/{secret}` or
+          `organizations/{organization}/spaces/{space}/secrets/{secret}`.
+      displayName:
+        type: string
+        description: Optional. Human-readable name. Must not exceed 256 characters.
+      value:
+        type: string
+        format: byte
+        description: |-
+          Input only. The opaque secret value, encrypted at rest and NEVER
+          returned in any response. Required (non-empty) on create. On update it
+          is written only when `value` is named in the update mask, and must be
+          non-empty then — an empty value in scope is rejected (INVALID_ARGUMENT).
+          A Secret always holds a value: rotate by sending a new one, and remove
+          by deleting the Secret; there is no empty/unset state. Store multi-field
+          credentials (e.g. AWS access+secret keys) as a JSON blob the consuming
+          connector parses — the vault treats the value as opaque.
+      createdBy:
+        $ref: '#/definitions/typesActor'
+        description: Output only. The identity that created this secret.
+        readOnly: true
+      createTime:
+        type: string
+        format: date-time
+        description: Output only. Creation time.
+        readOnly: true
+      updatedBy:
+        $ref: '#/definitions/typesActor'
+        description: Output only. The identity that last rotated or modified this secret.
+        readOnly: true
+      updateTime:
+        type: string
+        format: date-time
+        description: Output only. Last update (or rotation) time.
+        readOnly: true
+      etag:
+        type: string
+        description: |-
+          Optional. Entity tag for optimistic concurrency. Always set in server
+          responses; pass it back on update/delete to guard against a lost write.
+      annotations:
+        type: object
+        additionalProperties:
+          type: string
+        description: Optional. Labels for organizing and filtering secrets.
+    description: A Secret is one encrypted, write-only credential in the vault.
   v1SectionHeader:
     type: object
     properties:
