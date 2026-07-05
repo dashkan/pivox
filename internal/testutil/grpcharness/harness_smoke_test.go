@@ -43,7 +43,6 @@ func TestHarness_Smoke(t *testing.T) {
 			Queries:    h.Queries,
 			Codec:      codec,
 			LROManager: h.LROManager,
-			Encryptor:  h.Encryptor,
 		}))
 	}))
 

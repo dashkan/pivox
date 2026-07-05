@@ -95,6 +95,9 @@ func main() {
 	f.String("storage-session-cookie-domain", envOrDefault("PIVOX_STORAGE_SESSION_COOKIE_DOMAIN", ""), "Domain attribute for the storage-session Set-Cookie header (e.g. \".pivox.app\"). Empty omits Domain= so the cookie scopes to the response origin only — right default for self-hosted; SaaS deployments configure per-tenant subdomain.")
 	f.String("ollama-url", envOrDefault("PIVOX_OLLAMA_URL", "http://localhost:11434"), "Ollama API base URL")
 	f.String("ollama-model", envOrDefault("PIVOX_OLLAMA_MODEL", "qwen3-vl"), "Ollama model to use for AI chat")
+	f.String("encryption-provider", envOrDefault("PIVOX_ENCRYPTION_PROVIDER", "local"), "At-rest encryption backend: local (cleartext Tink keyset) or gcp (Cloud KMS)")
+	f.String("encryption-local-keyset", envOrDefault("PIVOX_ENCRYPTION_LOCAL_KEYSET", ""), "base64 cleartext Tink keyset; required when encryption-provider=local")
+	f.String("encryption-gcp-kms-key-name", envOrDefault("PIVOX_ENCRYPTION_GCP_KMS_KEY_NAME", ""), "Cloud KMS key resource name; required when encryption-provider=gcp")
 
 	// OIDC resource-server verification (Keycloak). The backend validates Bearer
 	// access tokens against the issuer's JWKS; client_id/secret live in the BFF,
@@ -155,6 +158,11 @@ func serve(cmd *cobra.Command, args []string) error {
 			DisableAudienceValidation: disableOIDCAud,
 			JWKSRefreshInterval:       jwksRefreshInterval,
 		},
+		Encryption: config.EncryptionConfig{
+			Provider:      must(f.GetString("encryption-provider")),
+			LocalKeyset:   must(f.GetString("encryption-local-keyset")),
+			GCPKMSKeyName: must(f.GetString("encryption-gcp-kms-key-name")),
+		},
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -189,7 +197,11 @@ func serve(cmd *cobra.Command, args []string) error {
 	queries := db.New(pool)
 
 	// Shared services
-	enc, err := crypto.NewEncryptor()
+	enc, err := crypto.NewEncryptor(crypto.EncryptorConfig{
+		Provider:       crypto.Provider(cfg.Encryption.Provider),
+		LocalKeysetB64: cfg.Encryption.LocalKeyset,
+		GCPKMSKeyName:  cfg.Encryption.GCPKMSKeyName,
+	})
 	if err != nil {
 		return fmt.Errorf("initialize encryptor: %w", err)
 	}
@@ -371,7 +383,6 @@ func serve(cmd *cobra.Command, args []string) error {
 		Resolver:      permResolver,
 		AuditResolver: auditResolver,
 		LROManager:    lroManager,
-		Encryptor:     enc,
 	}))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(tags.TagKeysConfig{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,

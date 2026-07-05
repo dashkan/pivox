@@ -5,7 +5,6 @@ go 1.26.0
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260415201107-50325440f8f2.1
 	buf.build/go/protovalidate v1.2.0
-	cloud.google.com/go/kms v1.31.0
 	cloud.google.com/go/longrunning v1.1.0
 	github.com/MicahParks/jwkset v0.11.0
 	github.com/MicahParks/keyfunc/v3 v3.8.0
@@ -28,6 +27,8 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+	github.com/tink-crypto/tink-go-gcpkms/v2 v2.3.0
+	github.com/tink-crypto/tink-go/v2 v2.7.0
 	github.com/twmb/franz-go v1.21.5
 	go.einride.tech/aip v0.86.3
 	go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
@@ -60,6 +61,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.11.0 // indirect
+	cloud.google.com/go/kms v1.31.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

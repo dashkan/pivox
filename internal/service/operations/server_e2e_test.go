@@ -41,7 +41,6 @@ func newOperationsHarness(t *testing.T) *grpcharness.Harness {
 				Codec:      codec,
 				Resolver:   permResolver,
 				LROManager: h.LROManager,
-				Encryptor:  h.Encryptor,
 			}))
 			longrunningpb.RegisterOperationsServer(s, operations.NewOperationsServer(operations.Config{
 				LRO:      h.LROManager,

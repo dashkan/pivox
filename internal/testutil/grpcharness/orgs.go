@@ -52,7 +52,6 @@ func registerOrganizationsServer(h *Harness, s *grpc.Server) {
 		Codec:      codec,
 		Resolver:   permission.NewResolver(h.Queries),
 		LROManager: h.LROManager,
-		Encryptor:  h.Encryptor,
 	}))
 }
 

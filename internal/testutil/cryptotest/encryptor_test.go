@@ -14,10 +14,10 @@ func TestEncryptor_RoundTrip(t *testing.T) {
 	e := New()
 	plaintext := []byte("sensitive registration token")
 
-	ciphertext, err := e.Encrypt(plaintext)
+	ciphertext, err := e.Encrypt(plaintext, nil)
 	require.NoError(t, err)
 
-	got, err := e.Decrypt(ciphertext)
+	got, err := e.Decrypt(ciphertext, nil)
 	require.NoError(t, err)
 	assert.Equal(t, plaintext, got)
 }
@@ -26,7 +26,7 @@ func TestEncryptor_PlaintextDistinguishableFromCiphertext(t *testing.T) {
 	e := New()
 	plaintext := []byte("hello")
 
-	ciphertext, err := e.Encrypt(plaintext)
+	ciphertext, err := e.Encrypt(plaintext, nil)
 	require.NoError(t, err)
 	assert.NotEqual(t, plaintext, ciphertext, "ciphertext must differ from plaintext so accidental plaintext storage is detectable")
 }
@@ -35,7 +35,7 @@ func TestEncryptor_DecryptRejectsRawPlaintext(t *testing.T) {
 	e := New()
 
 	// Pretend a handler stored plaintext where ciphertext belongs.
-	_, err := e.Decrypt([]byte("not-encrypted"))
+	_, err := e.Decrypt([]byte("not-encrypted"), nil)
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, ErrNotEncrypted))
 }
@@ -43,9 +43,9 @@ func TestEncryptor_DecryptRejectsRawPlaintext(t *testing.T) {
 func TestEncryptor_RecordsCalls(t *testing.T) {
 	e := New()
 
-	_, err := e.Encrypt([]byte("first"))
+	_, err := e.Encrypt([]byte("first"), nil)
 	require.NoError(t, err)
-	_, err = e.Encrypt([]byte("second"))
+	_, err = e.Encrypt([]byte("second"), nil)
 	require.NoError(t, err)
 
 	require.Len(t, e.EncryptedPlaintexts, 2)
@@ -58,7 +58,7 @@ func TestEncryptor_RecordedCopiesAreIndependent(t *testing.T) {
 	// the recorded plaintext — the buffer is copied on entry.
 	e := New()
 	buf := []byte("mutable")
-	_, err := e.Encrypt(buf)
+	_, err := e.Encrypt(buf, nil)
 	require.NoError(t, err)
 
 	buf[0] = 'X'
@@ -70,14 +70,14 @@ func TestEncryptor_DecryptedSliceIsIndependent(t *testing.T) {
 	// Mutating the decrypted slice must not corrupt the ciphertext
 	// the caller still holds.
 	e := New()
-	ciphertext, err := e.Encrypt([]byte("hello"))
+	ciphertext, err := e.Encrypt([]byte("hello"), nil)
 	require.NoError(t, err)
 
-	got, err := e.Decrypt(ciphertext)
+	got, err := e.Decrypt(ciphertext, nil)
 	require.NoError(t, err)
 	got[0] = 'X'
 
-	again, err := e.Decrypt(ciphertext)
+	again, err := e.Decrypt(ciphertext, nil)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("hello"), again, "ciphertext re-decryption must be unaffected by caller mutation")
 }
@@ -97,7 +97,7 @@ func TestEncryptor_ConcurrentEncrypts(t *testing.T) {
 			defer wg.Done()
 			payload := bytes.Repeat([]byte{byte(id)}, perGoroutine)
 			for range perGoroutine {
-				if _, err := e.Encrypt(payload); err != nil {
+				if _, err := e.Encrypt(payload, nil); err != nil {
 					t.Errorf("goroutine %d: %v", id, err)
 					return
 				}

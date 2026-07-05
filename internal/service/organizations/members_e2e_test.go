@@ -377,7 +377,6 @@ func newMembersHarness(t *testing.T) *grpcharness.Harness {
 			Codec:      codec,
 			Resolver:   permResolver,
 			LROManager: h.LROManager,
-			Encryptor:  h.Encryptor,
 		}))
 		apiv1.RegisterSpacesServer(s, spaces.NewSpacesServer(spaces.Config{
 			Pool:       h.Pool,

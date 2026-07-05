@@ -289,7 +289,6 @@ func newDomainsHarness(t *testing.T) *grpcharness.Harness {
 			Queries:    h.Queries,
 			Codec:      codec,
 			LROManager: h.LROManager,
-			Encryptor:  h.Encryptor,
 		}))
 	}))
 }

@@ -50,7 +50,12 @@ func New() *Encryptor { return &Encryptor{} }
 
 // Encrypt records a copy of plaintext and returns ciphertext that
 // will round-trip back through Decrypt.
-func (e *Encryptor) Encrypt(plaintext []byte) ([]byte, error) {
+// aad is ignored by this test double — AAD binding semantics (decrypt
+// fails on mismatch) are covered against the real crypto encryptors
+// (NewLocalEncryptor / NewGCPKMSEncryptor), not here. This type only needs
+// to round-trip and keep plaintext distinguishable from ciphertext for
+// handler tests.
+func (e *Encryptor) Encrypt(plaintext, _ []byte) ([]byte, error) {
 	e.mu.Lock()
 	e.EncryptedPlaintexts = append(e.EncryptedPlaintexts, append([]byte(nil), plaintext...))
 	e.mu.Unlock()
@@ -64,7 +69,7 @@ func (e *Encryptor) Encrypt(plaintext []byte) ([]byte, error) {
 // Decrypt strips the envelope prefix. Returns ErrNotEncrypted if
 // the input lacks the prefix — a deliberate signal that the caller
 // stored plaintext where ciphertext belongs.
-func (e *Encryptor) Decrypt(ciphertext []byte) ([]byte, error) {
+func (e *Encryptor) Decrypt(ciphertext, _ []byte) ([]byte, error) {
 	if !bytes.HasPrefix(ciphertext, envelopePrefix) {
 		return nil, ErrNotEncrypted
 	}

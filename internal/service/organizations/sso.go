@@ -48,23 +48,18 @@ func (s *OrganizationsServer) GetSsoConfig(ctx context.Context, req *apiv1.GetSs
 //
 //  1. Validate the request shape (org slug match, exactly one of
 //     OIDC/SAML set, OIDC required fields populated).
-//  2. KMS-envelope-encrypt the client_secret if the request set
-//     one. Empty string means "leave the existing secret alone";
-//     the SQL upsert preserves it via COALESCE.
-//  3. Look up the existing row to keep a stable provider id
+//  2. Look up the existing row to keep a stable provider id
 //     ("oidc.<org-slug>") across the row's lifetime.
-//  4. Upsert the local row (provider_id + display_name + enabled +
-//     oidc_config JSONB + ciphertext).
+//  3. Upsert the local row (provider_id + display_name + enabled +
+//     oidc_config / saml_config JSONB).
 //
-// Keycloak does SSO natively now (the realm owns the upstream OIDC/SAML
-// provider), so this handler no longer provisions an upstream provider —
-// it only persists the Pivox-side SsoConfig row.
+// The client_secret is NOT persisted here — Keycloak owns the upstream
+// provider (including its secret) now, so this handler only stores the
+// Pivox-side SsoConfig metadata. (SSO config is moving to a Keycloak
+// Admin API facade; see the org/SSO refactor.)
 //
 // Permission: organizations.ssoConfig.update (interceptor-gated).
 func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.UpdateSsoConfigRequest) (*apiv1.SsoConfig, error) {
-	if s.encryptor == nil {
-		return nil, apierr.Internal("UpdateSsoConfig is not configured on this server (encryptor dep missing)")
-	}
 	resolved := server.MustResolvedOrgFromContext(ctx)
 	cfg := req.GetSsoConfig()
 	if cfg == nil {
@@ -119,18 +114,8 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 			slog.ErrorContext(ctx, "update sso config: marshal oidc config failed", "error", err)
 			return nil, apierr.Internal("marshal oidc config")
 		}
-		var ciphertext []byte
-		if newSecret := oidc.GetClientSecret(); newSecret != "" {
-			ct, err := s.encryptor.Encrypt([]byte(newSecret))
-			if err != nil {
-				slog.ErrorContext(ctx, "update sso config: encrypt client secret failed", "error", err)
-				return nil, apierr.Internal("encrypt client secret")
-			}
-			ciphertext = ct
-		}
 		upsert.FirebaseProviderID = providerID("oidc.", resolved.Slug, existing, creating)
 		upsert.OidcConfig = oidcJSON
-		upsert.ClientSecretCiphertext = ciphertext
 	default: // saml != nil
 		samlJSON, err := convert.SamlConfigRowFromProto(saml)
 		if err != nil {

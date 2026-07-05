@@ -13,7 +13,6 @@ import (
 	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
-	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
@@ -39,10 +38,6 @@ type OrganizationsServer struct {
 	// DeleteOrganization and UndeleteOrganization. Optional in
 	// tests that don't exercise lifecycle paths.
 	lroManager *lro.Manager
-	// encryptor wraps Cloud KMS for column-level encryption of
-	// SsoConfig.client_secret. Optional in tests that don't
-	// exercise the SSO path.
-	encryptor crypto.Encryptor
 }
 
 // Config is the constructor input for OrganizationsServer.
@@ -65,10 +60,6 @@ type Config struct {
 	// DeleteOrganization / UndeleteOrganization. Optional in
 	// tests that don't exercise lifecycle paths.
 	LROManager *lro.Manager
-	// Encryptor wraps Cloud KMS for column-level encryption of
-	// SsoConfig.client_secret. Optional in tests that don't
-	// exercise the SSO path.
-	Encryptor crypto.Encryptor
 }
 
 // NewOrganizationsServer constructs the server from cfg. Panics on a
@@ -92,7 +83,6 @@ func NewOrganizationsServer(cfg Config) *OrganizationsServer {
 		resolver:   cfg.Resolver,
 		audit:      cfg.AuditResolver,
 		lroManager: cfg.LROManager,
-		encryptor:  cfg.Encryptor,
 	}
 }
 

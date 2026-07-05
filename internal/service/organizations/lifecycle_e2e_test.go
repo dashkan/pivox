@@ -455,7 +455,6 @@ func newLifecycleHarness(t *testing.T) *grpcharness.Harness {
 			Codec:      codec,
 			Resolver:   permResolver,
 			LROManager: h.LROManager,
-			Encryptor:  h.Encryptor,
 		}))
 	}))
 	startOrgLifecycleWorkers(t, h)

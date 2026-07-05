@@ -127,52 +127,6 @@ func TestE2E_SsoConfig_OmitsPlaintextSecret(t *testing.T) {
 		"Get response must omit the plaintext client_secret")
 }
 
-// TestE2E_SsoConfig_PersistsClientSecret pins that the secret
-// reaches the bytea column at all (UpdateSsoConfig actually
-// persists it, doesn't drop it on the floor). It does NOT verify
-// at-rest encryption against real KMS — tests run through
-// cryptotest.Encryptor, not the production GoogleCloudKMSEncryptor.
-func TestE2E_SsoConfig_PersistsClientSecret(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
-	}
-
-	h := newLifecycleHarness(t)
-	client := apiv1.NewOrganizationsClient(h.Conn())
-	ctx := context.Background()
-
-	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "sso-enc-owner"})
-	h.SetCaller(owner)
-	createOrg(t, client, "sso-encrypt", "SSO Encrypt")
-
-	_, err := client.UpdateSsoConfig(ctx, &apiv1.UpdateSsoConfigRequest{
-		SsoConfig: &apiv1.SsoConfig{
-			Name:        "organizations/sso-encrypt/ssoConfig",
-			DisplayName: "Persist Test",
-			Enabled:     true,
-			Config: &apiv1.SsoConfig_Oidc{
-				Oidc: &apiv1.OidcConfig{
-					Issuer:       "https://idp.example.com",
-					ClientId:     "client-enc",
-					ClientSecret: "the-secret-value",
-					ResponseType: &apiv1.OidcConfig_ResponseType{Code: true},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	var ciphertext []byte
-	err = h.Pool.QueryRow(ctx, `
-		SELECT client_secret_ciphertext
-		  FROM sso_configs sc
-		  JOIN organizations o ON o.id = sc.org_id
-		 WHERE o.name = $1`, "sso-encrypt").Scan(&ciphertext)
-	require.NoError(t, err)
-	assert.NotEmpty(t, ciphertext,
-		"client_secret_ciphertext must be populated after UpdateSsoConfig")
-}
-
 // TestE2E_SsoConfig_RejectsInvalidConfig is the validation matrix.
 // Each case fresh-creates an org and submits an UpdateSsoConfig
 // request that should be rejected. The cases probe distinct

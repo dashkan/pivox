@@ -25,6 +25,23 @@ type Config struct {
 	// abuse defenses live in single-use codes, TTLs, response-shape
 	// uniformity, and the auth chain.
 	OIDC OIDCConfig
+
+	// Encryption selects the at-rest encryption backend (KEK source).
+	Encryption EncryptionConfig
+}
+
+// EncryptionConfig selects the at-rest encryption backend. All backends
+// are Tink-backed; only the key-encryption key differs.
+type EncryptionConfig struct {
+	// Provider is "local" (cleartext Tink keyset) or "gcp" (Cloud KMS).
+	// Defaults to "local".
+	Provider string
+	// LocalKeyset is the base64-encoded cleartext Tink keyset used when
+	// Provider is "local". It IS the master key — treat as a secret.
+	LocalKeyset string
+	// GCPKMSKeyName is the Cloud KMS key resource name used when Provider
+	// is "gcp".
+	GCPKMSKeyName string
 }
 
 // OIDCConfig configures the backend's OIDC access-token verifier (Keycloak).
