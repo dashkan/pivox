@@ -149,4 +149,28 @@ func TestHandler(t *testing.T) {
 	t.Run("unparseable bytes are dropped without error", func(t *testing.T) {
 		assert.NoError(t, h.Handle(ctx, []byte("{not json")))
 	})
+
+	t.Run("REGISTER for an email already owned by another sub skips without wedging", func(t *testing.T) {
+		// The email is already provisioned under one sub...
+		existing := uuid.New()
+		_, err := queries.UpsertIdentity(ctx, db.UpsertIdentityParams{ID: existing, Email: "dup@acme.com"})
+		require.NoError(t, err)
+
+		// ...and a *different* sub (a duplicate KC user for the same person —
+		// e.g. a Firebase-era local user alongside a brokered login) registers
+		// the same email. This is permanently undeliverable: the email unique
+		// index will always reject it. Handle MUST skip it (return nil to
+		// advance the offset), not wedge the partition by returning the error.
+		other := uuid.New()
+		raw := []byte(`{"type":"REGISTER","realmName":"pivox","userId":"` + other.String() +
+			`","details":{"email":"dup@acme.com","name":"Dup User"}}`)
+		require.NoError(t, h.Handle(ctx, raw))
+
+		// The colliding sub is not provisioned; the original keeps the email.
+		_, err = queries.GetIdentityByID(ctx, other)
+		assert.ErrorIs(t, err, pgx.ErrNoRows)
+		got, err := queries.GetIdentityByEmail(ctx, "dup@acme.com")
+		require.NoError(t, err)
+		assert.Equal(t, existing, got.ID, "original identity retains the email")
+	})
 }

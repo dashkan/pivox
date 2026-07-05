@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
@@ -134,9 +135,31 @@ func (h *Handler) upsert(ctx context.Context, ev event) error {
 		// upsert leaves any existing display_name untouched.
 		DisplayName: ev.Details["name"],
 	}); err != nil {
+		if isEmailAlreadyOwned(err) {
+			// Permanently undeliverable: the email already belongs to a
+			// different sub — a duplicate Keycloak user for the same person
+			// (e.g. a Firebase-era local user alongside a brokered login).
+			// Retrying can't resolve it (the unique index will always
+			// reject), so skip-and-log rather than wedge the partition. The
+			// duplicate is reconciled at the Keycloak level, not here.
+			h.logger.WarnContext(ctx, "identitysync: email already owned by another sub; skipping",
+				"type", ev.Type, "user_id", ev.UserID, "email", ev.Details["email"])
+			return nil
+		}
 		return err
 	}
 	return nil
+}
+
+// isEmailAlreadyOwned reports whether err is the identities email-unique
+// violation — the incoming sub's email already belongs to another identity.
+// That's a permanent condition (a duplicate KC user), not a transient DB
+// error, so the handler skips the record rather than retrying it forever.
+func isEmailAlreadyOwned(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) &&
+		pgErr.Code == "23505" && // unique_violation
+		pgErr.ConstraintName == "idx_identities_email_unique"
 }
 
 func (h *Handler) softDelete(ctx context.Context, ev event) error {
