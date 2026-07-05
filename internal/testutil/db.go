@@ -15,10 +15,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dashkan/pivox/internal/riverpromigrate"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
-	"github.com/riverqueue/river/rivermigrate"
+	"riverqueue.com/riverpro/driver/riverpropgxv5"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
@@ -380,16 +380,10 @@ func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 // jobs) have river_job/river_queue/river_leader tables ready in
 // every cloned database.
 func runRiverMigrations(ctx context.Context, pool *pgxpool.Pool) error {
-	driver := riverpgxv5.New(pool)
-	migrator, err := rivermigrate.New(driver, &rivermigrate.Config{
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Schema: "river",
-	})
-	if err != nil {
-		return fmt.Errorf("river migrator: %w", err)
-	}
-	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
-		return fmt.Errorf("river migrate up: %w", err)
+	driver := riverpropgxv5.New(pool)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if err := riverpromigrate.Up(ctx, driver, "river", logger); err != nil {
+		return fmt.Errorf("river migrate: %w", err)
 	}
 	return nil
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/riverqueue/river"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
+	"riverqueue.com/riverpro"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -39,7 +40,7 @@ type Manager struct {
 	// queries directly. They're kept optional so callers that don't
 	// touch NewLro (some tests) don't need to wire either field.
 	pool  *pgxpool.Pool
-	river *river.Client[pgx.Tx]
+	river *riverpro.Client[pgx.Tx]
 
 	mu        sync.Mutex
 	listeners map[uuid.UUID][]chan struct{}
@@ -79,7 +80,7 @@ type ManagerConfig struct {
 	// required for NewLro. Production constructs a query/insert-only
 	// client (no Workers, no Start) — work execution lives in
 	// pivox-worker, not pivox-cloud.
-	River *river.Client[pgx.Tx]
+	River *riverpro.Client[pgx.Tx]
 }
 
 // NewManager constructs a Manager from cfg. Panics on a missing

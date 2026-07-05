@@ -7,8 +7,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/stretchr/testify/require"
+	"riverqueue.com/riverpro"
+	"riverqueue.com/riverpro/driver/riverpropgxv5"
 )
 
 // StartRiverWorkers boots an in-process River client wired to the
@@ -28,15 +29,17 @@ import (
 // observe completion only after their context times out, then
 // fall through to a final GetOperation read. Tests should size
 // their WaitOperation context with that fall-through cost in mind.
-func (h *Harness) StartRiverWorkers(t *testing.T, add func(rw *river.Workers)) *river.Client[pgx.Tx] {
+func (h *Harness) StartRiverWorkers(t *testing.T, add func(rw *river.Workers)) *riverpro.Client[pgx.Tx] {
 	t.Helper()
 	rw := river.NewWorkers()
 	add(rw)
-	c, err := river.NewClient(riverpgxv5.New(h.Pool), &river.Config{
-		Logger:  SilentLogger(),
-		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 2}},
-		Schema:  "river",
-		Workers: rw,
+	c, err := riverpro.NewClient(riverpropgxv5.New(h.Pool), &riverpro.Config{
+		Config: river.Config{
+			Logger:  SilentLogger(),
+			Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 2}},
+			Schema:  "river",
+			Workers: rw,
+		},
 	})
 	require.NoError(t, err)
 	require.NoError(t, c.Start(context.Background()))

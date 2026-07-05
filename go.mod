@@ -48,6 +48,8 @@ require (
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.53.0
+	riverqueue.com/riverpro v0.25.1
+	riverqueue.com/riverpro/driver/riverpropgxv5 v0.25.1
 	riverqueue.com/riverui v0.16.0
 )
 
@@ -145,4 +147,5 @@ require (
 	modernc.org/libc v1.73.5 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
+	riverqueue.com/riverpro/driver v0.25.1 // indirect
 )

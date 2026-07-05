@@ -17,7 +17,6 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	sloghttp "github.com/samber/slog-http"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -26,6 +25,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/test/bufconn"
+	"riverqueue.com/riverpro"
+	"riverqueue.com/riverpro/driver/riverpropgxv5"
 	"riverqueue.com/riverui"
 
 	"github.com/dashkan/pivox/internal/agentstream"
@@ -212,15 +213,17 @@ func serve(cmd *cobra.Command, args []string) error {
 	// Constructed without Workers + without Start so it's a
 	// query/insert-only handle. Migrations are owned by pivox-worker;
 	// pivox-cloud assumes the river schema exists.
-	riverDriver := riverpgxv5.New(pool)
-	riverClient, err := river.NewClient(riverDriver, &river.Config{
-		Logger: logger,
-		Schema: "river",
-		// otelriver emits river.insert_many spans + metrics; rivertrace
-		// (outer) injects the enqueuing request's trace context into job
-		// metadata so the worker's river.work joins this trace. The ordering
-		// is load-bearing, so the slice is built in one place.
-		Middleware: rivertrace.Middlewares(),
+	riverDriver := riverpropgxv5.New(pool)
+	riverClient, err := riverpro.NewClient(riverDriver, &riverpro.Config{
+		Config: river.Config{
+			Logger: logger,
+			Schema: "river",
+			// otelriver emits river.insert_many spans + metrics; rivertrace
+			// (outer) injects the enqueuing request's trace context into job
+			// metadata so the worker's river.work joins this trace. The ordering
+			// is load-bearing, so the slice is built in one place.
+			Middleware: rivertrace.Middlewares(),
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("river client: %w", err)
@@ -616,7 +619,10 @@ func serve(cmd *cobra.Command, args []string) error {
 	// auth via env-var creds is the recommended next step; see
 	// CLAUDE.md "Pre-prod freedom"). Leaving /river open on a
 	// public origin leaks job names, args, and error details.
-	riverUIEndpoints := riverui.NewEndpoints(riverClient, nil)
+	// riverui takes the embedded OSS *river.Client; the Pro client is a
+	// superset that embeds it. The dashboard shows the standard job/queue
+	// views (Pro workflow views are not wired through this handler).
+	riverUIEndpoints := riverui.NewEndpoints(riverClient.Client, nil)
 	riverUIHandler, err := riverui.NewHandler(&riverui.HandlerOpts{
 		Endpoints: riverUIEndpoints,
 		Logger:    logger,

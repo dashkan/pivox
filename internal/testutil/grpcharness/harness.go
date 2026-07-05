@@ -11,12 +11,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/test/bufconn"
+	"riverqueue.com/riverpro"
+	"riverqueue.com/riverpro/driver/riverpropgxv5"
 
 	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/crypto"
@@ -50,7 +51,7 @@ type Harness struct {
 	// Exposed for tests that want to invoke River workers directly
 	// via rivertest.NewWorker, or assert against river_job state
 	// via rivertest.RequireInsertedTx.
-	River *river.Client[pgx.Tx]
+	River *riverpro.Client[pgx.Tx]
 
 	// Auth is the authn.Service the test gRPC server's
 	// AuthInterceptor calls into. Tests that need to assert specific
@@ -125,10 +126,12 @@ func New(t *testing.T, opts ...Option) *Harness {
 	// Workers, no Start) — same shape as pivox-cloud's production
 	// client. Tests that want to actually run workers do so via
 	// rivertest.NewWorker, not through this client.
-	riverDriver := riverpgxv5.New(pool)
-	riverClient, err := river.NewClient(riverDriver, &river.Config{
-		Logger: SilentLogger(),
-		Schema: "river",
+	riverDriver := riverpropgxv5.New(pool)
+	riverClient, err := riverpro.NewClient(riverDriver, &riverpro.Config{
+		Config: river.Config{
+			Logger: SilentLogger(),
+			Schema: "river",
+		},
 	})
 	require.NoError(t, err)
 

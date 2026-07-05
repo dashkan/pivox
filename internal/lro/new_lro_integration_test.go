@@ -6,12 +6,13 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/dashkan/pivox/internal/riverpromigrate"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
-	"github.com/riverqueue/river/rivermigrate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
+	"riverqueue.com/riverpro"
+	"riverqueue.com/riverpro/driver/riverpropgxv5"
 
 	"github.com/dashkan/pivox/internal/testutil"
 )
@@ -38,21 +39,17 @@ func TestNewLro_AtomicallyInsertsOperationAndJob(t *testing.T) {
 	// runs our migrations; ensure the river schema + tables exist
 	// for this test by running rivermigrate the same way pivox-worker
 	// would on boot.
-	driver := riverpgxv5.New(pool)
+	driver := riverpropgxv5.New(pool)
 	_, err := pool.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS river")
 	require.NoError(t, err)
-	migrator, err := rivermigrate.New(driver, &rivermigrate.Config{
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Schema: "river",
-	})
-	require.NoError(t, err)
-	_, err = migrator.Migrate(ctx, rivermigrate.DirectionUp, nil)
-	require.NoError(t, err)
+	require.NoError(t, riverpromigrate.Up(ctx, driver, "river", slog.New(slog.NewTextHandler(io.Discard, nil))))
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	riverClient, err := river.NewClient(driver, &river.Config{
-		Logger: logger,
-		Schema: "river",
+	riverClient, err := riverpro.NewClient(driver, &riverpro.Config{
+		Config: river.Config{
+			Logger: logger,
+			Schema: "river",
+		},
 	})
 	require.NoError(t, err)
 
@@ -108,20 +105,16 @@ func TestNewLro_RollsBackOnTxFailure(t *testing.T) {
 	pool, queries := testutil.SetupTestDB(t)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	driver := riverpgxv5.New(pool)
+	driver := riverpropgxv5.New(pool)
 	_, err := pool.Exec(context.Background(), "CREATE SCHEMA IF NOT EXISTS river")
 	require.NoError(t, err)
-	migrator, err := rivermigrate.New(driver, &rivermigrate.Config{
-		Logger: logger,
-		Schema: "river",
-	})
-	require.NoError(t, err)
-	_, err = migrator.Migrate(context.Background(), rivermigrate.DirectionUp, nil)
-	require.NoError(t, err)
+	require.NoError(t, riverpromigrate.Up(context.Background(), driver, "river", logger))
 
-	riverClient, err := river.NewClient(driver, &river.Config{
-		Logger: logger,
-		Schema: "river",
+	riverClient, err := riverpro.NewClient(driver, &riverpro.Config{
+		Config: river.Config{
+			Logger: logger,
+			Schema: "river",
+		},
 	})
 	require.NoError(t, err)
 

@@ -21,11 +21,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dashkan/pivox/internal/riverpromigrate"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
-	"github.com/riverqueue/river/rivermigrate"
 	"github.com/spf13/cobra"
+	"riverqueue.com/riverpro"
+	"riverqueue.com/riverpro/driver/riverpropgxv5"
 
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/identitysync"
@@ -136,21 +137,14 @@ func serve(cmd *cobra.Command, _ []string) error {
 	defer sessionsPool.Close()
 	logger.Info("connected to sessions database")
 
-	driver := riverpgxv5.New(pool)
+	driver := riverpropgxv5.New(pool)
 
 	// Run River's own migrations into `river` schema. Idempotent —
 	// only un-applied versions are executed. This is how River's
 	// schema (river_job, river_queue, river_leader, ...) gets created
 	// on a fresh DB and how it stays current after a binary upgrade.
-	migrator, err := rivermigrate.New(driver, &rivermigrate.Config{
-		Logger: logger,
-		Schema: riverSchema,
-	})
-	if err != nil {
-		return fmt.Errorf("river migrator: %w", err)
-	}
-	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
-		return fmt.Errorf("river migrate up: %w", err)
+	if err := riverpromigrate.Up(ctx, driver, riverSchema, logger); err != nil {
+		return fmt.Errorf("river migrate: %w", err)
 	}
 
 	queries := db.New(pool)
@@ -225,19 +219,21 @@ func serve(cmd *cobra.Command, _ []string) error {
 		),
 	}
 
-	client, err := river.NewClient(driver, &river.Config{
-		Logger: logger,
-		Queues: map[string]river.QueueConfig{
-			river.QueueDefault: {MaxWorkers: 10},
+	client, err := riverpro.NewClient(driver, &riverpro.Config{
+		Config: river.Config{
+			Logger: logger,
+			Queues: map[string]river.QueueConfig{
+				river.QueueDefault: {MaxWorkers: 10},
+			},
+			Schema:       riverSchema,
+			Workers:      riverWorkers,
+			PeriodicJobs: periodic,
+			// rivertrace (outer) restores the enqueuing request's trace context
+			// from job metadata; otelriver then opens river.work as a child of
+			// it — so api insert and worker execution share one distributed trace.
+			// The ordering is load-bearing, so the slice is built in one place.
+			Middleware: rivertrace.Middlewares(),
 		},
-		Schema:       riverSchema,
-		Workers:      riverWorkers,
-		PeriodicJobs: periodic,
-		// rivertrace (outer) restores the enqueuing request's trace context
-		// from job metadata; otelriver then opens river.work as a child of
-		// it — so api insert and worker execution share one distributed trace.
-		// The ordering is load-bearing, so the slice is built in one place.
-		Middleware: rivertrace.Middlewares(),
 	})
 	if err != nil {
 		return fmt.Errorf("river client: %w", err)
