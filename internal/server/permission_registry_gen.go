@@ -10,6 +10,7 @@ import (
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	iamv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	secretsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 )
 
@@ -730,6 +731,36 @@ var GeneratedRegistry = Registry{
 		Permission: permission.GroupsUpdate,
 		Extract: func(req any) (ScopeRef, error) {
 			return ScopeFromPath("group.name", req.(*iamv1.UpdateGroupRequest).GetGroup().GetName())
+		},
+	},
+	"/pivox.secrets.v1.Secrets/CreateSecret": {
+		Permission: permission.SecretsCreate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*secretsv1.CreateSecretRequest).GetParent())
+		},
+	},
+	"/pivox.secrets.v1.Secrets/DeleteSecret": {
+		Permission: permission.SecretsDelete,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*secretsv1.DeleteSecretRequest).GetName())
+		},
+	},
+	"/pivox.secrets.v1.Secrets/GetSecret": {
+		Permission: permission.SecretsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*secretsv1.GetSecretRequest).GetName())
+		},
+	},
+	"/pivox.secrets.v1.Secrets/ListSecrets": {
+		Permission: permission.SecretsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*secretsv1.ListSecretsRequest).GetParent())
+		},
+	},
+	"/pivox.secrets.v1.Secrets/UpdateSecret": {
+		Permission: permission.SecretsUpdate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("secret.name", req.(*secretsv1.UpdateSecretRequest).GetSecret().GetName())
 		},
 	},
 	"/pivox.storage.v1.Agents/DrainAgent": {

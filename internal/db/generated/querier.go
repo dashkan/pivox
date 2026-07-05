@@ -635,6 +635,9 @@ type Querier interface {
 	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
 	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
+	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+	// (AIP-160 filter / order_by are not yet wired — ordered by id.)
+	ListSecretsByParent(ctx context.Context, arg ListSecretsByParentParams) ([]Secret, error)
 	// ListSoleOwnerOrgsForIdentity returns active orgs where the given
 	// identity is the ONLY owner. Used by DeleteAccount's VALIDATING
 	// phase to refuse deletion when the caller would leave any org

@@ -45,6 +45,7 @@ import (
 	"github.com/dashkan/pivox/internal/service/iam"
 	"github.com/dashkan/pivox/internal/service/operations"
 	"github.com/dashkan/pivox/internal/service/organizations"
+	"github.com/dashkan/pivox/internal/service/secrets"
 	"github.com/dashkan/pivox/internal/service/spaces"
 	"github.com/dashkan/pivox/internal/service/storage"
 	"github.com/dashkan/pivox/internal/service/tags"
@@ -62,6 +63,7 @@ import (
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	iamv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	secretsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 )
 
@@ -393,6 +395,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(tags.TagBindingsConfig{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
+	secretsv1.RegisterSecretsServer(grpcServer, secrets.NewSecretsServer(secrets.Config{
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver, Encryptor: enc,
+	}))
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(apikeys.Config{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
@@ -579,6 +584,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		apiv1.RegisterTagBindingsHandlerFromEndpoint,
 		apiv1.RegisterApiKeysHandlerFromEndpoint,
 		apiv1.RegisterDashboardsHandlerFromEndpoint,
+		secretsv1.RegisterSecretsHandlerFromEndpoint,
 		iamv1.RegisterIamHandlerFromEndpoint,
 		storagev1.RegisterStorageGatewaysHandlerFromEndpoint,
 		storagev1.RegisterAgentsHandlerFromEndpoint,

@@ -11,6 +11,7 @@ import (
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	iamv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	secretsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 )
 
@@ -35,6 +36,7 @@ var gatedServiceDescs = []*grpc.ServiceDesc{
 	&storagev1.Agents_ServiceDesc,
 	&storagev1.Endpoints_ServiceDesc,
 	&aiv1.AiChat_ServiceDesc,
+	&secretsv1.Secrets_ServiceDesc,
 }
 
 // TestGeneratedRegistry_CoversEveryGatedRPC is the build-time
