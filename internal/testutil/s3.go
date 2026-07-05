@@ -20,8 +20,12 @@ import (
 
 const (
 	composeS3Endpoint = "localhost:59000"
-	composeS3User     = "testaccess"
-	composeS3Password = "testsecret"
+
+	// S3TestAccessKey and S3TestSecretKey are the docker-compose rustfs
+	// root credentials (docker-compose.test.yml). Exported so storage
+	// backend integration tests can construct their own S3 clients.
+	S3TestAccessKey = "testaccess"
+	S3TestSecretKey = "testsecret"
 
 	// s3MaxBucketName is the S3 ceiling for a bucket label.
 	s3MaxBucketName = 63
@@ -78,7 +82,7 @@ func teardownBucket(c *minio.Client, name string) {
 // is up before tests run; this is purely a client construction.
 func initSharedS3Client() {
 	c, err := minio.New(composeS3Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(composeS3User, composeS3Password, ""),
+		Creds:  credentials.NewStaticV4(S3TestAccessKey, S3TestSecretKey, ""),
 		Secure: false,
 	})
 	if err != nil {
