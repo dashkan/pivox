@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Pivox API Reference</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app"></div>
+
+    <!-- Scalar API Reference, loaded from the jsDelivr CDN (needs internet at
+         page load). Served verbatim by envoy via direct_response — see the
+         /api-docs routes in configs/envoy.yaml. -->
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+
+    <!-- Spec is served same-origin by the same envoy listener, so no proxyUrl
+         is needed. The generated OpenAPI v3 doc lives next to this file at
+         api/openapi/v3/pivox.yaml and is exposed at /api-docs/pivox.yaml. -->
+    <script>
+      Scalar.createApiReference('#app', {
+        url: '/api-docs/pivox.yaml',
+      })
+    </script>
+  </body>
+</html>

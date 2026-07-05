@@ -460,6 +460,13 @@ const envoy = await builder
   .withBindMount("../configs/pivox.pb", "/etc/envoy/pivox.pb", {
     isReadOnly: true,
   })
+  // Scalar API reference: envoy serves the OpenAPI v3 spec + the Scalar HTML
+  // page inline (direct_response) at /api-docs. In the container those file
+  // bodies are read from absolute /etc/envoy/openapi/* paths — see the
+  // /api-docs routes in configs/envoy.aspire.yaml.
+  .withBindMount("../api/openapi/v3", "/etc/envoy/openapi", {
+    isReadOnly: true,
+  })
   .withArgs(["-c", "/etc/envoy/envoy.yaml"])
   .withHttpEndpoint({ name: "ingress", port: 8081, targetPort: 8081 })
   // Start after the collector so otel-collector:4317 resolves on first export.

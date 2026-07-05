@@ -22,6 +22,12 @@
 #      strips the `# BEGIN/END envoy-otel-tracing` block unless
 #      ASPIRE_OTEL_ENVOY_ENABLED is set, and mounts .data/envoy.effective.yaml.
 #      Keep those markers intact around the `tracing:` block.
+#   6. API-reference (Scalar) direct_response routes: the /api-docs routes carry
+#      file paths in `body.filename`. envoy.yaml uses paths relative to the repo
+#      root (its CWD); the sed below does NOT rewrite them, so in the container
+#      they must be ABSOLUTE under the /etc/envoy/openapi bind-mount (added in
+#      apphost.mts from ../api/openapi/v3). Re-apply the absolute paths by hand
+#      after regenerating.
 # Regenerate after editing envoy.yaml:
 #   sed -E -e '/port_value: 9901/!s/address: 127\.0\.0\.1/address: host.docker.internal/g' \
 #          -e 's/      type: STATIC/      type: STRICT_DNS\n      dns_lookup_family: V4_ONLY/' \
@@ -176,6 +182,11 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
                 route_config:
                   name: ingress_routes
+                  # Raise the direct_response body cap from the 4096-byte default
+                  # so the /api-docs routes can serve the OpenAPI spec inline
+                  # (~540KB and growing) + the Scalar page. RouteConfiguration
+                  # field — sibling of virtual_hosts, not a per-host setting.
+                  max_direct_response_body_size_bytes: 4194304
                   # FIRST-MATCH-WINS: specific prefixes/regexes precede general.
                   virtual_hosts:
                     - name: ingress
@@ -217,6 +228,28 @@ static_resources:
                           route: { cluster: debug }
                         - match: { prefix: "/readyz" }
                           route: { cluster: debug }
+
+                        # --- API reference (Scalar) — served inline by envoy -
+                        # ASPIRE-ONLY PATHS (diverge from envoy.yaml): envoy runs
+                        # as a CONTAINER here, so the relative api/openapi/v3/...
+                        # filenames don't resolve — they must be absolute, under
+                        # the /etc/envoy/openapi bind-mount (apphost.mts). The sed
+                        # regen does NOT rewrite direct_response filenames, so
+                        # re-apply these two absolute paths after regenerating.
+                        # The exact /api-docs/pivox.yaml match MUST precede the
+                        # /api-docs prefix, else the prefix swallows the spec.
+                        - match: { path: "/api-docs/pivox.yaml" }
+                          direct_response:
+                            status: 200
+                            body: { filename: "/etc/envoy/openapi/pivox.yaml" }
+                          response_headers_to_add:
+                            - header: { key: content-type, value: "application/yaml" }
+                        - match: { prefix: "/api-docs" }
+                          direct_response:
+                            status: 200
+                            body: { filename: "/etc/envoy/openapi/index.html" }
+                          response_headers_to_add:
+                            - header: { key: content-type, value: "text/html; charset=utf-8" }
 
                         # --- Keycloak (dev IDP) -> 8082 ----------------------
                         # ASPIRE-ONLY ROUTING (diverges from envoy.yaml): the

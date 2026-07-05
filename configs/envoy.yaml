@@ -125,6 +125,11 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
                 route_config:
                   name: ingress_routes
+                  # Raise the direct_response body cap from the 4096-byte default
+                  # so the /api-docs routes can serve the OpenAPI spec inline
+                  # (~540KB and growing) + the Scalar page. RouteConfiguration
+                  # field — sibling of virtual_hosts, not a per-host setting.
+                  max_direct_response_body_size_bytes: 4194304
                   # FIRST-MATCH-WINS: specific prefixes/regexes precede general.
                   virtual_hosts:
                     - name: ingress
@@ -166,6 +171,28 @@ static_resources:
                           route: { cluster: debug }
                         - match: { prefix: "/readyz" }
                           route: { cluster: debug }
+
+                        # --- API reference (Scalar) — served inline by envoy -
+                        # Envoy answers these two directly (no upstream) via
+                        # direct_response with a file body. The spec is the
+                        # generated OpenAPI v3 doc; the page is the Scalar
+                        # standalone HTML next to it. Paths are relative to the
+                        # envoy CWD (repo root) — same convention as the
+                        # proto_descriptor above. The exact /api-docs/pivox.yaml
+                        # match MUST precede the /api-docs prefix, else the
+                        # prefix swallows the spec request.
+                        - match: { path: "/api-docs/pivox.yaml" }
+                          direct_response:
+                            status: 200
+                            body: { filename: "api/openapi/v3/pivox.yaml" }
+                          response_headers_to_add:
+                            - header: { key: content-type, value: "application/yaml" }
+                        - match: { prefix: "/api-docs" }
+                          direct_response:
+                            status: 200
+                            body: { filename: "api/openapi/v3/index.html" }
+                          response_headers_to_add:
+                            - header: { key: content-type, value: "text/html; charset=utf-8" }
 
                         # --- Keycloak (dev IDP) -> 8082 ----------------------
                         # Keycloak serves at ROOT (no /keycloak base path). The
