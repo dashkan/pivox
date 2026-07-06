@@ -286,20 +286,24 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 
 	if isPlaceholder {
-		// Single-statement INSERT — autocommit handles atomicity, no
-		// tx needed. Caller controls subsequent state transitions
+		// Single-statement INSERT wrapped so validate_only can roll it
+		// back: the INSERT still runs against real constraints, so a
+		// would-fail request returns the same error a live one would while
+		// persisting nothing. Caller controls subsequent state transitions
 		// once the upload pipeline lands.
-		result, err := s.queries.CreateAsset(ctx, db.CreateAssetParams{
-			ID:          uuid.New(),
-			SpaceID:     spaceID,
-			EndpointID:  endpointID,
-			Name:        assetName,
-			DisplayName: asset.GetDisplayName(),
-			ImportPath:  "",
-			Filename:    req.GetFilename(),
-			State:       state,
-			Annotations: annotationsJSON,
-			CreatedBy:   pgtype.UUID{},
+		result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Asset, error) {
+			return qtx.CreateAsset(ctx, db.CreateAssetParams{
+				ID:          uuid.New(),
+				SpaceID:     spaceID,
+				EndpointID:  endpointID,
+				Name:        assetName,
+				DisplayName: asset.GetDisplayName(),
+				ImportPath:  "",
+				Filename:    req.GetFilename(),
+				State:       state,
+				Annotations: annotationsJSON,
+				CreatedBy:   pgtype.UUID{},
+			})
 		})
 		if err != nil {
 			return nil, apierr.HandleResourceError(err, "Asset", "")
@@ -320,8 +324,9 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 	// UPDATE would leave a row stuck in PROCESSING state with the
 	// caller already returned an error and unable to find the asset
 	// it just created (no name was returned). The tx makes both
-	// writes land or neither.
-	result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.Asset, error) {
+	// writes land or neither. validate_only runs both writes and rolls
+	// them back, persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Asset, error) {
 		row, err := qtx.CreateAsset(ctx, db.CreateAssetParams{
 			ID:          uuid.New(),
 			SpaceID:     spaceID,
@@ -398,7 +403,12 @@ func (s *AssetsServer) UpdateAsset(ctx context.Context, req *assetsv1.UpdateAsse
 		updateParams.DisplayName = pgtype.Text{String: asset.GetDisplayName(), Valid: true}
 	}
 
-	result, err := s.queries.UpdateAsset(ctx, updateParams)
+	// validate_only runs the UPDATE against real constraints and rolls it
+	// back, so a would-fail request returns the same error a live one would
+	// while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Asset, error) {
+		return qtx.UpdateAsset(ctx, updateParams)
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", asset.GetName())
 	}
@@ -428,9 +438,14 @@ func (s *AssetsServer) DeleteAsset(ctx context.Context, req *assetsv1.DeleteAsse
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())
 	}
 
-	err = s.queries.SoftDeleteAsset(ctx, db.SoftDeleteAssetParams{
-		ID:        existing.ID,
-		DeletedBy: pgtype.UUID{},
+	// validate_only runs the soft-delete against real state and rolls it
+	// back, so a would-fail request returns the same error a live one would
+	// while persisting nothing.
+	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
+		return qtx.SoftDeleteAsset(ctx, db.SoftDeleteAssetParams{
+			ID:        existing.ID,
+			DeletedBy: pgtype.UUID{},
+		})
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())

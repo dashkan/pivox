@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	"github.com/dashkan/pivox/internal/service/assets"
@@ -175,6 +177,41 @@ func TestIntegration_Assets_ListAssets(t *testing.T) {
 		assert.Len(t, resp.GetAssets(), 1)
 		assert.NotEmpty(t, resp.GetNextPageToken())
 	})
+}
+
+// TestIntegration_Assets_ValidateOnly pins the AIP validate_only contract
+// for CreateAsset: a dry-run returns the would-be resource (with a name)
+// but persists nothing, so fetching that name afterward is NotFound.
+func TestIntegration_Assets_ValidateOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h, parent := newAssetsHarness(t, "acme-vo", "proj-vo")
+	client := assetsv1.NewAssetsClient(h.Conn())
+	ctx := context.Background()
+
+	op, err := client.CreateAsset(ctx, &assetsv1.CreateAssetRequest{
+		Parent:       parent,
+		Asset:        &assetsv1.Asset{DisplayName: "Dry"},
+		ValidateOnly: true,
+	})
+	require.NoError(t, err)
+	require.True(t, op.GetDone())
+
+	var asset assetsv1.Asset
+	require.NoError(t, op.GetResponse().UnmarshalTo(&asset))
+	require.NotEmpty(t, asset.GetName())
+
+	// Nothing persisted → fetching the would-be asset is NotFound.
+	_, err = client.GetAsset(ctx, &assetsv1.GetAssetRequest{Name: asset.GetName()})
+	require.Error(t, err, "validate_only must not have persisted the asset")
+	assert.Equal(t, codes.NotFound, status.Code(err))
+
+	// And ListAssets shows nothing was created.
+	list, err := client.ListAssets(ctx, &assetsv1.ListAssetsRequest{Parent: parent})
+	require.NoError(t, err)
+	assert.Empty(t, list.GetAssets(), "validate_only create must persist nothing")
 }
 
 func TestIntegration_Assets_WithFile(t *testing.T) {
