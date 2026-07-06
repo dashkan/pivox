@@ -175,11 +175,16 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 		return nil, apierr.HandleResourceError(err, "TagValue", tb.GetTagValue())
 	}
 
-	created, err := s.queries.CreateTagBinding(ctx, db.CreateTagBindingParams{
-		ID:             uuid.New(),
-		ParentResource: req.GetParent(),
-		TagValueID:     tagValue.ID,
-		CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
+	// validate_only runs the INSERT against real constraints and rolls it
+	// back, so a would-fail request (e.g. duplicate binding) returns the
+	// same error a live one would while persisting nothing.
+	created, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.TagBinding, error) {
+		return qtx.CreateTagBinding(ctx, db.CreateTagBindingParams{
+			ID:             uuid.New(),
+			ParentResource: req.GetParent(),
+			TagValueID:     tagValue.ID,
+			CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
+		})
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagBinding", "")
@@ -203,12 +208,20 @@ func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.Del
 		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 
-	existing, err := s.queries.GetTagBinding(ctx, id)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
-	}
-	if err := s.queries.DeleteTagBinding(ctx, existing.ID); err != nil {
-		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
+	// validate_only runs the existence check + DELETE against real state
+	// and rolls it back, so a would-fail request (e.g. missing binding)
+	// returns the same error a live one would while persisting nothing.
+	if err := db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
+		existing, err := qtx.GetTagBinding(ctx, id)
+		if err != nil {
+			return apierr.HandleResourceError(err, "TagBinding", req.GetName())
+		}
+		if err := qtx.DeleteTagBinding(ctx, existing.ID); err != nil {
+			return apierr.HandleResourceError(err, "TagBinding", req.GetName())
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return lro.DoneOperation(&apiv1.TagBinding{Name: req.GetName()})
 }

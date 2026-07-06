@@ -207,13 +207,18 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 	}
 	namespacedName := parentKey.NamespacedName + "/" + tagValueID
 
-	result, err := s.queries.CreateTagValue(ctx, db.CreateTagValueParams{
-		ID:             uuid.New(),
-		TagKeyID:       parentKey.ID,
-		ShortName:      tagValueID,
-		NamespacedName: namespacedName,
-		Description:    tagValue.GetDescription(),
-		CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
+	// validate_only runs the INSERT against real constraints and rolls it
+	// back, so a would-fail request (e.g. duplicate short_name) returns the
+	// same error a live one would while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.TagValue, error) {
+		return qtx.CreateTagValue(ctx, db.CreateTagValueParams{
+			ID:             uuid.New(),
+			TagKeyID:       parentKey.ID,
+			ShortName:      tagValueID,
+			NamespacedName: namespacedName,
+			Description:    tagValue.GetDescription(),
+			CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
+		})
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", "")
@@ -257,7 +262,12 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 		updateParams.Description = pgtype.Text{String: tagValue.GetDescription(), Valid: true}
 	}
 
-	result, err := s.queries.UpdateTagValue(ctx, updateParams)
+	// validate_only runs the UPDATE against real constraints and rolls it
+	// back, so a would-fail request returns the same error a live one would
+	// while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.TagValue, error) {
+		return qtx.UpdateTagValue(ctx, updateParams)
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", tagValue.GetName())
 	}
@@ -285,7 +295,11 @@ func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteT
 		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
 
-	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
+	// validate_only runs the whole delete tx (row lock, binding count,
+	// DELETE) against real state and rolls it back, so a would-fail request
+	// (e.g. the value still has bindings) returns the same error a live one
+	// would while persisting nothing.
+	if err := db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
 		existing, err := qtx.GetTagValueForUpdate(ctx, id)
 		if err != nil {
 			return apierr.HandleResourceError(err, "TagValue", req.GetName())
