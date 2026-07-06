@@ -9,7 +9,6 @@ import (
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -260,14 +259,6 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 		labelsJSON = json.RawMessage("{}")
 	}
 
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		slog.ErrorContext(ctx, "create space: begin tx failed", "error", err)
-		return nil, apierr.Internal("begin transaction")
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	qtx := db.New(tx)
 	// Post-Phase-7 the founder's principal_id IS the caller's
 	// identity_id — no per-org `users` row to resolve.
 	// `callerID` is the identities.id (the universal user UUID,
@@ -276,46 +267,51 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 	founderID := callerID
 	createdBy := convert.PgUUID(callerID)
 
-	result, err := qtx.CreateSpace(ctx, db.CreateSpaceParams{
-		ID:          uuid.New(),
-		OrgID:       resolvedOrg.ID,
-		Name:        spaceName,
-		DisplayName: space.GetDisplayName(),
-		Labels:      labelsJSON,
-		CreatedBy:   createdBy,
+	// validate_only runs the whole bootstrap tx (space insert + owner
+	// binding) against real constraints and rolls it back, so a would-fail
+	// request (e.g. duplicate slug) returns the same error a live one would
+	// while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Space, error) {
+		result, err := qtx.CreateSpace(ctx, db.CreateSpaceParams{
+			ID:          uuid.New(),
+			OrgID:       resolvedOrg.ID,
+			Name:        spaceName,
+			DisplayName: space.GetDisplayName(),
+			Labels:      labelsJSON,
+			CreatedBy:   createdBy,
+		})
+		if err != nil {
+			return db.Space{}, apierr.HandleResourceError(err, "Space", "")
+		}
+
+		// Resolve the org-level owner role and seed a space-level owner
+		// binding for the founder. System roles are seeded per-org at
+		// CreateOrganization time, so the lookup must succeed for any
+		// reachable org.
+		ownerRole, err := qtx.GetSystemRole(ctx, db.GetSystemRoleParams{
+			OrgID: resolvedOrg.ID,
+			Name:  permission.RoleOwner,
+		})
+		if err != nil {
+			slog.ErrorContext(ctx, "create space: owner role lookup failed",
+				"org_id", resolvedOrg.ID, "error", err)
+			return db.Space{}, apierr.Internal("resolve owner role")
+		}
+		if _, err := qtx.CreateSpaceUserMember(ctx, db.CreateSpaceUserMemberParams{
+			ID:        uuid.New(),
+			SpaceID:   result.ID,
+			RoleID:    ownerRole.ID,
+			UserID:    convert.PgUUID(founderID),
+			CreatedBy: createdBy,
+		}); err != nil {
+			slog.ErrorContext(ctx, "create space: seed founder owner binding failed",
+				"space_id", result.ID, "error", err)
+			return db.Space{}, apierr.Internal("seed founder owner binding")
+		}
+		return result, nil
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Space", "")
-	}
-
-	// Resolve the org-level owner role and seed a space-level owner
-	// binding for the founder. System roles are seeded per-org at
-	// CreateOrganization time, so the lookup must succeed for any
-	// reachable org.
-	ownerRole, err := qtx.GetSystemRole(ctx, db.GetSystemRoleParams{
-		OrgID: resolvedOrg.ID,
-		Name:  permission.RoleOwner,
-	})
-	if err != nil {
-		slog.ErrorContext(ctx, "create space: owner role lookup failed",
-			"org_id", resolvedOrg.ID, "error", err)
-		return nil, apierr.Internal("resolve owner role")
-	}
-	if _, err := qtx.CreateSpaceUserMember(ctx, db.CreateSpaceUserMemberParams{
-		ID:        uuid.New(),
-		SpaceID:   result.ID,
-		RoleID:    ownerRole.ID,
-		UserID:    convert.PgUUID(founderID),
-		CreatedBy: createdBy,
-	}); err != nil {
-		slog.ErrorContext(ctx, "create space: seed founder owner binding failed",
-			"space_id", result.ID, "error", err)
-		return nil, apierr.Internal("seed founder owner binding")
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		slog.ErrorContext(ctx, "create space: commit failed", "space_id", result.ID, "error", err)
-		return nil, apierr.Internal("commit transaction")
+		return nil, err
 	}
 
 	// Best-effort enrichment after commit: state has landed, don't
@@ -375,7 +371,12 @@ func (s *SpacesServer) UpdateSpace(ctx context.Context, req *apiv1.UpdateSpaceRe
 		}
 	}
 
-	result, err := s.queries.UpdateSpace(ctx, updateParams)
+	// validate_only runs the UPDATE against real constraints and rolls it
+	// back, so a would-fail request returns the same error a live one would
+	// while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Space, error) {
+		return qtx.UpdateSpace(ctx, updateParams)
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Space", space.GetName())
 	}
@@ -440,9 +441,10 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 	// runs the SQL action and marks the operation done atomically.
 	opID := uuid.New()
 	return s.lroManager.NewLro(ctx, spaceRsrc, lro.NewLroOpts{
-		OperationID: opID,
-		SpaceID:     convert.PgUUID(resolvedSpace.ID),
-		CreatedBy:   convert.PgUUID(caller),
+		OperationID:  opID,
+		SpaceID:      convert.PgUUID(resolvedSpace.ID),
+		CreatedBy:    convert.PgUUID(caller),
+		ValidateOnly: req.GetValidateOnly(),
 		JobArgs: workers.DeleteSpaceArgs{
 			OperationID:  opID,
 			SpaceID:      resolvedSpace.ID,
@@ -493,9 +495,10 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 	// runs the SQL action and marks the operation done.
 	opID := uuid.New()
 	return s.lroManager.NewLro(ctx, spaceRsrc, lro.NewLroOpts{
-		OperationID: opID,
-		SpaceID:     convert.PgUUID(spaceID),
-		CreatedBy:   convert.PgUUID(caller),
+		OperationID:  opID,
+		SpaceID:      convert.PgUUID(spaceID),
+		CreatedBy:    convert.PgUUID(caller),
+		ValidateOnly: req.GetValidateOnly(),
 		JobArgs: workers.UndeleteSpaceArgs{
 			OperationID: opID,
 			SpaceID:     spaceID,

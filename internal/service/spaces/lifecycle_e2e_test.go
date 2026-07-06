@@ -404,6 +404,76 @@ func waitSpaceOp(t *testing.T, h *grpcharness.Harness, op *longrunningpb.Operati
 	return &space
 }
 
+// TestE2E_Space_ValidateOnly pins the AIP validate_only contract across
+// both the synchronous Create path (RunInTxValidate) and the River-backed
+// Delete path (NewLro rollback): a dry-run runs the same validation a live
+// request would (so a would-fail request still fails) but persists nothing.
+func TestE2E_Space_ValidateOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newSpacesHarness(t)
+	ctx := context.Background()
+
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "owner"})
+	h.SetCaller(owner)
+
+	orgClient := apiv1.NewOrganizationsClient(h.Conn())
+	orgOp, err := orgClient.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
+		OrganizationId: "space-vo-org",
+		Organization:   &apiv1.Organization{DisplayName: "Space VO"},
+	})
+	require.NoError(t, err)
+	require.True(t, orgOp.GetDone())
+
+	spacesClient := apiv1.NewSpacesClient(h.Conn())
+
+	// Dry-run Create: returns the would-be resource, persists nothing.
+	dry, err := spacesClient.CreateSpace(ctx, &apiv1.CreateSpaceRequest{
+		Parent:       "organizations/space-vo-org",
+		SpaceId:      "vo",
+		Space:        &apiv1.Space{DisplayName: "Dry"},
+		ValidateOnly: true,
+	})
+	require.NoError(t, err)
+	require.True(t, dry.GetDone())
+
+	// Nothing persisted → a real Create can reuse the same slug.
+	realOp, err := spacesClient.CreateSpace(ctx, &apiv1.CreateSpaceRequest{
+		Parent:  "organizations/space-vo-org",
+		SpaceId: "vo",
+		Space:   &apiv1.Space{DisplayName: "Real"},
+	})
+	require.NoError(t, err, "validate_only must not have persisted the space")
+	require.True(t, realOp.GetDone())
+
+	// A dry-run that WOULD fail live (duplicate slug now exists) fails.
+	_, err = spacesClient.CreateSpace(ctx, &apiv1.CreateSpaceRequest{
+		Parent:       "organizations/space-vo-org",
+		SpaceId:      "vo",
+		Space:        &apiv1.Space{DisplayName: "Dup"},
+		ValidateOnly: true,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, status.Code(err),
+		"validate_only must fail if the live request would")
+
+	// Dry-run Delete (River-backed LRO): the enqueue rolls back, so the
+	// space stays ACTIVE and no worker ever runs.
+	name := "organizations/space-vo-org/spaces/vo"
+	_, err = spacesClient.DeleteSpace(ctx, &apiv1.DeleteSpaceRequest{
+		Name:         name,
+		ValidateOnly: true,
+	})
+	require.NoError(t, err)
+
+	got, err := spacesClient.GetSpace(ctx, &apiv1.GetSpaceRequest{Name: name})
+	require.NoError(t, err, "validate_only delete must not have removed the space")
+	assert.Equal(t, apiv1.Space_ACTIVE, got.GetState(),
+		"validate_only delete must not change space state")
+}
+
 func newSpacesHarness(t *testing.T) *grpcharness.Harness {
 	h := grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		permResolver := permission.NewResolver(h.Queries)
