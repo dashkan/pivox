@@ -127,15 +127,20 @@ func (s *ApiKeysServer) CreateKey(ctx context.Context, req *apiv1.CreateKeyReque
 		restrictionsBytes, _ = protojson.Marshal(restrictions)
 	}
 
-	created, err := s.queries.CreateApiKey(ctx, db.CreateApiKeyParams{
-		ID:           uuid.New(),
-		OrgID:        org.ID,
-		KeyID:        keyID,
-		DisplayName:  key.GetDisplayName(),
-		KeyString:    keyString,
-		Annotations:  annotationsJSON,
-		Restrictions: restrictionsBytes,
-		CreatedBy:    convert.PgUUID(server.MustUserID(ctx)),
+	// validate_only runs the INSERT against real constraints and rolls it
+	// back, so a would-fail request (e.g. duplicate key_id) returns the
+	// same error a live one would while persisting nothing.
+	created, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.ApiKey, error) {
+		return qtx.CreateApiKey(ctx, db.CreateApiKeyParams{
+			ID:           uuid.New(),
+			OrgID:        org.ID,
+			KeyID:        keyID,
+			DisplayName:  key.GetDisplayName(),
+			KeyString:    keyString,
+			Annotations:  annotationsJSON,
+			Restrictions: restrictionsBytes,
+			CreatedBy:    convert.PgUUID(server.MustUserID(ctx)),
+		})
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", "")

@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/appkey"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
@@ -174,4 +176,55 @@ func TestIntegration_ApiKeys(t *testing.T) {
 	t.Run("UndeleteKey", func(t *testing.T) {
 		t.Skip("server uses GetApiKeyByOrgAndKeyID which filters deleted keys")
 	})
+}
+
+// TestIntegration_ApiKeys_CreateKey_ValidateOnly pins the AIP validate_only
+// contract for CreateKey: a dry-run runs the same validation a live request
+// would (so a would-fail request still fails) but persists nothing.
+func TestIntegration_ApiKeys_CreateKey_ValidateOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+			codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+			require.NoError(t, err)
+			apiv1.RegisterApiKeysServer(s, apikeys.NewApiKeysServer(apikeys.Config{
+				Pool: h.Pool, Queries: h.Queries, Codec: codec,
+			}))
+		}))
+	h.SeedOwnedOrg(t, "acme-vo", "Acme VO", "apikeys")
+
+	client := apiv1.NewApiKeysClient(h.Conn())
+	ctx := context.Background()
+
+	// A dry-run Create returns the would-be resource but writes nothing.
+	_, err := client.CreateKey(ctx, &apiv1.CreateKeyRequest{
+		Parent:       "organizations/acme-vo",
+		KeyId:        "dry-key",
+		Key:          &apiv1.Key{DisplayName: "Dry"},
+		ValidateOnly: true,
+	})
+	require.NoError(t, err)
+
+	// Nothing persisted → a real Create can reuse the same key_id.
+	_, err = client.CreateKey(ctx, &apiv1.CreateKeyRequest{
+		Parent: "organizations/acme-vo",
+		KeyId:  "dry-key",
+		Key:    &apiv1.Key{DisplayName: "Real"},
+	})
+	require.NoError(t, err, "validate_only must not have persisted the key")
+
+	// A dry-run that WOULD fail live (duplicate key_id now exists) fails.
+	_, err = client.CreateKey(ctx, &apiv1.CreateKeyRequest{
+		Parent:       "organizations/acme-vo",
+		KeyId:        "dry-key",
+		Key:          &apiv1.Key{DisplayName: "Dup"},
+		ValidateOnly: true,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, status.Code(err),
+		"validate_only must fail if the live request would")
 }
