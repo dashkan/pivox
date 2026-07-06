@@ -249,7 +249,7 @@ func (s *SecretsServer) CreateSecret(ctx context.Context, req *secretsv1.CreateS
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("secret.annotations", err.Error()))
 	}
 
-	row, err := s.queries.CreateSecret(ctx, db.CreateSecretParams{
+	params := db.CreateSecretParams{
 		ID:              id,
 		OrgID:           orgID,
 		SpaceID:         spaceID,
@@ -258,6 +258,12 @@ func (s *SecretsServer) CreateSecret(ctx context.Context, req *secretsv1.CreateS
 		ValueCiphertext: ciphertext,
 		Annotations:     annotations,
 		CreatedBy:       convert.PgUUID(server.MustUserID(ctx)),
+	}
+	// validate_only rolls back the insert but still runs it, so a would-fail
+	// request (e.g. duplicate secret_id) returns the same error a live one
+	// would. There are no non-DB side effects to guard here.
+	row, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Secret, error) {
+		return qtx.CreateSecret(ctx, params)
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Secret", secretID)
@@ -316,7 +322,7 @@ func (s *SecretsServer) UpdateSecret(ctx context.Context, req *secretsv1.UpdateS
 	}
 
 	var row db.Secret
-	err = db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
+	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
 		existing, err := qtx.GetSecretForUpdate(ctx, id)
 		if err != nil {
 			return apierr.HandleResourceError(err, "Secret", in.GetName())
@@ -345,7 +351,7 @@ func (s *SecretsServer) DeleteSecret(ctx context.Context, req *secretsv1.DeleteS
 		return nil, err
 	}
 	orgID, spaceID, _ := s.scope(ctx)
-	err = db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
+	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
 		existing, err := qtx.GetSecretForUpdate(ctx, id)
 		if err != nil {
 			return apierr.HandleResourceError(err, "Secret", req.GetName())

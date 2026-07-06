@@ -100,7 +100,7 @@ type RWPool interface {
 // as RunInTx.
 func RunInTxRaw[T any](ctx context.Context, pool TxBeginner,
 	fn func(qtx Querier, tx pgx.Tx) (T, error), opts ...pgx.TxOptions) (T, error) {
-	return runInTxImpl(ctx, pool, fn, opts...)
+	return runInTxImpl(ctx, pool, false, fn, opts...)
 }
 
 // RunInTx runs fn inside a Postgres transaction owned by pool.
@@ -147,7 +147,7 @@ func RunInTxRaw[T any](ctx context.Context, pool TxBeginner,
 // `interface{}` dance.
 func RunInTx[T any](ctx context.Context, pool TxBeginner,
 	fn func(qtx Querier) (T, error), opts ...pgx.TxOptions) (T, error) {
-	return runInTxImpl(ctx, pool, func(qtx Querier, _ pgx.Tx) (T, error) {
+	return runInTxImpl(ctx, pool, false, func(qtx Querier, _ pgx.Tx) (T, error) {
 		return fn(qtx)
 	}, opts...)
 }
@@ -158,7 +158,7 @@ func RunInTx[T any](ctx context.Context, pool TxBeginner,
 // pgx.Tx alongside Querier. Keeping a single core means retry
 // semantics, slow-tx warnings, and metrics live in exactly one
 // place.
-func runInTxImpl[T any](ctx context.Context, pool TxBeginner,
+func runInTxImpl[T any](ctx context.Context, pool TxBeginner, validateOnly bool,
 	fn func(qtx Querier, tx pgx.Tx) (T, error), opts ...pgx.TxOptions) (T, error) {
 	var zero T
 	if pool == nil {
@@ -200,7 +200,7 @@ func runInTxImpl[T any](ctx context.Context, pool TxBeginner,
 	var lastErr error
 	for attempt := 1; attempt <= maxTxRetries; attempt++ {
 		attempts = attempt
-		result, err := runTxOnce(ctx, pool, txOpts, fn)
+		result, err := runTxOnce(ctx, pool, txOpts, validateOnly, fn)
 		if err == nil {
 			if attempt > 1 {
 				slog.InfoContext(ctx, "tx succeeded after retry",
@@ -264,7 +264,7 @@ func runInTxImpl[T any](ctx context.Context, pool TxBeginner,
 
 // runTxOnce is a single tx attempt. Begin → fn → Commit/Rollback,
 // with panic recovery. The retry loop in runInTxImpl wraps this.
-func runTxOnce[T any](ctx context.Context, pool TxBeginner, txOpts pgx.TxOptions,
+func runTxOnce[T any](ctx context.Context, pool TxBeginner, txOpts pgx.TxOptions, validateOnly bool,
 	fn func(qtx Querier, tx pgx.Tx) (T, error)) (T, error) {
 	var zero T
 	tx, err := pool.BeginTx(ctx, txOpts)
@@ -296,6 +296,15 @@ func runTxOnce[T any](ctx context.Context, pool TxBeginner, txOpts pgx.TxOptions
 	}()
 	if fnErr != nil {
 		return result, fnErr
+	}
+	if validateOnly {
+		// Deliberate dry-run: skip Commit so the deferred Rollback discards
+		// the writes. fn ran against real constraints (unique/FK/NOT NULL,
+		// row locks), so any failure a live request would hit already
+		// surfaced as fnErr above — the caller gets the same outcome with
+		// nothing persisted. Transactional River enqueues (InsertTx) roll
+		// back here too, so they need no separate guard.
+		return result, nil
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -332,6 +341,42 @@ func isRetryableTxError(err error) bool {
 func RunInTxVoid(ctx context.Context, pool TxBeginner,
 	fn func(qtx Querier) error, opts ...pgx.TxOptions) error {
 	_, err := RunInTx(ctx, pool, func(qtx Querier) (struct{}, error) {
+		return struct{}{}, fn(qtx)
+	}, opts...)
+	return err
+}
+
+// RunInTxValidate runs fn in a transaction and, when validateOnly is true,
+// rolls back instead of committing: the writes are discarded, but fn still
+// ran against real constraints (unique / FK / NOT NULL / row locks), so any
+// error a live request would hit is returned unchanged. This is the AIP
+// validate_only substrate — permission + field-shape validation already ran
+// in the interceptors, so this simulates the DB side and nothing else.
+//
+// Non-DB side effects (cache/audit invalidation, outbound HTTP, notifications)
+// must stay OUTSIDE the closure and be guarded by `if !validateOnly`; they do
+// not roll back with the tx. Transactional River enqueues via InsertTx, being
+// rows in the same tx, DO roll back and need no guard.
+func RunInTxValidate[T any](ctx context.Context, pool TxBeginner, validateOnly bool,
+	fn func(qtx Querier) (T, error), opts ...pgx.TxOptions) (T, error) {
+	return runInTxImpl(ctx, pool, validateOnly, func(qtx Querier, _ pgx.Tx) (T, error) {
+		return fn(qtx)
+	}, opts...)
+}
+
+// RunInTxRawValidate is RunInTxValidate with raw pgx.Tx access, for handlers
+// that enqueue River jobs (InsertTx) or otherwise need the tx inside the
+// validated closure.
+func RunInTxRawValidate[T any](ctx context.Context, pool TxBeginner, validateOnly bool,
+	fn func(qtx Querier, tx pgx.Tx) (T, error), opts ...pgx.TxOptions) (T, error) {
+	return runInTxImpl(ctx, pool, validateOnly, fn, opts...)
+}
+
+// RunInTxVoidValidate is the side-effect-only RunInTxValidate for handlers
+// (e.g. Delete) that return no value beyond ok/err.
+func RunInTxVoidValidate(ctx context.Context, pool TxBeginner, validateOnly bool,
+	fn func(qtx Querier) error, opts ...pgx.TxOptions) error {
+	_, err := RunInTxValidate(ctx, pool, validateOnly, func(qtx Querier) (struct{}, error) {
 		return struct{}{}, fn(qtx)
 	}, opts...)
 	return err

@@ -131,6 +131,47 @@ func TestE2E_Secret_MetadataUpdateNoValue(t *testing.T) {
 	assert.NotEqual(t, created.GetEtag(), updated.GetEtag())
 }
 
+// TestE2E_Secret_ValidateOnly pins the AIP validate_only contract: the
+// request runs through the same validation a live one would (so a would-fail
+// request still fails) but persists nothing.
+func TestE2E_Secret_ValidateOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := grpcharness.New(t, grpcharness.WithOrganizationsServer(), grpcharness.WithSecretsServer())
+	owned := h.SeedOwnedOrg(t, "vault-vo", "Vault VO", "secrets")
+	ctx := context.Background()
+	client := secretsv1.NewSecretsClient(h.Conn())
+
+	// A dry-run Create returns the would-be resource but writes nothing.
+	dry, err := client.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
+		Parent:       "organizations/" + owned.Slug,
+		SecretId:     "dry",
+		ValidateOnly: true,
+		Secret:       &secretsv1.Secret{DisplayName: "Dry", Value: []byte("v")},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, dry.GetValue())
+
+	// Nothing persisted → a real Create can reuse the same secret_id.
+	_, err = client.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
+		Parent:   "organizations/" + owned.Slug,
+		SecretId: "dry",
+		Secret:   &secretsv1.Secret{Value: []byte("v")},
+	})
+	require.NoError(t, err, "validate_only must not have persisted the secret")
+
+	// A dry-run that WOULD fail live (duplicate secret_id now exists) fails.
+	_, err = client.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
+		Parent:       "organizations/" + owned.Slug,
+		SecretId:     "dry",
+		ValidateOnly: true,
+		Secret:       &secretsv1.Secret{Value: []byte("v")},
+	})
+	require.Error(t, err, "validate_only must fail if the live request would")
+	assert.Equal(t, codes.AlreadyExists, status.Code(err))
+}
+
 // TestE2E_Secret_ScopeIsolation pins that a secret's uuid can't be read or
 // deleted through a different org's name prefix. The resource-name leaf is a
 // global uuid; the interceptor gates on the name's org, so the handler must
