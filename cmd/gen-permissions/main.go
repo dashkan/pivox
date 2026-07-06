@@ -1,25 +1,34 @@
 // Permission generator. Reads internal/permission/permissions.yaml
-// (the source of truth for the v1 permission catalog) and emits
-// internal/permission/permissions_gen.go containing typed permission
-// constants, the canonical `All` slice, and the `RoleGrants`
-// role-to-permission grant data (which seeds the role_permissions
-// table — the DB-side source of truth for authorization).
+// (the source of truth for the v1 permission catalog) and emits three
+// artifacts, all from that single source:
+//
+//   - internal/permission/permissions_gen.go — typed permission
+//     constants, the canonical `All` slice, and the `RoleGrants`
+//     role-to-permission grant data.
+//   - scripts/seeds/16_role_permissions.sql — the dev-seed grant
+//     matrix (role_permissions rows for pre-seeded orgs).
+//   - the `INSERT INTO permissions` catalog spliced into the init
+//     migration between the marker lines (see spliceCatalogSQL).
+//
+// The role_permissions table is the DB-side source of truth for
+// authorization; the permissions catalog is the DB-side source of
+// truth for which permission_ids exist.
 //
 // Adding a permission:
 //
 //  1. Edit `internal/permission/permissions.yaml`.
-//  2. Run `make generate` (or `go generate ./internal/permission/...`).
+//  2. Run `make gen-permissions` (or `go generate
+//     ./internal/permission/...`).
 //  3. Use the new constant in handler code; the compile error from
 //     referencing it before regeneration is your reminder.
-//  4. Update the `INSERT INTO permissions` block in the init
-//     migration to match — the drift-guard test
-//     (TestPermissions_MigrationMatchesConstants) catches the
-//     mismatch.
 //
-// The migration seed remains hand-maintained because golang-migrate
-// doesn't support file-includes; keeping it in the same .sql file
-// preserves single-step `make db-up` runs. Drift-guard is the safety
-// net.
+// The migration catalog is generated, not hand-maintained: the
+// generator splices the `INSERT INTO permissions` block into the
+// marked region of the init migration (golang-migrate has no
+// file-include support, so the rows live inline in the .sql file, but
+// they're owned by this generator — do not edit them by hand). The
+// drift-guard test (TestPermissions_MigrationMatchesConstants) catches
+// any manual edit that diverges from `All`.
 package main
 
 import (
@@ -27,6 +36,7 @@ import (
 	"fmt"
 	"go/format"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -77,6 +87,11 @@ func run() error {
 	seed := emitSeedSQL(pf)
 	if err := os.WriteFile("../../scripts/seeds/16_role_permissions.sql", seed, 0o644); err != nil {
 		return fmt.Errorf("write seed sql: %w", err)
+	}
+	// Splice the permissions catalog into the init migration's marked
+	// region. Path is relative to the go:generate CWD (internal/permission/).
+	if err := spliceCatalogSQL("../db/migrations/000001_init.up.sql", pf); err != nil {
+		return fmt.Errorf("splice catalog sql: %w", err)
 	}
 	return nil
 }
@@ -134,8 +149,85 @@ func emitSeedSQL(pf permissionsFile) []byte {
 	return b.Bytes()
 }
 
+// sqlQuote SQL-escapes a string literal's contents by doubling any
+// embedded single quotes, so display names and descriptions containing
+// apostrophes (e.g. "Change a member's role") stay valid SQL.
+func sqlQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
+}
+
+// emitCatalogSQL produces the `INSERT INTO permissions` catalog block
+// spliced into the init migration. Rows are emitted in YAML order (same
+// order as permission.All) so downstream output is stable.
+func emitCatalogSQL(pf permissionsFile) []byte {
+	var b bytes.Buffer
+	b.WriteString("INSERT INTO permissions (permission_id, display_name, description) VALUES\n")
+	for i, p := range pf.Permissions {
+		sep := ","
+		if i == len(pf.Permissions)-1 {
+			sep = ";"
+		}
+		fmt.Fprintf(&b, "  ('%s', '%s', '%s')%s\n", p.ID, sqlQuote(p.DisplayName), sqlQuote(p.Description), sep)
+	}
+	return b.Bytes()
+}
+
+// spliceCatalogSQL rewrites the init migration in place, replacing
+// everything between the catalog marker lines with emitCatalogSQL's
+// output. The marker lines themselves are preserved. A missing marker
+// is a hard error — the generator refuses to silently no-op.
+func spliceCatalogSQL(path string, pf permissionsFile) error {
+	const (
+		beginMarker = "-- BEGIN generated: permissions catalog (cmd/gen-permissions). DO NOT EDIT."
+		endMarker   = "-- END generated: permissions catalog"
+	)
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read migration %s: %w", path, err)
+	}
+	content := string(body)
+
+	beginIdx := strings.Index(content, beginMarker)
+	if beginIdx < 0 {
+		return fmt.Errorf("begin marker %q not found in %s", beginMarker, path)
+	}
+	endIdx := strings.Index(content, endMarker)
+	if endIdx < 0 {
+		return fmt.Errorf("end marker %q not found in %s", endMarker, path)
+	}
+	if endIdx < beginIdx {
+		return fmt.Errorf("end marker precedes begin marker in %s", path)
+	}
+
+	// Prefix keeps everything through the begin-marker line (including
+	// its trailing newline); suffix starts at the end-marker line.
+	nl := strings.IndexByte(content[beginIdx:], '\n')
+	if nl < 0 {
+		return fmt.Errorf("begin marker not terminated by a newline in %s", path)
+	}
+	prefix := content[:beginIdx+nl+1]
+	suffix := content[endIdx:]
+
+	var out bytes.Buffer
+	out.WriteString(prefix)
+	out.Write(emitCatalogSQL(pf))
+	out.WriteString(suffix)
+
+	if err := os.WriteFile(path, out.Bytes(), 0o644); err != nil {
+		return fmt.Errorf("write migration %s: %w", path, err)
+	}
+	return nil
+}
+
 // validate enforces YAML invariants: unique ids, non-empty fields,
 // known role names.
+// permIDRe constrains permission ids to a safe charset. ids are interpolated
+// into the catalog SQL unquoted (emitCatalogSQL only escapes display_name and
+// description), so anything outside this set — notably a single quote — would
+// produce invalid or injectable SQL. Enforced here so a bad id fails at
+// generation, not later at the drift-guard test.
+var permIDRe = regexp.MustCompile(`^[a-zA-Z0-9._]+$`)
+
 func validate(pf permissionsFile) error {
 	knownRoles := map[string]bool{
 		"owner": true, "admin": true, "editor": true, "viewer": true,
@@ -144,6 +236,9 @@ func validate(pf permissionsFile) error {
 	for _, p := range pf.Permissions {
 		if p.ID == "" || p.DisplayName == "" || p.Description == "" {
 			return fmt.Errorf("permission %q: id/display_name/description must be non-empty", p.ID)
+		}
+		if !permIDRe.MatchString(p.ID) {
+			return fmt.Errorf("permission %q: id must match %s (it is interpolated into catalog SQL unquoted)", p.ID, permIDRe)
 		}
 		if seen[p.ID] {
 			return fmt.Errorf("duplicate permission id %q", p.ID)

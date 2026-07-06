@@ -1,0 +1,146 @@
+-- ============================================================================
+-- workflows (the container)
+-- ============================================================================
+
+-- name: CreateWorkflow :one
+-- id is app-generated so the caller has it before the write. `version` is
+-- always NULL at create — a workflow is created version-less, then a version
+-- is minted and promoted (workflow-first insert order avoids the circular FK).
+INSERT INTO workflows (id, org_id, space_id, workflow_id, display_name, description, enabled, config, origin, annotations, created_by, updated_by)
+VALUES ($1, $2, sqlc.narg('space_id'), $3, $4, $5, $6, $7, $8, $9, $10, $10)
+RETURNING *;
+
+-- name: GetWorkflow :one
+SELECT * FROM workflows WHERE id = $1;
+
+-- name: GetWorkflowByParent :one
+-- Resolves a Workflow from its parent + slug. space_id IS NOT DISTINCT FROM
+-- treats NULL (org-scoped) as a matchable value.
+SELECT * FROM workflows
+WHERE org_id = $1
+  AND space_id IS NOT DISTINCT FROM sqlc.narg('space_id')
+  AND workflow_id = $2;
+
+-- GetWorkflowForUpdate locks the row for the update/promote/delete tx so the
+-- etag check and the write serialize against a concurrent mutation.
+-- name: GetWorkflowForUpdate :one
+SELECT * FROM workflows WHERE id = $1 FOR UPDATE;
+
+-- name: UpdateWorkflow :one
+-- Masked update of the container fields. `version` (promoted pointer) and
+-- `origin` are set elsewhere (SetWorkflowVersion / create), never here.
+UPDATE workflows
+SET display_name = COALESCE(sqlc.narg('display_name'), display_name),
+    description = COALESCE(sqlc.narg('description'), description),
+    enabled = COALESCE(sqlc.narg('enabled'), enabled),
+    config = COALESCE(sqlc.narg('config'), config),
+    annotations = COALESCE(sqlc.narg('annotations'), annotations),
+    updated_by = $2,
+    update_time = now(),
+    etag = md5(now()::text)
+WHERE id = $1
+RETURNING *;
+
+-- name: SetWorkflowVersion :one
+-- Promote: point the container at one of its OWN versions, making it live.
+-- The join enforces v.workflow_id = w.id — fk_workflows_version only
+-- guarantees the version row exists, NOT that it belongs to this workflow, so
+-- without the join a cross-workflow promote would corrupt the
+-- container→definition link (Workflow A executing B's definition). No row is
+-- returned (→ ErrNoRows) when the version isn't this workflow's; the handler
+-- maps that to FailedPrecondition. Serialized under GetWorkflowForUpdate's lock.
+UPDATE workflows w
+SET version = v.id,
+    updated_by = $2,
+    update_time = now(),
+    etag = md5(now()::text)
+FROM workflow_versions v
+WHERE w.id = $1
+  AND v.id = @version
+  AND v.workflow_id = w.id
+RETURNING w.*;
+
+-- name: DeleteWorkflow :exec
+DELETE FROM workflows WHERE id = $1;
+
+-- name: ListWorkflowsByParent :many
+-- Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+SELECT * FROM workflows
+WHERE org_id = @org_id
+  AND space_id IS NOT DISTINCT FROM sqlc.narg('space_id')
+  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
+ORDER BY id
+LIMIT @page_limit;
+
+-- ============================================================================
+-- workflow_versions (immutable definitions)
+-- ============================================================================
+
+-- name: NextWorkflowVersionNumber :one
+-- The next monotonic version_number for a workflow. Called inside the create
+-- tx (under the workflow row lock) so concurrent version creates don't collide.
+SELECT COALESCE(MAX(version_number), 0) + 1 AS next_version_number
+FROM workflow_versions
+WHERE workflow_id = $1;
+
+-- name: CreateWorkflowVersion :one
+INSERT INTO workflow_versions (id, workflow_id, version_number, note, definition, created_by)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING *;
+
+-- name: GetWorkflowVersion :one
+SELECT * FROM workflow_versions WHERE id = $1;
+
+-- name: GetWorkflowVersionByNumber :one
+-- Resolves a version from its parent workflow + monotonic {version} segment.
+SELECT * FROM workflow_versions
+WHERE workflow_id = $1
+  AND version_number = $2;
+
+-- name: ListWorkflowVersions :many
+-- Keyset pagination on id (uuidv7 is time-ordered, matching version_number
+-- order). Fetch page_limit+1 to detect a next page.
+SELECT * FROM workflow_versions
+WHERE workflow_id = @workflow_id
+  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
+ORDER BY id
+LIMIT @page_limit;
+
+-- name: DeleteWorkflowVersion :exec
+DELETE FROM workflow_versions WHERE id = $1;
+
+-- ============================================================================
+-- workflow_runs (executions)
+-- ============================================================================
+
+-- name: CreateWorkflowRun :one
+-- A run is created PENDING; output/error/end_time are filled in later via
+-- UpdateWorkflowRunState. triggered_by is NULL for system triggers.
+INSERT INTO workflow_runs (id, workflow_id, version_id, state, trigger, subject, input, steps, triggered_by)
+VALUES ($1, $2, $3, $4, $5, $6, sqlc.narg('input'), $7, sqlc.narg('triggered_by'))
+RETURNING *;
+
+-- name: GetWorkflowRun :one
+SELECT * FROM workflow_runs WHERE id = $1;
+
+-- name: ListWorkflowRuns :many
+-- Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+SELECT * FROM workflow_runs
+WHERE workflow_id = @workflow_id
+  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
+ORDER BY id
+LIMIT @page_limit;
+
+-- name: UpdateWorkflowRunState :one
+-- Advances a run's lifecycle. state is always set; output/steps/error/end_time
+-- are masked (a nil arg leaves the column unchanged) so a mid-run step update
+-- doesn't clobber a not-yet-set terminal field.
+UPDATE workflow_runs
+SET state = $2,
+    output = COALESCE(sqlc.narg('output'), output),
+    steps = COALESCE(sqlc.narg('steps'), steps),
+    error = COALESCE(sqlc.narg('error'), error),
+    start_time = COALESCE(sqlc.narg('start_time'), start_time),
+    end_time = COALESCE(sqlc.narg('end_time'), end_time)
+WHERE id = $1
+RETURNING *;

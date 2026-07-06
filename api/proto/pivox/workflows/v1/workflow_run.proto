@@ -1,0 +1,315 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.workflows.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+import "pivox/permission/v1/options.proto";
+import "pivox/types/actor.proto";
+
+option go_package = "pivox/workflows/v1;workflowsv1";
+
+// WorkflowRuns is the execution surface. A WorkflowRun is one execution of a
+// pinned WorkflowVersion — LRO-shaped: pollable, cancellable, with rich
+// per-step state (including WAITING while parked on a signal/timer). It is
+// not a bare google.longrunning.Operation because it carries step state and a
+// waiting status a plain Operation can't.
+//
+// A run executes as a workflow service identity (not the triggering user);
+// `triggered_by` records who/what caused it, and anything the run mutates is
+// audited as created_by = that service identity, with the run as provenance.
+service WorkflowRuns {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Starts a run of a workflow (manual trigger). Returns the WorkflowRun
+  // immediately (PENDING/RUNNING); poll GetWorkflowRun for progress.
+  // (-- api-linter: core::0136::response-message-name=disabled
+  //     aip.dev/not-precedent: RunWorkflow is a custom action that creates and
+  //     returns a WorkflowRun — a different resource than the Workflow its
+  //     `name` binds. Returning the created resource is intended. --)
+  rpc RunWorkflow(RunWorkflowRequest) returns (WorkflowRun) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*/workflows/*}:run"
+      body: "*"
+      additional_bindings: {
+        post: "/v1/{name=organizations/*/spaces/*/workflows/*}:run"
+        body: "*"
+      }
+    };
+    option (pivox.permission.v1.required_permission) = "workflows.run";
+    option (pivox.permission.v1.scope_field) = "name";
+  }
+
+  // Retrieves a WorkflowRun.
+  rpc GetWorkflowRun(GetWorkflowRunRequest) returns (WorkflowRun) {
+    option (google.api.http) = {
+      get: "/v1/{name=organizations/*/workflows/*/runs/*}"
+      additional_bindings: {get: "/v1/{name=organizations/*/spaces/*/workflows/*/runs/*}"}
+    };
+    option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "workflows.read";
+  }
+
+  // Lists the runs of a Workflow.
+  rpc ListWorkflowRuns(ListWorkflowRunsRequest) returns (ListWorkflowRunsResponse) {
+    option (google.api.http) = {
+      get: "/v1/{parent=organizations/*/workflows/*}/runs"
+      additional_bindings: {get: "/v1/{parent=organizations/*/spaces/*/workflows/*}/runs"}
+    };
+    option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "workflows.read";
+  }
+
+  // Requests cancellation of a running (or waiting) run.
+  rpc CancelWorkflowRun(CancelWorkflowRunRequest) returns (WorkflowRun) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*/workflows/*/runs/*}:cancel"
+      body: "*"
+      additional_bindings: {
+        post: "/v1/{name=organizations/*/spaces/*/workflows/*/runs/*}:cancel"
+        body: "*"
+      }
+    };
+    option (pivox.permission.v1.required_permission) = "workflows.run";
+    option (pivox.permission.v1.scope_field) = "name";
+  }
+}
+
+// WorkflowRun is one execution of a pinned WorkflowVersion.
+message WorkflowRun {
+  option (google.api.resource) = {
+    type: "pivox.workflows/WorkflowRun"
+    pattern: "organizations/{organization}/workflows/{workflow}/runs/{run}"
+    pattern: "organizations/{organization}/spaces/{space}/workflows/{workflow}/runs/{run}"
+    plural: "workflowRuns"
+    singular: "workflowRun"
+  };
+
+  // Immutable. Resource name; {run} is a uuid.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Output only. The WorkflowVersion this run pinned at start.
+  string version = 2 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.resource_reference) = {type: "pivox.workflows/WorkflowVersion"}
+  ];
+
+  // Output only. Current state.
+  State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. What fired this run.
+  RunTrigger trigger = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The resource this run operates on (the triggering asset /
+  // request, or a manual subject). Empty for subject-less runs.
+  string subject = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Initial input (manual parameters / trigger payload).
+  google.protobuf.Struct input = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Final result on success.
+  google.protobuf.Struct output = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Per-step state — the run context + UI/debug view. NEVER
+  // contains a decrypted connector secret (secrets resolve at the request
+  // boundary, not into step outputs).
+  repeated StepState steps = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Error on FAILED.
+  google.rpc.Status error = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Who/what caused the run (a user or a system trigger). The
+  // run itself executes as the workflow service identity.
+  pivox.types.Actor triggered_by = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Creation time.
+  google.protobuf.Timestamp create_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Start time.
+  google.protobuf.Timestamp start_time = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. End time.
+  google.protobuf.Timestamp end_time = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// StepState is the runtime status + output of one step in the run.
+message StepState {
+  // The step's id within the WorkflowVersion.
+  string step_id = 1;
+
+  // Output only. The step's current state.
+  State state = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The step's output, addressable downstream as steps.<step_id>.output.
+  google.protobuf.Struct output = 3;
+
+  // The error if the step failed.
+  google.rpc.Status error = 4;
+
+  // When the step started.
+  google.protobuf.Timestamp start_time = 5;
+
+  // When the step ended.
+  google.protobuf.Timestamp end_time = 6;
+}
+
+// RunTrigger records what started a run.
+message RunTrigger {
+  // The kind of event that fired the run.
+  RunTriggerKind kind = 1;
+
+  // For RESOURCE_EVENT: the resource whose change fired the run.
+  string subject = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // For SUB_WORKFLOW: the parent run that invoked this via run_workflow.
+  string parent_run = 3 [
+    (google.api.field_behavior) = OPTIONAL,
+    (google.api.resource_reference) = {type: "pivox.workflows/WorkflowRun"}
+  ];
+}
+
+// Request for RunWorkflow.
+message RunWorkflowRequest {
+  // Required. The workflow to run.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.workflows/Workflow"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Pin a specific version; empty = the workflow's live version.
+  string version = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (google.api.resource_reference) = {type: "pivox.workflows/WorkflowVersion"}
+  ];
+
+  // Optional. Parameter values, validated against the version's parameter
+  // schema (layered over the workflow's persistent config).
+  google.protobuf.Struct parameters = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The subject resource the run operates on (for a manual run
+  // against a specific asset/request).
+  string subject = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If true, validate the request but do not start a run.
+  bool validate_only = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request for GetWorkflowRun.
+message GetWorkflowRunRequest {
+  // Required. The WorkflowRun resource name.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.workflows/WorkflowRun"},
+    (buf.validate.field).required = true
+  ];
+}
+
+// Request for ListWorkflowRuns.
+message ListWorkflowRunsRequest {
+  // Required. The parent Workflow.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.workflows/WorkflowRun"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Maximum number of runs to return; the server caps at 1000.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
+  ];
+
+  // Optional. A pagination token from a previous ListWorkflowRuns call.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. AIP-160 filter (e.g. state = "RUNNING").
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. A comma-separated list of fields to order by.
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response for ListWorkflowRuns.
+message ListWorkflowRunsResponse {
+  // The runs under the requested Workflow.
+  repeated WorkflowRun workflow_runs = 1;
+
+  // A pagination token for the next page, empty if there are no more.
+  string next_page_token = 2;
+}
+
+// Request for CancelWorkflowRun.
+message CancelWorkflowRunRequest {
+  // Required. The WorkflowRun resource name.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.workflows/WorkflowRun"},
+    (buf.validate.field).required = true
+  ];
+}
+
+// State is the lifecycle state of a run or step.
+enum State {
+  // Default, unused.
+  STATE_UNSPECIFIED = 0;
+
+  // Accepted, not yet started.
+  PENDING = 1;
+
+  // Executing steps.
+  RUNNING = 2;
+
+  // Parked on a signal/timer (long-running / human-in-the-loop).
+  WAITING = 3;
+
+  // Completed successfully.
+  SUCCEEDED = 4;
+
+  // Failed.
+  FAILED = 5;
+
+  // Cancelled.
+  CANCELLED = 6;
+}
+
+// RunTriggerKind is what fired a run.
+enum RunTriggerKind {
+  // Default, unused.
+  RUN_TRIGGER_KIND_UNSPECIFIED = 0;
+
+  // The RunWorkflow RPC (manual).
+  MANUAL = 1;
+
+  // An asset/request event.
+  RESOURCE_EVENT = 2;
+
+  // A schedule fired.
+  SCHEDULE = 3;
+
+  // Invoked via a run_workflow activity.
+  SUB_WORKFLOW = 4;
+}

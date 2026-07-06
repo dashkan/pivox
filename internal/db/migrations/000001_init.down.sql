@@ -1,6 +1,13 @@
 -- 000001_init.down.sql
 -- Drop all tables in reverse dependency order.
 
+-- Workflow engine. workflow_runs and workflow_versions reference workflows;
+-- the circular workflows.version FK is dropped implicitly with the table.
+DROP TABLE IF EXISTS connectors;
+DROP TABLE IF EXISTS workflow_runs;
+DROP TABLE IF EXISTS workflow_versions;
+DROP TABLE IF EXISTS workflows;
+
 -- Secrets vault
 DROP TABLE IF EXISTS secrets;
 

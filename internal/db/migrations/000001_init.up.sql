@@ -942,16 +942,14 @@ INSERT INTO public_email_domains (domain) VALUES
 -- ============================================================================
 -- Seed: permissions (org-level only; space access uses space_members roles)
 -- ============================================================================
+-- BEGIN generated: permissions catalog (cmd/gen-permissions). DO NOT EDIT.
 INSERT INTO permissions (permission_id, display_name, description) VALUES
-  -- Organization management
   ('organizations.read', 'Read Organization', 'View organization details'),
   ('organizations.update', 'Update Organization', 'Modify organization settings'),
   ('organizations.delete', 'Delete Organization', 'Delete or restore the organization (covers UndeleteOrganization too — same destruction-class tier)'),
   ('organizations.transferOwnership', 'Transfer Ownership', 'Atomically transfer the owner role to another member'),
-  -- SSO config (singleton sub-resource; tighter role list than the parent org)
   ('organizations.ssoConfig.read', 'Read SSO Config', 'View SSO configuration'),
   ('organizations.ssoConfig.update', 'Update SSO Config', 'Modify SSO configuration'),
-  -- Space creation (org-level; within-space access is space-role based)
   ('spaces.create', 'Create Space', 'Create new spaces in the organization'),
   ('spaces.read', 'Read Space', 'View and list spaces'),
   ('spaces.update', 'Update Space', 'Modify space metadata'),
@@ -960,48 +958,50 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('tags.read', 'Read Tags', 'View and list tag keys, values, and bindings'),
   ('tags.update', 'Update Tag', 'Modify tag keys or values'),
   ('tags.delete', 'Delete Tag', 'Delete tag keys, values, or bindings'),
-  -- User management
+  ('secrets.create', 'Create Secret', 'Create secrets in the vault'),
+  ('secrets.read', 'Read Secrets', 'View and list secret metadata (never the value); editors need this to reference secrets from connectors'),
+  ('secrets.update', 'Update Secret', 'Rotate or modify secrets'),
+  ('secrets.delete', 'Delete Secret', 'Delete secrets from the vault'),
+  ('workflows.read', 'Read Workflows', 'View and list workflows, versions, and runs'),
+  ('workflows.create', 'Create Workflow', 'Create workflows and workflow versions'),
+  ('workflows.update', 'Update Workflow', 'Modify workflows and promote versions'),
+  ('workflows.delete', 'Delete Workflow', 'Delete workflows and versions'),
+  ('workflows.run', 'Run Workflow', 'Start and cancel workflow runs'),
+  ('connectors.read', 'Read Connectors', 'View and list connectors'),
+  ('connectors.create', 'Create Connector', 'Create connectors'),
+  ('connectors.update', 'Update Connector', 'Modify connectors'),
+  ('connectors.delete', 'Delete Connector', 'Delete connectors'),
   ('users.read', 'Read Users', 'View and list users'),
   ('users.delete', 'Delete User', 'Delete a user globally (LRO; cascades memberships)'),
-  -- Group management
   ('groups.create', 'Create Group', 'Create new groups'),
   ('groups.read', 'Read Groups', 'View and list groups'),
   ('groups.update', 'Update Group', 'Modify groups'),
   ('groups.delete', 'Delete Group', 'Delete groups'),
   ('groups.manageMembers', 'Manage Group Members', 'Add/remove group members'),
-  -- Role management
   ('roles.create', 'Create Role', 'Create custom roles'),
   ('roles.read', 'Read Roles', 'View and list roles'),
   ('roles.update', 'Update Role', 'Modify custom roles'),
   ('roles.delete', 'Delete Role', 'Delete custom roles'),
   ('roles.manageMembers', 'Manage Role Members', 'Add/remove role members'),
-  -- Invitation management
   ('invitations.create', 'Create Invitation', 'Invite users to the organization'),
   ('invitations.read', 'Read Invitations', 'View and list invitations'),
   ('invitations.delete', 'Delete Invitation', 'Revoke invitations'),
   ('invitations.updatePolicy', 'Update Invitation Policy', 'Modify invitation policy'),
-  -- API key management
   ('apiKeys.create', 'Create API Key', 'Create API keys'),
   ('apiKeys.read', 'Read API Keys', 'View and list API keys'),
   ('apiKeys.update', 'Update API Key', 'Modify API keys'),
   ('apiKeys.delete', 'Delete API Key', 'Delete API keys'),
-  -- Dashboard management (org-level system catalog + space-level user
-  -- dashboards share one permission set; SYSTEM_MANAGED targets reject
-  -- mutation regardless of role via a data-driven handler guard, not IAM)
   ('dashboards.read', 'Read Dashboards', 'View and list dashboards (covers both org-level system catalog and space-level user dashboards)'),
   ('dashboards.create', 'Create Dashboard', 'Create user-managed dashboards in a space. Owner/admin only — dashboards are workspace structure, not day-to-day content (matches spaces.create tier).'),
   ('dashboards.update', 'Update Dashboard', 'Modify a user-managed dashboard. SYSTEM_MANAGED dashboards reject mutation regardless of role.'),
   ('dashboards.delete', 'Delete Dashboard', 'Delete a user-managed dashboard. SYSTEM_MANAGED dashboards reject deletion regardless of role.'),
-  -- Domain management
   ('domains.create', 'Create Domain', 'Claim a DNS domain for the organization'),
   ('domains.read', 'Read Domains', 'View and list domains'),
   ('domains.delete', 'Delete Domain', 'Release a domain claim'),
-  -- Member (role bindings at org and space scope)
   ('members.create', 'Create Member', 'Bind a principal to a role'),
   ('members.read', 'Read Members', 'View and list role bindings at a scope'),
   ('members.update', 'Update Member', 'Change a member''s role'),
   ('members.delete', 'Delete Member', 'Remove a role binding'),
-  -- Storage gateway management
   ('storage.gateways.create', 'Create Storage Gateway', 'Create storage gateways'),
   ('storage.gateways.read', 'Read Storage Gateways', 'View and list storage gateways'),
   ('storage.gateways.update', 'Update Storage Gateway', 'Modify storage gateways'),
@@ -1013,7 +1013,37 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('storage.endpoints.delete', 'Delete Storage Endpoint', 'Delete storage endpoints'),
   ('storage.agents.read', 'Read Agents', 'View and list agents'),
   ('storage.agents.drain', 'Drain Agent', 'Drain agents for maintenance'),
-  ('storage.agents.remove', 'Remove Agent', 'Remove agents from gateway pool');
+  ('storage.agents.remove', 'Remove Agent', 'Remove agents from gateway pool'),
+  ('assets.assets.read', 'Read Assets', 'View and list assets'),
+  ('assets.assets.create', 'Create Asset', 'Create assets'),
+  ('assets.assets.update', 'Update Asset', 'Modify asset metadata'),
+  ('assets.assets.delete', 'Delete Asset', 'Soft-delete assets'),
+  ('assets.assets.undelete', 'Undelete Asset', 'Restore soft-deleted assets'),
+  ('assets.assets.import', 'Import Assets', 'Import assets from storage endpoint'),
+  ('assets.requests.read', 'Read Requests', 'View and list requests'),
+  ('assets.requests.create', 'Create Request', 'Create asset requests'),
+  ('assets.requests.update', 'Update Request', 'Modify request details'),
+  ('assets.requests.delete', 'Delete Request', 'Soft-delete requests'),
+  ('assets.requests.assign', 'Assign Request', 'Assign artists to requests'),
+  ('assets.requests.claim', 'Claim Request', 'Self-assign to open requests'),
+  ('assets.requests.submit', 'Submit Request', 'Submit draft requests'),
+  ('assets.requests.deliver', 'Deliver Request', 'Mark requests as delivered'),
+  ('assets.requests.approve', 'Approve Request', 'Approve delivered requests'),
+  ('assets.requests.reject', 'Reject Request', 'Reject delivered requests'),
+  ('assets.requests.cancel', 'Cancel Request', 'Cancel requests'),
+  ('assets.lineItems.read', 'Read Line Items', 'View and list line items'),
+  ('assets.lineItems.create', 'Create Line Item', 'Add line items to requests'),
+  ('assets.lineItems.update', 'Update Line Item', 'Modify line item details'),
+  ('assets.lineItems.delete', 'Delete Line Item', 'Remove line items from requests'),
+  ('assets.lineItems.fulfill', 'Fulfill Line Item', 'Upload deliverable for line item'),
+  ('ai.conversations.read', 'Read Own Conversations', 'View and list the caller''s own conversations, messages, artifacts, and artifact versions'),
+  ('ai.conversations.create', 'Create Conversation', 'Create conversations under the caller''s own user-uuid'),
+  ('ai.conversations.update', 'Update Own Conversation', 'Modify the caller''s own conversations and their artifacts'),
+  ('ai.conversations.delete', 'Delete Own Conversation', 'Delete the caller''s own conversations and their artifacts'),
+  ('ai.conversations.readAll', 'Read All Conversations', 'Read any user''s conversations in the organization (audit/compliance)'),
+  ('ai.conversations.deleteAll', 'Delete All Conversations', 'Delete any user''s conversations in the organization (departed-employee cleanup)'),
+  ('ai.chat.stream', 'Stream Chat', 'Use AI chat streaming');
+-- END generated: permissions catalog
 
 -- ============================================================================
 -- delegated_auth_sessions (AUTHN-07: plugins delegate auth to the Pivox app)
@@ -1246,33 +1276,6 @@ CREATE INDEX idx_asset_request_line_items_request ON asset_request_line_items (r
 CREATE INDEX idx_asset_request_line_items_asset ON asset_request_line_items (asset_id) WHERE asset_id IS NOT NULL;
 
 -- ============================================================================
--- Asset permissions
--- ============================================================================
-INSERT INTO permissions (permission_id, display_name, description) VALUES
-  ('assets.assets.read', 'Read Assets', 'View and list assets'),
-  ('assets.assets.create', 'Create Asset', 'Create assets'),
-  ('assets.assets.update', 'Update Asset', 'Modify asset metadata'),
-  ('assets.assets.delete', 'Delete Asset', 'Soft-delete assets'),
-  ('assets.assets.undelete', 'Undelete Asset', 'Restore soft-deleted assets'),
-  ('assets.assets.import', 'Import Assets', 'Import assets from storage endpoint'),
-  ('assets.requests.read', 'Read Requests', 'View and list requests'),
-  ('assets.requests.create', 'Create Request', 'Create asset requests'),
-  ('assets.requests.update', 'Update Request', 'Modify request details'),
-  ('assets.requests.delete', 'Delete Request', 'Soft-delete requests'),
-  ('assets.requests.assign', 'Assign Request', 'Assign artists to requests'),
-  ('assets.requests.claim', 'Claim Request', 'Self-assign to open requests'),
-  ('assets.requests.submit', 'Submit Request', 'Submit draft requests'),
-  ('assets.requests.deliver', 'Deliver Request', 'Mark requests as delivered'),
-  ('assets.requests.approve', 'Approve Request', 'Approve delivered requests'),
-  ('assets.requests.reject', 'Reject Request', 'Reject delivered requests'),
-  ('assets.requests.cancel', 'Cancel Request', 'Cancel requests'),
-  ('assets.lineItems.read', 'Read Line Items', 'View and list line items'),
-  ('assets.lineItems.create', 'Create Line Item', 'Add line items to requests'),
-  ('assets.lineItems.update', 'Update Line Item', 'Modify line item details'),
-  ('assets.lineItems.delete', 'Delete Line Item', 'Remove line items from requests'),
-  ('assets.lineItems.fulfill', 'Fulfill Line Item', 'Upload deliverable for line item');
-
--- ============================================================================
 -- AI chat — ai_conversations
 -- ============================================================================
 CREATE TABLE ai_conversations (
@@ -1427,25 +1430,6 @@ ALTER TABLE ai_artifact_versions ADD CONSTRAINT fk_ai_artifact_versions_artifact
 CREATE INDEX idx_ai_artifact_versions_artifact ON ai_artifact_versions (artifact_id, id DESC);
 CREATE INDEX idx_ai_artifact_versions_asset ON ai_artifact_versions (asset_version_name) WHERE asset_version_name IS NOT NULL;
 
--- AI chat permissions. Conversations are personal post-Phase-7;
--- messages, artifacts, and artifact versions are facets of a
--- conversation — their reads roll up to ai.conversations.read, and
--- artifact/version mutations roll up to
--- ai.conversations.update/delete. The base CRUD perms gate
--- org-level eligibility; the handler enforces creator-only
--- ownership on top so a viewer can manage their OWN conversations
--- but cannot reach a peer's. The `*All` audit perms bypass the
--- creator check for legal-hold and departed-employee cleanup
--- workflows.
-INSERT INTO permissions (permission_id, display_name, description) VALUES
-  ('ai.conversations.read', 'Read Own Conversations', 'View and list the caller''s own conversations, messages, artifacts, and artifact versions'),
-  ('ai.conversations.create', 'Create Conversation', 'Create conversations under the caller''s own user-uuid'),
-  ('ai.conversations.update', 'Update Own Conversation', 'Modify the caller''s own conversations and their artifacts'),
-  ('ai.conversations.delete', 'Delete Own Conversation', 'Delete the caller''s own conversations and their artifacts'),
-  ('ai.conversations.readAll', 'Read All Conversations', 'Read any user''s conversations in the organization (audit/compliance)'),
-  ('ai.conversations.deleteAll', 'Delete All Conversations', 'Delete any user''s conversations in the organization (departed-employee cleanup)'),
-  ('ai.chat.stream', 'Stream Chat', 'Use AI chat streaming');
-
 -- ============================================================================
 -- secrets (encrypted credential vault)
 -- ============================================================================
@@ -1480,9 +1464,145 @@ CREATE TABLE secrets (
 CREATE INDEX idx_secrets_org ON secrets (org_id);
 CREATE INDEX idx_secrets_space ON secrets (space_id) WHERE space_id IS NOT NULL;
 
--- Secret (vault) permissions
-INSERT INTO permissions (permission_id, display_name, description) VALUES
-  ('secrets.create', 'Create Secret', 'Create secrets in the vault'),
-  ('secrets.read', 'Read Secrets', 'View and list secret metadata (never the value)'),
-  ('secrets.update', 'Update Secret', 'Rotate or modify secrets'),
-  ('secrets.delete', 'Delete Secret', 'Delete secrets from the vault');
+-- ============================================================================
+-- workflows (workflow engine — definitions, versions, runs, connectors)
+-- ============================================================================
+-- A Workflow is a container; its behavior lives in immutable
+-- workflow_versions. The container points at the promoted (live) version
+-- (`version`), holds the customer's persistent parameter config, and records
+-- whether it's a Pivox-MANAGED system workflow or customer-OWNED. Org- or
+-- space-scoped: space_id NULL means org-scoped.
+--
+-- Circular FK note: workflows.version → workflow_versions(id) and
+-- workflow_versions.workflow_id → workflows(id) form a cycle. The
+-- workflows.version FK is therefore added by a separate ALTER TABLE after
+-- both tables exist (see below). Inserts are always workflow-first
+-- (version NULL) → version → promote, so no deferral is needed.
+CREATE TABLE workflows (
+    id            UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    space_id      UUID REFERENCES spaces(id) ON DELETE CASCADE,
+    -- identity
+    workflow_id   TEXT NOT NULL, -- AIP slug, unique per (org_id, space_id)
+    -- domain
+    display_name  TEXT NOT NULL DEFAULT '',
+    description   TEXT NOT NULL DEFAULT '',
+    enabled       BOOLEAN NOT NULL DEFAULT false, -- master switch for triggers
+    -- the promoted (live) version; NULL until a version is promoted. FK added
+    -- below (circular ref). ON DELETE SET NULL: deleting the live version
+    -- unsets the pointer rather than blocking.
+    version       UUID,
+    -- persistent parameter config applied to every triggered run
+    config        JSONB NOT NULL DEFAULT '{}',
+    -- 'OWNED' (customer) | 'MANAGED' (Pivox system workflow)
+    origin        TEXT NOT NULL DEFAULT 'OWNED',
+    annotations   JSONB NOT NULL DEFAULT '{}',
+    -- versioning
+    etag          TEXT NOT NULL DEFAULT md5(now()::text),
+    -- audit
+    created_by    UUID REFERENCES identities(id),
+    updated_by    UUID REFERENCES identities(id),
+    -- timestamps
+    create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Slug unique per parent. NULLS NOT DISTINCT so two org-scoped rows
+    -- (space_id NULL) still collide on a duplicate workflow_id.
+    UNIQUE NULLS NOT DISTINCT (org_id, space_id, workflow_id)
+);
+CREATE INDEX idx_workflows_org ON workflows (org_id);
+CREATE INDEX idx_workflows_space ON workflows (space_id) WHERE space_id IS NOT NULL;
+
+-- An immutable definition version of a Workflow. Editing a workflow mints a
+-- new one; it is a draft until promoted. version_number is the monotonic
+-- {version} segment of the resource name (NOT the uuid). No update_time —
+-- versions are immutable once created.
+CREATE TABLE workflow_versions (
+    id             UUID PRIMARY KEY DEFAULT uuidv7(),
+    workflow_id    UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    -- monotonic per workflow; the {version} name segment
+    version_number BIGINT NOT NULL,
+    note           TEXT NOT NULL DEFAULT '', -- author's change note
+    -- marshaled parameters + trigger + root Sequence (opaque interpreted tree)
+    definition     JSONB NOT NULL,
+    -- audit (immutable: create only)
+    created_by     UUID REFERENCES identities(id),
+    create_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (workflow_id, version_number)
+);
+-- Listing versions of a workflow, keyset-paginated on id (uuidv7 id order
+-- matches version_number order). The UNIQUE (workflow_id, version_number)
+-- index orders by number, so an id-ordered keyset would otherwise sort.
+CREATE INDEX idx_workflow_versions_workflow ON workflow_versions (workflow_id, id);
+
+-- Circular-ref FK: workflows.version → workflow_versions(id). Added here
+-- (not inline) because workflow_versions references workflows, so neither
+-- table can carry the other's FK at create time. ON DELETE SET NULL so
+-- deleting a promoted version unsets the live pointer.
+ALTER TABLE workflows
+  ADD CONSTRAINT fk_workflows_version
+  FOREIGN KEY (version) REFERENCES workflow_versions(id) ON DELETE SET NULL;
+
+-- One execution of a pinned workflow_version. LRO-shaped: pollable, with
+-- rich per-step state. Executes as the workflow service identity;
+-- triggered_by records who/what caused it (NULL for system triggers).
+CREATE TABLE workflow_runs (
+    id           UUID PRIMARY KEY DEFAULT uuidv7(),
+    workflow_id  UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    -- the version pinned at start; NO ACTION so a version with runs can't be
+    -- dropped out from under them (checked at end-of-statement, so a
+    -- force-delete of the whole workflow still cascades cleanly).
+    version_id   UUID NOT NULL REFERENCES workflow_versions(id),
+    -- lifecycle: PENDING|RUNNING|WAITING|SUCCEEDED|FAILED|CANCELLED
+    state        TEXT NOT NULL,
+    trigger      JSONB NOT NULL DEFAULT '{}', -- RunTrigger (kind + subject/parent)
+    subject      TEXT NOT NULL DEFAULT '',    -- resource the run operates on
+    input        JSONB,                       -- initial input (params/payload)
+    output       JSONB,                       -- final result on success
+    steps        JSONB NOT NULL DEFAULT '[]', -- per-step state (never a secret)
+    error        JSONB,                       -- google.rpc.Status on FAILED
+    -- audit: who/what fired the run; NULL for system triggers
+    triggered_by UUID REFERENCES identities(id),
+    -- timestamps
+    create_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    start_time   TIMESTAMPTZ,
+    end_time     TIMESTAMPTZ
+);
+-- Listing runs of a workflow, keyset-paginated on id.
+CREATE INDEX idx_workflow_runs_workflow ON workflow_runs (workflow_id, id);
+-- FK index on version_id: Postgres does not auto-index FK columns, so the
+-- referential-integrity check on DELETE FROM workflow_versions would seq-scan
+-- workflow_runs. Also serves "list runs of a version".
+CREATE INDEX idx_workflow_runs_version ON workflow_runs (version_id);
+
+-- A reusable, credentialed connection to an external system. Workflow
+-- activities bind to a Connector by name so the definition stays
+-- credential-free. Org- or space-scoped like workflows.
+CREATE TABLE connectors (
+    id            UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    space_id      UUID REFERENCES spaces(id) ON DELETE CASCADE,
+    -- identity
+    connector_id  TEXT NOT NULL, -- AIP slug, unique per (org_id, space_id)
+    -- domain
+    display_name  TEXT NOT NULL DEFAULT '',
+    description   TEXT NOT NULL DEFAULT '',
+    -- typed connector config (CEL fields may reference vault Secrets)
+    config        JSONB NOT NULL DEFAULT '{}',
+    -- on-prem agent whose network runs activities using this connector;
+    -- empty = the cloud controller
+    agent         TEXT NOT NULL DEFAULT '',
+    annotations   JSONB NOT NULL DEFAULT '{}',
+    -- versioning
+    etag          TEXT NOT NULL DEFAULT md5(now()::text),
+    -- audit
+    created_by    UUID REFERENCES identities(id),
+    updated_by    UUID REFERENCES identities(id),
+    -- timestamps
+    create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE NULLS NOT DISTINCT (org_id, space_id, connector_id)
+);
+CREATE INDEX idx_connectors_org ON connectors (org_id);
+CREATE INDEX idx_connectors_space ON connectors (space_id) WHERE space_id IS NOT NULL;

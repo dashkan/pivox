@@ -82,6 +82,46 @@ permissions:
     display_name: Delete Secret
     description: Delete secrets from the vault
     roles: [owner, admin]
+  # Workflow engine: read/run reach editors (day-to-day operation);
+  # structural mutation (create/update/delete of workflows, versions,
+  # connectors) is owner/admin. `workflows.read` covers workflows,
+  # versions, and runs; `workflows.run` covers starting and cancelling runs.
+  - id: workflows.read
+    display_name: Read Workflows
+    description: View and list workflows, versions, and runs
+    roles: [owner, admin, editor]
+  - id: workflows.create
+    display_name: Create Workflow
+    description: Create workflows and workflow versions
+    roles: [owner, admin]
+  - id: workflows.update
+    display_name: Update Workflow
+    description: Modify workflows and promote versions
+    roles: [owner, admin]
+  - id: workflows.delete
+    display_name: Delete Workflow
+    description: Delete workflows and versions
+    roles: [owner, admin]
+  - id: workflows.run
+    display_name: Run Workflow
+    description: Start and cancel workflow runs
+    roles: [owner, admin, editor]
+  - id: connectors.read
+    display_name: Read Connectors
+    description: View and list connectors
+    roles: [owner, admin, editor]
+  - id: connectors.create
+    display_name: Create Connector
+    description: Create connectors
+    roles: [owner, admin]
+  - id: connectors.update
+    display_name: Update Connector
+    description: Modify connectors
+    roles: [owner, admin]
+  - id: connectors.delete
+    display_name: Delete Connector
+    description: Delete connectors
+    roles: [owner, admin]
   - id: users.read
     display_name: Read Users
     description: View and list users

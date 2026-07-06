@@ -23,6 +23,15 @@ const (
 	SecretsRead                    = "secrets.read"
 	SecretsUpdate                  = "secrets.update"
 	SecretsDelete                  = "secrets.delete"
+	WorkflowsRead                  = "workflows.read"
+	WorkflowsCreate                = "workflows.create"
+	WorkflowsUpdate                = "workflows.update"
+	WorkflowsDelete                = "workflows.delete"
+	WorkflowsRun                   = "workflows.run"
+	ConnectorsRead                 = "connectors.read"
+	ConnectorsCreate               = "connectors.create"
+	ConnectorsUpdate               = "connectors.update"
+	ConnectorsDelete               = "connectors.delete"
 	UsersRead                      = "users.read"
 	UsersDelete                    = "users.delete"
 	GroupsCreate                   = "groups.create"
@@ -119,6 +128,15 @@ var All = []string{
 	SecretsRead,
 	SecretsUpdate,
 	SecretsDelete,
+	WorkflowsRead,
+	WorkflowsCreate,
+	WorkflowsUpdate,
+	WorkflowsDelete,
+	WorkflowsRun,
+	ConnectorsRead,
+	ConnectorsCreate,
+	ConnectorsUpdate,
+	ConnectorsDelete,
 	UsersRead,
 	UsersDelete,
 	GroupsCreate,
@@ -235,6 +253,10 @@ var RoleGrants = map[string][]string{
 		AssetsRequestsReject,
 		AssetsRequestsSubmit,
 		AssetsRequestsUpdate,
+		ConnectorsCreate,
+		ConnectorsDelete,
+		ConnectorsRead,
+		ConnectorsUpdate,
 		DashboardsCreate,
 		DashboardsDelete,
 		DashboardsRead,
@@ -292,6 +314,11 @@ var RoleGrants = map[string][]string{
 		TagsUpdate,
 		UsersDelete,
 		UsersRead,
+		WorkflowsCreate,
+		WorkflowsDelete,
+		WorkflowsRead,
+		WorkflowsRun,
+		WorkflowsUpdate,
 	},
 	RoleAdmin: {
 		AiChatStream,
@@ -326,6 +353,10 @@ var RoleGrants = map[string][]string{
 		AssetsRequestsReject,
 		AssetsRequestsSubmit,
 		AssetsRequestsUpdate,
+		ConnectorsCreate,
+		ConnectorsDelete,
+		ConnectorsRead,
+		ConnectorsUpdate,
 		DashboardsCreate,
 		DashboardsDelete,
 		DashboardsRead,
@@ -379,6 +410,11 @@ var RoleGrants = map[string][]string{
 		TagsRead,
 		TagsUpdate,
 		UsersRead,
+		WorkflowsCreate,
+		WorkflowsDelete,
+		WorkflowsRead,
+		WorkflowsRun,
+		WorkflowsUpdate,
 	},
 	RoleEditor: {
 		AiChatStream,
@@ -404,6 +440,7 @@ var RoleGrants = map[string][]string{
 		AssetsRequestsRead,
 		AssetsRequestsSubmit,
 		AssetsRequestsUpdate,
+		ConnectorsRead,
 		DashboardsRead,
 		GroupsRead,
 		OrganizationsRead,
@@ -415,6 +452,8 @@ var RoleGrants = map[string][]string{
 		StorageGatewaysRead,
 		TagsRead,
 		UsersRead,
+		WorkflowsRead,
+		WorkflowsRun,
 	},
 	RoleViewer: {
 		AiChatStream,

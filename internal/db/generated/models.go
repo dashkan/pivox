@@ -898,6 +898,23 @@ type AssetVersion struct {
 	CreateTime     time.Time   `json:"create_time"`
 }
 
+type Connector struct {
+	ID          uuid.UUID       `json:"id"`
+	OrgID       uuid.UUID       `json:"org_id"`
+	SpaceID     pgtype.UUID     `json:"space_id"`
+	ConnectorID string          `json:"connector_id"`
+	DisplayName string          `json:"display_name"`
+	Description string          `json:"description"`
+	Config      json.RawMessage `json:"config"`
+	Agent       string          `json:"agent"`
+	Annotations json.RawMessage `json:"annotations"`
+	Etag        string          `json:"etag"`
+	CreatedBy   pgtype.UUID     `json:"created_by"`
+	UpdatedBy   pgtype.UUID     `json:"updated_by"`
+	CreateTime  time.Time       `json:"create_time"`
+	UpdateTime  time.Time       `json:"update_time"`
+}
+
 type Dashboard struct {
 	ID             uuid.UUID          `json:"id"`
 	SpaceID        uuid.UUID          `json:"space_id"`
@@ -1251,4 +1268,50 @@ type TagValue struct {
 	UpdatedBy      pgtype.UUID     `json:"updated_by"`
 	CreateTime     time.Time       `json:"create_time"`
 	UpdateTime     time.Time       `json:"update_time"`
+}
+
+type Workflow struct {
+	ID          uuid.UUID       `json:"id"`
+	OrgID       uuid.UUID       `json:"org_id"`
+	SpaceID     pgtype.UUID     `json:"space_id"`
+	WorkflowID  string          `json:"workflow_id"`
+	DisplayName string          `json:"display_name"`
+	Description string          `json:"description"`
+	Enabled     bool            `json:"enabled"`
+	Version     pgtype.UUID     `json:"version"`
+	Config      json.RawMessage `json:"config"`
+	Origin      string          `json:"origin"`
+	Annotations json.RawMessage `json:"annotations"`
+	Etag        string          `json:"etag"`
+	CreatedBy   pgtype.UUID     `json:"created_by"`
+	UpdatedBy   pgtype.UUID     `json:"updated_by"`
+	CreateTime  time.Time       `json:"create_time"`
+	UpdateTime  time.Time       `json:"update_time"`
+}
+
+type WorkflowRun struct {
+	ID          uuid.UUID          `json:"id"`
+	WorkflowID  uuid.UUID          `json:"workflow_id"`
+	VersionID   uuid.UUID          `json:"version_id"`
+	State       string             `json:"state"`
+	Trigger     json.RawMessage    `json:"trigger"`
+	Subject     string             `json:"subject"`
+	Input       []byte             `json:"input"`
+	Output      []byte             `json:"output"`
+	Steps       json.RawMessage    `json:"steps"`
+	Error       []byte             `json:"error"`
+	TriggeredBy pgtype.UUID        `json:"triggered_by"`
+	CreateTime  time.Time          `json:"create_time"`
+	StartTime   pgtype.Timestamptz `json:"start_time"`
+	EndTime     pgtype.Timestamptz `json:"end_time"`
+}
+
+type WorkflowVersion struct {
+	ID            uuid.UUID       `json:"id"`
+	WorkflowID    uuid.UUID       `json:"workflow_id"`
+	VersionNumber int64           `json:"version_number"`
+	Note          string          `json:"note"`
+	Definition    json.RawMessage `json:"definition"`
+	CreatedBy     pgtype.UUID     `json:"created_by"`
+	CreateTime    time.Time       `json:"create_time"`
 }

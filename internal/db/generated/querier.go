@@ -115,6 +115,9 @@ type Querier interface {
 	CreateAssetArtifactVersion(ctx context.Context, arg CreateAssetArtifactVersionParams) (AiArtifactVersion, error)
 	CreateAssetRendition(ctx context.Context, arg CreateAssetRenditionParams) (AssetRendition, error)
 	CreateAssetVersion(ctx context.Context, arg CreateAssetVersionParams) (AssetVersion, error)
+	// id is app-generated (uuid.New) so the caller has it before the write
+	// (mirrors the Secret create path, keeping ids caller-visible for logging).
+	CreateConnector(ctx context.Context, arg CreateConnectorParams) (Connector, error)
 	// `created_by` doubles as the conversation owner / authorization
 	// key (the `users/{user}` resource path segment). NOT NULL on the
 	// column; every conversation has a creator.
@@ -173,9 +176,24 @@ type Querier interface {
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
 	CreateTagKey(ctx context.Context, arg CreateTagKeyParams) (TagKey, error)
 	CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error)
+	// ============================================================================
+	// workflows (the container)
+	// ============================================================================
+	// id is app-generated so the caller has it before the write. `version` is
+	// always NULL at create — a workflow is created version-less, then a version
+	// is minted and promoted (workflow-first insert order avoids the circular FK).
+	CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) (Workflow, error)
+	// ============================================================================
+	// workflow_runs (executions)
+	// ============================================================================
+	// A run is created PENDING; output/error/end_time are filled in later via
+	// UpdateWorkflowRunState. triggered_by is NULL for system triggers.
+	CreateWorkflowRun(ctx context.Context, arg CreateWorkflowRunParams) (WorkflowRun, error)
+	CreateWorkflowVersion(ctx context.Context, arg CreateWorkflowVersionParams) (WorkflowVersion, error)
 	DeleteArtifact(ctx context.Context, id uuid.UUID) error
 	DeleteArtifactVersion(ctx context.Context, id uuid.UUID) error
 	DeleteAssetRenditionsByVersion(ctx context.Context, versionID uuid.UUID) error
+	DeleteConnector(ctx context.Context, id uuid.UUID) error
 	DeleteConversation(ctx context.Context, id uuid.UUID) error
 	// DeleteDomain removes a domain row. The handler runs preconditions
 	// (cancel in-flight LROs, last-VERIFIED-domain-on-enabled-SSO check)
@@ -235,6 +253,8 @@ type Querier interface {
 	DeleteTagBinding(ctx context.Context, id uuid.UUID) error
 	DeleteTagKey(ctx context.Context, id uuid.UUID) error
 	DeleteTagValue(ctx context.Context, id uuid.UUID) error
+	DeleteWorkflow(ctx context.Context, id uuid.UUID) error
+	DeleteWorkflowVersion(ctx context.Context, id uuid.UUID) error
 	// Catalog permission_id strings the identity holds at the org, resolved
 	// via role_permissions (direct user bindings + group-derived). DB-side
 	// source of truth for authorization; resolves system + custom roles
@@ -283,6 +303,13 @@ type Querier interface {
 	GetAssetNamesByIDs(ctx context.Context, ids []uuid.UUID) ([]GetAssetNamesByIDsRow, error)
 	GetAssetVersion(ctx context.Context, id uuid.UUID) (AssetVersion, error)
 	GetAssetVersionByNumber(ctx context.Context, arg GetAssetVersionByNumberParams) (AssetVersion, error)
+	GetConnector(ctx context.Context, id uuid.UUID) (Connector, error)
+	// Resolves a Connector from its parent + slug. space_id IS NOT DISTINCT FROM
+	// treats NULL (org-scoped) as a matchable value.
+	GetConnectorByParent(ctx context.Context, arg GetConnectorByParentParams) (Connector, error)
+	// GetConnectorForUpdate locks the row for the update/delete tx so the etag
+	// check and the write serialize against a concurrent update.
+	GetConnectorForUpdate(ctx context.Context, id uuid.UUID) (Connector, error)
 	GetConversationByID(ctx context.Context, id uuid.UUID) (AiConversation, error)
 	// GetConversationByIDForUpdate is the locking variant used by
 	// runGenerate / persistInputMessage inside their per-message
@@ -463,6 +490,17 @@ type Querier interface {
 	// commits — eliminating the TOCTOU window between "no bindings"
 	// and "delete value".
 	GetTagValueForUpdate(ctx context.Context, id uuid.UUID) (TagValue, error)
+	GetWorkflow(ctx context.Context, id uuid.UUID) (Workflow, error)
+	// Resolves a Workflow from its parent + slug. space_id IS NOT DISTINCT FROM
+	// treats NULL (org-scoped) as a matchable value.
+	GetWorkflowByParent(ctx context.Context, arg GetWorkflowByParentParams) (Workflow, error)
+	// GetWorkflowForUpdate locks the row for the update/promote/delete tx so the
+	// etag check and the write serialize against a concurrent mutation.
+	GetWorkflowForUpdate(ctx context.Context, id uuid.UUID) (Workflow, error)
+	GetWorkflowRun(ctx context.Context, id uuid.UUID) (WorkflowRun, error)
+	GetWorkflowVersion(ctx context.Context, id uuid.UUID) (WorkflowVersion, error)
+	// Resolves a version from its parent workflow + monotonic {version} segment.
+	GetWorkflowVersionByNumber(ctx context.Context, arg GetWorkflowVersionByNumberParams) (WorkflowVersion, error)
 	// Materializes a role's permission grants into role_permissions from a
 	// list of catalog permission_id strings (e.g. "organizations.read").
 	// Used at org bootstrap (and the dev seed) to write the static
@@ -565,6 +603,9 @@ type Querier interface {
 	// role_permissions supplies the generic read grant (all system roles
 	// hold it today, but the join future-proofs custom roles that may not).
 	ListAuthorizedOperations(ctx context.Context, arg ListAuthorizedOperationsParams) ([]Operation, error)
+	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+	// (AIP-160 filter / order_by are not yet wired — ordered by id.)
+	ListConnectorsByParent(ctx context.Context, arg ListConnectorsByParentParams) ([]Connector, error)
 	// Live dashboards in a space, newest-first. Pagination is offset-
 	// based for v1 — the catalog is small (≤ 100s of dashboards per
 	// space) and the surface won't grow until customers start
@@ -692,6 +733,13 @@ type Querier interface {
 	// names across gateways collapse to one pattern).
 	ListStorageEndpointShortNamesByOrg(ctx context.Context, orgID uuid.UUID) ([]string, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
+	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+	ListWorkflowRuns(ctx context.Context, arg ListWorkflowRunsParams) ([]WorkflowRun, error)
+	// Keyset pagination on id (uuidv7 is time-ordered, matching version_number
+	// order). Fetch page_limit+1 to detect a next page.
+	ListWorkflowVersions(ctx context.Context, arg ListWorkflowVersionsParams) ([]WorkflowVersion, error)
+	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+	ListWorkflowsByParent(ctx context.Context, arg ListWorkflowsByParentParams) ([]Workflow, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
 	// MarkDomainFailed flips a PENDING domain to FAILED. Same race-
 	// safety as MarkDomainVerified.
@@ -702,6 +750,12 @@ type Querier interface {
 	// absorbed (returns no rows).
 	MarkDomainVerified(ctx context.Context, id uuid.UUID) (Domain, error)
 	NextVersionNumber(ctx context.Context, assetID uuid.UUID) (int32, error)
+	// ============================================================================
+	// workflow_versions (immutable definitions)
+	// ============================================================================
+	// The next monotonic version_number for a workflow. Called inside the create
+	// tx (under the workflow row lock) so concurrent version creates don't collide.
+	NextWorkflowVersionNumber(ctx context.Context, workflowID uuid.UUID) (int32, error)
 	// PurgeExpiredOrganization is the purge-worker variant: deletes
 	// only soft-deleted orgs whose grace window has elapsed. The WHERE
 	// clause race-guards against a concurrent UndeleteOrganization
@@ -756,6 +810,14 @@ type Querier interface {
 	// Server-driven title write (the `:summarize` path). Does NOT flip
 	// `title_user_set` — that's the whole point of the flag.
 	SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiConversation, error)
+	// Promote: point the container at one of its OWN versions, making it live.
+	// The join enforces v.workflow_id = w.id — fk_workflows_version only
+	// guarantees the version row exists, NOT that it belongs to this workflow, so
+	// without the join a cross-workflow promote would corrupt the
+	// container→definition link (Workflow A executing B's definition). No row is
+	// returned (→ ErrNoRows) when the version isn't this workflow's; the handler
+	// maps that to FailedPrecondition. Serialized under GetWorkflowForUpdate's lock.
+	SetWorkflowVersion(ctx context.Context, arg SetWorkflowVersionParams) (Workflow, error)
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
 	// Sets delete_time + deleted_by; row is no longer returned by
@@ -797,6 +859,8 @@ type Querier interface {
 	UpdateAssetIngestion(ctx context.Context, arg UpdateAssetIngestionParams) error
 	UpdateAssetState(ctx context.Context, arg UpdateAssetStateParams) error
 	UpdateAssetVersionError(ctx context.Context, arg UpdateAssetVersionErrorParams) error
+	// Masked update: a nil arg leaves the column unchanged.
+	UpdateConnector(ctx context.Context, arg UpdateConnectorParams) (Connector, error)
 	// ListConversations/CountConversations replaced by filter.Query in the
 	// service layer — see internal/filter/declarations.go ConversationFilter.
 	// A user-driven title write (UpdateConversation with `title` in the
@@ -854,6 +918,13 @@ type Querier interface {
 	UpdateStorageGatewayVersion(ctx context.Context, arg UpdateStorageGatewayVersionParams) error
 	UpdateTagKey(ctx context.Context, arg UpdateTagKeyParams) (TagKey, error)
 	UpdateTagValue(ctx context.Context, arg UpdateTagValueParams) (TagValue, error)
+	// Masked update of the container fields. `version` (promoted pointer) and
+	// `origin` are set elsewhere (SetWorkflowVersion / create), never here.
+	UpdateWorkflow(ctx context.Context, arg UpdateWorkflowParams) (Workflow, error)
+	// Advances a run's lifecycle. state is always set; output/steps/error/end_time
+	// are masked (a nil arg leaves the column unchanged) so a mid-run step update
+	// doesn't clobber a not-yet-set terminal field.
+	UpdateWorkflowRunState(ctx context.Context, arg UpdateWorkflowRunStateParams) (WorkflowRun, error)
 	// Provisions / syncs a Keycloak-authenticated identity from a KC event
 	// (keycloak-events topic). The row's `id` IS the Keycloak `sub` (passed in,
 	// not generated by the uuidv7 default). REGISTER inserts; UPDATE_EMAIL /
