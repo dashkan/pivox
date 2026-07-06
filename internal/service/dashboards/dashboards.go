@@ -290,14 +290,19 @@ func (s *Server) CreateDashboard(ctx context.Context, req *apiv1.CreateDashboard
 		return nil, apierr.Internal("dashboard marshal")
 	}
 
-	row, err := s.queries.CreateDashboard(ctx, db.CreateDashboardParams{
-		SpaceID:        resolved.ID,
-		Name:           dashboardID,
-		DisplayName:    clean.GetDisplayName(),
-		Description:    clean.GetDescription(),
-		ManagementMode: "USER_MANAGED",
-		Payload:        payload,
-		CreatedBy:      convert.PgUUID(callerID),
+	// validate_only runs the INSERT against real constraints and rolls it
+	// back, so a would-fail request (e.g. duplicate slug) returns the same
+	// error a live one would while persisting nothing.
+	row, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Dashboard, error) {
+		return qtx.CreateDashboard(ctx, db.CreateDashboardParams{
+			SpaceID:        resolved.ID,
+			Name:           dashboardID,
+			DisplayName:    clean.GetDisplayName(),
+			Description:    clean.GetDescription(),
+			ManagementMode: "USER_MANAGED",
+			Payload:        payload,
+			CreatedBy:      convert.PgUUID(callerID),
+		})
 	})
 	if err != nil {
 		// HandleResourceError maps SQLSTATE 23505 (unique violation) →
@@ -359,7 +364,11 @@ func (s *Server) UpdateDashboard(ctx context.Context, req *apiv1.UpdateDashboard
 	resolved := server.MustResolvedSpaceFromContext(ctx)
 	callerID := server.MustUserID(ctx)
 
-	updated, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.Dashboard, error) {
+	// validate_only runs the whole update tx (row lock, guards, UPDATE)
+	// against real state and rolls it back, so a would-fail request (e.g.
+	// etag mismatch, SYSTEM_MANAGED) returns the same error a live one would
+	// while persisting nothing.
+	updated, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Dashboard, error) {
 		existing, err := qtx.GetDashboardByNameForUpdate(ctx, db.GetDashboardByNameForUpdateParams{
 			SpaceID: resolved.ID,
 			Name:    id,
@@ -459,7 +468,10 @@ func (s *Server) DeleteDashboard(ctx context.Context, req *apiv1.DeleteDashboard
 	resolved := server.MustResolvedSpaceFromContext(ctx)
 	callerID := server.MustUserID(ctx)
 
-	deleted, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.Dashboard, error) {
+	// validate_only runs the whole delete tx (row lock, guard, soft-delete)
+	// against real state and rolls it back, so a would-fail request returns
+	// the same error a live one would while persisting nothing.
+	deleted, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Dashboard, error) {
 		existing, err := qtx.GetDashboardByNameForUpdate(ctx, db.GetDashboardByNameForUpdateParams{
 			SpaceID: resolved.ID,
 			Name:    id,

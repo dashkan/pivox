@@ -602,3 +602,49 @@ func insertSystemManagedDashboard(t *testing.T, h *grpcharness.Harness, fx seede
 		`{"display_name":"Imported System Dashboard","management_mode":"SYSTEM_MANAGED"}`)
 	require.NoError(t, err)
 }
+
+// TestE2E_CreateDashboard_ValidateOnly pins the AIP validate_only contract:
+// a dry-run runs the same validation a live request would (so a would-fail
+// request still fails) but persists nothing — the would-be dashboard is not
+// gettable and its slug is reusable.
+func TestE2E_CreateDashboard_ValidateOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newDashboardsHarness(t)
+	fx := seedFixture(t, h, "dash-vo")
+	client := apiv1.NewDashboardsClient(h.Conn())
+	ctx := context.Background()
+
+	// A dry-run Create returns the would-be resource but writes nothing.
+	dry, err := client.CreateDashboard(ctx, &apiv1.CreateDashboardRequest{
+		Parent:       fx.spaceParent,
+		DashboardId:  "vo-dash",
+		Dashboard:    &apiv1.Dashboard{DisplayName: "Dry"},
+		ValidateOnly: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, fx.spaceParent+"/dashboards/vo-dash", dry.GetName())
+
+	// Not persisted → the would-be dashboard is not gettable.
+	_, err = client.GetDashboard(ctx, &apiv1.GetDashboardRequest{Name: dry.GetName()})
+	requireGRPCCode(t, err, codes.NotFound)
+
+	// A real Create can reuse the same slug.
+	_, err = client.CreateDashboard(ctx, &apiv1.CreateDashboardRequest{
+		Parent:      fx.spaceParent,
+		DashboardId: "vo-dash",
+		Dashboard:   &apiv1.Dashboard{DisplayName: "Real"},
+	})
+	require.NoError(t, err, "validate_only must not have persisted the dashboard")
+
+	// A dry-run that WOULD fail live (duplicate slug now exists) fails.
+	_, err = client.CreateDashboard(ctx, &apiv1.CreateDashboardRequest{
+		Parent:       fx.spaceParent,
+		DashboardId:  "vo-dash",
+		Dashboard:    &apiv1.Dashboard{DisplayName: "Dup"},
+		ValidateOnly: true,
+	})
+	requireGRPCCode(t, err, codes.AlreadyExists)
+}
