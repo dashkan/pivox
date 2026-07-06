@@ -96,6 +96,7 @@ func newSessionTestEnv(t *testing.T, opts ...sessionTestOpts) *sessionTestEnv {
 		grpcharness.WithSpacesServer(),
 		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 			storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
+				Pool:          h.Pool,
 				Queries:       h.Queries,
 				Encryptor:     h.Encryptor,
 				Conns:         conns,
@@ -103,7 +104,7 @@ func newSessionTestEnv(t *testing.T, opts ...sessionTestOpts) *sessionTestEnv {
 				CookieDomain:  o.CookieDomain,
 			}))
 			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
-				Queries: h.Queries, Encryptor: h.Encryptor,
+				Pool: h.Pool, Queries: h.Queries, Encryptor: h.Encryptor,
 			}))
 		}))
 	return &sessionTestEnv{
@@ -724,13 +725,14 @@ func TestIntegration_SessionSigningKey_RoundTripsControllerToAgent(t *testing.T)
 		grpcharness.WithSpacesServer(),
 		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 			storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
+				Pool:              h.Pool,
 				Queries:           h.Queries,
 				Encryptor:         h.Encryptor,
 				Conns:             conns,
 				SessionSigningKey: []byte(sharedKey),
 			}))
 			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
-				Queries: h.Queries, Encryptor: h.Encryptor,
+				Pool: h.Pool, Queries: h.Queries, Encryptor: h.Encryptor,
 			}))
 		}))
 	gwClient := storagev1.NewStorageGatewaysClient(h.Conn())

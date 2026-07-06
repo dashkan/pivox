@@ -25,6 +25,7 @@ import (
 
 type EndpointsServer struct {
 	storagev1.UnimplementedEndpointsServer
+	pool      db.TxBeginner
 	queries   db.Querier
 	encryptor crypto.Encryptor
 	audit     *audit.Resolver
@@ -32,6 +33,9 @@ type EndpointsServer struct {
 
 // EndpointsConfig is the constructor input for EndpointsServer.
 type EndpointsConfig struct {
+	// Pool begins transactions for tx-wrapped writes (used by the
+	// validate_only dry-run path). *pgxpool.Pool satisfies it. Required.
+	Pool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Encryptor wraps Cloud KMS for column-level encryption.
@@ -45,10 +49,14 @@ type EndpointsConfig struct {
 // NewEndpointsServer constructs the server from cfg. Panics on a
 // missing required field.
 func NewEndpointsServer(cfg EndpointsConfig) *EndpointsServer {
+	if cfg.Pool == nil {
+		panic("storage: EndpointsConfig.Pool is required")
+	}
 	if cfg.Queries == nil {
 		panic("storage: EndpointsConfig.Queries is required")
 	}
 	return &EndpointsServer{
+		pool:      cfg.Pool,
 		queries:   cfg.Queries,
 		encryptor: cfg.Encryptor,
 		audit:     cfg.AuditResolver,
@@ -183,18 +191,23 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 		}
 	}
 
-	result, err := s.queries.CreateStorageEndpoint(ctx, db.CreateStorageEndpointParams{
-		ID:             uuid.New(),
-		GatewayID:      gw.ID,
-		Name:           endpointID,
-		DisplayName:    endpoint.GetDisplayName(),
-		Configuration:  configJSON,
-		CacheEnabled:   cacheEnabled,
-		CacheMaxSizeGb: cacheMaxSizeGb,
-		CacheEviction:  cacheEviction,
-		CacheTtlHours:  cacheTtlHours,
-		Annotations:    annotationsJSON,
-		CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
+	// validate_only runs the INSERT against real constraints and rolls it
+	// back, so a would-fail request (e.g. duplicate name) returns the same
+	// error a live one would while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.StorageEndpoint, error) {
+		return qtx.CreateStorageEndpoint(ctx, db.CreateStorageEndpointParams{
+			ID:             uuid.New(),
+			GatewayID:      gw.ID,
+			Name:           endpointID,
+			DisplayName:    endpoint.GetDisplayName(),
+			Configuration:  configJSON,
+			CacheEnabled:   cacheEnabled,
+			CacheMaxSizeGb: cacheMaxSizeGb,
+			CacheEviction:  cacheEviction,
+			CacheTtlHours:  cacheTtlHours,
+			Annotations:    annotationsJSON,
+			CreatedBy:      convert.PgUUID(server.MustUserID(ctx)),
+		})
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Endpoint", "")
@@ -350,7 +363,12 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 		}
 	}
 
-	result, err := s.queries.UpdateStorageEndpoint(ctx, updateParams)
+	// validate_only runs the UPDATE against real constraints and rolls it
+	// back, so a would-fail request returns the same error a live one would
+	// while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.StorageEndpoint, error) {
+		return qtx.UpdateStorageEndpoint(ctx, updateParams)
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Endpoint", endpoint.GetName())
 	}
@@ -384,7 +402,12 @@ func (s *EndpointsServer) DeleteEndpoint(ctx context.Context, req *storagev1.Del
 		return nil, apierr.HandleResourceError(err, "Endpoint", req.GetName())
 	}
 
-	err = s.queries.DeleteStorageEndpoint(ctx, existing.ID)
+	// validate_only runs the DELETE against real state and rolls it back,
+	// so a would-fail request returns the same error a live one would while
+	// persisting nothing.
+	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
+		return qtx.DeleteStorageEndpoint(ctx, existing.ID)
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Endpoint", req.GetName())
 	}

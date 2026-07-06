@@ -24,10 +24,10 @@ func TestIntegration_Storage_GatewayLifecycle(t *testing.T) {
 		grpcharness.WithOrganizationsServer(),
 		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 			storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
-				Queries: h.Queries, Encryptor: h.Encryptor, Conns: conns,
+				Pool: h.Pool, Queries: h.Queries, Encryptor: h.Encryptor, Conns: conns,
 			}))
 			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
-				Queries: h.Queries, Encryptor: h.Encryptor,
+				Pool: h.Pool, Queries: h.Queries, Encryptor: h.Encryptor,
 			}))
 		}))
 	h.SeedOwnedOrg(t, "acme", "Acme", "storage")

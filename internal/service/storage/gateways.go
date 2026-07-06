@@ -37,6 +37,7 @@ import (
 
 type StorageGatewaysServer struct {
 	storagev1.UnimplementedStorageGatewaysServer
+	pool              db.TxBeginner
 	queries           db.Querier
 	encryptor         crypto.Encryptor
 	conns             *agentstream.ConnectionManager
@@ -60,6 +61,9 @@ const defaultSessionTTL = 1 * time.Hour
 // StorageGatewaysConfig is the constructor input for
 // StorageGatewaysServer.
 type StorageGatewaysConfig struct {
+	// Pool begins transactions for tx-wrapped writes (used by the
+	// validate_only dry-run path). *pgxpool.Pool satisfies it. Required.
+	Pool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Encryptor wraps Cloud KMS for column-level encryption.
@@ -104,6 +108,9 @@ type StorageGatewaysConfig struct {
 // NewStorageGatewaysServer constructs the server from cfg. Panics on
 // a missing required field.
 func NewStorageGatewaysServer(cfg StorageGatewaysConfig) *StorageGatewaysServer {
+	if cfg.Pool == nil {
+		panic("storage: StorageGatewaysConfig.Pool is required")
+	}
 	if cfg.Queries == nil {
 		panic("storage: StorageGatewaysConfig.Queries is required")
 	}
@@ -122,6 +129,7 @@ func NewStorageGatewaysServer(cfg StorageGatewaysConfig) *StorageGatewaysServer 
 		signingKey = []byte("pivox-dev-session-signing-key-do-not-use-in-prod")
 	}
 	return &StorageGatewaysServer{
+		pool:              cfg.Pool,
 		queries:           cfg.Queries,
 		encryptor:         cfg.Encryptor,
 		conns:             cfg.Conns,
@@ -188,16 +196,21 @@ func (s *StorageGatewaysServer) CreateStorageGateway(ctx context.Context, req *s
 		annotationsJSON = json.RawMessage("{}")
 	}
 
-	result, err := s.queries.CreateStorageGateway(ctx, db.CreateStorageGatewayParams{
-		ID:                uuid.New(),
-		OrgID:             orgID,
-		Name:              gwName,
-		DisplayName:       gw.GetDisplayName(),
-		IpAddresses:       gw.GetIpAddresses(),
-		RegistrationToken: registrationToken,
-		Hostname:          hostname,
-		Annotations:       annotationsJSON,
-		CreatedBy:         convert.PgUUID(server.MustUserID(ctx)),
+	// validate_only runs the INSERT against real constraints and rolls it
+	// back, so a would-fail request (e.g. duplicate name) returns the same
+	// error a live one would while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.StorageGateway, error) {
+		return qtx.CreateStorageGateway(ctx, db.CreateStorageGatewayParams{
+			ID:                uuid.New(),
+			OrgID:             orgID,
+			Name:              gwName,
+			DisplayName:       gw.GetDisplayName(),
+			IpAddresses:       gw.GetIpAddresses(),
+			RegistrationToken: registrationToken,
+			Hostname:          hostname,
+			Annotations:       annotationsJSON,
+			CreatedBy:         convert.PgUUID(server.MustUserID(ctx)),
+		})
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "StorageGateway", gwName)
@@ -296,7 +309,12 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 		}
 	}
 
-	result, err := s.queries.UpdateStorageGateway(ctx, updateParams)
+	// validate_only runs the UPDATE against real constraints and rolls it
+	// back, so a would-fail request returns the same error a live one would
+	// while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.StorageGateway, error) {
+		return qtx.UpdateStorageGateway(ctx, updateParams)
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "StorageGateway", gw.GetName())
 	}
@@ -329,7 +347,12 @@ func (s *StorageGatewaysServer) DeleteStorageGateway(ctx context.Context, req *s
 		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
-	if err := s.queries.DeleteStorageGateway(ctx, existing.ID); err != nil {
+	// validate_only runs the DELETE against real state and rolls it back,
+	// so a would-fail request returns the same error a live one would while
+	// persisting nothing.
+	if err := db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
+		return qtx.DeleteStorageGateway(ctx, existing.ID)
+	}); err != nil {
 		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
