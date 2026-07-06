@@ -56,6 +56,50 @@ func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {
 	assert.Equal(t, codes.AlreadyExists, st.Code())
 }
 
+// TestIntegration_CreateOrganization_ValidateOnly pins the AIP
+// validate_only contract: a dry-run Create runs the full bootstrap tx
+// (org insert + role seed) against real constraints but persists
+// nothing, so the same slug is reusable afterward — and a dry-run that
+// would fail live (duplicate slug) still returns AlreadyExists.
+func TestIntegration_CreateOrganization_ValidateOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newLifecycleHarness(t)
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "founder"})
+	h.SetCaller(owner)
+
+	client := apiv1.NewOrganizationsClient(h.Conn())
+	ctx := context.Background()
+
+	// A dry-run Create returns the would-be resource but writes nothing.
+	op, err := client.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
+		OrganizationId: "vo-org",
+		Organization:   &apiv1.Organization{DisplayName: "Dry Org"},
+		ValidateOnly:   true,
+	})
+	require.NoError(t, err)
+	require.True(t, op.GetDone())
+
+	// Nothing persisted → a real Create can reuse the same slug.
+	_, err = client.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
+		OrganizationId: "vo-org",
+		Organization:   &apiv1.Organization{DisplayName: "Real Org"},
+	})
+	require.NoError(t, err, "validate_only must not have persisted the org")
+
+	// A dry-run that WOULD fail live (duplicate slug now exists) fails.
+	_, err = client.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
+		OrganizationId: "vo-org",
+		Organization:   &apiv1.Organization{DisplayName: "Dup Org"},
+		ValidateOnly:   true,
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, status.Code(err),
+		"validate_only must fail if the live request would")
+}
+
 func TestIntegration_Organizations(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")

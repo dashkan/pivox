@@ -6,7 +6,6 @@ import (
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -185,40 +184,35 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	// unreachable; clients always supply a slug.
 	orgSlug := req.GetOrganizationId()
 
-	var err error
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		slog.ErrorContext(ctx, "begin transaction failed", "error", err)
-		return nil, apierr.Internal("begin transaction")
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	// validate_only runs the whole bootstrap tx (org insert + role seed +
+	// owner binding) against real constraints and rolls it back, so a
+	// would-fail request (e.g. duplicate slug) returns the same error a
+	// live one would while persisting nothing.
+	org, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Organization, error) {
+		org, err := qtx.CreateOrganization(ctx, db.CreateOrganizationParams{
+			ID:          uuid.New(),
+			Name:        orgSlug,
+			DisplayName: req.GetOrganization().GetDisplayName(),
+			CreatedBy:   convert.PgUUID(callerID),
+		})
+		if err != nil {
+			return db.Organization{}, apierr.HandleResourceError(err, "Organization", orgSlug)
+		}
 
-	qtx := db.New(tx)
-
-	org, err := qtx.CreateOrganization(ctx, db.CreateOrganizationParams{
-		ID:          uuid.New(),
-		Name:        orgSlug,
-		DisplayName: req.GetOrganization().GetDisplayName(),
-		CreatedBy:   convert.PgUUID(callerID),
+		// Seed the 4 system roles for this org and bind the founder
+		// (caller's identity_id, the universal user uuid post-
+		// Phase-7) to the owner role. Atomic with the org create above —
+		// a failure here rolls the whole bootstrap back, so no half-formed
+		// org ever exists. "≥1 owner per org" is established by definition
+		// for new orgs from this point forward.
+		if err := bootstrapOrgRoles(ctx, qtx, org.ID, callerID); err != nil {
+			slog.ErrorContext(ctx, "bootstrap org roles failed", "org_id", org.ID, "error", err)
+			return db.Organization{}, apierr.Internal("bootstrap org roles")
+		}
+		return org, nil
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Organization", orgSlug)
-	}
-
-	// Seed the 4 system roles for this org and bind the founder
-	// (caller's identity_id, the universal user uuid post-
-	// Phase-7) to the owner role. Atomic with the org create above —
-	// a failure here rolls the whole bootstrap back, so no half-formed
-	// org ever exists. "≥1 owner per org" is established by definition
-	// for new orgs from this point forward.
-	if err := bootstrapOrgRoles(ctx, qtx, org.ID, callerID); err != nil {
-		slog.ErrorContext(ctx, "bootstrap org roles failed", "org_id", org.ID, "error", err)
-		return nil, apierr.Internal("bootstrap org roles")
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		slog.ErrorContext(ctx, "commit transaction failed", "org_id", org.ID, "error", err)
-		return nil, apierr.Internal("commit transaction")
+		return nil, err
 	}
 
 	// Best-effort enrichment: org has committed, don't fail the
