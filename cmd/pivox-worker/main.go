@@ -29,6 +29,7 @@ import (
 	"riverqueue.com/riverpro/driver/riverpropgxv5"
 
 	"github.com/dashkan/pivox/internal/audit"
+	"github.com/dashkan/pivox/internal/engine"
 	"github.com/dashkan/pivox/internal/identitysync"
 	"github.com/dashkan/pivox/internal/telemetry"
 	"github.com/dashkan/pivox/internal/telemetry/rivertrace"
@@ -156,6 +157,22 @@ func serve(cmd *cobra.Command, _ []string) error {
 	// jobs in this process.
 	auditResolver := audit.NewResolver(audit.Config{Queries: queries})
 
+	// Workflow engine interpreter — the pure, network-free core shared across
+	// every run job. Constructed once (thread-safe: the CEL evaluator caches
+	// compiled programs under a mutex, the dispatcher is immutable). The 6b
+	// dispatcher wires only the `set` activity; `http`/`run_workflow` land in
+	// 6c/6d by extending DispatcherConfig here.
+	evaluator, err := engine.NewEvaluator()
+	if err != nil {
+		return fmt.Errorf("build workflow evaluator: %w", err)
+	}
+	interpreter := engine.NewInterpreter(engine.InterpreterConfig{
+		Evaluator: evaluator,
+		Dispatcher: engine.NewDispatcher(engine.DispatcherConfig{
+			Set: engine.NewSetActivity(engine.SetActivityConfig{Evaluator: evaluator}),
+		}),
+	})
+
 	// Worker registry. Each tick worker we used to host inline in
 	// pivox-cloud becomes a river.Worker registered here; River's
 	// scheduler drives invocation via the periodic-job table. The
@@ -181,6 +198,9 @@ func serve(cmd *cobra.Command, _ []string) error {
 	river.AddWorker(riverWorkers, &workers.DeleteOrgWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.DeleteAccountWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.VerifyDomainWorker{Pool: pool, Logger: logger})
+	// Workflow-run executor (Phase 6b). Enqueued by the Cloud Controller's
+	// RunWorkflow; runs the pinned version's definition through the interpreter.
+	river.AddWorker(riverWorkers, &workers.RunWorkflowWorker{Pool: pool, Interpreter: interpreter, Logger: logger})
 
 	// Periodic job registrations. RunOnStart=true so a freshly-booted
 	// replica does useful work immediately rather than waiting one

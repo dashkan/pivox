@@ -754,6 +754,27 @@ func (q *Queries) UpdateWorkflowRunState(ctx context.Context, arg UpdateWorkflow
 	return i, err
 }
 
+const updateWorkflowRunSteps = `-- name: UpdateWorkflowRunSteps :exec
+UPDATE workflow_runs
+SET steps = $2
+WHERE id = $1 AND state = 'RUNNING'
+`
+
+type UpdateWorkflowRunStepsParams struct {
+	ID    uuid.UUID       `json:"id"`
+	Steps json.RawMessage `json:"steps"`
+}
+
+// Checkpoints live per-step progress into the steps JSONB as the executor
+// walks the run, WITHOUT touching state or any lifecycle field. Guarded on
+// state = 'RUNNING' so a step write that lands after a concurrent cancel
+// (state → CANCELLED) or terminal finalize is a no-op — it can never resurrect
+// a run out of a terminal state. A no-match (0 rows) is expected and ignored.
+func (q *Queries) UpdateWorkflowRunSteps(ctx context.Context, arg UpdateWorkflowRunStepsParams) error {
+	_, err := q.db.Exec(ctx, updateWorkflowRunSteps, arg.ID, arg.Steps)
+	return err
+}
+
 const workflowVersionNumbersByIDs = `-- name: WorkflowVersionNumbersByIDs :many
 SELECT id, version_number FROM workflow_versions
 WHERE id = ANY($1::uuid[])

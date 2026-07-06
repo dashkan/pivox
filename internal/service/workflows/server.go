@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
+	"riverqueue.com/riverpro"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -52,6 +53,11 @@ type Config struct {
 	Codec *appkey.Codec
 	// AuditResolver inflates audit-field UUIDs into Actor protos. Optional.
 	AuditResolver *audit.Resolver
+	// River enqueues a run's execution job transactionally with the run's
+	// INSERT (see WorkflowRunsServer.RunWorkflow). Required by
+	// NewWorkflowRunsServer; unused by the container/version servers, so the
+	// shared validate() does not check it.
+	River *riverpro.Client[pgx.Tx]
 }
 
 func (cfg Config) validate(pkg string) {

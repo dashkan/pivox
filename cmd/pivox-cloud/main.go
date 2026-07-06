@@ -411,7 +411,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
 	workflowsv1.RegisterWorkflowRunsServer(grpcServer, workflows.NewWorkflowRunsServer(workflows.Config{
-		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver, River: riverClient,
 	}))
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(apikeys.Config{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,

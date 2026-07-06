@@ -56,6 +56,10 @@ func registerWorkflowRunsServer(h *Harness, s *grpc.Server) {
 		Pool:    h.Pool,
 		Queries: h.Queries,
 		Codec:   testCodec(),
+		// RunWorkflow enqueues the execution job transactionally with the run's
+		// INSERT, exactly as pivox-cloud does. Tests that want the job actually
+		// executed register a RunWorkflowWorker via Harness.StartRiverWorkers.
+		River: h.River,
 	}))
 }
 

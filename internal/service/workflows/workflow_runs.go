@@ -13,31 +13,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
+	"riverqueue.com/riverpro"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/engine/runjob"
 	"github.com/dashkan/pivox/internal/filter"
 	workflowsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"
 	"github.com/dashkan/pivox/internal/server"
 )
-
-// runStatePending is the DB state a run is born in — accepted, not yet started
-// by the execution engine (Phase 6).
-const runStatePending = "PENDING"
-
-// runStateCancelled is the terminal state a manual cancel drives a run into.
-const runStateCancelled = "CANCELLED"
-
-// terminalRunStates are the states from which a run can no longer transition —
-// a cancel against any of them is a no-op the API rejects.
-var terminalRunStates = map[string]bool{
-	"SUCCEEDED": true,
-	"FAILED":    true,
-	"CANCELLED": true,
-}
 
 // WorkflowRunsServer serves the WorkflowRuns RPCs (the execution surface).
 // Runs are children of a Workflow, uuid-named. This layer only manages run
@@ -49,17 +36,23 @@ type WorkflowRunsServer struct {
 	queries db.Querier
 	codec   *appkey.Codec
 	audit   *audit.Resolver
+	river   *riverpro.Client[pgx.Tx]
 }
 
 // NewWorkflowRunsServer constructs the server from cfg. Panics on a missing
-// required field.
+// required field — including River, which this server (unlike the container /
+// version servers) needs to enqueue a run's execution job.
 func NewWorkflowRunsServer(cfg Config) *WorkflowRunsServer {
 	cfg.validate("workflows")
+	if cfg.River == nil {
+		panic("workflows: Config.River is required for WorkflowRunsServer")
+	}
 	return &WorkflowRunsServer{
 		pool:    cfg.Pool,
 		queries: cfg.Queries,
 		codec:   cfg.Codec,
 		audit:   cfg.AuditResolver,
+		river:   cfg.River,
 	}
 }
 
@@ -118,7 +111,7 @@ func (s *WorkflowRunsServer) RunWorkflow(ctx context.Context, req *workflowsv1.R
 		run    db.WorkflowRun
 		verNum int64
 	)
-	run, err = db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.WorkflowRun, error) {
+	run, err = db.RunInTxRawValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier, tx pgx.Tx) (db.WorkflowRun, error) {
 		wf, err := qtx.GetWorkflow(ctx, wfID)
 		if err != nil {
 			return db.WorkflowRun{}, apierr.HandleResourceError(err, "Workflow", req.GetName())
@@ -133,18 +126,28 @@ func (s *WorkflowRunsServer) RunWorkflow(ctx context.Context, req *workflowsv1.R
 			return db.WorkflowRun{}, err
 		}
 		verNum = ver.VersionNumber
-		// Phase 6: enqueue the run for the execution engine.
-		return qtx.CreateWorkflowRun(ctx, db.CreateWorkflowRunParams{
+		created, err := qtx.CreateWorkflowRun(ctx, db.CreateWorkflowRunParams{
 			ID:          runID,
 			WorkflowID:  wfID,
 			VersionID:   ver.ID,
-			State:       runStatePending,
+			State:       runjob.StatePending,
 			Trigger:     trigger,
 			Subject:     req.GetSubject(),
 			Steps:       json.RawMessage("[]"),
 			Input:       input,
 			TriggeredBy: callerID,
 		})
+		if err != nil {
+			return db.WorkflowRun{}, err
+		}
+		// Enqueue the execution job for the Worker Process in the SAME tx as the
+		// run's INSERT. On validate_only (or any rollback) the enqueue rolls back
+		// with the run row — no orphaned job pointing at a run that never
+		// persisted, and no persisted run that never gets picked up.
+		if _, err := s.river.InsertTx(ctx, tx, runjob.Args{RunID: runID}, nil); err != nil {
+			return db.WorkflowRun{}, apierr.Internal("enqueue workflow run")
+		}
+		return created, nil
 	})
 	if err != nil {
 		return nil, err
@@ -291,13 +294,13 @@ func (s *WorkflowRunsServer) CancelWorkflowRun(ctx context.Context, req *workflo
 		if existing.WorkflowID != wfID {
 			return db.WorkflowRun{}, apierr.NotFound("WorkflowRun", req.GetName())
 		}
-		if terminalRunStates[existing.State] {
+		if runjob.IsTerminalState(existing.State) {
 			return db.WorkflowRun{}, apierr.FailedPrecondition("run is not active")
 		}
 		// Phase 6: also stop the River job backing the run.
 		updated, err := qtx.UpdateWorkflowRunState(ctx, db.UpdateWorkflowRunStateParams{
 			ID:      runID,
-			State:   runStateCancelled,
+			State:   runjob.StateCancelled,
 			EndTime: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		})
 		if err != nil {
