@@ -47,3 +47,28 @@ WHERE org_id = @org_id
   AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
 ORDER BY id
 LIMIT @page_limit;
+
+-- name: DeleteConnectorSecretRefs :exec
+-- Clears a connector's tracked secret refs. Called inside the connector-write
+-- tx before re-inserting the current set, so the ref table always mirrors the
+-- config's secret("…") references.
+DELETE FROM connector_secret_refs WHERE connector_id = $1;
+
+-- name: InsertConnectorSecretRefs :exec
+-- Batch-inserts a connector's resolved secret refs in one round trip: the
+-- connector_id pairs with each element of the secret_ids array via unnest.
+-- ON CONFLICT DO NOTHING tolerates the same secret being referenced twice in
+-- one config (distinct names resolving to the same secret id).
+INSERT INTO connector_secret_refs (connector_id, secret_id)
+SELECT @connector_id::uuid, unnest(@secret_ids::uuid[])
+ON CONFLICT DO NOTHING;
+
+-- name: ConnectorsReferencingSecret :many
+-- The DeleteSecret guard's lookup: connectors that reference a given secret,
+-- with enough identity (slug + scope) to name them in the FailedPrecondition
+-- error. Ordered by slug for a stable, readable message.
+SELECT c.id, c.connector_id, c.org_id, c.space_id
+FROM connector_secret_refs r
+JOIN connectors c ON c.id = r.connector_id
+WHERE r.secret_id = $1
+ORDER BY c.connector_id;

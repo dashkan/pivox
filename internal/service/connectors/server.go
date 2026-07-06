@@ -238,7 +238,6 @@ func (s *ConnectorsServer) CreateConnector(ctx context.Context, req *workflowsv1
 	if err != nil {
 		return nil, apierr.Internal("generate connector id")
 	}
-	// TODO(3b): validate + track secret() refs in config
 	config, err := marshalConfig(in)
 	if err != nil {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("connector.config", err.Error()))
@@ -261,13 +260,23 @@ func (s *ConnectorsServer) CreateConnector(ctx context.Context, req *workflowsv1
 		CreatedBy:   convert.PgUUID(server.MustUserID(ctx)),
 	}
 	// validate_only rolls back the insert but still runs it, so a would-fail
-	// request (e.g. duplicate connector_id) returns the same error a live one
-	// would. There are no non-DB side effects to guard here.
+	// request (e.g. duplicate connector_id, or a config referencing a missing
+	// secret) returns the same error a live one would. Both the write and the
+	// secret-ref tracking run in the one tx — there are no non-DB side effects
+	// to guard here. Errors are shaped inside the closure so trackSecretRefs's
+	// InvalidArgument isn't flattened to Internal by an outer HandleResourceError.
 	row, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Connector, error) {
-		return qtx.CreateConnector(ctx, params)
+		row, err := qtx.CreateConnector(ctx, params)
+		if err != nil {
+			return db.Connector{}, apierr.HandleResourceError(err, "Connector", connectorID)
+		}
+		if err := trackSecretRefs(ctx, qtx, row.ID, orgID, spaceID, in); err != nil {
+			return db.Connector{}, err
+		}
+		return row, nil
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Connector", connectorID)
+		return nil, err
 	}
 	return convert.ConnectorToProto(row, prefix, s.resolveActors(ctx, []db.Connector{row})), nil
 }
@@ -312,7 +321,9 @@ func (s *ConnectorsServer) UpdateConnector(ctx context.Context, req *workflowsv1
 		params.Annotations = annotations
 	}
 	if inScope("config") {
-		// TODO(3b): validate + track secret() refs in config
+		// The secret("…") refs in this config are re-derived and tracked
+		// in-tx below (only when config is in scope — an update that leaves
+		// config untouched keeps its existing refs).
 		config, err := marshalConfig(in)
 		if err != nil {
 			return nil, apierr.InvalidArgument(apierr.FieldViolation("connector.config", err.Error()))
@@ -335,6 +346,13 @@ func (s *ConnectorsServer) UpdateConnector(ctx context.Context, req *workflowsv1
 		row, err = qtx.UpdateConnector(ctx, params)
 		if err != nil {
 			return apierr.HandleResourceError(err, "Connector", in.GetName())
+		}
+		// Re-track secret refs only when config changed. A config-less update
+		// (metadata only) leaves the tracked set — and the config — untouched.
+		if inScope("config") {
+			if err := trackSecretRefs(ctx, qtx, id, orgID, spaceID, in); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

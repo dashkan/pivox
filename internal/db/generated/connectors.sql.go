@@ -13,6 +13,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const connectorsReferencingSecret = `-- name: ConnectorsReferencingSecret :many
+SELECT c.id, c.connector_id, c.org_id, c.space_id
+FROM connector_secret_refs r
+JOIN connectors c ON c.id = r.connector_id
+WHERE r.secret_id = $1
+ORDER BY c.connector_id
+`
+
+type ConnectorsReferencingSecretRow struct {
+	ID          uuid.UUID   `json:"id"`
+	ConnectorID string      `json:"connector_id"`
+	OrgID       uuid.UUID   `json:"org_id"`
+	SpaceID     pgtype.UUID `json:"space_id"`
+}
+
+// The DeleteSecret guard's lookup: connectors that reference a given secret,
+// with enough identity (slug + scope) to name them in the FailedPrecondition
+// error. Ordered by slug for a stable, readable message.
+func (q *Queries) ConnectorsReferencingSecret(ctx context.Context, secretID uuid.UUID) ([]ConnectorsReferencingSecretRow, error) {
+	rows, err := q.db.Query(ctx, connectorsReferencingSecret, secretID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ConnectorsReferencingSecretRow{}
+	for rows.Next() {
+		var i ConnectorsReferencingSecretRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ConnectorID,
+			&i.OrgID,
+			&i.SpaceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createConnector = `-- name: CreateConnector :one
 INSERT INTO connectors (id, org_id, space_id, connector_id, display_name, description, config, agent, annotations, created_by, updated_by)
 VALUES ($1, $2, $10, $3, $4, $5, $6, $7, $8, $9, $9)
@@ -73,6 +116,18 @@ DELETE FROM connectors WHERE id = $1
 
 func (q *Queries) DeleteConnector(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteConnector, id)
+	return err
+}
+
+const deleteConnectorSecretRefs = `-- name: DeleteConnectorSecretRefs :exec
+DELETE FROM connector_secret_refs WHERE connector_id = $1
+`
+
+// Clears a connector's tracked secret refs. Called inside the connector-write
+// tx before re-inserting the current set, so the ref table always mirrors the
+// config's secret("…") references.
+func (q *Queries) DeleteConnectorSecretRefs(ctx context.Context, connectorID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteConnectorSecretRefs, connectorID)
 	return err
 }
 
@@ -165,6 +220,26 @@ func (q *Queries) GetConnectorForUpdate(ctx context.Context, id uuid.UUID) (Conn
 		&i.UpdateTime,
 	)
 	return i, err
+}
+
+const insertConnectorSecretRefs = `-- name: InsertConnectorSecretRefs :exec
+INSERT INTO connector_secret_refs (connector_id, secret_id)
+SELECT $1::uuid, unnest($2::uuid[])
+ON CONFLICT DO NOTHING
+`
+
+type InsertConnectorSecretRefsParams struct {
+	ConnectorID uuid.UUID   `json:"connector_id"`
+	SecretIds   []uuid.UUID `json:"secret_ids"`
+}
+
+// Batch-inserts a connector's resolved secret refs in one round trip: the
+// connector_id pairs with each element of the secret_ids array via unnest.
+// ON CONFLICT DO NOTHING tolerates the same secret being referenced twice in
+// one config (distinct names resolving to the same secret id).
+func (q *Queries) InsertConnectorSecretRefs(ctx context.Context, arg InsertConnectorSecretRefsParams) error {
+	_, err := q.db.Exec(ctx, insertConnectorSecretRefs, arg.ConnectorID, arg.SecretIds)
+	return err
 }
 
 const listConnectorsByParent = `-- name: ListConnectorsByParent :many

@@ -67,6 +67,10 @@ type Querier interface {
 	// was never created, already completed, or has expired.
 	CompleteDelegatedAuthSession(ctx context.Context, arg CompleteDelegatedAuthSessionParams) (DelegatedAuthSession, error)
 	CompleteOperation(ctx context.Context, arg CompleteOperationParams) (Operation, error)
+	// The DeleteSecret guard's lookup: connectors that reference a given secret,
+	// with enough identity (slug + scope) to name them in the FailedPrecondition
+	// error. Ordered by slug for a stable, readable message.
+	ConnectorsReferencingSecret(ctx context.Context, secretID uuid.UUID) ([]ConnectorsReferencingSecretRow, error)
 	// Atomically deletes an approved session and returns its custom token. This is
 	// the poll path — a single statement ensures the token is single-use even
 	// under concurrent pollers. No-row result means the session is still pending,
@@ -194,6 +198,10 @@ type Querier interface {
 	DeleteArtifactVersion(ctx context.Context, id uuid.UUID) error
 	DeleteAssetRenditionsByVersion(ctx context.Context, versionID uuid.UUID) error
 	DeleteConnector(ctx context.Context, id uuid.UUID) error
+	// Clears a connector's tracked secret refs. Called inside the connector-write
+	// tx before re-inserting the current set, so the ref table always mirrors the
+	// config's secret("…") references.
+	DeleteConnectorSecretRefs(ctx context.Context, connectorID uuid.UUID) error
 	DeleteConversation(ctx context.Context, id uuid.UUID) error
 	// DeleteDomain removes a domain row. The handler runs preconditions
 	// (cancel in-flight LROs, last-VERIFIED-domain-on-enabled-SSO check)
@@ -531,6 +539,11 @@ type Querier interface {
 	//
 	HeartbeatConversationLease(ctx context.Context, arg HeartbeatConversationLeaseParams) (uuid.UUID, error)
 	IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error
+	// Batch-inserts a connector's resolved secret refs in one round trip: the
+	// connector_id pairs with each element of the secret_ids array via unnest.
+	// ON CONFLICT DO NOTHING tolerates the same secret being referenced twice in
+	// one config (distinct names resolving to the same secret id).
+	InsertConnectorSecretRefs(ctx context.Context, arg InsertConnectorSecretRefsParams) error
 	// IsConversationLocked reports whether a conversation currently has
 	// an active (non-expired) lease. Used by DeleteConversation and
 	// UpdateConversation to reject mid-stream mutations.

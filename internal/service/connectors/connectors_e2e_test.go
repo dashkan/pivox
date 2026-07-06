@@ -12,9 +12,17 @@ import (
 	"google.golang.org/grpc/status"
 
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	secretsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	workflowsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
+
+// secretRefHeader builds an HttpConnector header value that references a
+// vault Secret by resource name via a literal secret("…") CEL call — the
+// shape the ref extractor statically scans for.
+func secretRefHeader(secretName string) string {
+	return `"Bearer " + secret("` + secretName + `")`
+}
 
 func idFromName(t *testing.T, name string) uuid.UUID {
 	t.Helper()
@@ -36,9 +44,13 @@ func TestE2E_Connector_CRUD(t *testing.T) {
 	ctx := context.Background()
 	client := workflowsv1.NewConnectorsClient(h.Conn())
 
+	// A CEL header value with no secret("…") reference — this test pins config
+	// round-tripping, not ref tracking (which resolves refs against the vault
+	// and would reject a dangling name). Secret-ref behavior is covered by the
+	// TestE2E_Connector_SecretRef_* suite below.
 	httpCfg := &workflowsv1.HttpConnector{
 		BaseUrl: "https://api.example.com",
-		Headers: map[string]string{"Authorization": `"Bearer " + secret("org/secrets/tok")`},
+		Headers: map[string]string{"X-Env": `"prod"`},
 	}
 	created, err := client.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
 		Parent:      "organizations/" + owned.Slug,
@@ -191,4 +203,280 @@ func TestE2E_Connector_ScopeIsolation(t *testing.T) {
 	_, err = client.DeleteConnector(ctx, &workflowsv1.DeleteConnectorRequest{Name: crossName})
 	require.Error(t, err)
 	assert.Equal(t, codes.NotFound, status.Code(err), "cross-scope delete must be NotFound")
+}
+
+// countSecretRefs returns how many connector_secret_refs rows link the given
+// connector and secret — used to assert a config's secret("…") reference was
+// tracked in the same tx that wrote the connector.
+func countSecretRefs(t *testing.T, h *grpcharness.Harness, connectorID, secretID uuid.UUID) int {
+	t.Helper()
+	var n int
+	require.NoError(t, h.Pool.QueryRow(context.Background(),
+		`SELECT count(*) FROM connector_secret_refs WHERE connector_id = $1 AND secret_id = $2`,
+		connectorID, secretID).Scan(&n))
+	return n
+}
+
+// TestE2E_Connector_SecretRef_TrackedAndGuarded is the Phase-3b core loop: a
+// connector's config references a vault Secret via secret("…"); the ref is
+// tracked on write, DeleteSecret is then blocked (FailedPrecondition) while
+// the connector references it, and unblocks once the connector is deleted.
+func TestE2E_Connector_SecretRef_TrackedAndGuarded(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithSecretsServer(),
+		grpcharness.WithConnectorsServer())
+	owned := h.SeedOwnedOrg(t, "ref-track", "Ref Co", "connectors")
+	ctx := context.Background()
+	secretsClient := secretsv1.NewSecretsClient(h.Conn())
+	connClient := workflowsv1.NewConnectorsClient(h.Conn())
+
+	secret, err := secretsClient.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
+		Parent:   "organizations/" + owned.Slug,
+		SecretId: "hub-token",
+		Secret:   &secretsv1.Secret{Value: []byte("s3cr3t")},
+	})
+	require.NoError(t, err)
+	secretID := idFromName(t, secret.GetName())
+
+	created, err := connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
+		Parent:      "organizations/" + owned.Slug,
+		ConnectorId: "vizrt-hub",
+		Connector: &workflowsv1.Connector{
+			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
+				BaseUrl: "https://api.example.com",
+				Headers: map[string]string{"Authorization": secretRefHeader(secret.GetName())},
+			}},
+		},
+	})
+	require.NoError(t, err)
+	connID := idFromName(t, created.GetName())
+
+	// The ref was tracked in the same tx as the connector write.
+	assert.Equal(t, 1, countSecretRefs(t, h, connID, secretID))
+
+	// The secret is now referenced → DeleteSecret is blocked.
+	_, err = secretsClient.DeleteSecret(ctx, &secretsv1.DeleteSecretRequest{Name: secret.GetName()})
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err),
+		"deleting a referenced secret must be FailedPrecondition")
+	assert.Contains(t, status.Convert(err).Message(), "vizrt-hub",
+		"the guard error should name the referencing connector")
+
+	// Drop the connector → the ref cascades away → DeleteSecret succeeds.
+	_, err = connClient.DeleteConnector(ctx, &workflowsv1.DeleteConnectorRequest{Name: created.GetName()})
+	require.NoError(t, err)
+	_, err = secretsClient.DeleteSecret(ctx, &secretsv1.DeleteSecretRequest{Name: secret.GetName()})
+	require.NoError(t, err, "with no connector referencing it, the secret is deletable")
+}
+
+// TestE2E_Connector_SecretRef_Nonexistent pins that saving a connector whose
+// config references a secret that doesn't exist is a client error — you can't
+// point a connector at a secret that isn't there.
+func TestE2E_Connector_SecretRef_Nonexistent(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithSecretsServer(),
+		grpcharness.WithConnectorsServer())
+	owned := h.SeedOwnedOrg(t, "ref-missing", "Ref Missing", "connectors")
+	ctx := context.Background()
+	connClient := workflowsv1.NewConnectorsClient(h.Conn())
+
+	// A well-formed name whose leaf uuid resolves to no secret.
+	danglingName := "organizations/" + owned.Slug + "/secrets/" + uuid.New().String()
+	_, err := connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
+		Parent:      "organizations/" + owned.Slug,
+		ConnectorId: "dangling",
+		Connector: &workflowsv1.Connector{
+			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
+				BaseUrl: "https://api.example.com",
+				Headers: map[string]string{"Authorization": secretRefHeader(danglingName)},
+			}},
+		},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+
+	// And a malformed ref (leaf isn't a uuid) is likewise rejected.
+	_, err = connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
+		Parent:      "organizations/" + owned.Slug,
+		ConnectorId: "malformed",
+		Connector: &workflowsv1.Connector{
+			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
+				BaseUrl: "https://api.example.com",
+				Headers: map[string]string{"Authorization": secretRefHeader("not/a/secret/name")},
+			}},
+		},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+// TestE2E_Connector_SecretRef_CrossScope pins that a connector can't reference
+// a secret in a different org, even by its real uuid — the ref must resolve to
+// a secret in the connector's own scope.
+func TestE2E_Connector_SecretRef_CrossScope(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithSecretsServer(),
+		grpcharness.WithConnectorsServer())
+	// One owner owns both orgs.
+	h.SeedOwnedOrg(t, "xs-a", "XS A", "iso")
+	ctx := context.Background()
+
+	op, err := apiv1.NewOrganizationsClient(h.Conn()).CreateOrganization(ctx,
+		&apiv1.CreateOrganizationRequest{
+			OrganizationId: "xs-b",
+			Organization:   &apiv1.Organization{DisplayName: "XS B"},
+		})
+	require.NoError(t, err)
+	require.True(t, op.GetDone())
+
+	secretsClient := secretsv1.NewSecretsClient(h.Conn())
+	bSecret, err := secretsClient.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
+		Parent:   "organizations/xs-b",
+		SecretId: "b-secret",
+		Secret:   &secretsv1.Secret{Value: []byte("b")},
+	})
+	require.NoError(t, err)
+
+	// Connector in org A referencing org B's secret (real uuid, A's prefix).
+	crossName := "organizations/xs-a/secrets/" + idFromName(t, bSecret.GetName()).String()
+	_, err = workflowsv1.NewConnectorsClient(h.Conn()).CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
+		Parent:      "organizations/xs-a",
+		ConnectorId: "cross",
+		Connector: &workflowsv1.Connector{
+			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
+				BaseUrl: "https://api.example.com",
+				Headers: map[string]string{"Authorization": secretRefHeader(crossName)},
+			}},
+		},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err),
+		"referencing a secret outside the connector's scope must be InvalidArgument")
+}
+
+// TestE2E_Connector_SecretRef_UpdateRetracks pins that a config update
+// re-derives the tracked refs: an update pointing at a missing secret is
+// rejected, and an update that drops the reference frees the secret to be
+// deleted.
+func TestE2E_Connector_SecretRef_UpdateRetracks(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithSecretsServer(),
+		grpcharness.WithConnectorsServer())
+	owned := h.SeedOwnedOrg(t, "ref-upd", "Ref Upd", "connectors")
+	ctx := context.Background()
+	secretsClient := secretsv1.NewSecretsClient(h.Conn())
+	connClient := workflowsv1.NewConnectorsClient(h.Conn())
+
+	secret, err := secretsClient.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
+		Parent:   "organizations/" + owned.Slug,
+		SecretId: "tok",
+		Secret:   &secretsv1.Secret{Value: []byte("v")},
+	})
+	require.NoError(t, err)
+	secretID := idFromName(t, secret.GetName())
+
+	created, err := connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
+		Parent:      "organizations/" + owned.Slug,
+		ConnectorId: "c",
+		Connector: &workflowsv1.Connector{
+			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
+				BaseUrl: "https://api.example.com",
+				Headers: map[string]string{"Authorization": secretRefHeader(secret.GetName())},
+			}},
+		},
+	})
+	require.NoError(t, err)
+	connID := idFromName(t, created.GetName())
+	require.Equal(t, 1, countSecretRefs(t, h, connID, secretID))
+
+	// A config update pointing at a missing secret is rejected (and the tx
+	// rolls back, so the existing ref survives).
+	danglingName := "organizations/" + owned.Slug + "/secrets/" + uuid.New().String()
+	_, err = connClient.UpdateConnector(ctx, &workflowsv1.UpdateConnectorRequest{
+		Connector: &workflowsv1.Connector{
+			Name: created.GetName(),
+			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
+				BaseUrl: "https://api.example.com",
+				Headers: map[string]string{"Authorization": secretRefHeader(danglingName)},
+			}},
+		},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, 1, countSecretRefs(t, h, connID, secretID), "failed update must not drop the ref")
+
+	// An update that drops the reference (no secret in the new config) frees
+	// the secret to be deleted.
+	_, err = connClient.UpdateConnector(ctx, &workflowsv1.UpdateConnectorRequest{
+		Connector: &workflowsv1.Connector{
+			Name: created.GetName(),
+			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
+				BaseUrl: "https://api.example.com",
+				Headers: map[string]string{"X-Env": `"prod"`},
+			}},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 0, countSecretRefs(t, h, connID, secretID), "update dropping the ref must clear it")
+
+	_, err = secretsClient.DeleteSecret(ctx, &secretsv1.DeleteSecretRequest{Name: secret.GetName()})
+	require.NoError(t, err, "with the ref dropped, the secret is deletable")
+}
+
+// TestE2E_Connector_SecretRef_ValidateOnly pins that a validate_only create
+// referencing a valid secret persists nothing — neither the connector nor its
+// ref — so the secret remains deletable.
+func TestE2E_Connector_SecretRef_ValidateOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithSecretsServer(),
+		grpcharness.WithConnectorsServer())
+	owned := h.SeedOwnedOrg(t, "ref-vo", "Ref VO", "connectors")
+	ctx := context.Background()
+	secretsClient := secretsv1.NewSecretsClient(h.Conn())
+	connClient := workflowsv1.NewConnectorsClient(h.Conn())
+
+	secret, err := secretsClient.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
+		Parent:   "organizations/" + owned.Slug,
+		SecretId: "tok",
+		Secret:   &secretsv1.Secret{Value: []byte("v")},
+	})
+	require.NoError(t, err)
+
+	dry, err := connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
+		Parent:       "organizations/" + owned.Slug,
+		ConnectorId:  "dry",
+		ValidateOnly: true,
+		Connector: &workflowsv1.Connector{
+			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
+				BaseUrl: "https://api.example.com",
+				Headers: map[string]string{"Authorization": secretRefHeader(secret.GetName())},
+			}},
+		},
+	})
+	require.NoError(t, err, "validate_only with a valid ref must pass validation")
+	require.NotEmpty(t, dry.GetName())
+
+	// Nothing persisted → the secret has no live reference and is deletable.
+	_, err = secretsClient.DeleteSecret(ctx, &secretsv1.DeleteSecretRequest{Name: secret.GetName()})
+	require.NoError(t, err, "validate_only must not have persisted the ref")
 }

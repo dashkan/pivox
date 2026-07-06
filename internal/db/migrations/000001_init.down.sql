@@ -3,6 +3,9 @@
 
 -- Workflow engine. workflow_runs and workflow_versions reference workflows;
 -- the circular workflows.version FK is dropped implicitly with the table.
+-- connector_secret_refs references both connectors and secrets, so it drops
+-- first.
+DROP TABLE IF EXISTS connector_secret_refs;
 DROP TABLE IF EXISTS connectors;
 DROP TABLE IF EXISTS workflow_runs;
 DROP TABLE IF EXISTS workflow_versions;

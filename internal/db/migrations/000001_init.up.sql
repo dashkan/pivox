@@ -1606,3 +1606,20 @@ CREATE TABLE connectors (
 );
 CREATE INDEX idx_connectors_org ON connectors (org_id);
 CREATE INDEX idx_connectors_space ON connectors (space_id) WHERE space_id IS NOT NULL;
+
+-- connector_secret_refs records which vault Secrets a Connector's config
+-- references via secret("…") CEL calls. The set is rebuilt from the config on
+-- every connector write (clear-then-insert inside the write tx). The
+-- delete-guard in DeleteSecret is the ACTUAL block on removing a referenced
+-- secret; these FK CASCADEs exist only for org-purge tidiness — when a whole
+-- org (with its connectors + secrets) is dropped, the ref rows vanish with it
+-- rather than blocking the cascade.
+CREATE TABLE connector_secret_refs (
+    connector_id UUID NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
+    secret_id    UUID NOT NULL REFERENCES secrets(id) ON DELETE CASCADE,
+    PRIMARY KEY (connector_id, secret_id)
+);
+-- The delete-guard looks up "who references this secret", so index secret_id.
+-- (The composite PK already covers connector_id-prefixed lookups and the
+-- clear-on-rewrite DELETE.)
+CREATE INDEX idx_connector_secret_refs_secret ON connector_secret_refs (secret_id);

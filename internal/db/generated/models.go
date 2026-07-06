@@ -915,6 +915,11 @@ type Connector struct {
 	UpdateTime  time.Time       `json:"update_time"`
 }
 
+type ConnectorSecretRef struct {
+	ConnectorID uuid.UUID `json:"connector_id"`
+	SecretID    uuid.UUID `json:"secret_id"`
+}
+
 type Dashboard struct {
 	ID             uuid.UUID          `json:"id"`
 	SpaceID        uuid.UUID          `json:"space_id"`

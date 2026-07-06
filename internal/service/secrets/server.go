@@ -7,6 +7,7 @@ package secrets
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -362,9 +363,27 @@ func (s *SecretsServer) DeleteSecret(ctx context.Context, req *secretsv1.DeleteS
 		if etag := req.GetEtag(); etag != "" && etag != existing.Etag {
 			return apierr.Aborted("Secret", req.GetName(), "etag mismatch")
 		}
-		// TODO(connectors): return FailedPrecondition if any connector still
-		// references this secret. No connector resource exists yet, so there
-		// is nothing to check — the guard lands with the connector resource.
+		// Delete-guard: block if any connector's config still references this
+		// secret via secret("…"). CreateConnector/UpdateConnector track those
+		// refs in connector_secret_refs (in the same tx as the connector
+		// write), so this in-tx lookup is authoritative. The FK CASCADE on
+		// that table is only for org-purge tidiness — this app-level check is
+		// the actual block. (A referencing connector is always in this
+		// secret's own scope, since cross-scope refs are rejected at connector
+		// write time, so naming its slug here leaks nothing.)
+		refs, err := qtx.ConnectorsReferencingSecret(ctx, id)
+		if err != nil {
+			return apierr.Internal("check secret references")
+		}
+		if len(refs) > 0 {
+			slugs := make([]string, 0, len(refs))
+			for _, r := range refs {
+				slugs = append(slugs, r.ConnectorID)
+			}
+			return apierr.FailedPrecondition(fmt.Sprintf(
+				"secret is referenced by connector(s) %s; remove the reference before deleting",
+				strings.Join(slugs, ", ")))
+		}
 		return qtx.DeleteSecret(ctx, id)
 	})
 	if err != nil {
