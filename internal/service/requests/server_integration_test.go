@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	"github.com/dashkan/pivox/internal/service/requests"
@@ -237,4 +239,43 @@ func TestIntegration_Requests_CancelWorkflow(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, assetsv1.Request_CANCELLED, resp.GetState())
+}
+
+// TestIntegration_Requests_ValidateOnly pins the AIP validate_only contract
+// for CreateRequest: a dry-run runs the whole fan-out (request row + a
+// placeholder asset + line item per line item) against real constraints but
+// rolls it back, so the would-be request is not gettable afterward.
+func TestIntegration_Requests_ValidateOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h, parent := newRequestsHarness(t, "acme-vo", "proj-vo")
+	client := assetsv1.NewRequestsClient(h.Conn())
+	ctx := context.Background()
+
+	op, err := client.CreateRequest(ctx, &assetsv1.CreateRequestRequest{
+		Parent: parent,
+		Request: &assetsv1.Request{
+			DisplayName: "Dry",
+			LineItems:   []*assetsv1.LineItem{{DisplayName: "One"}},
+		},
+		ValidateOnly: true,
+	})
+	require.NoError(t, err)
+	require.True(t, op.GetDone())
+
+	var req assetsv1.Request
+	require.NoError(t, op.GetResponse().UnmarshalTo(&req))
+	require.NotEmpty(t, req.GetName())
+
+	// Nothing persisted → the would-be request is not gettable.
+	_, err = client.GetRequest(ctx, &assetsv1.GetRequestRequest{Name: req.GetName()})
+	require.Error(t, err, "validate_only must not have persisted the request")
+	assert.Equal(t, codes.NotFound, status.Code(err))
+
+	// And ListRequests shows nothing was created.
+	list, err := client.ListRequests(ctx, &assetsv1.ListRequestsRequest{Parent: parent})
+	require.NoError(t, err)
+	assert.Empty(t, list.GetRequests(), "validate_only create must persist nothing")
 }

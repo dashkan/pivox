@@ -307,8 +307,10 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 	// iteration k would leave k assets + k-1 line items + the request
 	// row committed individually — a half-built request the client
 	// is told doesn't exist. RunInTx rolls everything back as a
-	// single unit on any failure inside the closure.
-	result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.AssetRequest, error) {
+	// single unit on any failure inside the closure. validate_only runs
+	// the whole fan-out and rolls it back, so a would-fail request returns
+	// the same error a live one would while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.AssetRequest, error) {
 		req, err := qtx.CreateRequest(ctx, db.CreateRequestParams{
 			ID:          uuid.New(),
 			SpaceID:     spaceID,
@@ -439,7 +441,12 @@ func (s *RequestsServer) UpdateRequest(ctx context.Context, req *assetsv1.Update
 		updateParams.Description = pgtype.Text{String: request.GetDescription(), Valid: true}
 	}
 
-	result, err := s.queries.UpdateRequest(ctx, updateParams)
+	// validate_only runs the UPDATE against real constraints and rolls it
+	// back, so a would-fail request returns the same error a live one would
+	// while persisting nothing.
+	result, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.AssetRequest, error) {
+		return qtx.UpdateRequest(ctx, updateParams)
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", request.GetName())
 	}
@@ -468,7 +475,12 @@ func (s *RequestsServer) DeleteRequest(ctx context.Context, req *assetsv1.Delete
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
 
-	err = s.queries.DeleteRequest(ctx, existing.ID)
+	// validate_only runs the DELETE against real state and rolls it back,
+	// so a would-fail request returns the same error a live one would while
+	// persisting nothing.
+	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
+		return qtx.DeleteRequest(ctx, existing.ID)
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
