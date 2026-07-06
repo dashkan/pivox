@@ -224,6 +224,13 @@ type NewLroOpts struct {
 	// signal there); audit + a "my operations" filter for the rest.
 	// Handlers set it via server.MustUserID(ctx).
 	CreatedBy pgtype.UUID
+	// ValidateOnly, when true, runs the synchronous LRO tx (operation-row
+	// INSERT + River job enqueue) against real constraints but rolls it
+	// back instead of committing — the AIP validate_only contract for a
+	// River-backed LRO. The async job never runs because its enqueue
+	// rolled back, so nothing is persisted; the returned Operation is the
+	// would-be resource. Handlers pass req.GetValidateOnly() here.
+	ValidateOnly bool
 }
 
 // NewLro creates a new operation row AND enqueues a River job for it,
@@ -299,6 +306,14 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 
 	if _, err := m.river.InsertTx(ctx, tx, opts.JobArgs, opts.JobOpts); err != nil {
 		return nil, apierr.Internal("failed to enqueue river job")
+	}
+
+	// validate_only: the operation row and the enqueued job both ran
+	// against real constraints; roll them back so nothing persists and no
+	// worker ever picks the job up. The deferred Rollback fires on return.
+	// The returned Operation is the would-be resource (its row is gone).
+	if opts.ValidateOnly {
+		return OperationToProto(dbOp)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
