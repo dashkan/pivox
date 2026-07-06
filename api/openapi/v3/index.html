@@ -25,6 +25,24 @@
     <script>
       Scalar.createApiReference('#app', {
         url: '/api-docs/pivox.yaml',
+        // Pre-fill the public "api-docs" Keycloak client (realm pivox) so the
+        // OAuth2 panel is one-click. x-usePkce 'SHA-256' marks it a public
+        // client (no secret sent). The redirect URI defaults to this page's own
+        // URL — register that in Keycloak (dev: https://pivox.ngrok.app/api-docs).
+        authentication: {
+          preferredSecurityScheme: 'OAuth2',
+          securitySchemes: {
+            OAuth2: {
+              flows: {
+                authorizationCode: {
+                  'x-scalar-client-id': 'api-docs',
+                  selectedScopes: ['openid', 'profile', 'email'],
+                  'x-usePkce': 'SHA-256',
+                },
+              },
+            },
+          },
+        },
       })
     </script>
   </body>

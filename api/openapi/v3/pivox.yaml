@@ -18,9 +18,14 @@ tags:
   - name: Assets
   - name: Requests
   - name: Iam
+  - name: Secrets
   - name: Agents
   - name: Endpoints
   - name: StorageGateways
+  - name: Connectors
+  - name: Workflows
+  - name: WorkflowVersions
+  - name: WorkflowRuns
 schemes:
   - https
 paths:
@@ -504,6 +509,263 @@ paths:
           must
 
           be populated to identify the organization to update.
+        required: true
+  /v1/organizations/{organization}/connectors:
+    get:
+      summary: Lists Connectors under an organization or space.
+      operationId: Connectors_ListConnectors
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListConnectorsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: Optional. Maximum number of Connectors to return; the server caps
+            at 1000.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListConnectors call.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: filter
+          description: Optional. An AIP-160 filter expression.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: orderBy
+          description: Optional. A comma-separated list of fields to order by.
+          in: query
+          required: false
+      tags:
+        - Connectors
+    post:
+      summary: Creates a Connector.
+      operationId: Connectors_CreateConnector
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Connector"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: connectorId
+          description: Required. The user-assigned id for the Connector, unique within the
+            parent.
+          in: query
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not create the
+            Connector.
+          in: query
+          required: false
+      tags:
+        - Connectors
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/v1Connector"
+        description: Required. The Connector to create.
+        required: true
+  /v1/organizations/{organization}/connectors/{connector}:
+    get:
+      summary: Retrieves a Connector.
+      operationId: Connectors_GetConnector
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Connector"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: connector
+          in: path
+          required: true
+      tags:
+        - Connectors
+    delete:
+      summary: Deletes a Connector.
+      operationId: Connectors_DeleteConnector
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: {}
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: connector
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not delete the
+            Connector.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: etag
+          description: Optional. The etag the client expects; used for optimistic
+            concurrency.
+          in: query
+          required: false
+      tags:
+        - Connectors
+    patch:
+      summary: Updates a Connector.
+      operationId: Connectors_UpdateConnector
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Connector"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: connector
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not update the
+            Connector.
+          in: query
+          required: false
+      tags:
+        - Connectors
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  description: Optional. Human-readable name.
+                description:
+                  type: string
+                  description: Optional. Description.
+                http:
+                  $ref: "#/components/schemas/v1HttpConnector"
+                  description: Configuration for an HTTP connector.
+                agent:
+                  type: string
+                  description: >-
+                    Optional. On-prem agent resource name whose network executes
+                    activities
+
+                    using this connector. Empty = the cloud controller.
+                createdBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that created this connector.
+                  readOnly: true
+                createTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Creation time.
+                  readOnly: true
+                updatedBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that last modified this connector.
+                  readOnly: true
+                updateTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Update time.
+                  readOnly: true
+                etag:
+                  type: string
+                  description: Optional. Optimistic-concurrency tag.
+                annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Optional. Labels.
+              title: Required. The new state of the Connector.
+        description: Required. The new state of the Connector.
         required: true
   /v1/organizations/{organization}/dashboards:
     get:
@@ -2393,6 +2655,332 @@ paths:
           required: true
       tags:
         - Iam
+  /v1/organizations/{organization}/secrets:
+    get:
+      summary: Lists Secrets under a parent. The value is never included.
+      operationId: Secrets_ListSecrets
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListSecretsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: |-
+            Optional. Maximum number of Secrets to return. Server caps at 1000;
+            defaults to 100 when unspecified.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListSecrets call.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: filter
+          description: |-
+            Optional. An AIP-160 filter expression. Filterable fields:
+
+            + `displayName`
+
+            For more information, see [AIP-160](https://aip.dev/160).
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: orderBy
+          description: >-
+            Optional. A comma-separated list of fields to order by (append "
+            desc"
+
+            for descending). Supported: `displayName`, `createTime`. Defaults to
+
+            `displayName` ascending.
+          in: query
+          required: false
+      tags:
+        - Secrets
+    post:
+      summary: Creates a new Secret. The value is required and is encrypted at rest.
+      operationId: Secrets_CreateSecret
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Secret"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: secretId
+          description: Required. The user-assigned id for the Secret, unique within the
+            parent.
+          in: query
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not create the Secret.
+          in: query
+          required: false
+      tags:
+        - Secrets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/v1Secret"
+        description: |-
+          Required. The Secret to create. Its `value` is required here and is
+          encrypted at rest.
+        required: true
+  /v1/organizations/{organization}/secrets/{secret}:
+    get:
+      summary: Retrieves a Secret's metadata. The value is never included.
+      operationId: Secrets_GetSecret
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Secret"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: secret
+          in: path
+          required: true
+      tags:
+        - Secrets
+    delete:
+      summary: |-
+        Deletes a Secret. Returns FAILED_PRECONDITION if any connector still
+        references it — remove the references first. There is no cascade.
+      operationId: Secrets_DeleteSecret
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: {}
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: secret
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not delete the Secret.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: etag
+          description: Optional. The etag the client expects; used for optimistic
+            concurrency.
+          in: query
+          required: false
+      tags:
+        - Secrets
+    patch:
+      summary: |-
+        Updates a Secret. Rotate the value by naming it in the update mask with
+        a new non-empty value; omit it from the mask to change only metadata.
+      operationId: Secrets_UpdateSecret
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Secret"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: secret
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: allowMissing
+          description: >-
+            Optional. If true and the Secret does not exist, create it
+            (update_mask
+
+            is then ignored).
+          in: query
+          required: false
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not update the Secret.
+          in: query
+          required: false
+      tags:
+        - Secrets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  description: Optional. Human-readable name. Must not exceed 256 characters.
+                value:
+                  type: string
+                  description: >-
+                    Input only. The opaque secret value, encrypted at rest and
+                    NEVER
+
+                    returned in any response. Required (non-empty) on create. On
+                    update it
+
+                    is written only when `value` is named in the update mask,
+                    and must be
+
+                    non-empty then — an empty value in scope is rejected
+                    (INVALID_ARGUMENT).
+
+                    A Secret always holds a value: rotate by sending a new one,
+                    and remove
+
+                    by deleting the Secret; there is no empty/unset state. Store
+                    multi-field
+
+                    credentials (e.g. AWS access+secret keys) as a JSON blob the
+                    consuming
+
+                    connector parses — the vault treats the value as opaque.
+                  contentEncoding: base64
+                  contentMediaType: application/json
+                createdBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that created this secret.
+                  readOnly: true
+                createTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Creation time.
+                  readOnly: true
+                updatedBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that last rotated or modified this
+                    secret.
+                  readOnly: true
+                updateTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Last update (or rotation) time.
+                  readOnly: true
+                etag:
+                  type: string
+                  description: >-
+                    Optional. Entity tag for optimistic concurrency. Always set
+                    in server
+
+                    responses; pass it back on update/delete to guard against a
+                    lost write.
+                annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Optional. Labels for organizing and filtering secrets.
+              description: >-
+                Required. The new state of the Secret. To rotate the value, name
+                `value`
+
+                in the update mask with a new non-empty value; an empty value in
+                scope
+
+                is rejected. To change only metadata, omit `value` from the mask
+                and the
+
+                stored value is untouched. If `etag` is set it must match the
+                stored
+
+                etag or `ABORTED` is returned.
+        description: >-
+          Required. The new state of the Secret. To rotate the value, name
+          `value`
+
+          in the update mask with a new non-empty value; an empty value in scope
+
+          is rejected. To change only metadata, omit `value` from the mask and
+          the
+
+          stored value is untouched. If `etag` is set it must match the stored
+
+          etag or `ABORTED` is returned.
+        required: true
   /v1/organizations/{organization}/spaces:
     get:
       summary: |-
@@ -3998,6 +4586,288 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/AssetsImportAssetsBody"
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/connectors:
+    get:
+      summary: Lists Connectors under an organization or space.
+      operationId: Connectors_ListConnectors2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListConnectorsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: Optional. Maximum number of Connectors to return; the server caps
+            at 1000.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListConnectors call.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: filter
+          description: Optional. An AIP-160 filter expression.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: orderBy
+          description: Optional. A comma-separated list of fields to order by.
+          in: query
+          required: false
+      tags:
+        - Connectors
+    post:
+      summary: Creates a Connector.
+      operationId: Connectors_CreateConnector2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Connector"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: connectorId
+          description: Required. The user-assigned id for the Connector, unique within the
+            parent.
+          in: query
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not create the
+            Connector.
+          in: query
+          required: false
+      tags:
+        - Connectors
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/v1Connector"
+        description: Required. The Connector to create.
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/connectors/{connector}:
+    get:
+      summary: Retrieves a Connector.
+      operationId: Connectors_GetConnector2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Connector"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: connector
+          in: path
+          required: true
+      tags:
+        - Connectors
+    delete:
+      summary: Deletes a Connector.
+      operationId: Connectors_DeleteConnector2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: {}
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: connector
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not delete the
+            Connector.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: etag
+          description: Optional. The etag the client expects; used for optimistic
+            concurrency.
+          in: query
+          required: false
+      tags:
+        - Connectors
+    patch:
+      summary: Updates a Connector.
+      operationId: Connectors_UpdateConnector2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Connector"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: connector
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not update the
+            Connector.
+          in: query
+          required: false
+      tags:
+        - Connectors
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  description: Optional. Human-readable name.
+                description:
+                  type: string
+                  description: Optional. Description.
+                http:
+                  $ref: "#/components/schemas/v1HttpConnector"
+                  description: Configuration for an HTTP connector.
+                agent:
+                  type: string
+                  description: >-
+                    Optional. On-prem agent resource name whose network executes
+                    activities
+
+                    using this connector. Empty = the cloud controller.
+                createdBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that created this connector.
+                  readOnly: true
+                createTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Creation time.
+                  readOnly: true
+                updatedBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that last modified this connector.
+                  readOnly: true
+                updateTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Update time.
+                  readOnly: true
+                etag:
+                  type: string
+                  description: Optional. Optimistic-concurrency tag.
+                annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Optional. Labels.
+              title: Required. The new state of the Connector.
+        description: Required. The new state of the Connector.
         required: true
   /v1/organizations/{organization}/spaces/{space}/dashboards:
     get:
@@ -5757,6 +6627,357 @@ paths:
             schema:
               $ref: "#/components/schemas/RequestsSubmitRequestBody"
         required: true
+  /v1/organizations/{organization}/spaces/{space}/secrets:
+    get:
+      summary: Lists Secrets under a parent. The value is never included.
+      operationId: Secrets_ListSecrets2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListSecretsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: |-
+            Optional. Maximum number of Secrets to return. Server caps at 1000;
+            defaults to 100 when unspecified.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListSecrets call.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: filter
+          description: |-
+            Optional. An AIP-160 filter expression. Filterable fields:
+
+            + `displayName`
+
+            For more information, see [AIP-160](https://aip.dev/160).
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: orderBy
+          description: >-
+            Optional. A comma-separated list of fields to order by (append "
+            desc"
+
+            for descending). Supported: `displayName`, `createTime`. Defaults to
+
+            `displayName` ascending.
+          in: query
+          required: false
+      tags:
+        - Secrets
+    post:
+      summary: Creates a new Secret. The value is required and is encrypted at rest.
+      operationId: Secrets_CreateSecret2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Secret"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: secretId
+          description: Required. The user-assigned id for the Secret, unique within the
+            parent.
+          in: query
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not create the Secret.
+          in: query
+          required: false
+      tags:
+        - Secrets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/v1Secret"
+        description: |-
+          Required. The Secret to create. Its `value` is required here and is
+          encrypted at rest.
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/secrets/{secret}:
+    get:
+      summary: Retrieves a Secret's metadata. The value is never included.
+      operationId: Secrets_GetSecret2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Secret"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: secret
+          in: path
+          required: true
+      tags:
+        - Secrets
+    delete:
+      summary: |-
+        Deletes a Secret. Returns FAILED_PRECONDITION if any connector still
+        references it — remove the references first. There is no cascade.
+      operationId: Secrets_DeleteSecret2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: {}
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: secret
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not delete the Secret.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: etag
+          description: Optional. The etag the client expects; used for optimistic
+            concurrency.
+          in: query
+          required: false
+      tags:
+        - Secrets
+    patch:
+      summary: |-
+        Updates a Secret. Rotate the value by naming it in the update mask with
+        a new non-empty value; omit it from the mask to change only metadata.
+      operationId: Secrets_UpdateSecret2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Secret"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: secret
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: allowMissing
+          description: >-
+            Optional. If true and the Secret does not exist, create it
+            (update_mask
+
+            is then ignored).
+          in: query
+          required: false
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not update the Secret.
+          in: query
+          required: false
+      tags:
+        - Secrets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  description: Optional. Human-readable name. Must not exceed 256 characters.
+                value:
+                  type: string
+                  description: >-
+                    Input only. The opaque secret value, encrypted at rest and
+                    NEVER
+
+                    returned in any response. Required (non-empty) on create. On
+                    update it
+
+                    is written only when `value` is named in the update mask,
+                    and must be
+
+                    non-empty then — an empty value in scope is rejected
+                    (INVALID_ARGUMENT).
+
+                    A Secret always holds a value: rotate by sending a new one,
+                    and remove
+
+                    by deleting the Secret; there is no empty/unset state. Store
+                    multi-field
+
+                    credentials (e.g. AWS access+secret keys) as a JSON blob the
+                    consuming
+
+                    connector parses — the vault treats the value as opaque.
+                  contentEncoding: base64
+                  contentMediaType: application/json
+                createdBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that created this secret.
+                  readOnly: true
+                createTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Creation time.
+                  readOnly: true
+                updatedBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that last rotated or modified this
+                    secret.
+                  readOnly: true
+                updateTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Last update (or rotation) time.
+                  readOnly: true
+                etag:
+                  type: string
+                  description: >-
+                    Optional. Entity tag for optimistic concurrency. Always set
+                    in server
+
+                    responses; pass it back on update/delete to guard against a
+                    lost write.
+                annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Optional. Labels for organizing and filtering secrets.
+              description: >-
+                Required. The new state of the Secret. To rotate the value, name
+                `value`
+
+                in the update mask with a new non-empty value; an empty value in
+                scope
+
+                is rejected. To change only metadata, omit `value` from the mask
+                and the
+
+                stored value is untouched. If `etag` is set it must match the
+                stored
+
+                etag or `ABORTED` is returned.
+        description: >-
+          Required. The new state of the Secret. To rotate the value, name
+          `value`
+
+          in the update mask with a new non-empty value; an empty value in scope
+
+          is rejected. To change only metadata, omit `value` from the mask and
+          the
+
+          stored value is untouched. If `etag` is set it must match the stored
+
+          etag or `ABORTED` is returned.
+        required: true
   /v1/organizations/{organization}/spaces/{space}/tagBindings:
     get:
       summary: |-
@@ -6752,6 +7973,800 @@ paths:
           nonempty, it must match the `etag` field of the existing ControlGroup.
 
           Otherwise, `ABORTED` will be returned.
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/workflows:
+    get:
+      summary: Lists Workflows under an organization or space.
+      operationId: Workflows_ListWorkflows2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListWorkflowsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: Optional. Maximum number of Workflows to return; the server caps at
+            1000.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListWorkflows call.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: filter
+          description: Optional. An AIP-160 filter expression.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: orderBy
+          description: Optional. A comma-separated list of fields to order by.
+          in: query
+          required: false
+      tags:
+        - Workflows
+    post:
+      summary: |-
+        Creates a customer-owned (OWNED) workflow. MANAGED workflows are
+        provisioned by Pivox and cannot be created via this RPC.
+      operationId: Workflows_CreateWorkflow2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflowId
+          description: Required. The user-assigned id for the Workflow, unique within the
+            parent.
+          in: query
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not create the
+            Workflow.
+          in: query
+          required: false
+      tags:
+        - Workflows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/v1Workflow"
+        description: Required. The Workflow to create.
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/workflows/{workflow}:
+    get:
+      summary: Retrieves a Workflow.
+      operationId: Workflows_GetWorkflow2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+      tags:
+        - Workflows
+    delete:
+      summary: |-
+        Deletes a Workflow. By default this fails if the Workflow has runs; set
+        `force` to cascade its versions and run history.
+      operationId: Workflows_DeleteWorkflow2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: {}
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not delete the
+            Workflow.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: etag
+          description: Optional. The etag the client expects; used for optimistic
+            concurrency.
+          in: query
+          required: false
+        - schema:
+            type: boolean
+          name: force
+          description: >-
+            Optional. Default false refuses to delete a Workflow that has runs;
+            true
+
+            cascades its versions and run history.
+          in: query
+          required: false
+      tags:
+        - Workflows
+    patch:
+      summary: |-
+        Updates the container (display_name, description, enabled, config). The
+        definition itself is changed by creating a new WorkflowVersion; the live
+        version is changed via PromoteWorkflowVersion — not here.
+      operationId: Workflows_UpdateWorkflow2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not update the
+            Workflow.
+          in: query
+          required: false
+      tags:
+        - Workflows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  description: Optional. Human-readable name.
+                description:
+                  type: string
+                  description: Optional. Description.
+                enabled:
+                  type: boolean
+                  description: "Optional. Master switch: when false, no trigger fires a run."
+                version:
+                  type: string
+                  description: >-
+                    Output only. Resource name of the promoted (live)
+                    WorkflowVersion. Empty
+
+                    until a version is promoted. Set via PromoteWorkflowVersion,
+                    not Update.
+                  readOnly: true
+                config:
+                  type: object
+                  description: >-
+                    Optional. Persistent parameter values applied to every
+                    triggered run,
+
+                    validated against the live version's parameter schema. This
+                    is where a
+
+                    customer's configuration of a MANAGED workflow lives — it
+                    survives
+
+                    version upgrades.
+                origin:
+                  $ref: "#/components/schemas/v1WorkflowOrigin"
+                  description: >-
+                    Output only. Whether Pivox manages this workflow's versions
+                    (MANAGED) or
+
+                    the customer owns them (OWNED). Only OWNED workflows are
+                    structurally
+
+                    editable; a MANAGED one is configured via `config` or
+                    forked.
+                  readOnly: true
+                createdBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that created this workflow.
+                  readOnly: true
+                createTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Creation time.
+                  readOnly: true
+                updatedBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that last modified this workflow.
+                  readOnly: true
+                updateTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Update time.
+                  readOnly: true
+                etag:
+                  type: string
+                  description: Optional. Optimistic-concurrency tag.
+                annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Optional. Labels.
+              title: Required. The new state of the Workflow.
+        description: Required. The new state of the Workflow.
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/runs:
+    get:
+      summary: Lists the runs of a Workflow.
+      operationId: WorkflowRuns_ListWorkflowRuns2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListWorkflowRunsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: Optional. Maximum number of runs to return; the server caps at 1000.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListWorkflowRuns call.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: filter
+          description: Optional. AIP-160 filter (e.g. state = "RUNNING").
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: orderBy
+          description: Optional. A comma-separated list of fields to order by.
+          in: query
+          required: false
+      tags:
+        - WorkflowRuns
+  /v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/runs/{run}:
+    get:
+      summary: Retrieves a WorkflowRun.
+      operationId: WorkflowRuns_GetWorkflowRun2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowRun"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: run
+          in: path
+          required: true
+      tags:
+        - WorkflowRuns
+  /v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/runs/{run}:cancel:
+    post:
+      summary: Requests cancellation of a running (or waiting) run.
+      operationId: WorkflowRuns_CancelWorkflowRun2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowRun"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: run
+          in: path
+          required: true
+      tags:
+        - WorkflowRuns
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowRunsCancelWorkflowRunBody"
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/versions:
+    get:
+      summary: Lists the versions of a Workflow.
+      operationId: WorkflowVersions_ListWorkflowVersions2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListWorkflowVersionsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: Optional. Maximum number of versions to return; the server caps at
+            1000.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListWorkflowVersions
+            call.
+          in: query
+          required: false
+      tags:
+        - WorkflowVersions
+    post:
+      summary: |-
+        Mints a new immutable version from a definition. The version is a draft
+        until PromoteWorkflowVersion makes it live.
+      operationId: WorkflowVersions_CreateWorkflowVersion2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowVersion"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not create the
+            version.
+          in: query
+          required: false
+      tags:
+        - WorkflowVersions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/v1WorkflowVersion"
+        description: Required. The version to create.
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/versions/{version}:
+    get:
+      summary: Retrieves a WorkflowVersion.
+      operationId: WorkflowVersions_GetWorkflowVersion2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowVersion"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: version
+          in: path
+          required: true
+      tags:
+        - WorkflowVersions
+    delete:
+      summary: |-
+        Deletes a version. Only permitted for a version that is not currently
+        promoted (Workflow.version must not point at it).
+      operationId: WorkflowVersions_DeleteWorkflowVersion2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: {}
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: version
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not delete the
+            version.
+          in: query
+          required: false
+      tags:
+        - WorkflowVersions
+  /v1/organizations/{organization}/spaces/{space}/workflows/{workflow}:fork:
+    post:
+      summary: |-
+        Forks a Workflow into a new customer-OWNED Workflow: clones the source
+        version's definition and parameter schema and carries its config. Forks
+        receive no auto-upgrade — the escape hatch for structural change to a
+        MANAGED workflow.
+      operationId: Workflows_ForkWorkflow2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+      tags:
+        - Workflows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowsForkWorkflowBody"
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/workflows/{workflow}:promote:
+    post:
+      summary: >-
+        Promotes a version to live (sets Workflow.version). Explicit — a new
+
+        version is a draft until promoted, so edits never disturb production
+        runs.
+      operationId: Workflows_PromoteWorkflowVersion2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+      tags:
+        - Workflows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowsPromoteWorkflowVersionBody"
+        required: true
+  /v1/organizations/{organization}/spaces/{space}/workflows/{workflow}:run:
+    post:
+      summary: |-
+        Starts a run of a workflow (manual trigger). Returns the WorkflowRun
+        immediately (PENDING/RUNNING); poll GetWorkflowRun for progress.
+      operationId: WorkflowRuns_RunWorkflow2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowRun"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: space
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+      tags:
+        - WorkflowRuns
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowRunsRunWorkflowBody"
         required: true
   /v1/organizations/{organization}/spaces/{space}:queryDashboardData:
     post:
@@ -10183,6 +12198,725 @@ paths:
             schema:
               $ref: "#/components/schemas/AiChatStreamGenerateContentBody"
         required: true
+  /v1/organizations/{organization}/workflows:
+    get:
+      summary: Lists Workflows under an organization or space.
+      operationId: Workflows_ListWorkflows
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListWorkflowsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: Optional. Maximum number of Workflows to return; the server caps at
+            1000.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListWorkflows call.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: filter
+          description: Optional. An AIP-160 filter expression.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: orderBy
+          description: Optional. A comma-separated list of fields to order by.
+          in: query
+          required: false
+      tags:
+        - Workflows
+    post:
+      summary: |-
+        Creates a customer-owned (OWNED) workflow. MANAGED workflows are
+        provisioned by Pivox and cannot be created via this RPC.
+      operationId: Workflows_CreateWorkflow
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflowId
+          description: Required. The user-assigned id for the Workflow, unique within the
+            parent.
+          in: query
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not create the
+            Workflow.
+          in: query
+          required: false
+      tags:
+        - Workflows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/v1Workflow"
+        description: Required. The Workflow to create.
+        required: true
+  /v1/organizations/{organization}/workflows/{workflow}:
+    get:
+      summary: Retrieves a Workflow.
+      operationId: Workflows_GetWorkflow
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+      tags:
+        - Workflows
+    delete:
+      summary: |-
+        Deletes a Workflow. By default this fails if the Workflow has runs; set
+        `force` to cascade its versions and run history.
+      operationId: Workflows_DeleteWorkflow
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: {}
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not delete the
+            Workflow.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: etag
+          description: Optional. The etag the client expects; used for optimistic
+            concurrency.
+          in: query
+          required: false
+        - schema:
+            type: boolean
+          name: force
+          description: >-
+            Optional. Default false refuses to delete a Workflow that has runs;
+            true
+
+            cascades its versions and run history.
+          in: query
+          required: false
+      tags:
+        - Workflows
+    patch:
+      summary: |-
+        Updates the container (display_name, description, enabled, config). The
+        definition itself is changed by creating a new WorkflowVersion; the live
+        version is changed via PromoteWorkflowVersion — not here.
+      operationId: Workflows_UpdateWorkflow
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not update the
+            Workflow.
+          in: query
+          required: false
+      tags:
+        - Workflows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  description: Optional. Human-readable name.
+                description:
+                  type: string
+                  description: Optional. Description.
+                enabled:
+                  type: boolean
+                  description: "Optional. Master switch: when false, no trigger fires a run."
+                version:
+                  type: string
+                  description: >-
+                    Output only. Resource name of the promoted (live)
+                    WorkflowVersion. Empty
+
+                    until a version is promoted. Set via PromoteWorkflowVersion,
+                    not Update.
+                  readOnly: true
+                config:
+                  type: object
+                  description: >-
+                    Optional. Persistent parameter values applied to every
+                    triggered run,
+
+                    validated against the live version's parameter schema. This
+                    is where a
+
+                    customer's configuration of a MANAGED workflow lives — it
+                    survives
+
+                    version upgrades.
+                origin:
+                  $ref: "#/components/schemas/v1WorkflowOrigin"
+                  description: >-
+                    Output only. Whether Pivox manages this workflow's versions
+                    (MANAGED) or
+
+                    the customer owns them (OWNED). Only OWNED workflows are
+                    structurally
+
+                    editable; a MANAGED one is configured via `config` or
+                    forked.
+                  readOnly: true
+                createdBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that created this workflow.
+                  readOnly: true
+                createTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Creation time.
+                  readOnly: true
+                updatedBy:
+                  $ref: "#/components/schemas/typesActor"
+                  description: Output only. The identity that last modified this workflow.
+                  readOnly: true
+                updateTime:
+                  type: string
+                  format: date-time
+                  description: Output only. Update time.
+                  readOnly: true
+                etag:
+                  type: string
+                  description: Optional. Optimistic-concurrency tag.
+                annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Optional. Labels.
+              title: Required. The new state of the Workflow.
+        description: Required. The new state of the Workflow.
+        required: true
+  /v1/organizations/{organization}/workflows/{workflow}/runs:
+    get:
+      summary: Lists the runs of a Workflow.
+      operationId: WorkflowRuns_ListWorkflowRuns
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListWorkflowRunsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: Optional. Maximum number of runs to return; the server caps at 1000.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListWorkflowRuns call.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: filter
+          description: Optional. AIP-160 filter (e.g. state = "RUNNING").
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: orderBy
+          description: Optional. A comma-separated list of fields to order by.
+          in: query
+          required: false
+      tags:
+        - WorkflowRuns
+  /v1/organizations/{organization}/workflows/{workflow}/runs/{run}:
+    get:
+      summary: Retrieves a WorkflowRun.
+      operationId: WorkflowRuns_GetWorkflowRun
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowRun"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: run
+          in: path
+          required: true
+      tags:
+        - WorkflowRuns
+  /v1/organizations/{organization}/workflows/{workflow}/runs/{run}:cancel:
+    post:
+      summary: Requests cancellation of a running (or waiting) run.
+      operationId: WorkflowRuns_CancelWorkflowRun
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowRun"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: run
+          in: path
+          required: true
+      tags:
+        - WorkflowRuns
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowRunsCancelWorkflowRunBody"
+        required: true
+  /v1/organizations/{organization}/workflows/{workflow}/versions:
+    get:
+      summary: Lists the versions of a Workflow.
+      operationId: WorkflowVersions_ListWorkflowVersions
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1ListWorkflowVersionsResponse"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: integer
+            format: int32
+          name: pageSize
+          description: Optional. Maximum number of versions to return; the server caps at
+            1000.
+          in: query
+          required: false
+        - schema:
+            type: string
+          name: pageToken
+          description: Optional. A pagination token from a previous ListWorkflowVersions
+            call.
+          in: query
+          required: false
+      tags:
+        - WorkflowVersions
+    post:
+      summary: |-
+        Mints a new immutable version from a definition. The version is a draft
+        until PromoteWorkflowVersion makes it live.
+      operationId: WorkflowVersions_CreateWorkflowVersion
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowVersion"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not create the
+            version.
+          in: query
+          required: false
+      tags:
+        - WorkflowVersions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/v1WorkflowVersion"
+        description: Required. The version to create.
+        required: true
+  /v1/organizations/{organization}/workflows/{workflow}/versions/{version}:
+    get:
+      summary: Retrieves a WorkflowVersion.
+      operationId: WorkflowVersions_GetWorkflowVersion
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowVersion"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: version
+          in: path
+          required: true
+      tags:
+        - WorkflowVersions
+    delete:
+      summary: |-
+        Deletes a version. Only permitted for a version that is not currently
+        promoted (Workflow.version must not point at it).
+      operationId: WorkflowVersions_DeleteWorkflowVersion
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: {}
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: version
+          in: path
+          required: true
+        - schema:
+            type: boolean
+          name: validateOnly
+          description: Optional. If true, validate the request but do not delete the
+            version.
+          in: query
+          required: false
+      tags:
+        - WorkflowVersions
+  /v1/organizations/{organization}/workflows/{workflow}:fork:
+    post:
+      summary: |-
+        Forks a Workflow into a new customer-OWNED Workflow: clones the source
+        version's definition and parameter schema and carries its config. Forks
+        receive no auto-upgrade — the escape hatch for structural change to a
+        MANAGED workflow.
+      operationId: Workflows_ForkWorkflow
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+      tags:
+        - Workflows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowsForkWorkflowBody"
+        required: true
+  /v1/organizations/{organization}/workflows/{workflow}:promote:
+    post:
+      summary: >-
+        Promotes a version to live (sets Workflow.version). Explicit — a new
+
+        version is a draft until promoted, so edits never disturb production
+        runs.
+      operationId: Workflows_PromoteWorkflowVersion
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Workflow"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+      tags:
+        - Workflows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowsPromoteWorkflowVersionBody"
+        required: true
+  /v1/organizations/{organization}/workflows/{workflow}:run:
+    post:
+      summary: |-
+        Starts a run of a workflow (manual trigger). Returns the WorkflowRun
+        immediately (PENDING/RUNNING); poll GetWorkflowRun for progress.
+      operationId: WorkflowRuns_RunWorkflow
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1WorkflowRun"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: organization
+          in: path
+          required: true
+        - schema:
+            type: string
+          name: workflow
+          in: path
+          required: true
+      tags:
+        - WorkflowRuns
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowRunsRunWorkflowBody"
+        required: true
   /v1/organizations/{organization}:queryDashboardData:
     post:
       summary: |-
@@ -10498,6 +13232,8 @@ paths:
           required: false
       tags:
         - Watcher
+security:
+  - OAuth2: []
 openapi: 3.1.1
 components:
   schemas:
@@ -11073,6 +13809,66 @@ components:
          - DIRECTION_UNSPECIFIED: Unspecified direction.
          - ABOVE: Values above the threshold.
          - BELOW: Values below the threshold.
+    WorkflowRunsCancelWorkflowRunBody:
+      type: object
+      description: Request for CancelWorkflowRun.
+    WorkflowRunsRunWorkflowBody:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Optional. Pin a specific version; empty = the workflow's live
+            version.
+        parameters:
+          type: object
+          description: >-
+            Optional. Parameter values, validated against the version's
+            parameter
+
+            schema (layered over the workflow's persistent config).
+        subject:
+          type: string
+          description: |-
+            Optional. The subject resource the run operates on (for a manual run
+            against a specific asset/request).
+        validateOnly:
+          type: boolean
+          description: Optional. If true, validate the request but do not start a run.
+      description: Request for RunWorkflow.
+    WorkflowsForkWorkflowBody:
+      type: object
+      properties:
+        sourceVersion:
+          type: string
+          description: Optional. Version to fork from; empty = the source's live version.
+        parent:
+          type: string
+          description: Required. The parent organization or space the fork lands under.
+        workflowId:
+          type: string
+          description: Required. The user-assigned id for the forked Workflow.
+        displayName:
+          type: string
+          description: Optional. Human-readable name for the forked Workflow.
+        validateOnly:
+          type: boolean
+          description: Optional. If true, validate the request but do not fork.
+      description: Request for ForkWorkflow.
+      required:
+        - parent
+        - workflowId
+    WorkflowsPromoteWorkflowVersionBody:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Required. The version to promote to live.
+        validateOnly:
+          type: boolean
+          description: Optional. If true, validate the request but do not promote.
+      description: Request for PromoteWorkflowVersion.
+      required:
+        - version
     longrunningOperation:
       type: object
       properties:
@@ -11653,6 +14449,23 @@ components:
         lifecycle state. Soft-deleted orgs are excluded from this view —
         those surface only through `Organizations.ListOrganizations` for
         the undelete UX.
+    v1Activity:
+      type: object
+      properties:
+        http:
+          $ref: "#/components/schemas/v1HttpActivity"
+          description: An HTTP request through an http Connector.
+        set:
+          $ref: "#/components/schemas/v1SetActivity"
+          description: A run-variable assignment.
+        runWorkflow:
+          $ref: "#/components/schemas/v1RunWorkflowActivity"
+          description: A sub-workflow invocation.
+      description: >-
+        Activity is a typed leaf operation. The connector-backed variants (http,
+        ...)
+
+        reference a Connector.
     v1AddGroupMembersResponse:
       type: object
       description: Response message for `Iam.AddGroupMembers`.
@@ -12175,6 +14988,19 @@ components:
           format: double
           description: Optional. The maximum axis value.
       description: AxisConfig defines display properties for a chart axis.
+    v1Branch:
+      type: object
+      properties:
+        when:
+          type: string
+          description: Required. CEL guard evaluated over the run context.
+        then:
+          $ref: "#/components/schemas/v1Sequence"
+          description: Required. Steps run when `when` evaluates true.
+      description: "Branch is one arm of a Condition: a CEL guard and the steps it runs."
+      required:
+        - when
+        - then
     v1BrowserKeyRestrictions:
       type: object
       properties:
@@ -12477,6 +15303,72 @@ components:
         query without the column ever appearing in TABLE mode.
       required:
         - field
+    v1Condition:
+      type: object
+      properties:
+        branches:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/v1Branch"
+          description: Required. The ordered if / else-if branches.
+        otherwise:
+          $ref: "#/components/schemas/v1Sequence"
+          description: Optional. The else block, run when no branch matches.
+      description: |-
+        Condition is an if / else-if / else block. The first branch whose `when`
+        evaluates true runs; if none match, `otherwise` runs when present.
+      required:
+        - branches
+    v1Connector:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Immutable. Resource name.
+        displayName:
+          type: string
+          description: Optional. Human-readable name.
+        description:
+          type: string
+          description: Optional. Description.
+        http:
+          $ref: "#/components/schemas/v1HttpConnector"
+          description: Configuration for an HTTP connector.
+        agent:
+          type: string
+          description: >-
+            Optional. On-prem agent resource name whose network executes
+            activities
+
+            using this connector. Empty = the cloud controller.
+        createdBy:
+          $ref: "#/components/schemas/typesActor"
+          description: Output only. The identity that created this connector.
+          readOnly: true
+        createTime:
+          type: string
+          format: date-time
+          description: Output only. Creation time.
+          readOnly: true
+        updatedBy:
+          $ref: "#/components/schemas/typesActor"
+          description: Output only. The identity that last modified this connector.
+          readOnly: true
+        updateTime:
+          type: string
+          format: date-time
+          description: Output only. Update time.
+          readOnly: true
+        etag:
+          type: string
+          description: Optional. Optimistic-concurrency tag.
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional. Labels.
+      description: Connector is a reusable, credentialed connection to an external system.
     v1Conversation:
       type: object
       properties:
@@ -13177,6 +16069,62 @@ components:
       description: A membership of a user in a group.
       required:
         - member
+    v1HttpActivity:
+      type: object
+      properties:
+        connector:
+          type: string
+          description: Required. The Connector to use (must be an http connector).
+        method:
+          type: string
+          description: Required. The HTTP method (GET, POST, PUT, DELETE, HEAD).
+        path:
+          type: string
+          description: Optional. CEL path appended to the connector's base URL.
+        query:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional. Query parameters as CEL over the run context (no secret()).
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional. Header values as CEL over the run context (no secret()).
+        body:
+          type: string
+          description: Optional. Request body as a CEL expression producing JSON.
+      description: >-
+        HttpActivity calls an HTTP endpoint through an http Connector, which
+
+        supplies the base URL, static/credentialed headers, and execution
+        locality.
+      required:
+        - connector
+        - method
+    v1HttpConnector:
+      type: object
+      properties:
+        baseUrl:
+          type: string
+          description: Required. The base URL prepended to each HTTP activity's path.
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: |-
+            Optional. Header name to CEL value (connector-config env; `secret()`
+            allowed). These take precedence over an activity's headers.
+      description: >-
+        HttpConnector supplies the base URL and headers for HTTP activities.
+        Header
+
+        values are CEL over the connector-config environment: a literal, a
+
+        `secret("…/secrets/x")`, or an expression like `"Bearer " +
+        secret("…")`.
+      required:
+        - baseUrl
     v1Icon:
       type: string
       enum:
@@ -13787,6 +16735,19 @@ components:
           type: string
           description: A pagination token for the next page.
       description: The response from the ListAssets method.
+    v1ListConnectorsResponse:
+      type: object
+      properties:
+        connectors:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/v1Connector"
+          description: The Connectors under the requested parent.
+        nextPageToken:
+          type: string
+          description: A pagination token for the next page, empty if there are no more.
+      description: Response for ListConnectors.
     v1ListConversationsResponse:
       type: object
       properties:
@@ -14032,6 +16993,19 @@ components:
           type: string
           description: Token for the next page of results.
       description: Response message for `Iam.ListRoles`.
+    v1ListSecretsResponse:
+      type: object
+      properties:
+        secrets:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/v1Secret"
+          description: The Secrets under the requested parent (values omitted).
+        nextPageToken:
+          type: string
+          description: A pagination token for the next page, empty if there are no more.
+      description: The response message for ListSecrets.
     v1ListSpacesResponse:
       type: object
       properties:
@@ -14185,6 +17159,45 @@ components:
           type: string
           description: Token for the next page of results.
       description: Response message for `Iam.ListUsers`.
+    v1ListWorkflowRunsResponse:
+      type: object
+      properties:
+        workflowRuns:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/v1WorkflowRun"
+          description: The runs under the requested Workflow.
+        nextPageToken:
+          type: string
+          description: A pagination token for the next page, empty if there are no more.
+      description: Response for ListWorkflowRuns.
+    v1ListWorkflowVersionsResponse:
+      type: object
+      properties:
+        workflowVersions:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/v1WorkflowVersion"
+          description: The versions under the requested Workflow.
+        nextPageToken:
+          type: string
+          description: A pagination token for the next page, empty if there are no more.
+      description: Response for ListWorkflowVersions.
+    v1ListWorkflowsResponse:
+      type: object
+      properties:
+        workflows:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/v1Workflow"
+          description: The Workflows under the requested parent.
+        nextPageToken:
+          type: string
+          description: A pagination token for the next page, empty if there are no more.
+      description: Response for ListWorkflows.
     v1LookupKeyResponse:
       type: object
       properties:
@@ -14589,6 +17602,70 @@ components:
         role grants.
       required:
         - permissions
+    v1Parallel:
+      type: object
+      properties:
+        branches:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/v1Sequence"
+          description: Required. The branches run concurrently.
+      description: >-
+        Parallel runs its branches concurrently and joins (waits for all) at the
+
+        block boundary — the steps after the Parallel run once every branch is
+        done.
+      required:
+        - branches
+    v1ParamType:
+      type: string
+      enum:
+        - PARAM_TYPE_UNSPECIFIED
+        - PARAM_STRING
+        - PARAM_INT
+        - PARAM_NUMBER
+        - PARAM_BOOL
+        - PARAM_RESOURCE
+        - PARAM_STRUCT
+        - PARAM_LIST
+      default: PARAM_TYPE_UNSPECIFIED
+      description: |-
+        ParamType is the value type of a workflow parameter.
+
+         - PARAM_TYPE_UNSPECIFIED: Default, unused.
+         - PARAM_STRING: A string value.
+         - PARAM_INT: A 64-bit integer value.
+         - PARAM_NUMBER: A floating-point value.
+         - PARAM_BOOL: A boolean value.
+         - PARAM_RESOURCE: An AIP resource name.
+         - PARAM_STRUCT: A structured object value.
+         - PARAM_LIST: A list value.
+    v1ParameterDef:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Required. The parameter's key, unique within the version's contract.
+        type:
+          $ref: "#/components/schemas/v1ParamType"
+          description: Required. The parameter's value type.
+        required:
+          type: boolean
+          description: Optional. Whether a value must be supplied at run time.
+        description:
+          type: string
+          description: Optional. Human-readable description of the parameter.
+        defaultValue:
+          description: >-
+            Optional. Value used when none is supplied. Every parameter should
+            have a
+
+            default so the workflow runs out of the box.
+      description: ParameterDef declares one input in a version's contract.
+      required:
+        - key
+        - type
     v1Permission:
       type: object
       properties:
@@ -14867,6 +17944,9 @@ components:
         and the request moves back to IN_PROGRESS.
          - REJECTED: The producer has rejected the deliverables.
          - CANCELLED: The request was cancelled.
+    v1ResourceEventTrigger:
+      type: object
+      description: ResourceEventTrigger fires a run when a subject resource changes.
     v1ResourceQuery:
       type: object
       properties:
@@ -15049,6 +18129,63 @@ components:
         available.
       required:
         - key
+    v1RunTrigger:
+      type: object
+      properties:
+        kind:
+          $ref: "#/components/schemas/v1RunTriggerKind"
+          description: The kind of event that fired the run.
+        subject:
+          type: string
+          description: "For RESOURCE_EVENT: the resource whose change fired the run."
+        parentRun:
+          type: string
+          description: "For SUB_WORKFLOW: the parent run that invoked this via
+            run_workflow."
+      description: RunTrigger records what started a run.
+    v1RunTriggerKind:
+      type: string
+      enum:
+        - RUN_TRIGGER_KIND_UNSPECIFIED
+        - MANUAL
+        - RESOURCE_EVENT
+        - SCHEDULE
+        - SUB_WORKFLOW
+      default: RUN_TRIGGER_KIND_UNSPECIFIED
+      description: |-
+        RunTriggerKind is what fired a run.
+
+         - RUN_TRIGGER_KIND_UNSPECIFIED: Default, unused.
+         - MANUAL: The RunWorkflow RPC (manual).
+         - RESOURCE_EVENT: An asset/request event.
+         - SCHEDULE: A schedule fired.
+         - SUB_WORKFLOW: Invoked via a run_workflow activity.
+    v1RunWorkflowActivity:
+      type: object
+      properties:
+        workflow:
+          type: string
+          description: >-
+            Required. The workflow to run. Resolves to the target's live version
+            at
+
+            call time; a WorkflowVersion name pins a specific version.
+        parameters:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional. Parameter values (CEL over the run context) passed to the
+            run.
+      description: >-
+        RunWorkflowActivity invokes another workflow as a sub-workflow. Subject
+        to
+
+        a call-stack cycle guard + depth cap. This is how customer workflows
+        compose
+
+        system building blocks.
+      required:
+        - workflow
     v1S3AccessKeyCredentials:
       type: object
       properties:
@@ -15139,6 +18276,78 @@ components:
         - idpEntityId
         - ssoUrl
         - x509Certificates
+    v1ScheduleTrigger:
+      type: object
+      description: ScheduleTrigger fires a run on a schedule.
+    v1Secret:
+      type: object
+      properties:
+        name:
+          type: string
+          description: |-
+            Immutable. The resource name for a Secret, in the format
+            `organizations/{organization}/secrets/{secret}` or
+            `organizations/{organization}/spaces/{space}/secrets/{secret}`.
+        displayName:
+          type: string
+          description: Optional. Human-readable name. Must not exceed 256 characters.
+        value:
+          type: string
+          description: >-
+            Input only. The opaque secret value, encrypted at rest and NEVER
+
+            returned in any response. Required (non-empty) on create. On update
+            it
+
+            is written only when `value` is named in the update mask, and must
+            be
+
+            non-empty then — an empty value in scope is rejected
+            (INVALID_ARGUMENT).
+
+            A Secret always holds a value: rotate by sending a new one, and
+            remove
+
+            by deleting the Secret; there is no empty/unset state. Store
+            multi-field
+
+            credentials (e.g. AWS access+secret keys) as a JSON blob the
+            consuming
+
+            connector parses — the vault treats the value as opaque.
+          contentEncoding: base64
+        createdBy:
+          $ref: "#/components/schemas/typesActor"
+          description: Output only. The identity that created this secret.
+          readOnly: true
+        createTime:
+          type: string
+          format: date-time
+          description: Output only. Creation time.
+          readOnly: true
+        updatedBy:
+          $ref: "#/components/schemas/typesActor"
+          description: Output only. The identity that last rotated or modified this secret.
+          readOnly: true
+        updateTime:
+          type: string
+          format: date-time
+          description: Output only. Last update (or rotation) time.
+          readOnly: true
+        etag:
+          type: string
+          description: >-
+            Optional. Entity tag for optimistic concurrency. Always set in
+            server
+
+            responses; pass it back on update/delete to guard against a lost
+            write.
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional. Labels for organizing and filtering secrets.
+      description: A Secret is one encrypted, write-only credential in the vault.
     v1SectionHeader:
       type: object
       properties:
@@ -15149,6 +18358,18 @@ components:
           type: boolean
           description: Optional. Whether to render a divider line below the header.
       description: SectionHeader is a visual separator for organizing dashboard sections.
+    v1Sequence:
+      type: object
+      properties:
+        steps:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/workflowsV1Step"
+          description: Required. The ordered steps.
+      description: Sequence is an ordered list of steps, executed top to bottom.
+      required:
+        - steps
     v1ServerEvent:
       type: object
       properties:
@@ -15251,6 +18472,26 @@ components:
 
             with this key.
       description: The IP addresses of callers that are allowed to use the key.
+    v1SetActivity:
+      type: object
+      properties:
+        assignments:
+          type: object
+          additionalProperties:
+            type: string
+          description: |-
+            Required. Variable name to CEL expression over the run context (no
+            secret()).
+      description: >-
+        SetActivity assigns CEL expressions to named run variables
+        (vars.<name>).
+
+        This is the data-transformation activity — CEL provides
+        math/string/JSON/
+
+        conversion; the UI presents friendly builders that generate the CEL.
+      required:
+        - assignments
     v1SourceDocument:
       type: object
       properties:
@@ -15563,6 +18804,31 @@ components:
       description: StatisticWidget displays a single KPI value with optional sparkline.
       required:
         - dataSource
+    v1StepState:
+      type: object
+      properties:
+        stepId:
+          type: string
+          description: The step's id within the WorkflowVersion.
+        state:
+          $ref: "#/components/schemas/workflowsV1State"
+          description: Output only. The step's current state.
+          readOnly: true
+        output:
+          type: object
+          description: The step's output, addressable downstream as steps.<step_id>.output.
+        error:
+          $ref: "#/components/schemas/rpcStatus"
+          description: The error if the step failed.
+        startTime:
+          type: string
+          format: date-time
+          description: When the step started.
+        endTime:
+          type: string
+          format: date-time
+          description: When the step ended.
+      description: StepState is the runtime status + output of one step in the run.
     v1StorageGateway:
       type: object
       properties:
@@ -16187,6 +19453,16 @@ components:
         before/after owner refs so clients can confirm the swap and
         optimistically update their UI without a follow-up read of the
         affected Member rows.
+    v1Trigger:
+      type: object
+      properties:
+        resourceEvent:
+          $ref: "#/components/schemas/v1ResourceEventTrigger"
+          description: Fires when a subject resource changes.
+        schedule:
+          $ref: "#/components/schemas/v1ScheduleTrigger"
+          description: Fires on a schedule.
+      description: Trigger declares what starts a run automatically.
     v1User:
       type: object
       properties:
@@ -16271,3 +19547,267 @@ components:
           $ref: "#/components/schemas/v1SectionHeader"
           description: A visual section separator.
       description: Widget contains a single dashboard component.
+    v1Workflow:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Immutable. Resource name.
+        displayName:
+          type: string
+          description: Optional. Human-readable name.
+        description:
+          type: string
+          description: Optional. Description.
+        enabled:
+          type: boolean
+          description: "Optional. Master switch: when false, no trigger fires a run."
+        version:
+          type: string
+          description: >-
+            Output only. Resource name of the promoted (live) WorkflowVersion.
+            Empty
+
+            until a version is promoted. Set via PromoteWorkflowVersion, not
+            Update.
+          readOnly: true
+        config:
+          type: object
+          description: >-
+            Optional. Persistent parameter values applied to every triggered
+            run,
+
+            validated against the live version's parameter schema. This is where
+            a
+
+            customer's configuration of a MANAGED workflow lives — it survives
+
+            version upgrades.
+        origin:
+          $ref: "#/components/schemas/v1WorkflowOrigin"
+          description: >-
+            Output only. Whether Pivox manages this workflow's versions
+            (MANAGED) or
+
+            the customer owns them (OWNED). Only OWNED workflows are
+            structurally
+
+            editable; a MANAGED one is configured via `config` or forked.
+          readOnly: true
+        createdBy:
+          $ref: "#/components/schemas/typesActor"
+          description: Output only. The identity that created this workflow.
+          readOnly: true
+        createTime:
+          type: string
+          format: date-time
+          description: Output only. Creation time.
+          readOnly: true
+        updatedBy:
+          $ref: "#/components/schemas/typesActor"
+          description: Output only. The identity that last modified this workflow.
+          readOnly: true
+        updateTime:
+          type: string
+          format: date-time
+          description: Output only. Update time.
+          readOnly: true
+        etag:
+          type: string
+          description: Optional. Optimistic-concurrency tag.
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional. Labels.
+      description: Workflow is the container for a versioned workflow definition.
+    v1WorkflowOrigin:
+      type: string
+      enum:
+        - WORKFLOW_ORIGIN_UNSPECIFIED
+        - OWNED
+        - MANAGED
+      default: WORKFLOW_ORIGIN_UNSPECIFIED
+      description: >-
+        WorkflowOrigin records who owns a Workflow's versions.
+
+         - WORKFLOW_ORIGIN_UNSPECIFIED: Default, unused.
+         - OWNED: Customer-owned; fully editable.
+         - MANAGED: Pivox-managed system workflow; versions land from Pivox, and the customer
+        configures via `config` or forks for structural change.
+    v1WorkflowRun:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Immutable. Resource name; {run} is a uuid.
+        version:
+          type: string
+          description: Output only. The WorkflowVersion this run pinned at start.
+          readOnly: true
+        state:
+          $ref: "#/components/schemas/workflowsV1State"
+          description: Output only. Current state.
+          readOnly: true
+        trigger:
+          $ref: "#/components/schemas/v1RunTrigger"
+          description: Output only. What fired this run.
+          readOnly: true
+        subject:
+          type: string
+          description: >-
+            Output only. The resource this run operates on (the triggering asset
+            /
+
+            request, or a manual subject). Empty for subject-less runs.
+          readOnly: true
+        input:
+          type: object
+          description: Output only. Initial input (manual parameters / trigger payload).
+          readOnly: true
+        output:
+          type: object
+          description: Output only. Final result on success.
+          readOnly: true
+        steps:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/v1StepState"
+          description: >-
+            Output only. Per-step state — the run context + UI/debug view. NEVER
+
+            contains a decrypted connector secret (secrets resolve at the
+            request
+
+            boundary, not into step outputs).
+          readOnly: true
+        error:
+          $ref: "#/components/schemas/rpcStatus"
+          description: Output only. Error on FAILED.
+          readOnly: true
+        triggeredBy:
+          $ref: "#/components/schemas/typesActor"
+          description: >-
+            Output only. Who/what caused the run (a user or a system trigger).
+            The
+
+            run itself executes as the workflow service identity.
+          readOnly: true
+        createTime:
+          type: string
+          format: date-time
+          description: Output only. Creation time.
+          readOnly: true
+        startTime:
+          type: string
+          format: date-time
+          description: Output only. Start time.
+          readOnly: true
+        endTime:
+          type: string
+          format: date-time
+          description: Output only. End time.
+          readOnly: true
+      description: WorkflowRun is one execution of a pinned WorkflowVersion.
+    v1WorkflowVersion:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Immutable. Resource name; the {version} segment is a monotonic id.
+        note:
+          type: string
+          description: Optional. Author's change note for this version.
+        parameters:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/v1ParameterDef"
+          description: >-
+            Optional. The run input contract. Manual runs supply values for
+            these;
+
+            triggered runs use the container's `config` + defaults.
+        trigger:
+          $ref: "#/components/schemas/v1Trigger"
+          description: >-
+            Optional. What fires a run. Absent = a building block, runnable only
+            via
+
+            a `run_workflow` activity (or a direct RunWorkflow RPC), never by
+            events.
+        root:
+          $ref: "#/components/schemas/v1Sequence"
+          description: Required. The workflow body — the ordered, nested step sequence.
+        createdBy:
+          $ref: "#/components/schemas/typesActor"
+          description: Output only. The identity that created this version.
+          readOnly: true
+        createTime:
+          type: string
+          format: date-time
+          description: Output only. Creation time. Immutable — a version has no update time.
+          readOnly: true
+      description: >-
+        WorkflowVersion is an IMMUTABLE definition. Editing a workflow mints a
+        new
+
+        one; it is a draft until promoted.
+      required:
+        - root
+    workflowsV1State:
+      type: string
+      enum:
+        - STATE_UNSPECIFIED
+        - PENDING
+        - RUNNING
+        - WAITING
+        - SUCCEEDED
+        - FAILED
+        - CANCELLED
+      default: STATE_UNSPECIFIED
+      description: |-
+        State is the lifecycle state of a run or step.
+
+         - STATE_UNSPECIFIED: Default, unused.
+         - PENDING: Accepted, not yet started.
+         - RUNNING: Executing steps.
+         - WAITING: Parked on a signal/timer (long-running / human-in-the-loop).
+         - SUCCEEDED: Completed successfully.
+         - FAILED: Failed.
+         - CANCELLED: Cancelled.
+    workflowsV1Step:
+      type: object
+      properties:
+        id:
+          type: string
+          description: >-
+            Required. Unique within the WorkflowVersion. Names this step's
+            output in
+
+            the run context (steps.<id>.output).
+        activity:
+          $ref: "#/components/schemas/v1Activity"
+          description: A leaf activity.
+        condition:
+          $ref: "#/components/schemas/v1Condition"
+          description: A conditional block.
+        parallel:
+          $ref: "#/components/schemas/v1Parallel"
+          description: A parallel block.
+      description: "Step is one node in the flow: a leaf Activity, a Condition, or a
+        Parallel."
+      required:
+        - id
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://pivox.ngrok.app/realms/pivox/protocol/openid-connect/auth
+          tokenUrl: https://pivox.ngrok.app/realms/pivox/protocol/openid-connect/token
+          scopes:
+            email: Email address
+            openid: OpenID Connect
+            profile: Profile (name, username)

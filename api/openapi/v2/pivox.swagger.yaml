@@ -16817,3 +16817,15 @@ definitions:
     description: 'Step is one node in the flow: a leaf Activity, a Condition, or a Parallel.'
     required:
       - id
+securityDefinitions:
+  OAuth2:
+    type: oauth2
+    flow: accessCode
+    authorizationUrl: https://pivox.ngrok.app/realms/pivox/protocol/openid-connect/auth
+    tokenUrl: https://pivox.ngrok.app/realms/pivox/protocol/openid-connect/token
+    scopes:
+      email: Email address
+      openid: OpenID Connect
+      profile: Profile (name, username)
+security:
+  - OAuth2: []

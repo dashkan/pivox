@@ -28,3 +28,24 @@ openapiOptions:
           - application/json
         produces:
           - application/json
+        # OAuth2 so Scalar can obtain a token and make authenticated calls.
+        # Swagger 2.0 has no openIdConnect scheme (that's OpenAPI 3.0), so this is
+        # oauth2 + the authorization-code flow against Keycloak's `pivox` realm
+        # (the issuer the backend verifies — PIVOX_OIDC_ISSUER). Point a PUBLIC
+        # Keycloak client (PKCE) at the docs origin. URLs are the dev host; a prod
+        # deploy needs its own KC origin (Swagger 2.0 can't template these).
+        security_definitions:
+          security:
+            OAuth2:
+              type: TYPE_OAUTH2
+              flow: FLOW_ACCESS_CODE
+              authorization_url: https://pivox.ngrok.app/realms/pivox/protocol/openid-connect/auth
+              token_url: https://pivox.ngrok.app/realms/pivox/protocol/openid-connect/token
+              scopes:
+                scope:
+                  openid: OpenID Connect
+                  profile: Profile (name, username)
+                  email: Email address
+        security:
+          - security_requirement:
+              OAuth2: {}
