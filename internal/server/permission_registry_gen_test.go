@@ -41,6 +41,7 @@ var gatedServiceDescs = []*grpc.ServiceDesc{
 	&workflowsv1.Connectors_ServiceDesc,
 	&workflowsv1.Workflows_ServiceDesc,
 	&workflowsv1.WorkflowVersions_ServiceDesc,
+	&workflowsv1.WorkflowRuns_ServiceDesc,
 }
 
 // TestGeneratedRegistry_CoversEveryGatedRPC is the build-time

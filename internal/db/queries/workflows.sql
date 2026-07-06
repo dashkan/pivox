@@ -150,6 +150,13 @@ RETURNING *;
 -- name: GetWorkflowRun :one
 SELECT * FROM workflow_runs WHERE id = $1;
 
+-- name: GetWorkflowRunForUpdate :one
+-- Locks the run row for a cancel/transition tx so the terminal-state check and
+-- the state write serialize against a concurrent transition — the Phase-6
+-- engine advancing the run, or DeleteWorkflow's force cancel (both take
+-- run-row locks).
+SELECT * FROM workflow_runs WHERE id = $1 FOR UPDATE;
+
 -- name: ListWorkflowRuns :many
 -- Keyset pagination on id. Fetch page_limit+1 to detect a next page.
 SELECT * FROM workflow_runs

@@ -43,6 +43,22 @@ func registerWorkflowVersionsServer(h *Harness, s *grpc.Server) {
 	}))
 }
 
+// WithWorkflowRunsServer registers the WorkflowRuns (execution) service on the
+// harness's gRPC server.
+func WithWorkflowRunsServer() Option {
+	return func(c *config) {
+		c.registerServices = append(c.registerServices, registerWorkflowRunsServer)
+	}
+}
+
+func registerWorkflowRunsServer(h *Harness, s *grpc.Server) {
+	workflowsv1.RegisterWorkflowRunsServer(s, workflows.NewWorkflowRunsServer(workflows.Config{
+		Pool:    h.Pool,
+		Queries: h.Queries,
+		Codec:   testCodec(),
+	}))
+}
+
 // testCodec builds the hard-coded test app key codec shared by the workflow
 // harness registrations.
 func testCodec() *appkey.Codec {

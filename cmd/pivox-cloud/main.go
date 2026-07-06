@@ -410,6 +410,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	workflowsv1.RegisterWorkflowVersionsServer(grpcServer, workflows.NewWorkflowVersionsServer(workflows.Config{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
+	workflowsv1.RegisterWorkflowRunsServer(grpcServer, workflows.NewWorkflowRunsServer(workflows.Config{
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+	}))
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(apikeys.Config{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
@@ -600,6 +603,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		workflowsv1.RegisterConnectorsHandlerFromEndpoint,
 		workflowsv1.RegisterWorkflowsHandlerFromEndpoint,
 		workflowsv1.RegisterWorkflowVersionsHandlerFromEndpoint,
+		workflowsv1.RegisterWorkflowRunsHandlerFromEndpoint,
 		iamv1.RegisterIamHandlerFromEndpoint,
 		storagev1.RegisterStorageGatewaysHandlerFromEndpoint,
 		storagev1.RegisterAgentsHandlerFromEndpoint,

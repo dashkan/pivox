@@ -79,6 +79,7 @@ var gatedServices = map[string]bool{
 	"pivox.workflows.v1.Connectors":       true,
 	"pivox.workflows.v1.Workflows":        true,
 	"pivox.workflows.v1.WorkflowVersions": true,
+	"pivox.workflows.v1.WorkflowRuns":     true,
 }
 
 // goPkgInfo maps a proto package name (e.g. "pivox.iam.v1") to the

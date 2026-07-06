@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
+	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -93,4 +94,91 @@ func WorkflowVersionToProto(v db.WorkflowVersion, workflowName string, actors ma
 		}
 	}
 	return out
+}
+
+// runState maps the DB state text ('PENDING'/'RUNNING'/…) to the proto State
+// enum. An unknown value degrades to STATE_UNSPECIFIED rather than panicking.
+func runState(s string) workflowsv1.State {
+	if v, ok := workflowsv1.State_value[s]; ok {
+		return workflowsv1.State(v)
+	}
+	return workflowsv1.State_STATE_UNSPECIFIED
+}
+
+// WorkflowRunToProto maps a workflow_runs row to its proto. workflowName is the
+// parent Workflow's resource name
+// ("organizations/{org}[/spaces/{space}]/workflows/{wf-uuid}"); the run's own
+// name appends "/runs/{run-uuid}".
+//
+// The OUTPUT_ONLY `version` pointer is the pinned WorkflowVersion's numbered
+// resource name — the run stores the version's uuid (version_id), so
+// versionNumbers supplies the uuid→version_number mapping the numbered name
+// needs (mirrors WorkflowToProto's promoted-pointer rendering). If the number
+// is absent from the map the field is left empty.
+//
+// trigger/input/output/steps/error are JSONB columns holding protojson-encoded
+// proto values; each round-trips back here symmetric with the write path.
+// triggered_by is the pivox.types.Actor for the user/service that fired the
+// run — a NULL triggered_by (system trigger) leaves it unset.
+func WorkflowRunToProto(r db.WorkflowRun, workflowName string, actors map[uuid.UUID]*typespb.Actor, versionNumbers map[uuid.UUID]int64) *workflowsv1.WorkflowRun {
+	out := &workflowsv1.WorkflowRun{
+		Name:        workflowName + "/runs/" + r.ID.String(),
+		State:       runState(r.State),
+		Subject:     r.Subject,
+		TriggeredBy: actorOrNil(actors, r.TriggeredBy),
+		CreateTime:  timestamppb.New(r.CreateTime),
+	}
+	if n, ok := versionNumbers[r.VersionID]; ok {
+		out.Version = workflowName + "/versions/" + strconv.FormatInt(n, 10)
+	}
+	if len(r.Trigger) > 0 {
+		var trig workflowsv1.RunTrigger
+		if err := protojson.Unmarshal(r.Trigger, &trig); err == nil {
+			out.Trigger = &trig
+		}
+	}
+	out.Input = unmarshalStruct(r.Input)
+	out.Output = unmarshalStruct(r.Output)
+	if len(r.Steps) > 0 {
+		var elems []json.RawMessage
+		if err := json.Unmarshal(r.Steps, &elems); err == nil {
+			steps := make([]*workflowsv1.StepState, 0, len(elems))
+			for _, elem := range elems {
+				var ss workflowsv1.StepState
+				if err := protojson.Unmarshal(elem, &ss); err == nil {
+					steps = append(steps, &ss)
+				}
+			}
+			if len(steps) > 0 {
+				out.Steps = steps
+			}
+		}
+	}
+	if len(r.Error) > 0 {
+		var st statuspb.Status
+		if err := protojson.Unmarshal(r.Error, &st); err == nil {
+			out.Error = &st
+		}
+	}
+	if r.StartTime.Valid {
+		out.StartTime = timestamppb.New(r.StartTime.Time)
+	}
+	if r.EndTime.Valid {
+		out.EndTime = timestamppb.New(r.EndTime.Time)
+	}
+	return out
+}
+
+// unmarshalStruct decodes a JSONB google.protobuf.Struct column back to its
+// proto. A NULL/empty column or an empty object yields nil, so the proto field
+// stays unset rather than rendering an empty Struct envelope.
+func unmarshalStruct(b []byte) *structpb.Struct {
+	if len(b) == 0 {
+		return nil
+	}
+	var s structpb.Struct
+	if err := protojson.Unmarshal(b, &s); err != nil || len(s.GetFields()) == 0 {
+		return nil
+	}
+	return &s
 }

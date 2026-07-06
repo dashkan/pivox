@@ -515,6 +515,11 @@ type Querier interface {
 	// etag check and the write serialize against a concurrent mutation.
 	GetWorkflowForUpdate(ctx context.Context, id uuid.UUID) (Workflow, error)
 	GetWorkflowRun(ctx context.Context, id uuid.UUID) (WorkflowRun, error)
+	// Locks the run row for a cancel/transition tx so the terminal-state check and
+	// the state write serialize against a concurrent transition — the Phase-6
+	// engine advancing the run, or DeleteWorkflow's force cancel (both take
+	// run-row locks).
+	GetWorkflowRunForUpdate(ctx context.Context, id uuid.UUID) (WorkflowRun, error)
 	GetWorkflowVersion(ctx context.Context, id uuid.UUID) (WorkflowVersion, error)
 	// Resolves a version from its parent workflow + monotonic {version} segment.
 	GetWorkflowVersionByNumber(ctx context.Context, arg GetWorkflowVersionByNumberParams) (WorkflowVersion, error)

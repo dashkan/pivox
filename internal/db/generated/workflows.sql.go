@@ -343,6 +343,36 @@ func (q *Queries) GetWorkflowRun(ctx context.Context, id uuid.UUID) (WorkflowRun
 	return i, err
 }
 
+const getWorkflowRunForUpdate = `-- name: GetWorkflowRunForUpdate :one
+SELECT id, workflow_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time FROM workflow_runs WHERE id = $1 FOR UPDATE
+`
+
+// Locks the run row for a cancel/transition tx so the terminal-state check and
+// the state write serialize against a concurrent transition — the Phase-6
+// engine advancing the run, or DeleteWorkflow's force cancel (both take
+// run-row locks).
+func (q *Queries) GetWorkflowRunForUpdate(ctx context.Context, id uuid.UUID) (WorkflowRun, error) {
+	row := q.db.QueryRow(ctx, getWorkflowRunForUpdate, id)
+	var i WorkflowRun
+	err := row.Scan(
+		&i.ID,
+		&i.WorkflowID,
+		&i.VersionID,
+		&i.State,
+		&i.Trigger,
+		&i.Subject,
+		&i.Input,
+		&i.Output,
+		&i.Steps,
+		&i.Error,
+		&i.TriggeredBy,
+		&i.CreateTime,
+		&i.StartTime,
+		&i.EndTime,
+	)
+	return i, err
+}
+
 const getWorkflowVersion = `-- name: GetWorkflowVersion :one
 SELECT id, workflow_id, version_number, note, definition, created_by, create_time FROM workflow_versions WHERE id = $1
 `

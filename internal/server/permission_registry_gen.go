@@ -902,6 +902,30 @@ var GeneratedRegistry = Registry{
 			return ScopeFromPath("connector.name", req.(*workflowsv1.UpdateConnectorRequest).GetConnector().GetName())
 		},
 	},
+	"/pivox.workflows.v1.WorkflowRuns/CancelWorkflowRun": {
+		Permission: permission.WorkflowsRun,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.CancelWorkflowRunRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.WorkflowRuns/GetWorkflowRun": {
+		Permission: permission.WorkflowsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.GetWorkflowRunRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.WorkflowRuns/ListWorkflowRuns": {
+		Permission: permission.WorkflowsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*workflowsv1.ListWorkflowRunsRequest).GetParent())
+		},
+	},
+	"/pivox.workflows.v1.WorkflowRuns/RunWorkflow": {
+		Permission: permission.WorkflowsRun,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.RunWorkflowRequest).GetName())
+		},
+	},
 	"/pivox.workflows.v1.WorkflowVersions/CreateWorkflowVersion": {
 		Permission: permission.WorkflowsUpdate,
 		Extract: func(req any) (ScopeRef, error) {
