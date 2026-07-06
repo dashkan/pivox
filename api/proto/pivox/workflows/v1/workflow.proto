@@ -120,6 +120,10 @@ service Workflows {
       }
     };
     option (pivox.permission.v1.required_permission) = "workflows.create";
+    // The fork lands under `parent`; `workflows.create` is evaluated there
+    // (ForkWorkflowRequest carries both `name` and `parent`, so the scope
+    // field is explicit).
+    option (pivox.permission.v1.scope_field) = "parent";
   }
 
   // Promotes a version to live (sets Workflow.version). Explicit — a new

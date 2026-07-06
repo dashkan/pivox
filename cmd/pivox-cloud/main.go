@@ -58,6 +58,7 @@ import (
 	"github.com/dashkan/pivox/internal/service/assets"
 	"github.com/dashkan/pivox/internal/service/connectors"
 	"github.com/dashkan/pivox/internal/service/requests"
+	"github.com/dashkan/pivox/internal/service/workflows"
 
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
@@ -403,6 +404,12 @@ func serve(cmd *cobra.Command, args []string) error {
 	workflowsv1.RegisterConnectorsServer(grpcServer, connectors.NewConnectorsServer(connectors.Config{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
+	workflowsv1.RegisterWorkflowsServer(grpcServer, workflows.NewWorkflowsServer(workflows.Config{
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+	}))
+	workflowsv1.RegisterWorkflowVersionsServer(grpcServer, workflows.NewWorkflowVersionsServer(workflows.Config{
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+	}))
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(apikeys.Config{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
@@ -591,6 +598,8 @@ func serve(cmd *cobra.Command, args []string) error {
 		apiv1.RegisterDashboardsHandlerFromEndpoint,
 		secretsv1.RegisterSecretsHandlerFromEndpoint,
 		workflowsv1.RegisterConnectorsHandlerFromEndpoint,
+		workflowsv1.RegisterWorkflowsHandlerFromEndpoint,
+		workflowsv1.RegisterWorkflowVersionsHandlerFromEndpoint,
 		iamv1.RegisterIamHandlerFromEndpoint,
 		storagev1.RegisterStorageGatewaysHandlerFromEndpoint,
 		storagev1.RegisterAgentsHandlerFromEndpoint,

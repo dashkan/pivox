@@ -55,6 +55,11 @@ const (
 type WorkflowRunsClient interface {
 	// Starts a run of a workflow (manual trigger). Returns the WorkflowRun
 	// immediately (PENDING/RUNNING); poll GetWorkflowRun for progress.
+	// (-- api-linter: core::0136::response-message-name=disabled
+	//
+	//	aip.dev/not-precedent: RunWorkflow is a custom action that creates and
+	//	returns a WorkflowRun — a different resource than the Workflow its
+	//	`name` binds. Returning the created resource is intended. --)
 	RunWorkflow(ctx context.Context, in *RunWorkflowRequest, opts ...grpc.CallOption) (*WorkflowRun, error)
 	// Retrieves a WorkflowRun.
 	GetWorkflowRun(ctx context.Context, in *GetWorkflowRunRequest, opts ...grpc.CallOption) (*WorkflowRun, error)
@@ -128,6 +133,11 @@ func (c *workflowRunsClient) CancelWorkflowRun(ctx context.Context, in *CancelWo
 type WorkflowRunsServer interface {
 	// Starts a run of a workflow (manual trigger). Returns the WorkflowRun
 	// immediately (PENDING/RUNNING); poll GetWorkflowRun for progress.
+	// (-- api-linter: core::0136::response-message-name=disabled
+	//
+	//	aip.dev/not-precedent: RunWorkflow is a custom action that creates and
+	//	returns a WorkflowRun — a different resource than the Workflow its
+	//	`name` binds. Returning the created resource is intended. --)
 	RunWorkflow(context.Context, *RunWorkflowRequest) (*WorkflowRun, error)
 	// Retrieves a WorkflowRun.
 	GetWorkflowRun(context.Context, *GetWorkflowRunRequest) (*WorkflowRun, error)

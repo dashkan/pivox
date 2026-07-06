@@ -27,6 +27,11 @@ type Querier interface {
 	// expiration mechanism.
 	//
 	AcquireConversationLease(ctx context.Context, arg AcquireConversationLeaseParams) (uuid.UUID, error)
+	// Force-cancels a workflow's active runs (DB state only). DeleteWorkflow calls
+	// this under force=true before dropping the workflow. The rows are then
+	// removed by the FK cascade, so this update models intent for Phase 6, when
+	// cancelling must also stop the River job backing each run.
+	CancelActiveWorkflowRuns(ctx context.Context, workflowID uuid.UUID) error
 	// CancelDomainOpsForDomain marks running CreateDomain LROs for the
 	// given (org, domain) pair as cancelled. The match is on
 	// metadata->>'domain' (set by runVerifyDomain) AND on the
@@ -76,6 +81,10 @@ type Querier interface {
 	// under concurrent pollers. No-row result means the session is still pending,
 	// already consumed, or expired; callers distinguish pending via GetDelegatedAuthSessionState.
 	ConsumeDelegatedAuthSession(ctx context.Context, code uuid.UUID) (pgtype.Text, error)
+	// Counts a workflow's runs in an active state (RUNNING or WAITING). Used by
+	// DeleteWorkflow's force guard: with force=false a nonzero count blocks the
+	// delete (the caller must cancel the runs or pass force=true).
+	CountActiveWorkflowRuns(ctx context.Context, workflowID uuid.UUID) (int64, error)
 	CountArtifactVersionsByArtifact(ctx context.Context, artifactID uuid.UUID) (int64, error)
 	CountArtifactsByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	CountAssetVersions(ctx context.Context, assetID uuid.UUID) (int64, error)
@@ -969,6 +978,11 @@ type Querier interface {
 	// cleared secret would render an enabled SsoConfig non-functional, so
 	// callers that want to disable SSO flip `enabled=false` instead.
 	UpsertSsoConfig(ctx context.Context, arg UpsertSsoConfigParams) (SsoConfig, error)
+	// Maps a set of version uuids to their monotonic version_number. A Workflow's
+	// promoted `version` column stores the version uuid, but the resource name
+	// renders the number — List/Get resolve the page's promoted pointers in one
+	// round-trip (no N+1 per workflow).
+	WorkflowVersionNumbersByIDs(ctx context.Context, ids []uuid.UUID) ([]WorkflowVersionNumbersByIDsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

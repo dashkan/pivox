@@ -902,6 +902,72 @@ var GeneratedRegistry = Registry{
 			return ScopeFromPath("connector.name", req.(*workflowsv1.UpdateConnectorRequest).GetConnector().GetName())
 		},
 	},
+	"/pivox.workflows.v1.WorkflowVersions/CreateWorkflowVersion": {
+		Permission: permission.WorkflowsUpdate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*workflowsv1.CreateWorkflowVersionRequest).GetParent())
+		},
+	},
+	"/pivox.workflows.v1.WorkflowVersions/DeleteWorkflowVersion": {
+		Permission: permission.WorkflowsUpdate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.DeleteWorkflowVersionRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.WorkflowVersions/GetWorkflowVersion": {
+		Permission: permission.WorkflowsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.GetWorkflowVersionRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.WorkflowVersions/ListWorkflowVersions": {
+		Permission: permission.WorkflowsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*workflowsv1.ListWorkflowVersionsRequest).GetParent())
+		},
+	},
+	"/pivox.workflows.v1.Workflows/CreateWorkflow": {
+		Permission: permission.WorkflowsCreate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*workflowsv1.CreateWorkflowRequest).GetParent())
+		},
+	},
+	"/pivox.workflows.v1.Workflows/DeleteWorkflow": {
+		Permission: permission.WorkflowsDelete,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.DeleteWorkflowRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.Workflows/ForkWorkflow": {
+		Permission: permission.WorkflowsCreate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*workflowsv1.ForkWorkflowRequest).GetParent())
+		},
+	},
+	"/pivox.workflows.v1.Workflows/GetWorkflow": {
+		Permission: permission.WorkflowsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.GetWorkflowRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.Workflows/ListWorkflows": {
+		Permission: permission.WorkflowsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*workflowsv1.ListWorkflowsRequest).GetParent())
+		},
+	},
+	"/pivox.workflows.v1.Workflows/PromoteWorkflowVersion": {
+		Permission: permission.WorkflowsUpdate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.PromoteWorkflowVersionRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.Workflows/UpdateWorkflow": {
+		Permission: permission.WorkflowsUpdate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("workflow.name", req.(*workflowsv1.UpdateWorkflowRequest).GetWorkflow().GetName())
+		},
+	},
 }
 
 // GeneratedExempt is the union exempt set for every gRPC method

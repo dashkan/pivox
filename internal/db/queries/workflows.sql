@@ -63,6 +63,25 @@ RETURNING w.*;
 -- name: DeleteWorkflow :exec
 DELETE FROM workflows WHERE id = $1;
 
+-- name: CountActiveWorkflowRuns :one
+-- Counts a workflow's runs in an active state (RUNNING or WAITING). Used by
+-- DeleteWorkflow's force guard: with force=false a nonzero count blocks the
+-- delete (the caller must cancel the runs or pass force=true).
+SELECT count(*) FROM workflow_runs
+WHERE workflow_id = $1
+  AND state IN ('RUNNING', 'WAITING');
+
+-- name: CancelActiveWorkflowRuns :exec
+-- Force-cancels a workflow's active runs (DB state only). DeleteWorkflow calls
+-- this under force=true before dropping the workflow. The rows are then
+-- removed by the FK cascade, so this update models intent for Phase 6, when
+-- cancelling must also stop the River job backing each run.
+UPDATE workflow_runs
+SET state = 'CANCELLED',
+    end_time = COALESCE(end_time, now())
+WHERE workflow_id = $1
+  AND state IN ('RUNNING', 'WAITING');
+
 -- name: ListWorkflowsByParent :many
 -- Keyset pagination on id. Fetch page_limit+1 to detect a next page.
 SELECT * FROM workflows
@@ -90,6 +109,14 @@ RETURNING *;
 
 -- name: GetWorkflowVersion :one
 SELECT * FROM workflow_versions WHERE id = $1;
+
+-- name: WorkflowVersionNumbersByIDs :many
+-- Maps a set of version uuids to their monotonic version_number. A Workflow's
+-- promoted `version` column stores the version uuid, but the resource name
+-- renders the number — List/Get resolve the page's promoted pointers in one
+-- round-trip (no N+1 per workflow).
+SELECT id, version_number FROM workflow_versions
+WHERE id = ANY(@ids::uuid[]);
 
 -- name: GetWorkflowVersionByNumber :one
 -- Resolves a version from its parent workflow + monotonic {version} segment.

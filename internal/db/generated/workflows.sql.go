@@ -13,6 +13,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelActiveWorkflowRuns = `-- name: CancelActiveWorkflowRuns :exec
+UPDATE workflow_runs
+SET state = 'CANCELLED',
+    end_time = COALESCE(end_time, now())
+WHERE workflow_id = $1
+  AND state IN ('RUNNING', 'WAITING')
+`
+
+// Force-cancels a workflow's active runs (DB state only). DeleteWorkflow calls
+// this under force=true before dropping the workflow. The rows are then
+// removed by the FK cascade, so this update models intent for Phase 6, when
+// cancelling must also stop the River job backing each run.
+func (q *Queries) CancelActiveWorkflowRuns(ctx context.Context, workflowID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, cancelActiveWorkflowRuns, workflowID)
+	return err
+}
+
+const countActiveWorkflowRuns = `-- name: CountActiveWorkflowRuns :one
+SELECT count(*) FROM workflow_runs
+WHERE workflow_id = $1
+  AND state IN ('RUNNING', 'WAITING')
+`
+
+// Counts a workflow's runs in an active state (RUNNING or WAITING). Used by
+// DeleteWorkflow's force guard: with force=false a nonzero count blocks the
+// delete (the caller must cancel the runs or pass force=true).
+func (q *Queries) CountActiveWorkflowRuns(ctx context.Context, workflowID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveWorkflowRuns, workflowID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createWorkflow = `-- name: CreateWorkflow :one
 
 INSERT INTO workflows (id, org_id, space_id, workflow_id, display_name, description, enabled, config, origin, annotations, created_by, updated_by)
@@ -689,4 +722,38 @@ func (q *Queries) UpdateWorkflowRunState(ctx context.Context, arg UpdateWorkflow
 		&i.EndTime,
 	)
 	return i, err
+}
+
+const workflowVersionNumbersByIDs = `-- name: WorkflowVersionNumbersByIDs :many
+SELECT id, version_number FROM workflow_versions
+WHERE id = ANY($1::uuid[])
+`
+
+type WorkflowVersionNumbersByIDsRow struct {
+	ID            uuid.UUID `json:"id"`
+	VersionNumber int64     `json:"version_number"`
+}
+
+// Maps a set of version uuids to their monotonic version_number. A Workflow's
+// promoted `version` column stores the version uuid, but the resource name
+// renders the number — List/Get resolve the page's promoted pointers in one
+// round-trip (no N+1 per workflow).
+func (q *Queries) WorkflowVersionNumbersByIDs(ctx context.Context, ids []uuid.UUID) ([]WorkflowVersionNumbersByIDsRow, error) {
+	rows, err := q.db.Query(ctx, workflowVersionNumbersByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WorkflowVersionNumbersByIDsRow{}
+	for rows.Next() {
+		var i WorkflowVersionNumbersByIDsRow
+		if err := rows.Scan(&i.ID, &i.VersionNumber); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
