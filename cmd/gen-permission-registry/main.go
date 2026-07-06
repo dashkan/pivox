@@ -44,6 +44,7 @@ import (
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"
 
 	permissionv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 )
@@ -75,6 +76,7 @@ var gatedServices = map[string]bool{
 	"pivox.storage.v1.Endpoints":       true,
 	"pivox.ai.v1.AiChat":               true,
 	"pivox.secrets.v1.Secrets":         true,
+	"pivox.workflows.v1.Connectors":    true,
 }
 
 // goPkgInfo maps a proto package name (e.g. "pivox.iam.v1") to the
@@ -87,12 +89,13 @@ var goPkgInfo = map[string]struct {
 	alias string
 	path  string
 }{
-	"pivox.api.v1":     {"apiv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"},
-	"pivox.iam.v1":     {"iamv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"},
-	"pivox.assets.v1":  {"assetsv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"},
-	"pivox.storage.v1": {"storagev1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"},
-	"pivox.ai.v1":      {"aiv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"},
-	"pivox.secrets.v1": {"secretsv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"},
+	"pivox.api.v1":       {"apiv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"},
+	"pivox.iam.v1":       {"iamv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"},
+	"pivox.assets.v1":    {"assetsv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"},
+	"pivox.storage.v1":   {"storagev1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"},
+	"pivox.ai.v1":        {"aiv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"},
+	"pivox.secrets.v1":   {"secretsv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"},
+	"pivox.workflows.v1": {"workflowsv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"},
 }
 
 type entry struct {

@@ -12,6 +12,7 @@ import (
 	iamv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	secretsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	workflowsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"
 )
 
 // GeneratedRegistry is the union permission registry for every
@@ -869,6 +870,36 @@ var GeneratedRegistry = Registry{
 		Permission: permission.StorageGatewaysUpgrade,
 		Extract: func(req any) (ScopeRef, error) {
 			return ScopeFromPath("name", req.(*storagev1.UpgradeGatewayRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.Connectors/CreateConnector": {
+		Permission: permission.ConnectorsCreate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*workflowsv1.CreateConnectorRequest).GetParent())
+		},
+	},
+	"/pivox.workflows.v1.Connectors/DeleteConnector": {
+		Permission: permission.ConnectorsDelete,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.DeleteConnectorRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.Connectors/GetConnector": {
+		Permission: permission.ConnectorsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*workflowsv1.GetConnectorRequest).GetName())
+		},
+	},
+	"/pivox.workflows.v1.Connectors/ListConnectors": {
+		Permission: permission.ConnectorsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*workflowsv1.ListConnectorsRequest).GetParent())
+		},
+	},
+	"/pivox.workflows.v1.Connectors/UpdateConnector": {
+		Permission: permission.ConnectorsUpdate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("connector.name", req.(*workflowsv1.UpdateConnectorRequest).GetConnector().GetName())
 		},
 	},
 }

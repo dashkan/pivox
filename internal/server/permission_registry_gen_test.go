@@ -13,6 +13,7 @@ import (
 	iamv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	secretsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	workflowsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"
 )
 
 // gatedServiceDescs mirrors cmd/gen-permission-registry's
@@ -37,6 +38,7 @@ var gatedServiceDescs = []*grpc.ServiceDesc{
 	&storagev1.Endpoints_ServiceDesc,
 	&aiv1.AiChat_ServiceDesc,
 	&secretsv1.Secrets_ServiceDesc,
+	&workflowsv1.Connectors_ServiceDesc,
 }
 
 // TestGeneratedRegistry_CoversEveryGatedRPC is the build-time

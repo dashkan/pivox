@@ -56,6 +56,7 @@ import (
 	"github.com/dashkan/pivox/internal/service/aichat/model"
 	"github.com/dashkan/pivox/internal/service/aichat/tools"
 	"github.com/dashkan/pivox/internal/service/assets"
+	"github.com/dashkan/pivox/internal/service/connectors"
 	"github.com/dashkan/pivox/internal/service/requests"
 
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
@@ -65,6 +66,7 @@ import (
 	iamv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	secretsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	workflowsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"
 )
 
 var version = "dev"
@@ -398,6 +400,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	secretsv1.RegisterSecretsServer(grpcServer, secrets.NewSecretsServer(secrets.Config{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver, Encryptor: enc,
 	}))
+	workflowsv1.RegisterConnectorsServer(grpcServer, connectors.NewConnectorsServer(connectors.Config{
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+	}))
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(apikeys.Config{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
@@ -585,6 +590,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		apiv1.RegisterApiKeysHandlerFromEndpoint,
 		apiv1.RegisterDashboardsHandlerFromEndpoint,
 		secretsv1.RegisterSecretsHandlerFromEndpoint,
+		workflowsv1.RegisterConnectorsHandlerFromEndpoint,
 		iamv1.RegisterIamHandlerFromEndpoint,
 		storagev1.RegisterStorageGatewaysHandlerFromEndpoint,
 		storagev1.RegisterAgentsHandlerFromEndpoint,
