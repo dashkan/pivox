@@ -104,6 +104,13 @@ func (it *Interpreter) Run(
 		reporter = nopReporter{}
 	}
 
+	// Install the sub-run capability on ctx so a run_workflow activity can recurse
+	// back into this interpreter without the Dispatcher holding it — that would be
+	// a construction cycle (the Interpreter is built with a Dispatcher that
+	// contains the activity). Re-installing on each (including nested) Run is
+	// idempotent. See [subRunner].
+	ctx = withSubRunner(ctx, it)
+
 	if err := validateUniqueStepIDs(root, errorSeq); err != nil {
 		return Result{Status: RunStatusFailed, Output: rc.VarsSnapshot()}, err
 	}

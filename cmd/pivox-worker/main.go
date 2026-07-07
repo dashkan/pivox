@@ -207,9 +207,9 @@ func serve(cmd *cobra.Command, _ []string) error {
 
 	// Workflow engine interpreter — the pure, network-free core shared across
 	// every run job. Constructed once (thread-safe: the CEL evaluator caches
-	// compiled programs under a mutex, the dispatcher is immutable). The 6c
-	// dispatcher wires `set` + `http`; `run_workflow` lands in 6d by extending
-	// DispatcherConfig here.
+	// compiled programs under a mutex, the dispatcher is immutable). The
+	// dispatcher wires `set`, `http`, and `run_workflow` (the last recurses back
+	// into this same interpreter in-process for sub-workflows).
 	//
 	// The connector broker is the single secret-injecting execution path: it
 	// resolves a connector's credentialed config, decrypts referenced Secrets via
@@ -233,6 +233,14 @@ func serve(cmd *cobra.Command, _ []string) error {
 			HTTP: connector.NewHTTPActivity(connector.ActivityConfig{
 				Evaluator: evaluator,
 				Broker:    broker,
+				Store:     queries,
+			}),
+			// run_workflow recurses back into this same interpreter in-process
+			// (via a sub-run capability installed on ctx by Interpreter.Run), so
+			// no interpreter reference is needed at construction. Store=queries
+			// resolves the target workflow/version.
+			RunWorkflow: engine.NewRunWorkflowActivity(engine.RunWorkflowActivityConfig{
+				Evaluator: evaluator,
 				Store:     queries,
 			}),
 		}),

@@ -41,6 +41,11 @@ type RunContext struct {
 	orgID   uuid.UUID
 	spaceID uuid.UUID
 
+	// workflowID is the id of the workflow this run executes. It is NOT exposed
+	// to CEL; the run_workflow activity reads it to seed the sub-workflow cycle
+	// guard (so a self-call at the top level is detected). uuid.Nil when unset.
+	workflowID uuid.UUID
+
 	// trigger and params are immutable after construction; no lock needed to
 	// read them, and concurrent map reads are safe.
 	trigger map[string]any
@@ -62,18 +67,22 @@ type RunContextConfig struct {
 	OrgID uuid.UUID
 	// SpaceID is the run's space scope; uuid.Nil for an org-scoped run.
 	SpaceID uuid.UUID
+	// WorkflowID is the id of the workflow this run executes. Used by the
+	// run_workflow activity's cycle guard; uuid.Nil when unset.
+	WorkflowID uuid.UUID
 }
 
 // NewRunContext builds a RunContext from cfg. The Trigger and Params maps are
 // cloned so later caller mutations can't leak into the run.
 func NewRunContext(cfg RunContextConfig) *RunContext {
 	return &RunContext{
-		orgID:   cfg.OrgID,
-		spaceID: cfg.SpaceID,
-		trigger: cloneOrEmpty(cfg.Trigger),
-		params:  cloneOrEmpty(cfg.Params),
-		steps:   map[string]any{},
-		vars:    map[string]any{},
+		orgID:      cfg.OrgID,
+		spaceID:    cfg.SpaceID,
+		workflowID: cfg.WorkflowID,
+		trigger:    cloneOrEmpty(cfg.Trigger),
+		params:     cloneOrEmpty(cfg.Params),
+		steps:      map[string]any{},
+		vars:       map[string]any{},
 	}
 }
 
@@ -82,6 +91,12 @@ func NewRunContext(cfg RunContextConfig) *RunContext {
 // id (e.g. a Connector) actually belongs to this run's scope.
 func (rc *RunContext) Scope() (orgID, spaceID uuid.UUID) {
 	return rc.orgID, rc.spaceID
+}
+
+// WorkflowID returns the id of the workflow this run executes. uuid.Nil when
+// unset. It is the cycle-guard seed for the run_workflow activity.
+func (rc *RunContext) WorkflowID() uuid.UUID {
+	return rc.workflowID
 }
 
 // SetVar assigns a run variable, readable as `vars.<name>` in CEL. Concurrent

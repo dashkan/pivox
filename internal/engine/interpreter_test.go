@@ -309,7 +309,7 @@ func TestInterpreter_ParallelBranchErrorCancelsSiblings(t *testing.T) {
 
 	// runWorkflowStep uses the run_workflow slot for the failing branch.
 	root := seq(parallelStep("par",
-		seq(runWorkflowStep("failer")),
+		seq(runWorkflowStep("failer", "", nil)),
 		seq(httpStep("sibling")),
 	))
 
@@ -407,12 +407,17 @@ func TestInterpreter_UnregisteredActivityIsTerminal(t *testing.T) {
 
 // --- test activities ------------------------------------------------------
 
-func runWorkflowStep(id string) *workflowsv1.Step {
+func runWorkflowStep(id, ref string, params map[string]string) *workflowsv1.Step {
 	return &workflowsv1.Step{
 		Id: id,
 		Kind: &workflowsv1.Step_Activity{
 			Activity: &workflowsv1.Activity{
-				Kind: &workflowsv1.Activity_RunWorkflow{RunWorkflow: &workflowsv1.RunWorkflowActivity{}},
+				Kind: &workflowsv1.Activity_RunWorkflow{
+					RunWorkflow: &workflowsv1.RunWorkflowActivity{
+						Workflow:   ref,
+						Parameters: params,
+					},
+				},
 			},
 		},
 	}

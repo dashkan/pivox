@@ -246,10 +246,11 @@ func buildRunContext(run db.WorkflowRun, orgID, spaceID uuid.UUID) (*engine.RunC
 		return nil, fmt.Errorf("decode run input: %w", err)
 	}
 	return engine.NewRunContext(engine.RunContextConfig{
-		Trigger: trigger,
-		Params:  params,
-		OrgID:   orgID,
-		SpaceID: spaceID,
+		Trigger:    trigger,
+		Params:     params,
+		OrgID:      orgID,
+		SpaceID:    spaceID,
+		WorkflowID: run.WorkflowID,
 	}), nil
 }
 
