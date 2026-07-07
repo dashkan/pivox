@@ -20,10 +20,6 @@ BEGIN;
 
 DO $$
 DECLARE
-    -- Founder's Firebase localId. Legacy column; retained for the
-    -- identities upsert until the Firebase→KC identity seed cleanup.
-    _ashkan_firebase_uid CONSTANT TEXT := '2YCxpX5nmQXT5fmjri30SA3ra8t2';
-
     -- Pinned identity UUID for ashkan@acme.com — the pivox-realm `sub`
     -- minted when the acme user is brokered in via the oidc.acme IdP
     -- (identities.id == KC sub). See 15_dev_user_membership.sql header.
@@ -48,11 +44,11 @@ DECLARE
     acme_id   UUID := _acme_id;
     owner_id  UUID := _acme_owner_id;
 BEGIN
-    -- 0) Founder identity. Pinned id + ON CONFLICT (firebase_uid) keeps
-    --    the row stable across re-seeds.
-    INSERT INTO identities (id, firebase_uid, email, email_verified)
-    VALUES (_ashkan_id, _ashkan_firebase_uid, 'ashkan@acme.com', true)
-    ON CONFLICT (firebase_uid) DO NOTHING;
+    -- 0) Founder identity. Pinned id (the KC `sub`) + ON CONFLICT (id)
+    --    keeps the row stable across re-seeds.
+    INSERT INTO identities (id, email, email_verified)
+    VALUES (_ashkan_id, 'ashkan@acme.com', true)
+    ON CONFLICT (id) DO NOTHING;
 
     -- 1) acme organization (idempotent). created_by is back-filled on
     --    conflict so a re-seed after the founder identity exists

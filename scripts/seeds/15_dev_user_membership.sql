@@ -57,11 +57,6 @@
 
 DO $$
 DECLARE
-    -- Pivox identity. Pre-existing firebase_uid pinned so a
-    -- reseed against a real-signed-in account preserves the
-    -- blocking-fn-populated fields.
-    _ashkan_firebase_uid CONSTANT TEXT := 'ScQytJWi2ycF3jiiBlRazncbfQB3';
-
     -- Pinned identity UUID. Under Keycloak this IS the user's `sub`
     -- (identities.id == KC sub), so it's frozen to the real KC login
     -- for ashkan.daie@gmail.com — a fresh seed then maps straight to
@@ -100,13 +95,13 @@ DECLARE
     bound          INTEGER := 0;
     skipped        INTEGER := 0;
 BEGIN
-    -- 1) Identity. Pinned id + ON CONFLICT (firebase_uid) lets a
-    --    real sign-in overwrite the seeded skeleton with live
-    --    Firebase data (display_name, email_verified, photo_url)
-    --    without clobbering it on subsequent reseeds.
-    INSERT INTO identities (id, firebase_uid, email, email_verified)
-    VALUES (_ashkan_id, _ashkan_firebase_uid, 'ashkan.daie@gmail.com', true)
-    ON CONFLICT (firebase_uid) DO NOTHING;
+    -- 1) Identity. Pinned id (the KC `sub`) + ON CONFLICT (id) lets a
+    --    real sign-in populate the seeded skeleton with live KC data
+    --    (display_name, email_verified, photo_url) without clobbering
+    --    it on subsequent reseeds.
+    INSERT INTO identities (id, email, email_verified)
+    VALUES (_ashkan_id, 'ashkan.daie@gmail.com', true)
+    ON CONFLICT (id) DO NOTHING;
 
     -- 2) Bind ashkan as owner of each dev org. Each iteration is
     --    independent — a missing org or missing owner role logs a
