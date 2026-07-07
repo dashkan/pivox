@@ -227,9 +227,16 @@ const kafka = await builder
 
 const keycloak = await builder
   .addKeycloak("keycloak", { port: 8082 })
-  // Custom image: stock Keycloak + the keycloak-kafka event-listener SPI, built
-  // in (kc build). Version pinned in aspire/keycloak/Dockerfile (KC_VERSION).
+  // Custom image: stock Keycloak + the Pivox provider SPIs (kafka event listener
+  // + select-organization authenticator), baked in via `kc build`. Versions
+  // pinned in aspire/keycloak/Dockerfile (KC_VERSION / PIVOX_KC_SPI_VERSION).
   .withDockerfile("keycloak")
+  // Build-time PAT (read-only) to clone the private dashkan/pivox-keycloak-spi
+  // repo during the image build. Sourced live from .envrc via a dedicated var
+  // (PIVOX_KEYCLOAK_SPI_GITHUB_PAT, distinct from the shared GITHUB_PAT); empty
+  // string when unset so `aspire:build` still typechecks — the KC image build
+  // then fails the clone until it's set. Dev-only: lands in image build layers.
+  .withBuildArg("GITHUB_PAT", process.env.PIVOX_KEYCLOAK_SPI_GITHUB_PAT ?? "")
   // Use Postgres (KC_DB) instead of the start-dev default H2; the db is created
   // by the pg init script and KC auto-migrates its schema into it on boot.
   .withEnvironment("KC_DB", "postgres")

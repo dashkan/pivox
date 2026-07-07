@@ -65,15 +65,9 @@
         "description": "${role_default-roles}",
         "composite": true,
         "composites": {
-          "realm": [
-            "offline_access",
-            "uma_authorization"
-          ],
+          "realm": ["offline_access", "uma_authorization"],
           "client": {
-            "account": [
-              "manage-account",
-              "view-profile"
-            ]
+            "account": ["manage-account", "view-profile"]
           }
         },
         "clientRole": false,
@@ -108,9 +102,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "realm-management": [
-                "query-clients"
-              ]
+              "realm-management": ["query-clients"]
             }
           },
           "clientRole": true,
@@ -265,10 +257,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "realm-management": [
-                "query-groups",
-                "query-users"
-              ]
+              "realm-management": ["query-groups", "query-users"]
             }
           },
           "clientRole": true,
@@ -313,6 +302,7 @@
           "attributes": {}
         }
       ],
+      "postman": [],
       "security-admin-console": [],
       "electron": [],
       "start": [],
@@ -356,9 +346,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "account": [
-                "manage-account-links"
-              ]
+              "account": ["manage-account-links"]
             }
           },
           "clientRole": true,
@@ -381,9 +369,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "account": [
-                "view-consent"
-              ]
+              "account": ["view-consent"]
             }
           },
           "clientRole": true,
@@ -433,9 +419,7 @@
     "id": "66347610-e9b5-422e-a93b-1c1937e7d543",
     "clientId": "admin-permissions"
   },
-  "requiredCredentials": [
-    "password"
-  ],
+  "requiredCredentials": ["password"],
   "otpPolicyType": "totp",
   "otpPolicyAlgorithm": "HmacSHA1",
   "otpPolicyInitialCounter": 0,
@@ -450,10 +434,7 @@
   ],
   "localizationTexts": {},
   "webAuthnPolicyRpEntityName": "keycloak",
-  "webAuthnPolicySignatureAlgorithms": [
-    "ES256",
-    "RS256"
-  ],
+  "webAuthnPolicySignatureAlgorithms": ["ES256", "RS256"],
   "webAuthnPolicyRpId": "",
   "webAuthnPolicyAttestationConveyancePreference": "not specified",
   "webAuthnPolicyAuthenticatorAttachment": "not specified",
@@ -464,10 +445,7 @@
   "webAuthnPolicyAcceptableAaguids": [],
   "webAuthnPolicyExtraOrigins": [],
   "webAuthnPolicyPasswordlessRpEntityName": "keycloak",
-  "webAuthnPolicyPasswordlessSignatureAlgorithms": [
-    "ES256",
-    "RS256"
-  ],
+  "webAuthnPolicyPasswordlessSignatureAlgorithms": ["ES256", "RS256"],
   "webAuthnPolicyPasswordlessRpId": "",
   "webAuthnPolicyPasswordlessAttestationConveyancePreference": "not specified",
   "webAuthnPolicyPasswordlessAuthenticatorAttachment": "not specified",
@@ -480,19 +458,14 @@
   "scopeMappings": [
     {
       "clientScope": "offline_access",
-      "roles": [
-        "offline_access"
-      ]
+      "roles": ["offline_access"]
     }
   ],
   "clientScopeMappings": {
     "account": [
       {
         "client": "account-console",
-        "roles": [
-          "manage-account",
-          "view-groups"
-        ]
+        "roles": ["manage-account", "view-groups"]
       }
     ]
   },
@@ -507,9 +480,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "/realms/pivox/account/*"
-      ],
+      "redirectUris": ["/realms/pivox/account/*"],
       "webOrigins": [],
       "notBefore": 0,
       "bearerOnly": false,
@@ -554,9 +525,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "/realms/pivox/account/*"
-      ],
+      "redirectUris": ["/realms/pivox/account/*"],
       "webOrigins": [],
       "notBefore": 0,
       "bearerOnly": false,
@@ -668,14 +637,12 @@
       "protocol": "openid-connect",
       "attributes": {
         "realm_client": "false",
-        "client.secret.creation.time": "1782686198"
+        "client.secret.creation.time": "1783404930"
       },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": true,
       "nodeReRegistrationTimeout": -1,
-      "defaultClientScopes": [
-        "service_account"
-      ],
+      "defaultClientScopes": [],
       "optionalClientScopes": [],
       "authorizationSettings": {
         "allowRemoteResourceManagement": true,
@@ -713,10 +680,10 @@
             "uris": [],
             "scopes": [
               {
-                "name": "view"
+                "name": "manage-group-membership"
               },
               {
-                "name": "manage-group-membership"
+                "name": "view"
               },
               {
                 "name": "impersonate"
@@ -835,61 +802,53 @@
         "decisionStrategy": "UNANIMOUS",
         "authorizationSchema": {
           "resourceTypes": {
-            "Roles": {
-              "type": "Roles",
+            "Users": {
+              "type": "Users",
               "scopes": [
-                "map-role",
-                "map-role-composite",
-                "map-role-client-scope"
+                "manage-group-membership",
+                "reset-password",
+                "view",
+                "impersonate",
+                "map-roles",
+                "manage"
               ],
-              "scopeAliases": {}
+              "scopeAliases": {
+                "impersonate": ["impersonate-members"],
+                "manage-group-membership": ["manage-membership-of-members"],
+                "view": ["view-members"],
+                "manage": ["manage-members"]
+              },
+              "groupType": "Groups"
             },
             "Groups": {
               "type": "Groups",
               "scopes": [
-                "manage-membership-of-members",
-                "manage",
-                "manage-membership",
-                "view-members",
                 "view",
-                "impersonate-members",
-                "manage-members"
+                "view-members",
+                "manage-membership",
+                "manage",
+                "manage-membership-of-members",
+                "manage-members",
+                "impersonate-members"
               ],
               "scopeAliases": {}
             },
-            "Users": {
-              "type": "Users",
+            "Roles": {
+              "type": "Roles",
               "scopes": [
-                "view",
-                "reset-password",
-                "manage-group-membership",
-                "manage",
-                "map-roles",
-                "impersonate"
+                "map-role-composite",
+                "map-role",
+                "map-role-client-scope"
               ],
-              "scopeAliases": {
-                "view": [
-                  "view-members"
-                ],
-                "manage-group-membership": [
-                  "manage-membership-of-members"
-                ],
-                "impersonate": [
-                  "impersonate-members"
-                ],
-                "manage": [
-                  "manage-members"
-                ]
-              },
-              "groupType": "Groups"
+              "scopeAliases": {}
             },
             "Clients": {
               "type": "Clients",
               "scopes": [
-                "view",
-                "map-roles-client-scope",
-                "map-roles",
                 "manage",
+                "map-roles",
+                "map-roles-client-scope",
+                "view",
                 "map-roles-composite"
               ],
               "scopeAliases": {}
@@ -914,9 +873,7 @@
         "https://pivox.ngrok.app/api-docs*",
         "https://pivox.ngrok.app/api-docs"
       ],
-      "webOrigins": [
-        ""
-      ],
+      "webOrigins": [""],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -933,6 +890,7 @@
         "backchannel.logout.session.required": "true",
         "standard.token.exchange.enabled": "false",
         "oauth2.jwt.authorization.grant.enabled": "false",
+        "post.logout.redirect.uris": "+",
         "oauth2.device.authorization.grant.enabled": "false",
         "pkce.code.challenge.method": "S256",
         "backchannel.logout.revoke.offline.tokens": "false",
@@ -1018,9 +976,7 @@
         "pivox://oidc-callback",
         "http://127.0.0.1/oidc/callback"
       ],
-      "webOrigins": [
-        ""
-      ],
+      "webOrigins": [""],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1032,16 +988,72 @@
       "frontchannelLogout": true,
       "protocol": "openid-connect",
       "attributes": {
-        "realm_client": "false",
         "logout.confirmation.enabled": "false",
-        "oidc.ciba.grant.enabled": "false",
-        "backchannel.logout.session.required": "true",
         "standard.token.exchange.enabled": "false",
         "oauth2.jwt.authorization.grant.enabled": "false",
         "frontchannel.logout.session.required": "true",
+        "post.logout.redirect.uris": "+",
         "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "realm_client": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
         "display.on.consent.screen": "false",
         "pkce.code.challenge.method": "S256",
+        "dpop.bound.access.tokens": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "aud",
+        "acr",
+        "roles",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "organization",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "id": "6e674c26-00f5-4bf4-a268-9e476047df71",
+      "clientId": "postman",
+      "name": "Postman",
+      "description": "",
+      "rootUrl": "",
+      "adminUrl": "",
+      "baseUrl": "",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": ["https://oauth.pstmn.io/v1/callback"],
+      "webOrigins": [""],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "realm_client": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "client.secret.creation.time": "1783452390",
+        "backchannel.logout.session.required": "true",
+        "standard.token.exchange.enabled": "false",
+        "oauth2.jwt.authorization.grant.enabled": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
         "dpop.bound.access.tokens": "false"
       },
@@ -1118,12 +1130,8 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "/admin/pivox/console/*"
-      ],
-      "webOrigins": [
-        "+"
-      ],
+      "redirectUris": ["/admin/pivox/console/*"],
+      "webOrigins": ["+"],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1192,12 +1200,9 @@
       "secret": "${IMPORT_KC_START_CLIENT_SECRET}",
       "redirectUris": [
         "https://pivox.ngrok.app/auth/callback",
-        "http://localhost:3000/auth/callback)",
-        "https://oauth.pstmn.io/v1/callback"
+        "http://localhost:3000/auth/callback)"
       ],
-      "webOrigins": [
-        ""
-      ],
+      "webOrigins": [""],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1997,10 +2002,7 @@
   "adminTheme": "",
   "emailTheme": "",
   "eventsEnabled": true,
-  "eventsListeners": [
-    "kafka",
-    "jboss-logging"
-  ],
+  "eventsListeners": ["kafka", "jboss-logging"],
   "enabledEventTypes": [
     "UPDATE_CONSENT_ERROR",
     "UPDATE_TOTP",
@@ -2171,6 +2173,7 @@
       "storeToken": false,
       "linkOnly": false,
       "hideOnLogin": false,
+      "postBrokerLoginFlowAlias": "post broker org select",
       "config": {
         "clientId": "${IMPORT_KC_IDP_GOOGLE_CLIENT_ID}",
         "acceptsPromptNoneForwardFromClient": "false",
@@ -2222,8 +2225,8 @@
         "uiLocales": "true",
         "disableNonce": "false",
         "useJwksUrl": "true",
-        "kc.org.domain": "acme.com",
         "kc.org.broker.redirect.mode.email-matches": "true",
+        "kc.org.domain": "acme.com",
         "tokenIntrospectionUrl": "https://pivox.ngrok.app/realms/acme/protocol/openid-connect/token/introspect",
         "sendClientIdOnLogout": "false",
         "metadataDescriptorUrl": "https://pivox.ngrok.app/realms/acme/.well-known/openid-configuration",
@@ -2277,14 +2280,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-sha256-pairwise-sub-mapper",
-            "oidc-usermodel-attribute-mapper",
-            "saml-user-property-mapper",
-            "saml-role-list-mapper",
-            "oidc-usermodel-property-mapper",
+            "saml-user-attribute-mapper",
             "oidc-full-name-mapper",
             "oidc-address-mapper",
-            "saml-user-attribute-mapper"
+            "oidc-sha256-pairwise-sub-mapper",
+            "saml-user-property-mapper",
+            "oidc-usermodel-attribute-mapper",
+            "saml-role-list-mapper",
+            "oidc-usermodel-property-mapper"
           ]
         }
       },
@@ -2295,12 +2298,8 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
-          "host-sending-registration-request-must-match": [
-            "true"
-          ],
-          "client-uris-must-match": [
-            "true"
-          ]
+          "host-sending-registration-request-must-match": ["true"],
+          "client-uris-must-match": ["true"]
         }
       },
       {
@@ -2310,9 +2309,7 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
-          "max-clients": [
-            "200"
-          ]
+          "max-clients": ["200"]
         }
       },
       {
@@ -2339,14 +2336,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-address-mapper",
             "saml-role-list-mapper",
             "oidc-sha256-pairwise-sub-mapper",
-            "oidc-usermodel-property-mapper",
             "oidc-usermodel-attribute-mapper",
-            "saml-user-property-mapper",
+            "oidc-usermodel-property-mapper",
+            "saml-user-attribute-mapper",
             "oidc-full-name-mapper",
-            "saml-user-attribute-mapper"
+            "oidc-address-mapper",
+            "saml-user-property-mapper"
           ]
         }
       },
@@ -2357,9 +2354,7 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
-          "allow-default-scopes": [
-            "true"
-          ]
+          "allow-default-scopes": ["true"]
         }
       },
       {
@@ -2385,9 +2380,7 @@
         "subType": "authenticated",
         "subComponents": {},
         "config": {
-          "allow-default-scopes": [
-            "true"
-          ]
+          "allow-default-scopes": ["true"]
         }
       }
     ],
@@ -2948,6 +2941,24 @@
       ]
     },
     {
+      "id": "e41b8638-d1a3-4336-aeda-dbaa90b84e9d",
+      "alias": "post broker org select",
+      "description": "",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "select-organization",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 0,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
       "id": "1e5a224f-be38-4a9a-8e53-cb8013414b60",
       "alias": "registration",
       "description": "Registration flow",
@@ -3259,9 +3270,9 @@
   "organizationsEnabled": true,
   "organizations": [
     {
-      "id": "065af7bc-0475-49fa-805e-420424fec6dc",
-      "name": "acme",
-      "alias": "Acme",
+      "id": "0bece37b-8ea5-4429-a5c2-feeefa5d6784",
+      "name": "Acme Inc.",
+      "alias": "acme",
       "enabled": true,
       "description": "",
       "attributes": {},
@@ -3275,10 +3286,6 @@
         {
           "username": "ashkan@acme.com",
           "membershipType": "MANAGED"
-        },
-        {
-          "username": "emma@acme.com",
-          "membershipType": "MANAGED"
         }
       ],
       "identityProviders": [
@@ -3286,6 +3293,116 @@
           "alias": "oidc.acme",
           "enabled": true,
           "config": {}
+        }
+      ]
+    },
+    {
+      "id": "73a29d32-500d-477f-a97f-28549f91ae93",
+      "name": "Crescent Entertainment Group",
+      "alias": "crescent-ent",
+      "enabled": true,
+      "description": "",
+      "attributes": {}
+    },
+    {
+      "id": "d634484a-6bd1-4b4e-b363-a322e99eb545",
+      "name": "Heartland Media Corporation",
+      "alias": "heartland-media",
+      "enabled": true,
+      "description": "",
+      "attributes": {},
+      "members": [
+        {
+          "username": "ashkan.daie@gmail.com",
+          "membershipType": "UNMANAGED"
+        }
+      ]
+    },
+    {
+      "id": "42ee6517-1c9d-4710-ae50-5e0c67b76202",
+      "name": "Ironbridge Productions",
+      "alias": "ironbridge-prod",
+      "enabled": true,
+      "description": "",
+      "attributes": {}
+    },
+    {
+      "id": "18c3bf4e-20b4-4e94-92cb-ed7a4aa6fd19",
+      "name": "Lakeshore Public Media",
+      "alias": "lakeshore-public",
+      "enabled": true,
+      "description": "",
+      "attributes": {}
+    },
+    {
+      "id": "913b922b-e137-4ef2-87ac-39d3fc7ad6f5",
+      "name": "Local Corp",
+      "alias": "local-corp",
+      "enabled": true,
+      "description": "",
+      "attributes": {}
+    },
+    {
+      "id": "1855e1b4-0043-473c-b69d-871bb08cfdf8",
+      "name": "Meridian Broadcasting Group",
+      "alias": "meridian-broad",
+      "enabled": true,
+      "description": "",
+      "attributes": {},
+      "members": [
+        {
+          "username": "ashkan.daie@gmail.com",
+          "membershipType": "UNMANAGED"
+        }
+      ]
+    },
+    {
+      "id": "a531645b-999c-4de9-afeb-867c596bd1f3",
+      "name": "Pacific Coast Networks",
+      "alias": "pacific-coast-net",
+      "enabled": true,
+      "description": "",
+      "attributes": {},
+      "members": [
+        {
+          "username": "ashkan.daie@gmail.com",
+          "membershipType": "UNMANAGED"
+        }
+      ]
+    },
+    {
+      "id": "8d1fe26c-003a-4e74-8e77-d9bfc119c6fd",
+      "name": "Pinnacle Digital Broadcasting",
+      "alias": "pinnacle-digital",
+      "enabled": true,
+      "description": "",
+      "attributes": {}
+    },
+    {
+      "id": "441b73b9-06a8-4cff-a365-2d4a4035d343",
+      "name": "Starlight Studios International",
+      "alias": "starlight-studios",
+      "enabled": true,
+      "description": "",
+      "attributes": {},
+      "members": [
+        {
+          "username": "ashkan.daie@gmail.com",
+          "membershipType": "UNMANAGED"
+        }
+      ]
+    },
+    {
+      "id": "2423fc49-a866-4008-a345-77cb627cbd23",
+      "name": "Summit Sports Media",
+      "alias": "summit-sports",
+      "enabled": true,
+      "description": "",
+      "attributes": {},
+      "members": [
+        {
+          "username": "ashkan.daie@gmail.com",
+          "membershipType": "UNMANAGED"
         }
       ]
     }
