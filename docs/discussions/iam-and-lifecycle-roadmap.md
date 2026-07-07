@@ -186,7 +186,6 @@ re-introduce it as part of the new `Iam` service alongside `Member`.
 - [x] No `tenant`, `custom_domain`, `account` (in identity sense), `Policy`/`Binding`/`SetIamPolicy`/`AddRoleMembers` references remain in non-generated code.
 - [x] Manual smoke: registration → org onboarding → AIChat verified (post phase 1.4 deploy via gcloud).
 - [x] **`make api-lint`**: Pivox-IAM files all clean (`groups.proto`, `iam.proto`, `permissions.proto`, `roles.proto`, `users.proto` all `problems: []`). Pre-existing failures in `assets/v1/asset.proto`, `storage/v1/storage_gateway.proto`, `storage/v1/endpoint.proto`, `ai/v1/messages.proto` predate this phase; tracked under "Pre-existing test failures".
-- [ ] `xcodebuild test -scheme PivoxTests` — macOS unit tests (run before phase 1 ships).
 
 ---
 
@@ -642,10 +641,6 @@ reusable by Phase 5+ space-scoped tests without modification.
       including the create-or-update fallback for both OIDC and SAML.)
 - [x] `CreateDomain` LRO drives PENDING → VERIFIED → EXPIRED through
       stubbed DNS resolver. (`internal/service/organizations/domains_e2e_test.go`)
-- [x] Native macOS app rebuilds against regenerated stubs.
-      Verified via `xcodebuild build -project build-xcode/Pivox.xcodeproj
-      -scheme Pivox` — clean BUILD SUCCEEDED including the new
-      `Iam.DeleteAccount` RPC + `accounts/me` resource stubs.
 - [ ] `make build && go test ./... && make api-lint && make lint` clean.
       (Open: `internal/service/aichat` build-fail and
       `internal/storageagent` runtime flake are pre-existing, not

@@ -598,7 +598,7 @@ Server tools (executed in Go during the same stream):
 4. Same model call continues emitting text_deltas after receiving the tool result
 5. All in one model call, one stream, one turn
 
-Client tools (executed by the caller — native app or web, via the next turn):
+Client tools (executed by the caller — the client app, via the next turn):
 1. Model emits `tool_call_complete` for a tool that's NOT in the server registry
 2. Server persists the `tool_call` as a message part (standard conversation history), streams the `ToolInputAvailable` event to the client
 3. Model turn ends, stream closes cleanly
@@ -696,7 +696,7 @@ if err := gwMux.HandlePath(
 
 #### 7b. SSE stream handler — `POST /v1/ai:stream`
 
-Mirrors Vercel AI SDK UI message stream format so any future web client can use `@ai-sdk/react`'s `useChat` directly. Native clients continue to use the bidi gRPC `AiChat.Stream` — this is the web adapter.
+Mirrors Vercel AI SDK UI message stream format so any future web client can use `@ai-sdk/react`'s `useChat` directly. gRPC clients continue to use the bidi gRPC `AiChat.Stream` — this is the web adapter.
 
 **Request**: `POST /v1/ai:stream`, JSON body:
 ```json
@@ -878,7 +878,7 @@ Follow existing test file conventions: use `testify/require`, table-driven tests
 
 - **Config**: extend `internal/config/config.go` with `AIChatConfig { OllamaURL, OllamaModel, ModelContextBudget, ArtifactMaxBytes }`, wire flags in main.go.
 - **Makefile**: no new targets needed — existing `make build`, `make test`, `make proto-gen` cover it.
-- **Docs**: a short note in `docs/` describing the new service, the proto contract, and how to run against a local Ollama for development. Not a full design doc — the existing `docs/ai/plan.md` already covers the architecture.
+- **Docs**: a short note in `docs/` describing the new service, the proto contract, and how to run against a local Ollama for development. Not a full design doc.
 
 ## Risks and open questions
 
@@ -889,7 +889,7 @@ Follow existing test file conventions: use `testify/require`, table-driven tests
 5. **Orphaned artifact versions when upstream asset version is deleted** — `asset_version_name` is a plain string pointer, not a real FK. If the asset system deletes a version that an artifact version points to, the artifact version is orphaned: `:content` returns 404, client renders "content unavailable" placeholder. Acceptable for v1. Follow-up: consider a real FK or a cleanup job that walks the `idx_artifact_versions_asset` partial index and nulls out orphans when asset deletion is observed.
 6. **Asset system content URL shape** — the `:content` handler's redirect to the asset system needs the exact URL pattern. Confirm during Phase 7a: read `internal/service/assets/` or `internal/service/requests/` to find the existing asset content serving route (if any) and mirror it. If the asset system doesn't yet serve content over HTTP, either add that capability first or document the gap and temporarily inline asset bytes through the artifact `:content` handler.
 7. **SSE handler self-dial** — the SSE handler opens a gRPC client to the local gRPC server to reuse `AiChat.Stream`. Requires the gRPC server to be up before the SSE handler starts accepting requests, and proper context cancellation so the upstream stream tears down when the SSE client disconnects. Test the disconnect path explicitly.
-8. **Streaming write backpressure** — if the Swift/WinUI client is slow to consume, the gRPC bidi stream builds up a buffer. For v1 we don't handle this explicitly — grpc-go handles basic flow control. Follow-up: explicit buffer management if we see backpressure issues.
+8. **Streaming write backpressure** — if the client is slow to consume, the gRPC bidi stream builds up a buffer. For v1 we don't handle this explicitly — grpc-go handles basic flow control. Follow-up: explicit buffer management if we see backpressure issues.
 9. **Orphaned streams on disconnect** — if the client disconnects mid-stream, we still need to persist the partial assistant message (or mark it errored). Stream handler's cleanup path catches this via `ctx.Err()`. Applies to both the gRPC `Stream` method and the SSE handler.
 10. **Auth interceptor only sets UID** — org membership is not in the context. Every resource method does a DB lookup to resolve `uid → (org, member)`. This is the existing Pivox pattern; AiChat doesn't introduce anything new here.
 
@@ -923,11 +923,11 @@ Estimated total: **1–2 days** of focused work. The plan is specific enough tha
 
 ## Out of scope for this work stream
 
-These are tracked separately in `docs/ai/plan.md` and happen after the Go BE is shipped:
+These happen after the Go BE is shipped:
 
-- SwiftUI / WinUI client implementation (AIElements library)
-- Shared C++ core bridging between native client and `AiChat` Stream
-- Actual client-tool implementations (server-side machinery and dispatch loop are in v1; the specific tools like `open_view`, `edit_asset`, etc. come with the macOS AIElements work)
+- Client UI implementation (AIElements library)
+- Client-side bridging between the UI and the `AiChat` Stream
+- Actual client-tool implementations (server-side machinery and dispatch loop are in v1; the specific tools like `open_view`, `edit_asset`, etc. come with the AIElements work)
 - Additional model providers (Anthropic, OpenAI, Gateway)
 - Artifact renderers (code/markdown/svg/pdf/etc. UI components)
 - Chat UI components (Conversation, Message, PromptInput, etc.)

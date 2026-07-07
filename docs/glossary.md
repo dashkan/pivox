@@ -36,7 +36,7 @@ Terms used across Pivox documentation. Organized alphabetically.
 
 **DVE (Digital Video Effect)** — A transition or effect that transforms video/graphics spatially — squeeze, zoom, spin, picture-in-picture.
 
-**Embedded Engine** — The playout engine loaded in-process inside the native app for Designer mode and engine development. Full engine capability (GPU compositor, all plugins, hardware encode/decode) minus broadcast I/O (AJA, GPI). Uses software clock and direct framebuffer output. Connected via in-process gRPC — same API as standalone engine.
+**Embedded Engine** — The playout engine loaded in-process (rather than as a standalone process) for Designer-mode and engine-development workflows. Full engine capability (GPU compositor, all plugins, hardware encode/decode) minus broadcast I/O (AJA, GPI). Uses software clock and direct framebuffer output. Connected via in-process gRPC — same API as standalone engine.
 
 **EGL** — An API for connecting rendering APIs (OpenGL, Vulkan) to the native windowing system. CEF uses `--use-gl=egl` on Linux for GPU-accelerated rendering without X11/Wayland.
 
@@ -78,11 +78,9 @@ Terms used across Pivox documentation. Organized alphabetically.
 
 **NTV2** — AJA's SDK/driver for their video I/O cards. Open source (GitHub: aja-video/ntv2). Provides APIs for frame output, genlock, GPI, audio embedding, VANC.
 
-**Native App** — The Pivox operator application, built with SwiftUI (macOS) and WinUI 3 (Windows) with a shared C++ core. Replaces Electron. Native shell for menus/toolbars/forms, shared custom-drawn components for complex UI (timeline, waveform), CEF viewports for template preview. Can embed the engine for Designer mode.
-
 **NVDEC / NVENC** — NVIDIA's hardware video decoder and encoder on their GPUs. FFmpeg uses NVDEC for hardware-accelerated video decode and NVENC for compliance recording.
 
-**OSR (Off-Screen Rendering)** — CEF rendering mode where the browser renders to a pixel buffer in memory instead of a visible window. The engine controls frame timing by ticking CEF's message loop. Required on Windows (WinUI 3's DirectComposition paints over child HWNDs). macOS uses windowed mode (SetAsChild) instead.
+**OSR (Off-Screen Rendering)** — CEF rendering mode where the browser renders to a pixel buffer in memory instead of a visible window. The engine controls frame timing by ticking CEF's message loop.
 
 **Playout Agent** — On-prem agent installed alongside the engine. Manages local engines, routes playout commands, relays data feeds, caches config and entitlements. Connects outbound to the Cloud Controller via bidi gRPC. Operates independently during cloud outages. Installed with a single script (same pattern as Storage Agent). See also: Cloud Controller, Storage Agent.
 
@@ -95,8 +93,6 @@ Terms used across Pivox documentation. Organized alphabetically.
 **Rec.709** — The color space standard for HD broadcast (HDTV). Defines color primaries, transfer function, and white point. sRGB (used by CEF/browsers) shares the same primaries but has a slightly different transfer function.
 
 **Rec.2020** — The color space standard for UHD/4K broadcast. Wider color gamut than Rec.709. Required for HDR content.
-
-**Remote MCP Server** — A Model Context Protocol server running on a remote build machine (e.g., Windows). Enables cross-platform development from macOS — Claude Code on macOS calls the Windows MCP server to trigger builds, run tests, and capture results. Git is the only shared state. See `docs/dev/cross-platform-workflow.md`.
 
 **Rive** — A design tool and runtime for interactive 2D animations. Pivox uses Rive's native C/C++ runtime (not WASM) for high-performance motion graphics via the Rive plugin.
 
@@ -114,7 +110,7 @@ Terms used across Pivox documentation. Organized alphabetically.
 
 **Stinger** — A short animated transition graphic (typically 0.5-2 seconds) used between show segments or as a branded transition element.
 
-**Storage Agent** — On-prem agent that proxies and caches assets on the local network. Serves templates, images, video clips to browsers, native app, and engines via HTTPS. Installed with a single script. Managed from the Cloud Controller. Same agent pattern as Playout Agent. See `docs/storage.md`.
+**Storage Agent** — On-prem agent that proxies and caches assets on the local network. Serves templates, images, video clips to browsers and engines via HTTPS. Installed with a single script. Managed from the Cloud Controller. Same agent pattern as Playout Agent. See `docs/storage.md`.
 
 **SW-P-08** — A serial/TCP protocol for controlling broadcast video routers (Evertz, Grass Valley). The Playout Agent uses this to route sources to destinations.
 
@@ -132,7 +128,7 @@ Terms used across Pivox documentation. Organized alphabetically.
 
 **Video Ingest** — Future capability: capturing live SDI feeds into storage for replay workflows. AJA cards are bidirectional — same hardware used for output can capture input. Phased roadmap from basic ingest through growing-file playback to full EVS-style replay. See `docs/video-ingest.md`.
 
-**VideoToolbox** — Apple's hardware video encode/decode framework on macOS and iOS. Uses Apple Silicon's dedicated media engine. Equivalent to NVENC/NVDEC on NVIDIA GPUs. Used by the engine and native app for hardware-accelerated encoding on macOS.
+**VideoToolbox** — Apple's hardware video encode/decode framework on macOS and iOS. Uses Apple Silicon's dedicated media engine. Equivalent to NVENC/NVDEC on NVIDIA GPUs. Used by the engine for hardware-accelerated encoding on macOS.
 
 **View Model** — The SDK's reactive data layer. Templates bind fields to DOM elements via `pivox.model.bind()`. When data changes (from any source), bindings fire automatically and the template updates.
 
@@ -142,4 +138,4 @@ Terms used across Pivox documentation. Organized alphabetically.
 
 **wgpu** — A Rust implementation of the WebGPU standard. Available as a cross-platform GPU abstraction if the engine ever needs native GPU compute (e.g., HDR tone mapping).
 
-**Workspace** — A mode within the native app that presents a role-specific panel layout. Workspaces: Operator, Designer, Library, Engineering, Admin. Users with multiple roles switch between workspaces. License entitlements gate which workspaces are visible.
+**Workspace** — A role-specific panel layout in the operator UI. Workspaces: Operator, Designer, Library, Engineering, Admin. Users with multiple roles switch between workspaces. License entitlements gate which workspaces are visible.

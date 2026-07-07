@@ -4,7 +4,7 @@
 
 Pivox uses **signed JWT tokens** as the license format. The Cloud Controller is the license authority — it issues, validates, and distributes license entitlements. No third-party licensing system (CodeMeter, FlexLM, hardware dongles) is required.
 
-Licenses gate features at three enforcement points: the engine, the Playout Agent, and the native app. The engine never hard-stops on-air operations due to licensing — licensing only gates *starting* things, not *running* things.
+Licenses gate features at three enforcement points: the engine, the Playout Agent, and the operator UI. The engine never hard-stops on-air operations due to licensing — licensing only gates *starting* things, not *running* things.
 
 For dependency and third-party licensing (FFmpeg, CEF, NDI, AJA SDK, codec patents), see `docs/licensing.md`.
 
@@ -33,7 +33,7 @@ A license is a signed JWT containing claims that define what the customer paid f
 }
 ```
 
-Signed with ES256 (ECDSA on P-256). The Cloud Controller holds the private key in a cloud HSM (AWS KMS, Google Cloud HSM). The public key is embedded in the Playout Agent and native app binaries for offline validation.
+Signed with ES256 (ECDSA on P-256). The Cloud Controller holds the private key in a cloud HSM (AWS KMS, Google Cloud HSM). The public key is embedded in the Playout Agent and engine binaries for offline validation.
 
 ## License Dimensions
 
@@ -46,7 +46,7 @@ Signed with ES256 (ECDSA on P-256). The Cloud Controller holds the private key i
 | **Redundancy** | Hot standby engine pairs | Playout Agent |
 | **Engine count** | Max engines managed by one Playout Agent | Playout Agent |
 | **Concurrent operators** | Max simultaneous authenticated users | Cloud Controller |
-| **App modes** | Which workspaces are visible (Operator, Designer, Library, Engineering, Admin) | Native app |
+| **App modes** | Which workspaces are visible (Operator, Designer, Library, Engineering, Admin) | Operator UI |
 
 ## License Tiers
 
@@ -63,7 +63,7 @@ Tiers are a sales construct — the license JWT contains the actual entitlements
 
 ### Cloud Customers (No On-Prem)
 
-The Cloud Controller enforces entitlements directly. No license file. Entitlements are tied to the customer's subscription in the billing system. The native app receives entitlements from the Cloud Controller API at login.
+The Cloud Controller enforces entitlements directly. No license file. Entitlements are tied to the customer's subscription in the billing system. The operator UI receives entitlements from the Cloud Controller API at login.
 
 ### On-Prem Customers (Playout Agent)
 
@@ -83,18 +83,18 @@ Playout Agent (on-prem)
   │
   ├──→ Engine A: "4 channels, 2160p, SDI+NDI"
   ├──→ Engine B: "4 channels, 2160p, SDI+NDI"
-  └──→ Native App: "all modes, 10 operators"
+  └──→ Operator UI: "all modes, 10 operators"
 ```
 
 The Playout Agent distributes entitlements to engines at startup via the existing gRPC connection. Engines cache their entitlements locally.
 
-### Native App
+### Operator UI
 
-The native app receives entitlements either:
+The operator UI receives entitlements either:
 - **From the Cloud Controller** (cloud-only customers) — at login, via the API
 - **From the Playout Agent** (on-prem customers) — via the existing gRPC connection
 
-The app uses entitlements to show/hide workspace modes and features.
+The UI uses entitlements to show/hide workspace modes and features.
 
 ## Entitlement Caching and Offline Operation
 
@@ -118,7 +118,7 @@ If the Playout Agent hasn't reached the Cloud Controller for 30+ days:
 
 - **Everything on-air keeps running.** The engine never stops a live broadcast for licensing.
 - **New shows can't be started.** Can't load new rundowns, can't start new channels that weren't already running.
-- **Warnings displayed.** Monitoring dashboard, native app, admin email alerts.
+- **Warnings displayed.** Monitoring dashboard, operator UI, admin email alerts.
 
 The on-air path is never touched by licensing. Licensing only gates *starting* things, not *running* things.
 
@@ -152,7 +152,7 @@ The engine receives entitlements from the Playout Agent at startup and caches th
 - Redundancy — refuses to configure hot standby pairs if not licensed
 - Feature gates on playout commands — returns errors for unlicensed features before they reach the engine
 
-### Native App
+### Operator UI
 
 **What it enforces:**
 - Workspace visibility — hides modes the license doesn't include

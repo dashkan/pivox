@@ -16,8 +16,6 @@ Refer to components by their canonical names, not their tech stack:
   verification, LRO reaping, auth-artifact cleanup) via River
   queue. Multi-replica safe via River's leader election; scales
   independently of Cloud Controller.
-- **Native App** — operator application. SwiftUI on macOS, WinUI 3
-  on Windows, shared C++ core.
 - **Engine** — playout engine. Compositor, plugins (CEF, Rive,
   FFmpeg), output adapters.
 - **Storage Agent** — on-prem agent for asset storage, paired with
@@ -115,13 +113,6 @@ internal/             Go application code (Cloud Controller + Storage Agent)
 api/                  Proto definitions (source of truth for gRPC API)
 proto/ buf.yaml ...   buf config + dependencies
 
-native/               Native App
-  AGENTS.md           Native conventions
-  platform/macos/swift/  SwiftUI + AppKit code
-  platform/windows/      WinUI 3 + C++/WinRT code
-  core/                  Shared C++ core
-  build-xcode/           Generated Xcode project (cmake -G Xcode)
-
 aspire/               Aspire AppHost — preferred local dev orchestration
   apphost.mts         Resource graph (source of truth; .aspire/ generated)
 configs/envoy.aspire.yaml  envoy ingress config for the Aspire flow
@@ -151,10 +142,6 @@ code. It covers:
 - Permission model + interceptor chain.
 - AIP resource naming.
 - sqlc workflow.
-
-Other stacks:
-
-- **`native/AGENTS.md`** — macOS/Windows/shared-core conventions.
 
 ## Build + run + test
 
@@ -199,9 +186,8 @@ make db-drop / db-create                # drop / create the database
 make db-force VERSION=N                 # force migration version (recovery)
 
 # Proto + codegen
-make proto-generate                     # full chain: proto → Go + native + sqlc
-make proto-generate-go                  # buf generate (Go only)
-make proto-generate-native              # SwiftProtobuf + grpc-swift-2
+make proto-generate                     # full chain: proto → Go + sqlc
+make proto-generate-go                  # buf generate (Go)
 make lint-proto                         # buf lint
 make api-lint                           # AIP api-linter
 make proto-format                       # buf format -w
@@ -293,20 +279,6 @@ Conventions and gotchas (each was paid for once; don't relearn them):
   Keycloak tokens directly.)
 - **ngrok** claims `pivox.ngrok.app`; only one agent session per domain,
   so stop `make proxy-ngrok` before `aspire start`.
-
-### Native
-
-Read **`docs/build.md`** first. Native build is `xcodebuild`, not
-`cmake --build` (which builds broken UITests).
-
-```sh
-cd native
-cmake -G Xcode -B build-xcode -S .                     # regen Xcode project
-xcodebuild build -project build-xcode/Pivox.xcodeproj -scheme Pivox \
-  -configuration Debug -allowProvisioningUpdates
-xcodebuild test -scheme PivoxTests                     # unit tests
-make test-native-ui                                    # UI tests (XCUITest)
-```
 
 ## Skills (`.agents/skills/golang-*`)
 
@@ -447,7 +419,7 @@ The bar is "would a senior Google engineer ship this." Concretely:
   something written earlier in the same session.
 - **Verify before claiming green.** When validating a change, run
   the actual command (build, test, lint) and confirm the output.
-  Don't trust SourceKit / gopls diagnostics — they go stale.
+  Don't trust gopls diagnostics — they go stale.
 
 ## Testing
 
@@ -473,8 +445,8 @@ Applies equally to:
   fail; then fix)
 - Schema migrations (the integration test that exercises the new
   shape comes before the migration)
-- Native (XCTest / XCUITest / gtest), Cloud Functions, and any
-  other stack — same rule, different framework
+- The Engine (Rust `cargo test`, C/C++ Google Test) and any other
+  stack — same rule, different framework
 
 Narrow exceptions, used sparingly:
 - Pure renames, formatting, and gofmt-equivalent mechanical changes
@@ -498,8 +470,6 @@ must include the test in the same commit, not a follow-up.
 | Go | `go test` — table-driven | `go test ./...` |
 | Rust | `cargo test` — `#[cfg(test)]` + `tests/` | `cargo test` |
 | C/C++ | Google Test via CMake FetchContent | `ctest` |
-| Swift / Obj-C | XCTest, XCUITest | `xcodebuild test -scheme PivoxTests` |
-| WinUI 3 / C++/WinRT | MSTest, WinAppDriver, gtest | `vstest.console.exe` |
 
 See `docs/dev/testing.md` for framework patterns and CI integration.
 

@@ -448,7 +448,7 @@ under any session grant.
 rely heavily on alpha (logos, lower-thirds, overlay graphics). WebP
 supports alpha in both lossy and lossless modes, ships ~25-30%
 smaller than JPEG at equivalent quality, and is natively decoded by
-macOS NSImage / SwiftUI (Big Sur+) and every modern browser. The
+macOS (Big Sur+) and every modern browser. The
 rendition pipeline picks lossy vs lossless internally based on
 source-image properties; the URL contract doesn't vary.
 

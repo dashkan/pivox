@@ -229,10 +229,9 @@ The Electron app (deprecated) used a similar pattern: external browser + deep li
 
 | File | Description |
 |---|---|
-| `native/platform/windows/shared/DelegatedAuthClient.h/cpp` | HTTP client for the three backend endpoints |
-| `native/platform/windows/shared/Views/DelegatedLoginPage.xaml*` | Plugin login page (button + poll flow) |
-| `native/platform/windows/app/App.xaml.cpp` | Deep link parsing, delegated auth orchestration |
-| `native/platform/windows/WinAuthService.h/cpp` | `signInWithCustomTokenAsync`, `getIdTokenAsync` |
 | `internal/server/internal_hooks.go` | Backend endpoint handlers |
 | `internal/db/queries/delegated_auth_sessions.sql` | Database queries |
 | `internal/config/config.go` | `DelegatedAuthConfig` (TTL, poll interval) |
+
+> The plugin-side client (Windows ActiveX/UXP) lived in the deleted
+> Native App codebase; only the backend half above survives.

@@ -9,16 +9,16 @@ The goal: an engineer sees a dropped frame, clicks into it, and traces the full 
 ## Architecture
 
 ```
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│ Engine      │  │ Playout     │  │ Cloud       │  │ Native App  │
-│ (Rust)      │  │ Agent (Go)  │  │ Controller  │  │ (C++/Swift) │
-│             │  │             │  │ (Go)        │  │             │
-│ OTel SDK    │  │ OTel SDK    │  │ OTel SDK    │  │ OTel SDK    │
-└──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
-       │                │                │                │
-       │           OTLP │           OTLP │           OTLP │
-       │                │                │                │
-       └────────────────┴────────┬───────┴────────────────┘
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│ Engine      │  │ Playout     │  │ Cloud       │
+│ (Rust)      │  │ Agent (Go)  │  │ Controller  │
+│             │  │             │  │ (Go)        │
+│ OTel SDK    │  │ OTel SDK    │  │ OTel SDK    │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                │                │
+       │           OTLP │           OTLP │
+       │                │                │
+       └────────────────┴────────┬───────┘
                                  │
                                  ▼
                         ┌────────────────┐
@@ -43,13 +43,11 @@ Each language uses its idiomatic OTel SDK. All export via OTLP.
 | Engine | Rust | `opentelemetry-rust` + `tracing` | `tracing` crate with OTel layer |
 | Playout Agent | Go | `go.opentelemetry.io/otel` | `slog` with OTel bridge |
 | Cloud Controller | Go | `go.opentelemetry.io/otel` | `slog` with OTel bridge |
-| Shared C++ Core | C++ | `opentelemetry-cpp` | `absl::log` with custom OTel `LogSink` |
-| Native App (macOS) | Swift | `opentelemetry-swift` | `os.Logger` or OTel bridge |
-| Native App (Windows) | C++/WinRT | `opentelemetry-cpp` | `absl::log` (via shared core) |
+| Engine C++ (CEF/AJA/NDI FFI) | C++ | `opentelemetry-cpp` | `absl::log` with custom OTel `LogSink` |
 
 ### Why `absl::log` for C++
 
-gRPC uses `absl::log` internally. It's already linked as a transitive dependency. The shared C++ core uses `absl::log` directly — `LOG(INFO)`, `LOG(ERROR)`, `VLOG(2)`. A custom `absl::LogSink` bridges to OTel's log exporter:
+gRPC uses `absl::log` internally. It's already linked as a transitive dependency. The engine's C++ FFI layers use `absl::log` directly — `LOG(INFO)`, `LOG(ERROR)`, `VLOG(2)`. A custom `absl::LogSink` bridges to OTel's log exporter:
 
 ```cpp
 class OTelLogSink : public absl::LogSink {
@@ -92,7 +90,7 @@ This produces a trace with parent span `render_frame` and child spans `cef_rende
 
 ### Traces
 
-Traces follow requests across component boundaries. Every gRPC call between the native app, Playout Agent, and engine is automatically instrumented by gRPC's OTel integration.
+Traces follow requests across component boundaries. Every gRPC call between the operator UI, Playout Agent, and engine is automatically instrumented by gRPC's OTel integration.
 
 **Engine traces (per frame):**
 
@@ -123,7 +121,7 @@ Traces follow requests across component boundaries. Every gRPC call between the 
 **Cross-component trace example:**
 
 ```
-Native App: operator.take (element="lower-third")
+Operator UI: operator.take (element="lower-third")
   └── Playout Agent: command.take (channel=0, layer=2)
         ├── engine.load (template="lower-third.html", slot=background)
         └── engine.play (transition=dissolve, duration=20 frames)
@@ -146,7 +144,7 @@ Logs are correlated with trace IDs when available. Every log line includes the a
 | `timestamp` | ISO 8601 | When |
 | `severity` | enum | `trace`, `debug`, `info`, `warn`, `error`, `fatal` |
 | `body` | string | Human-readable message |
-| `component` | string | `engine`, `playout-agent`, `cloud-controller`, `native-app` |
+| `component` | string | `engine`, `playout-agent`, `cloud-controller` |
 | `host` | string | Machine hostname |
 | `trace_id` | hex string | OTel trace ID (if in a trace context) |
 | `span_id` | hex string | OTel span ID (if in a span) |
@@ -261,8 +259,6 @@ Storage Machine:
   Storage Agent ──OTLP──→ Cloud Backend
                     │
               Local disk buffer
-
-Native App ──OTLP──→ Cloud Backend
 ```
 
 ```toml
@@ -295,16 +291,16 @@ The buffer has a fixed disk budget (configurable, default 1GB). When the buffer 
 
 ### Offline Diagnosis
 
-When the cloud is unreachable, engineers diagnose locally via the Playout Agent. The native app (Engineering workspace) connects to the Playout Agent on the LAN and reads telemetry directly:
+When the cloud is unreachable, engineers diagnose locally via the Playout Agent. The operator UI (Engineering workspace) connects to the Playout Agent on the LAN and reads telemetry directly:
 
 ```
-Native App (Engineering mode) ──gRPC──→ Playout Agent
-                                         ├── Recent traces (in-memory ring buffer)
-                                         ├── Recent logs (disk buffer, queryable)
-                                         └── Current metrics (live)
+Operator UI (Engineering mode) ──gRPC──→ Playout Agent
+                                          ├── Recent traces (in-memory ring buffer)
+                                          ├── Recent logs (disk buffer, queryable)
+                                          └── Current metrics (live)
 ```
 
-No cloud needed for local diagnosis. The engineer is already on the LAN. The Playout Agent exposes a local telemetry query API — recent traces, logs, and live metrics — accessible from the native app's Engineering workspace.
+No cloud needed for local diagnosis. The engineer is already on the LAN. The Playout Agent exposes a local telemetry query API — recent traces, logs, and live metrics — accessible from the operator UI's Engineering workspace.
 
 ## gRPC Auto-Instrumentation
 
@@ -314,7 +310,7 @@ gRPC's OTel integration (`grpc-observability`) automatically instruments all RPC
 - **Metrics:** Request count, latency histograms, error rates per method.
 - **Logs:** RPC request/response metadata (configurable — can be disabled for performance).
 
-This means every command from the native app through the Playout Agent to the engine is traced automatically. No manual instrumentation needed for the gRPC layer.
+This means every command from the operator UI through the Playout Agent to the engine is traced automatically. No manual instrumentation needed for the gRPC layer.
 
 ```go
 // Go — enable gRPC OTel instrumentation

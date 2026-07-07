@@ -18,9 +18,7 @@
 > Both share the `@pivox/oidc` core (`web/packages/oidc/`: discovery,
 > PKCE, code exchange, refresh, end-session, id-token claims). The
 > custom Go OAuth broker was removed — Keycloak is the broker now and
-> owns the SSO OAuth flow to customer IdPs. The Native app
-> (macOS/Windows) still references Firebase but is legacy/reference,
-> not a migration target.
+> owns the SSO OAuth flow to customer IdPs.
 >
 > **Historical note.** Earlier revisions also described two
 > local-development modes: an emulator-based mode and a `-tags dev`

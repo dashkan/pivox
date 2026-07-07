@@ -239,11 +239,6 @@ overwrite or clear the value via UpdateSsoConfig.
 Carried forward from `iam-and-lifecycle-roadmap.md`. Grouped by
 intended next-touch.
 
-### Pre-Phase 1 ship gate
-
-- [ ] `xcodebuild test -scheme PivoxTests` — macOS unit tests must
-      pass before phase 1 cuts a release.
-
 ### Phase 4 — Step 5 (User lifecycle)
 
 - [ ] `onUserDeleted` Firebase webhook handler. Idempotent — no-op
