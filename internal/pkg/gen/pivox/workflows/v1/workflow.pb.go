@@ -696,6 +696,11 @@ type Step_Parallel struct {
 
 type Step_Try struct {
 	// A try/catch error-handling block.
+	// (-- api-linter: core::0140::reserved-words=disabled
+	//
+	//	aip.dev/not-precedent: `try` is the universal name for the
+	//	try/catch construct this step implements; any alternative loses the
+	//	idiom every author already knows. --)
 	Try *Try `protobuf:"bytes,5,opt,name=try,proto3,oneof"`
 }
 
@@ -722,6 +727,10 @@ type Try struct {
 	// Optional. The handler run when `body` raises a catchable error. Absent =
 	// the error is swallowed (when `rethrow` is false) or re-raised as-is (when
 	// `rethrow` is true).
+	// (-- api-linter: core::0140::reserved-words=disabled
+	//
+	//	aip.dev/not-precedent: `catch` pairs with `try` as the standard
+	//	try/catch idiom; renaming it breaks the pairing readers expect. --)
 	Catch *Sequence `protobuf:"bytes,2,opt,name=catch,proto3" json:"catch,omitempty"`
 	// Optional. When true, re-raise the original error after `catch` runs, so the
 	// handler observes and reacts but does not suppress the failure.

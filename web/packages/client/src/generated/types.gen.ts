@@ -161,6 +161,43 @@ export interface paths {
         patch: operations["Organizations_UpdateOrganization"];
         trace?: never;
     };
+    "/v1/organizations/{organization}/connectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists Connectors under an organization or space. */
+        get: operations["Connectors_ListConnectors"];
+        put?: never;
+        /** Creates a Connector. */
+        post: operations["Connectors_CreateConnector"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/connectors/{connector}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a Connector. */
+        get: operations["Connectors_GetConnector"];
+        put?: never;
+        post?: never;
+        /** Deletes a Connector. */
+        delete: operations["Connectors_DeleteConnector"];
+        options?: never;
+        head?: never;
+        /** Updates a Connector. */
+        patch: operations["Connectors_UpdateConnector"];
+        trace?: never;
+    };
     "/v1/organizations/{organization}/dashboards": {
         parameters: {
             query?: never;
@@ -637,6 +674,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/organizations/{organization}/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists Secrets under a parent. The value is never included. */
+        get: operations["Secrets_ListSecrets"];
+        put?: never;
+        /** Creates a new Secret. The value is required and is encrypted at rest. */
+        post: operations["Secrets_CreateSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/secrets/{secret}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a Secret's metadata. The value is never included. */
+        get: operations["Secrets_GetSecret"];
+        put?: never;
+        post?: never;
+        /**
+         * Deletes a Secret. Returns FAILED_PRECONDITION if any connector still
+         *     references it — remove the references first. There is no cascade.
+         */
+        delete: operations["Secrets_DeleteSecret"];
+        options?: never;
+        head?: never;
+        /**
+         * Updates a Secret. Rotate the value by naming it in the update mask with
+         *     a new non-empty value; omit it from the mask to change only metadata.
+         */
+        patch: operations["Secrets_UpdateSecret"];
+        trace?: never;
+    };
     "/v1/organizations/{organization}/spaces": {
         parameters: {
             query?: never;
@@ -939,6 +1019,43 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/connectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists Connectors under an organization or space. */
+        get: operations["Connectors_ListConnectors2"];
+        put?: never;
+        /** Creates a Connector. */
+        post: operations["Connectors_CreateConnector2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/connectors/{connector}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a Connector. */
+        get: operations["Connectors_GetConnector2"];
+        put?: never;
+        post?: never;
+        /** Deletes a Connector. */
+        delete: operations["Connectors_DeleteConnector2"];
+        options?: never;
+        head?: never;
+        /** Updates a Connector. */
+        patch: operations["Connectors_UpdateConnector2"];
         trace?: never;
     };
     "/v1/organizations/{organization}/spaces/{space}/dashboards": {
@@ -1338,6 +1455,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/organizations/{organization}/spaces/{space}/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists Secrets under a parent. The value is never included. */
+        get: operations["Secrets_ListSecrets2"];
+        put?: never;
+        /** Creates a new Secret. The value is required and is encrypted at rest. */
+        post: operations["Secrets_CreateSecret2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/secrets/{secret}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a Secret's metadata. The value is never included. */
+        get: operations["Secrets_GetSecret2"];
+        put?: never;
+        post?: never;
+        /**
+         * Deletes a Secret. Returns FAILED_PRECONDITION if any connector still
+         *     references it — remove the references first. There is no cascade.
+         */
+        delete: operations["Secrets_DeleteSecret2"];
+        options?: never;
+        head?: never;
+        /**
+         * Updates a Secret. Rotate the value by naming it in the update mask with
+         *     a new non-empty value; omit it from the mask to change only metadata.
+         */
+        patch: operations["Secrets_UpdateSecret2"];
+        trace?: never;
+    };
     "/v1/organizations/{organization}/spaces/{space}/tagBindings": {
         parameters: {
             query?: never;
@@ -1471,6 +1631,208 @@ export interface paths {
         head?: never;
         /** Updates the attributes of the TagValue resource. */
         patch: operations["TagValues_UpdateTagValue2"];
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists Workflows under an organization or space. */
+        get: operations["Workflows_ListWorkflows2"];
+        put?: never;
+        /**
+         * Creates a customer-owned (OWNED) workflow. MANAGED workflows are
+         *     provisioned by Pivox and cannot be created via this RPC.
+         */
+        post: operations["Workflows_CreateWorkflow2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a Workflow. */
+        get: operations["Workflows_GetWorkflow2"];
+        put?: never;
+        post?: never;
+        /**
+         * Deletes a Workflow. By default this fails if the Workflow has runs; set
+         *     `force` to cascade its versions and run history.
+         */
+        delete: operations["Workflows_DeleteWorkflow2"];
+        options?: never;
+        head?: never;
+        /**
+         * Updates the container (display_name, description, enabled, config). The
+         *     definition itself is changed by creating a new WorkflowVersion; the live
+         *     version is changed via PromoteWorkflowVersion — not here.
+         */
+        patch: operations["Workflows_UpdateWorkflow2"];
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists the runs of a Workflow. */
+        get: operations["WorkflowRuns_ListWorkflowRuns2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/runs/{run}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a WorkflowRun. */
+        get: operations["WorkflowRuns_GetWorkflowRun2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/runs/{run}:cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Requests cancellation of a running (or waiting) run. */
+        post: operations["WorkflowRuns_CancelWorkflowRun2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists the versions of a Workflow. */
+        get: operations["WorkflowVersions_ListWorkflowVersions2"];
+        put?: never;
+        /**
+         * Mints a new immutable version from a definition. The version is a draft
+         *     until PromoteWorkflowVersion makes it live.
+         */
+        post: operations["WorkflowVersions_CreateWorkflowVersion2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a WorkflowVersion. */
+        get: operations["WorkflowVersions_GetWorkflowVersion2"];
+        put?: never;
+        post?: never;
+        /**
+         * Deletes a version. Only permitted for a version that is not currently
+         *     promoted (Workflow.version must not point at it).
+         */
+        delete: operations["WorkflowVersions_DeleteWorkflowVersion2"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}:fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forks a Workflow into a new customer-OWNED Workflow: clones the source
+         *     version's definition and parameter schema and carries its config. Forks
+         *     receive no auto-upgrade — the escape hatch for structural change to a
+         *     MANAGED workflow.
+         */
+        post: operations["Workflows_ForkWorkflow2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}:promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promotes a version to live (sets Workflow.version). Explicit — a new
+         *     version is a draft until promoted, so edits never disturb production runs.
+         */
+        post: operations["Workflows_PromoteWorkflowVersion2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}:run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts a run of a workflow (manual trigger). Returns the WorkflowRun
+         *     immediately (PENDING/RUNNING); poll GetWorkflowRun for progress.
+         */
+        post: operations["WorkflowRuns_RunWorkflow2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/organizations/{organization}/spaces/{space}:queryDashboardData": {
@@ -2306,6 +2668,208 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/organizations/{organization}/workflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists Workflows under an organization or space. */
+        get: operations["Workflows_ListWorkflows"];
+        put?: never;
+        /**
+         * Creates a customer-owned (OWNED) workflow. MANAGED workflows are
+         *     provisioned by Pivox and cannot be created via this RPC.
+         */
+        post: operations["Workflows_CreateWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/workflows/{workflow}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a Workflow. */
+        get: operations["Workflows_GetWorkflow"];
+        put?: never;
+        post?: never;
+        /**
+         * Deletes a Workflow. By default this fails if the Workflow has runs; set
+         *     `force` to cascade its versions and run history.
+         */
+        delete: operations["Workflows_DeleteWorkflow"];
+        options?: never;
+        head?: never;
+        /**
+         * Updates the container (display_name, description, enabled, config). The
+         *     definition itself is changed by creating a new WorkflowVersion; the live
+         *     version is changed via PromoteWorkflowVersion — not here.
+         */
+        patch: operations["Workflows_UpdateWorkflow"];
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/workflows/{workflow}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists the runs of a Workflow. */
+        get: operations["WorkflowRuns_ListWorkflowRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/workflows/{workflow}/runs/{run}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a WorkflowRun. */
+        get: operations["WorkflowRuns_GetWorkflowRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/workflows/{workflow}/runs/{run}:cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Requests cancellation of a running (or waiting) run. */
+        post: operations["WorkflowRuns_CancelWorkflowRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/workflows/{workflow}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists the versions of a Workflow. */
+        get: operations["WorkflowVersions_ListWorkflowVersions"];
+        put?: never;
+        /**
+         * Mints a new immutable version from a definition. The version is a draft
+         *     until PromoteWorkflowVersion makes it live.
+         */
+        post: operations["WorkflowVersions_CreateWorkflowVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/workflows/{workflow}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retrieves a WorkflowVersion. */
+        get: operations["WorkflowVersions_GetWorkflowVersion"];
+        put?: never;
+        post?: never;
+        /**
+         * Deletes a version. Only permitted for a version that is not currently
+         *     promoted (Workflow.version must not point at it).
+         */
+        delete: operations["WorkflowVersions_DeleteWorkflowVersion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/workflows/{workflow}:fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forks a Workflow into a new customer-OWNED Workflow: clones the source
+         *     version's definition and parameter schema and carries its config. Forks
+         *     receive no auto-upgrade — the escape hatch for structural change to a
+         *     MANAGED workflow.
+         */
+        post: operations["Workflows_ForkWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/workflows/{workflow}:promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promotes a version to live (sets Workflow.version). Explicit — a new
+         *     version is a draft until promoted, so edits never disturb production runs.
+         */
+        post: operations["Workflows_PromoteWorkflowVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/organizations/{organization}/workflows/{workflow}:run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts a run of a workflow (manual trigger). Returns the WorkflowRun
+         *     immediately (PENDING/RUNNING); poll GetWorkflowRun for progress.
+         */
+        post: operations["WorkflowRuns_RunWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/organizations/{organization}:queryDashboardData": {
         parameters: {
             query?: never;
@@ -2892,6 +3456,45 @@ export interface components {
          * @enum {string}
          */
         ThresholdDirection: "DIRECTION_UNSPECIFIED" | "ABOVE" | "BELOW";
+        /** @description Request for CancelWorkflowRun. */
+        WorkflowRunsCancelWorkflowRunBody: Record<string, never>;
+        /** @description Request for RunWorkflow. */
+        WorkflowRunsRunWorkflowBody: {
+            /** @description Optional. Pin a specific version; empty = the workflow's live version. */
+            version?: string;
+            /**
+             * @description Optional. Parameter values, validated against the version's parameter
+             *     schema (layered over the workflow's persistent config).
+             */
+            parameters?: Record<string, never>;
+            /**
+             * @description Optional. The subject resource the run operates on (for a manual run
+             *     against a specific asset/request).
+             */
+            subject?: string;
+            /** @description Optional. If true, validate the request but do not start a run. */
+            validateOnly?: boolean;
+        };
+        /** @description Request for ForkWorkflow. */
+        WorkflowsForkWorkflowBody: {
+            /** @description Optional. Version to fork from; empty = the source's live version. */
+            sourceVersion?: string;
+            /** @description Required. The parent organization or space the fork lands under. */
+            parent: string;
+            /** @description Required. The user-assigned id for the forked Workflow. */
+            workflowId: string;
+            /** @description Optional. Human-readable name for the forked Workflow. */
+            displayName?: string;
+            /** @description Optional. If true, validate the request but do not fork. */
+            validateOnly?: boolean;
+        };
+        /** @description Request for PromoteWorkflowVersion. */
+        WorkflowsPromoteWorkflowVersionBody: {
+            /** @description Required. The version to promote to live. */
+            version: string;
+            /** @description Optional. If true, validate the request but do not promote. */
+            validateOnly?: boolean;
+        };
         /**
          * @description This resource represents a long-running operation that is the result of a
          *     network API call.
@@ -3341,6 +3944,22 @@ export interface components {
              */
             readonly role?: string;
         };
+        /**
+         * @description Activity is a typed leaf operation. The connector-backed variants (http, ...)
+         *     reference a Connector.
+         */
+        v1Activity: {
+            /** @description An HTTP request through an http Connector. */
+            http?: components["schemas"]["v1HttpActivity"];
+            /** @description A run-variable assignment. */
+            set?: components["schemas"]["v1SetActivity"];
+            /** @description A sub-workflow invocation. */
+            runWorkflow?: components["schemas"]["v1RunWorkflowActivity"];
+            /** @description Raise a catchable error (fails the run unless caught by a Try). */
+            fail?: components["schemas"]["v1FailActivity"];
+            /** @description End the run successfully, skipping all remaining steps. */
+            end?: components["schemas"]["v1EndActivity"];
+        };
         /** @description Response message for `Iam.AddGroupMembers`. */
         v1AddGroupMembersResponse: Record<string, never>;
         /**
@@ -3752,6 +4371,13 @@ export interface components {
              */
             max?: number;
         };
+        /** @description Branch is one arm of a Condition: a CEL guard and the steps it runs. */
+        v1Branch: {
+            /** @description Required. CEL guard evaluated over the run context. */
+            when: string;
+            /** @description Required. Steps run when `when` evaluates true. */
+            then: components["schemas"]["v1Sequence"];
+        };
         /** @description The HTTP referrers (websites) that are allowed to use the key. */
         v1BrowserKeyRestrictions: {
             /**
@@ -3979,6 +4605,52 @@ export interface components {
              *     field.
              */
             filterable?: boolean;
+        };
+        /**
+         * @description Condition is an if / else-if / else block. The first branch whose `when`
+         *     evaluates true runs; if none match, `otherwise` runs when present.
+         */
+        v1Condition: {
+            /** @description Required. The ordered if / else-if branches. */
+            branches: components["schemas"]["v1Branch"][];
+            /** @description Optional. The else block, run when no branch matches. */
+            otherwise?: components["schemas"]["v1Sequence"];
+        };
+        /** @description Connector is a reusable, credentialed connection to an external system. */
+        v1Connector: {
+            /** @description Immutable. Resource name. */
+            name?: string;
+            /** @description Optional. Human-readable name. */
+            displayName?: string;
+            /** @description Optional. Description. */
+            description?: string;
+            /** @description Configuration for an HTTP connector. */
+            http?: components["schemas"]["v1HttpConnector"];
+            /**
+             * @description Optional. On-prem agent resource name whose network executes activities
+             *     using this connector. Empty = the cloud controller.
+             */
+            agent?: string;
+            /** @description Output only. The identity that created this connector. */
+            readonly createdBy?: components["schemas"]["typesActor"];
+            /**
+             * Format: date-time
+             * @description Output only. Creation time.
+             */
+            readonly createTime?: string;
+            /** @description Output only. The identity that last modified this connector. */
+            readonly updatedBy?: components["schemas"]["typesActor"];
+            /**
+             * Format: date-time
+             * @description Output only. Update time.
+             */
+            readonly updateTime?: string;
+            /** @description Optional. Optimistic-concurrency tag. */
+            etag?: string;
+            /** @description Optional. Labels. */
+            annotations?: {
+                [key: string]: string;
+            };
         };
         /** @description A conversation represents a single chat thread between a user and the AI. */
         v1Conversation: {
@@ -4341,6 +5013,13 @@ export interface components {
             primaryAction?: components["schemas"]["v1RowAction"];
         };
         /**
+         * @description EndActivity ends the run immediately and SUCCESSFULLY: it unwinds every
+         *     enclosing block (cancelling in-flight Parallel siblings) and skips all
+         *     remaining steps. It is NOT an error, so a Try does not intercept it and the
+         *     error_sequence does not run. The run output is the current run variables.
+         */
+        v1EndActivity: Record<string, never>;
+        /**
          * @description An endpoint represents a storage backend attached to a storage gateway.
          *     Agents use endpoint configuration to serve storage operations. The
          *     configuration is type-specific — currently only S3-compatible backends
@@ -4407,6 +5086,19 @@ export interface components {
              *     server-internal detail.
              */
             errorText?: string;
+        };
+        /**
+         * @description FailActivity raises a terminal, catchable error carrying `message`. It
+         *     propagates like any activity failure: an enclosing Try catches it, and an
+         *     uncaught fail runs the workflow's `error_sequence` and then FAILs the run. It
+         *     is never retried.
+         */
+        v1FailActivity: {
+            /**
+             * @description Optional. The failure message surfaced as `error.message` to a catch or
+             *     the error_sequence. A default is supplied when empty.
+             */
+            message?: string;
         };
         v1File: {
             url?: string;
@@ -4546,6 +5238,64 @@ export interface components {
              * @description Output only. Timestamp when the membership was created.
              */
             readonly createTime?: string;
+        };
+        /**
+         * @description HttpActivity calls an HTTP endpoint through an http Connector, which
+         *     supplies the base URL, static/credentialed headers, and execution locality.
+         */
+        v1HttpActivity: {
+            /** @description Required. The Connector to use (must be an http connector). */
+            connector: string;
+            /** @description Required. The HTTP method (GET, POST, PUT, DELETE, HEAD). */
+            method: string;
+            /** @description Optional. CEL path appended to the connector's base URL. */
+            path?: string;
+            /** @description Optional. Query parameters as CEL over the run context (no secret()). */
+            query?: {
+                [key: string]: string;
+            };
+            /** @description Optional. Header values as CEL over the run context (no secret()). */
+            headers?: {
+                [key: string]: string;
+            };
+            /** @description Optional. Request body as a CEL expression producing JSON. */
+            body?: string;
+            /**
+             * @description Optional. In-process retry policy for transient outcomes (network failure,
+             *     5xx, or a code in `retryable_status`). Absent = a single attempt with no
+             *     retry. This retry loops the HTTP call within the activity; it is distinct
+             *     from a workflow-run job retry, which only infra faults trigger.
+             */
+            retry?: components["schemas"]["v1RetryPolicy"];
+            /**
+             * @description Optional. Response status codes treated as SUCCESS in addition to the
+             *     default 2xx range (e.g. 404 to treat "not found" as a normal outcome). A
+             *     success produces the step output; it never retries or fails the run.
+             */
+            successStatus?: number[];
+            /**
+             * @description Optional. Non-success status codes treated as RETRYABLE in addition to the
+             *     default 5xx range and network failures (e.g. 429 for rate limiting). A
+             *     retryable code drives the `retry` policy; once retries are exhausted the
+             *     activity fails terminally (it does not become a job retry).
+             */
+            retryableStatus?: number[];
+        };
+        /**
+         * @description HttpConnector supplies the base URL and headers for HTTP activities. Header
+         *     values are CEL over the connector-config environment: a literal, a
+         *     `secret("…/secrets/x")`, or an expression like `"Bearer " + secret("…")`.
+         */
+        v1HttpConnector: {
+            /** @description Required. The base URL prepended to each HTTP activity's path. */
+            baseUrl: string;
+            /**
+             * @description Optional. Header name to CEL value (connector-config env; `secret()`
+             *     allowed). These take precedence over an activity's headers.
+             */
+            headers?: {
+                [key: string]: string;
+            };
         };
         /**
          * @description Icon is a curated cross-platform semantic icon catalog. Renderers map
@@ -4988,6 +5738,13 @@ export interface components {
             /** @description A pagination token for the next page. */
             nextPageToken?: string;
         };
+        /** @description Response for ListConnectors. */
+        v1ListConnectorsResponse: {
+            /** @description The Connectors under the requested parent. */
+            connectors?: components["schemas"]["v1Connector"][];
+            /** @description A pagination token for the next page, empty if there are no more. */
+            nextPageToken?: string;
+        };
         /** @description Response message for `ListConversations`. */
         v1ListConversationsResponse: {
             /** @description The conversations in the organization. */
@@ -5124,6 +5881,13 @@ export interface components {
             /** @description Token for the next page of results. */
             nextPageToken?: string;
         };
+        /** @description The response message for ListSecrets. */
+        v1ListSecretsResponse: {
+            /** @description The Secrets under the requested parent (values omitted). */
+            secrets?: components["schemas"]["v1Secret"][];
+            /** @description A pagination token for the next page, empty if there are no more. */
+            nextPageToken?: string;
+        };
         /**
          * @description A page of the response received from the
          *     [ListSpaces][pivox.api.v1.Spaces.ListSpaces]
@@ -5216,6 +5980,27 @@ export interface components {
             /** @description The users in the organization. */
             users?: components["schemas"]["v1User"][];
             /** @description Token for the next page of results. */
+            nextPageToken?: string;
+        };
+        /** @description Response for ListWorkflowRuns. */
+        v1ListWorkflowRunsResponse: {
+            /** @description The runs under the requested Workflow. */
+            workflowRuns?: components["schemas"]["v1WorkflowRun"][];
+            /** @description A pagination token for the next page, empty if there are no more. */
+            nextPageToken?: string;
+        };
+        /** @description Response for ListWorkflowVersions. */
+        v1ListWorkflowVersionsResponse: {
+            /** @description The versions under the requested Workflow. */
+            workflowVersions?: components["schemas"]["v1WorkflowVersion"][];
+            /** @description A pagination token for the next page, empty if there are no more. */
+            nextPageToken?: string;
+        };
+        /** @description Response for ListWorkflows. */
+        v1ListWorkflowsResponse: {
+            /** @description The Workflows under the requested parent. */
+            workflows?: components["schemas"]["v1Workflow"][];
+            /** @description A pagination token for the next page, empty if there are no more. */
             nextPageToken?: string;
         };
         /** @description Response message for `LookupKey` method. */
@@ -5553,6 +6338,45 @@ export interface components {
             permissions: string[];
         };
         /**
+         * @description Parallel runs its branches concurrently and joins (waits for all) at the
+         *     block boundary — the steps after the Parallel run once every branch is done.
+         */
+        v1Parallel: {
+            /** @description Required. The branches run concurrently. */
+            branches: components["schemas"]["v1Sequence"][];
+        };
+        /**
+         * @description ParamType is the value type of a workflow parameter.
+         *
+         *      - PARAM_TYPE_UNSPECIFIED: Default, unused.
+         *      - PARAM_STRING: A string value.
+         *      - PARAM_INT: A 64-bit integer value.
+         *      - PARAM_NUMBER: A floating-point value.
+         *      - PARAM_BOOL: A boolean value.
+         *      - PARAM_RESOURCE: An AIP resource name.
+         *      - PARAM_STRUCT: A structured object value.
+         *      - PARAM_LIST: A list value.
+         * @default PARAM_TYPE_UNSPECIFIED
+         * @enum {string}
+         */
+        v1ParamType: "PARAM_TYPE_UNSPECIFIED" | "PARAM_STRING" | "PARAM_INT" | "PARAM_NUMBER" | "PARAM_BOOL" | "PARAM_RESOURCE" | "PARAM_STRUCT" | "PARAM_LIST";
+        /** @description ParameterDef declares one input in a version's contract. */
+        v1ParameterDef: {
+            /** @description Required. The parameter's key, unique within the version's contract. */
+            key: string;
+            /** @description Required. The parameter's value type. */
+            type: components["schemas"]["v1ParamType"];
+            /** @description Optional. Whether a value must be supplied at run time. */
+            required?: boolean;
+            /** @description Optional. Human-readable description of the parameter. */
+            description?: string;
+            /**
+             * @description Optional. Value used when none is supplied. Every parameter should have a
+             *     default so the workflow runs out of the box.
+             */
+            defaultValue?: unknown;
+        };
+        /**
          * @description A system-defined permission that can be assigned to roles. Permissions
          *     are global (no parent resource) and code-defined; they are exposed
          *     read-only via `Iam.ListPermissions`.
@@ -5754,6 +6578,8 @@ export interface components {
          * @enum {string}
          */
         v1RequestState: "STATE_UNSPECIFIED" | "DRAFT" | "OPEN" | "IN_PROGRESS" | "DELIVERED" | "APPROVED" | "REVISION_REQUESTED" | "REJECTED" | "CANCELLED";
+        /** @description ResourceEventTrigger fires a run when a subject resource changes. */
+        v1ResourceEventTrigger: Record<string, never>;
         /**
          * @description ResourceQuery describes a query against Pivox resources. It is a declarative
          *     DSL stored in the dashboard configuration; a future QueryDashboardData RPC
@@ -5805,6 +6631,28 @@ export interface components {
              *     specified, all targets are allowed.
              */
             apiTargets?: components["schemas"]["v1ApiTarget"][];
+        };
+        /**
+         * @description RetryPolicy configures exponential backoff for an in-process retry loop.
+         *     Fields left unset fall back to the engine defaults noted below.
+         */
+        v1RetryPolicy: {
+            /**
+             * Format: int32
+             * @description Optional. Maximum number of attempts (the first try plus retries).
+             *     Defaults to 1 (no retry) when unset or <= 0.
+             */
+            maxAttempts?: number;
+            /** @description Optional. Backoff before the first retry. Defaults to 100ms when unset. */
+            initialBackoff?: string;
+            /** @description Optional. Upper bound on any single backoff. Defaults to 30s when unset. */
+            maxBackoff?: string;
+            /**
+             * Format: double
+             * @description Optional. Multiplier applied to the backoff after each attempt. Defaults
+             *     to 2.0 when unset or <= 0.
+             */
+            backoffMultiplier?: number;
         };
         /**
          * @description A role within an organization. Roles can be system-defined (owner, admin,
@@ -5891,6 +6739,43 @@ export interface components {
              */
             requiresConfirmation?: boolean;
         };
+        /** @description RunTrigger records what started a run. */
+        v1RunTrigger: {
+            /** @description The kind of event that fired the run. */
+            kind?: components["schemas"]["v1RunTriggerKind"];
+            /** @description For RESOURCE_EVENT: the resource whose change fired the run. */
+            subject?: string;
+            /** @description For SUB_WORKFLOW: the parent run that invoked this via run_workflow. */
+            parentRun?: string;
+        };
+        /**
+         * @description RunTriggerKind is what fired a run.
+         *
+         *      - RUN_TRIGGER_KIND_UNSPECIFIED: Default, unused.
+         *      - MANUAL: The RunWorkflow RPC (manual).
+         *      - RESOURCE_EVENT: An asset/request event.
+         *      - SCHEDULE: A schedule fired.
+         *      - SUB_WORKFLOW: Invoked via a run_workflow activity.
+         * @default RUN_TRIGGER_KIND_UNSPECIFIED
+         * @enum {string}
+         */
+        v1RunTriggerKind: "RUN_TRIGGER_KIND_UNSPECIFIED" | "MANUAL" | "RESOURCE_EVENT" | "SCHEDULE" | "SUB_WORKFLOW";
+        /**
+         * @description RunWorkflowActivity invokes another workflow as a sub-workflow. Subject to
+         *     a call-stack cycle guard + depth cap. This is how customer workflows compose
+         *     system building blocks.
+         */
+        v1RunWorkflowActivity: {
+            /**
+             * @description Required. The workflow to run. Resolves to the target's live version at
+             *     call time; a WorkflowVersion name pins a specific version.
+             */
+            workflow: string;
+            /** @description Optional. Parameter values (CEL over the run context) passed to the run. */
+            parameters?: {
+                [key: string]: string;
+            };
+        };
         /** @description Static access key credentials for an S3-compatible backend. */
         v1S3AccessKeyCredentials: {
             /** @description Required. The access key ID. */
@@ -5958,12 +6843,64 @@ export interface components {
              */
             readonly callbackUrl?: string;
         };
+        /** @description ScheduleTrigger fires a run on a schedule. */
+        v1ScheduleTrigger: Record<string, never>;
+        /** @description A Secret is one encrypted, write-only credential in the vault. */
+        v1Secret: {
+            /**
+             * @description Immutable. The resource name for a Secret, in the format
+             *     `organizations/{organization}/secrets/{secret}` or
+             *     `organizations/{organization}/spaces/{space}/secrets/{secret}`.
+             */
+            name?: string;
+            /** @description Optional. Human-readable name. Must not exceed 256 characters. */
+            displayName?: string;
+            /**
+             * @description Input only. The opaque secret value, encrypted at rest and NEVER
+             *     returned in any response. Required (non-empty) on create. On update it
+             *     is written only when `value` is named in the update mask, and must be
+             *     non-empty then — an empty value in scope is rejected (INVALID_ARGUMENT).
+             *     A Secret always holds a value: rotate by sending a new one, and remove
+             *     by deleting the Secret; there is no empty/unset state. Store multi-field
+             *     credentials (e.g. AWS access+secret keys) as a JSON blob the consuming
+             *     connector parses — the vault treats the value as opaque.
+             */
+            value?: string;
+            /** @description Output only. The identity that created this secret. */
+            readonly createdBy?: components["schemas"]["typesActor"];
+            /**
+             * Format: date-time
+             * @description Output only. Creation time.
+             */
+            readonly createTime?: string;
+            /** @description Output only. The identity that last rotated or modified this secret. */
+            readonly updatedBy?: components["schemas"]["typesActor"];
+            /**
+             * Format: date-time
+             * @description Output only. Last update (or rotation) time.
+             */
+            readonly updateTime?: string;
+            /**
+             * @description Optional. Entity tag for optimistic concurrency. Always set in server
+             *     responses; pass it back on update/delete to guard against a lost write.
+             */
+            etag?: string;
+            /** @description Optional. Labels for organizing and filtering secrets. */
+            annotations?: {
+                [key: string]: string;
+            };
+        };
         /** @description SectionHeader is a visual separator for organizing dashboard sections. */
         v1SectionHeader: {
             /** @description Optional. A subtitle displayed below the widget title. */
             subtitle?: string;
             /** @description Optional. Whether to render a divider line below the header. */
             dividerBelow?: boolean;
+        };
+        /** @description Sequence is an ordered list of steps, executed top to bottom. */
+        v1Sequence: {
+            /** @description Required. The ordered steps. */
+            steps: components["schemas"]["workflowsV1Step"][];
         };
         /**
          * @description One emission on the streaming wire. Each variant maps 1:1 to a
@@ -6040,6 +6977,20 @@ export interface components {
              *     with this key.
              */
             allowedIps?: string[];
+        };
+        /**
+         * @description SetActivity assigns CEL expressions to named run variables (vars.<name>).
+         *     This is the data-transformation activity — CEL provides math/string/JSON/
+         *     conversion; the UI presents friendly builders that generate the CEL.
+         */
+        v1SetActivity: {
+            /**
+             * @description Required. Variable name to CEL expression over the run context (no
+             *     secret()).
+             */
+            assignments: {
+                [key: string]: string;
+            };
         };
         v1SourceDocument: {
             sourceId?: string;
@@ -6274,6 +7225,27 @@ export interface components {
             thresholds?: components["schemas"]["v1Threshold"][];
             /** @description Optional. Whether to show a sparkline trend below the value. */
             sparkline?: boolean;
+        };
+        /** @description StepState is the runtime status + output of one step in the run. */
+        v1StepState: {
+            /** @description The step's id within the WorkflowVersion. */
+            stepId?: string;
+            /** @description Output only. The step's current state. */
+            readonly state?: components["schemas"]["workflowsV1State"];
+            /** @description The step's output, addressable downstream as steps.<step_id>.output. */
+            output?: Record<string, never>;
+            /** @description The error if the step failed. */
+            error?: components["schemas"]["rpcStatus"];
+            /**
+             * Format: date-time
+             * @description When the step started.
+             */
+            startTime?: string;
+            /**
+             * Format: date-time
+             * @description When the step ended.
+             */
+            endTime?: string;
         };
         /**
          * @description A storage gateway deployed within an organization. Storage gateways act
@@ -6746,6 +7718,38 @@ export interface components {
              */
             readonly previousOwner?: string;
         };
+        /** @description Trigger declares what starts a run automatically. */
+        v1Trigger: {
+            /** @description Fires when a subject resource changes. */
+            resourceEvent?: components["schemas"]["v1ResourceEventTrigger"];
+            /** @description Fires on a schedule. */
+            schedule?: components["schemas"]["v1ScheduleTrigger"];
+        };
+        /**
+         * @description Try runs `body`; if a step in it raises a catchable error (an activity
+         *     failure, a `fail`, or a CEL error — but NOT an `end` or context
+         *     cancellation), `catch` runs with the failure exposed in CEL scope (as
+         *     `error`). If `catch` completes and `rethrow` is false the error is HANDLED
+         *     and the flow continues past the Try. If `rethrow` is true the ORIGINAL error
+         *     is re-raised after `catch` runs. If `catch` itself raises, that new error
+         *     propagates. This is the nearest error boundary between an activity's own
+         *     retry and the workflow-level `error_sequence`.
+         */
+        v1Try: {
+            /** @description Required. The protected step sequence. */
+            body: components["schemas"]["v1Sequence"];
+            /**
+             * @description Optional. The handler run when `body` raises a catchable error. Absent =
+             *     the error is swallowed (when `rethrow` is false) or re-raised as-is (when
+             *     `rethrow` is true).
+             */
+            catch?: components["schemas"]["v1Sequence"];
+            /**
+             * @description Optional. When true, re-raise the original error after `catch` runs, so the
+             *     handler observes and reacts but does not suppress the failure.
+             */
+            rethrow?: boolean;
+        };
         /**
          * @description A user within an organization. Users are synced from Firebase Auth and
          *     are read-only via `Iam.GetUser` / `Iam.ListUsers`.
@@ -6808,6 +7812,181 @@ export interface components {
             text?: components["schemas"]["v1TextWidget"];
             /** @description A visual section separator. */
             sectionHeader?: components["schemas"]["v1SectionHeader"];
+        };
+        /** @description Workflow is the container for a versioned workflow definition. */
+        v1Workflow: {
+            /** @description Immutable. Resource name. */
+            name?: string;
+            /** @description Optional. Human-readable name. */
+            displayName?: string;
+            /** @description Optional. Description. */
+            description?: string;
+            /** @description Optional. Master switch: when false, no trigger fires a run. */
+            enabled?: boolean;
+            /**
+             * @description Output only. Resource name of the promoted (live) WorkflowVersion. Empty
+             *     until a version is promoted. Set via PromoteWorkflowVersion, not Update.
+             */
+            readonly version?: string;
+            /**
+             * @description Optional. Persistent parameter values applied to every triggered run,
+             *     validated against the live version's parameter schema. This is where a
+             *     customer's configuration of a MANAGED workflow lives — it survives
+             *     version upgrades.
+             */
+            config?: Record<string, never>;
+            /**
+             * @description Output only. Whether Pivox manages this workflow's versions (MANAGED) or
+             *     the customer owns them (OWNED). Only OWNED workflows are structurally
+             *     editable; a MANAGED one is configured via `config` or forked.
+             */
+            readonly origin?: components["schemas"]["v1WorkflowOrigin"];
+            /** @description Output only. The identity that created this workflow. */
+            readonly createdBy?: components["schemas"]["typesActor"];
+            /**
+             * Format: date-time
+             * @description Output only. Creation time.
+             */
+            readonly createTime?: string;
+            /** @description Output only. The identity that last modified this workflow. */
+            readonly updatedBy?: components["schemas"]["typesActor"];
+            /**
+             * Format: date-time
+             * @description Output only. Update time.
+             */
+            readonly updateTime?: string;
+            /** @description Optional. Optimistic-concurrency tag. */
+            etag?: string;
+            /** @description Optional. Labels. */
+            annotations?: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * @description WorkflowOrigin records who owns a Workflow's versions.
+         *
+         *      - WORKFLOW_ORIGIN_UNSPECIFIED: Default, unused.
+         *      - OWNED: Customer-owned; fully editable.
+         *      - MANAGED: Pivox-managed system workflow; versions land from Pivox, and the customer
+         *     configures via `config` or forks for structural change.
+         * @default WORKFLOW_ORIGIN_UNSPECIFIED
+         * @enum {string}
+         */
+        v1WorkflowOrigin: "WORKFLOW_ORIGIN_UNSPECIFIED" | "OWNED" | "MANAGED";
+        /** @description WorkflowRun is one execution of a pinned WorkflowVersion. */
+        v1WorkflowRun: {
+            /** @description Immutable. Resource name; {run} is a uuid. */
+            name?: string;
+            /** @description Output only. The WorkflowVersion this run pinned at start. */
+            readonly version?: string;
+            /** @description Output only. Current state. */
+            readonly state?: components["schemas"]["workflowsV1State"];
+            /** @description Output only. What fired this run. */
+            readonly trigger?: components["schemas"]["v1RunTrigger"];
+            /**
+             * @description Output only. The resource this run operates on (the triggering asset /
+             *     request, or a manual subject). Empty for subject-less runs.
+             */
+            readonly subject?: string;
+            /** @description Output only. Initial input (manual parameters / trigger payload). */
+            readonly input?: Record<string, never>;
+            /** @description Output only. Final result on success. */
+            readonly output?: Record<string, never>;
+            /**
+             * @description Output only. Per-step state — the run context + UI/debug view. NEVER
+             *     contains a decrypted connector secret (secrets resolve at the request
+             *     boundary, not into step outputs).
+             */
+            readonly steps?: components["schemas"]["v1StepState"][];
+            /** @description Output only. Error on FAILED. */
+            readonly error?: components["schemas"]["rpcStatus"];
+            /**
+             * @description Output only. Who/what caused the run (a user or a system trigger). The
+             *     run itself executes as the workflow service identity.
+             */
+            readonly triggeredBy?: components["schemas"]["typesActor"];
+            /**
+             * Format: date-time
+             * @description Output only. Creation time.
+             */
+            readonly createTime?: string;
+            /**
+             * Format: date-time
+             * @description Output only. Start time.
+             */
+            readonly startTime?: string;
+            /**
+             * Format: date-time
+             * @description Output only. End time.
+             */
+            readonly endTime?: string;
+        };
+        /**
+         * @description WorkflowVersion is an IMMUTABLE definition. Editing a workflow mints a new
+         *     one; it is a draft until promoted.
+         */
+        v1WorkflowVersion: {
+            /** @description Immutable. Resource name; the {version} segment is a monotonic id. */
+            name?: string;
+            /** @description Optional. Author's change note for this version. */
+            note?: string;
+            /**
+             * @description Optional. The run input contract. Manual runs supply values for these;
+             *     triggered runs use the container's `config` + defaults.
+             */
+            parameters?: components["schemas"]["v1ParameterDef"][];
+            /**
+             * @description Optional. What fires a run. Absent = a building block, runnable only via
+             *     a `run_workflow` activity (or a direct RunWorkflow RPC), never by events.
+             */
+            trigger?: components["schemas"]["v1Trigger"];
+            /** @description Required. The workflow body — the ordered, nested step sequence. */
+            root: components["schemas"]["v1Sequence"];
+            /** @description Output only. The identity that created this version. */
+            readonly createdBy?: components["schemas"]["typesActor"];
+            /**
+             * Format: date-time
+             * @description Output only. Creation time. Immutable — a version has no update time.
+             */
+            readonly createTime?: string;
+            /**
+             * @description Optional. The workflow-level error handler. Runs when `root` fails with an
+             *     error that no enclosing Try caught, with the failure exposed in CEL scope
+             *     (as `error`) for cleanup / notify / compensate work. The run is FAILED
+             *     regardless of this sequence's own outcome. It does NOT run when `root`
+             *     succeeds or when the run ends early via an `end` activity.
+             */
+            errorSequence?: components["schemas"]["v1Sequence"];
+        };
+        /**
+         * @description State is the lifecycle state of a run or step.
+         *
+         *      - STATE_UNSPECIFIED: Default, unused.
+         *      - PENDING: Accepted, not yet started.
+         *      - RUNNING: Executing steps.
+         *      - WAITING: Parked on a signal/timer (long-running / human-in-the-loop).
+         *      - SUCCEEDED: Completed successfully.
+         *      - FAILED: Failed.
+         *      - CANCELLED: Cancelled.
+         * @default STATE_UNSPECIFIED
+         * @enum {string}
+         */
+        workflowsV1State: "STATE_UNSPECIFIED" | "PENDING" | "RUNNING" | "WAITING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+        /** @description Step is one node in the flow: a leaf Activity, a Condition, or a Parallel. */
+        workflowsV1Step: {
+            /**
+             * @description Required. Unique within the WorkflowVersion. Names this step's output in
+             *     the run context (steps.<id>.output).
+             */
+            id: string;
+            /** @description A leaf activity. */
+            activity?: components["schemas"]["v1Activity"];
+            /** @description A conditional block. */
+            condition?: components["schemas"]["v1Condition"];
+            /** @description A parallel block. */
+            parallel?: components["schemas"]["v1Parallel"];
+            /** @description A try/catch error-handling block. */
+            try?: components["schemas"]["v1Try"];
         };
     };
     responses: never;
@@ -7200,6 +8379,228 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["longrunningOperation"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_ListConnectors: {
+        parameters: {
+            query?: {
+                /** @description Optional. Maximum number of Connectors to return; the server caps at 1000. */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListConnectors call. */
+                pageToken?: string;
+                /** @description Optional. An AIP-160 filter expression. */
+                filter?: string;
+                /** @description Optional. A comma-separated list of fields to order by. */
+                orderBy?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListConnectorsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_CreateConnector: {
+        parameters: {
+            query: {
+                /** @description Required. The user-assigned id for the Connector, unique within the parent. */
+                connectorId: string;
+                /** @description Optional. If true, validate the request but do not create the Connector. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The Connector to create. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["v1Connector"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Connector"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_GetConnector: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                connector: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Connector"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_DeleteConnector: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not delete the Connector. */
+                validateOnly?: boolean;
+                /** @description Optional. The etag the client expects; used for optimistic concurrency. */
+                etag?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                connector: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_UpdateConnector: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not update the Connector. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                connector: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The new state of the Connector. */
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Optional. Human-readable name. */
+                    displayName?: string;
+                    /** @description Optional. Description. */
+                    description?: string;
+                    /** @description Configuration for an HTTP connector. */
+                    http?: components["schemas"]["v1HttpConnector"];
+                    /**
+                     * @description Optional. On-prem agent resource name whose network executes activities
+                     *     using this connector. Empty = the cloud controller.
+                     */
+                    agent?: string;
+                    /** @description Output only. The identity that created this connector. */
+                    readonly createdBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Creation time.
+                     */
+                    readonly createTime?: string;
+                    /** @description Output only. The identity that last modified this connector. */
+                    readonly updatedBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Update time.
+                     */
+                    readonly updateTime?: string;
+                    /** @description Optional. Optimistic-concurrency tag. */
+                    etag?: string;
+                    /** @description Optional. Labels. */
+                    annotations?: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Connector"];
                 };
             };
             /** @description An unexpected error response. */
@@ -8880,6 +10281,260 @@ export interface operations {
             };
         };
     };
+    Secrets_ListSecrets: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Optional. Maximum number of Secrets to return. Server caps at 1000;
+                 *     defaults to 100 when unspecified.
+                 */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListSecrets call. */
+                pageToken?: string;
+                /**
+                 * @description Optional. An AIP-160 filter expression. Filterable fields:
+                 *
+                 *     + `displayName`
+                 *
+                 *     For more information, see [AIP-160](https://aip.dev/160).
+                 */
+                filter?: string;
+                /**
+                 * @description Optional. A comma-separated list of fields to order by (append " desc"
+                 *     for descending). Supported: `displayName`, `createTime`. Defaults to
+                 *     `displayName` ascending.
+                 */
+                orderBy?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListSecretsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Secrets_CreateSecret: {
+        parameters: {
+            query: {
+                /** @description Required. The user-assigned id for the Secret, unique within the parent. */
+                secretId: string;
+                /** @description Optional. If true, validate the request but do not create the Secret. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Required. The Secret to create. Its `value` is required here and is
+         *     encrypted at rest.
+         */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["v1Secret"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Secret"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Secrets_GetSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                secret: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Secret"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Secrets_DeleteSecret: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not delete the Secret. */
+                validateOnly?: boolean;
+                /** @description Optional. The etag the client expects; used for optimistic concurrency. */
+                etag?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                secret: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Secrets_UpdateSecret: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Optional. If true and the Secret does not exist, create it (update_mask
+                 *     is then ignored).
+                 */
+                allowMissing?: boolean;
+                /** @description Optional. If true, validate the request but do not update the Secret. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                secret: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Required. The new state of the Secret. To rotate the value, name `value`
+         *     in the update mask with a new non-empty value; an empty value in scope
+         *     is rejected. To change only metadata, omit `value` from the mask and the
+         *     stored value is untouched. If `etag` is set it must match the stored
+         *     etag or `ABORTED` is returned.
+         */
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Optional. Human-readable name. Must not exceed 256 characters. */
+                    displayName?: string;
+                    /**
+                     * @description Input only. The opaque secret value, encrypted at rest and NEVER
+                     *     returned in any response. Required (non-empty) on create. On update it
+                     *     is written only when `value` is named in the update mask, and must be
+                     *     non-empty then — an empty value in scope is rejected (INVALID_ARGUMENT).
+                     *     A Secret always holds a value: rotate by sending a new one, and remove
+                     *     by deleting the Secret; there is no empty/unset state. Store multi-field
+                     *     credentials (e.g. AWS access+secret keys) as a JSON blob the consuming
+                     *     connector parses — the vault treats the value as opaque.
+                     */
+                    value?: string;
+                    /** @description Output only. The identity that created this secret. */
+                    readonly createdBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Creation time.
+                     */
+                    readonly createTime?: string;
+                    /** @description Output only. The identity that last rotated or modified this secret. */
+                    readonly updatedBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Last update (or rotation) time.
+                     */
+                    readonly updateTime?: string;
+                    /**
+                     * @description Optional. Entity tag for optimistic concurrency. Always set in server
+                     *     responses; pass it back on update/delete to guard against a lost write.
+                     */
+                    etag?: string;
+                    /** @description Optional. Labels for organizing and filtering secrets. */
+                    annotations?: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Secret"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
     Spaces_ListSpaces: {
         parameters: {
             query?: {
@@ -10057,6 +11712,233 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["longrunningOperation"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_ListConnectors2: {
+        parameters: {
+            query?: {
+                /** @description Optional. Maximum number of Connectors to return; the server caps at 1000. */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListConnectors call. */
+                pageToken?: string;
+                /** @description Optional. An AIP-160 filter expression. */
+                filter?: string;
+                /** @description Optional. A comma-separated list of fields to order by. */
+                orderBy?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListConnectorsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_CreateConnector2: {
+        parameters: {
+            query: {
+                /** @description Required. The user-assigned id for the Connector, unique within the parent. */
+                connectorId: string;
+                /** @description Optional. If true, validate the request but do not create the Connector. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The Connector to create. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["v1Connector"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Connector"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_GetConnector2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                connector: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Connector"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_DeleteConnector2: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not delete the Connector. */
+                validateOnly?: boolean;
+                /** @description Optional. The etag the client expects; used for optimistic concurrency. */
+                etag?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                connector: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Connectors_UpdateConnector2: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not update the Connector. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                connector: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The new state of the Connector. */
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Optional. Human-readable name. */
+                    displayName?: string;
+                    /** @description Optional. Description. */
+                    description?: string;
+                    /** @description Configuration for an HTTP connector. */
+                    http?: components["schemas"]["v1HttpConnector"];
+                    /**
+                     * @description Optional. On-prem agent resource name whose network executes activities
+                     *     using this connector. Empty = the cloud controller.
+                     */
+                    agent?: string;
+                    /** @description Output only. The identity that created this connector. */
+                    readonly createdBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Creation time.
+                     */
+                    readonly createTime?: string;
+                    /** @description Output only. The identity that last modified this connector. */
+                    readonly updatedBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Update time.
+                     */
+                    readonly updateTime?: string;
+                    /** @description Optional. Optimistic-concurrency tag. */
+                    etag?: string;
+                    /** @description Optional. Labels. */
+                    annotations?: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Connector"];
                 };
             };
             /** @description An unexpected error response. */
@@ -11482,6 +13364,265 @@ export interface operations {
             };
         };
     };
+    Secrets_ListSecrets2: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Optional. Maximum number of Secrets to return. Server caps at 1000;
+                 *     defaults to 100 when unspecified.
+                 */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListSecrets call. */
+                pageToken?: string;
+                /**
+                 * @description Optional. An AIP-160 filter expression. Filterable fields:
+                 *
+                 *     + `displayName`
+                 *
+                 *     For more information, see [AIP-160](https://aip.dev/160).
+                 */
+                filter?: string;
+                /**
+                 * @description Optional. A comma-separated list of fields to order by (append " desc"
+                 *     for descending). Supported: `displayName`, `createTime`. Defaults to
+                 *     `displayName` ascending.
+                 */
+                orderBy?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListSecretsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Secrets_CreateSecret2: {
+        parameters: {
+            query: {
+                /** @description Required. The user-assigned id for the Secret, unique within the parent. */
+                secretId: string;
+                /** @description Optional. If true, validate the request but do not create the Secret. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Required. The Secret to create. Its `value` is required here and is
+         *     encrypted at rest.
+         */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["v1Secret"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Secret"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Secrets_GetSecret2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                secret: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Secret"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Secrets_DeleteSecret2: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not delete the Secret. */
+                validateOnly?: boolean;
+                /** @description Optional. The etag the client expects; used for optimistic concurrency. */
+                etag?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                secret: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Secrets_UpdateSecret2: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Optional. If true and the Secret does not exist, create it (update_mask
+                 *     is then ignored).
+                 */
+                allowMissing?: boolean;
+                /** @description Optional. If true, validate the request but do not update the Secret. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                secret: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Required. The new state of the Secret. To rotate the value, name `value`
+         *     in the update mask with a new non-empty value; an empty value in scope
+         *     is rejected. To change only metadata, omit `value` from the mask and the
+         *     stored value is untouched. If `etag` is set it must match the stored
+         *     etag or `ABORTED` is returned.
+         */
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Optional. Human-readable name. Must not exceed 256 characters. */
+                    displayName?: string;
+                    /**
+                     * @description Input only. The opaque secret value, encrypted at rest and NEVER
+                     *     returned in any response. Required (non-empty) on create. On update it
+                     *     is written only when `value` is named in the update mask, and must be
+                     *     non-empty then — an empty value in scope is rejected (INVALID_ARGUMENT).
+                     *     A Secret always holds a value: rotate by sending a new one, and remove
+                     *     by deleting the Secret; there is no empty/unset state. Store multi-field
+                     *     credentials (e.g. AWS access+secret keys) as a JSON blob the consuming
+                     *     connector parses — the vault treats the value as opaque.
+                     */
+                    value?: string;
+                    /** @description Output only. The identity that created this secret. */
+                    readonly createdBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Creation time.
+                     */
+                    readonly createTime?: string;
+                    /** @description Output only. The identity that last rotated or modified this secret. */
+                    readonly updatedBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Last update (or rotation) time.
+                     */
+                    readonly updateTime?: string;
+                    /**
+                     * @description Optional. Entity tag for optimistic concurrency. Always set in server
+                     *     responses; pass it back on update/delete to guard against a lost write.
+                     */
+                    etag?: string;
+                    /** @description Optional. Labels for organizing and filtering secrets. */
+                    annotations?: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Secret"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
     TagBindings_ListTagBindings2: {
         parameters: {
             query?: {
@@ -12247,6 +14388,626 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["longrunningOperation"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_ListWorkflows2: {
+        parameters: {
+            query?: {
+                /** @description Optional. Maximum number of Workflows to return; the server caps at 1000. */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListWorkflows call. */
+                pageToken?: string;
+                /** @description Optional. An AIP-160 filter expression. */
+                filter?: string;
+                /** @description Optional. A comma-separated list of fields to order by. */
+                orderBy?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListWorkflowsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_CreateWorkflow2: {
+        parameters: {
+            query: {
+                /** @description Required. The user-assigned id for the Workflow, unique within the parent. */
+                workflowId: string;
+                /** @description Optional. If true, validate the request but do not create the Workflow. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The Workflow to create. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["v1Workflow"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_GetWorkflow2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_DeleteWorkflow2: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not delete the Workflow. */
+                validateOnly?: boolean;
+                /** @description Optional. The etag the client expects; used for optimistic concurrency. */
+                etag?: string;
+                /**
+                 * @description Optional. Default false refuses to delete a Workflow that has runs; true
+                 *     cascades its versions and run history.
+                 */
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_UpdateWorkflow2: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not update the Workflow. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The new state of the Workflow. */
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Optional. Human-readable name. */
+                    displayName?: string;
+                    /** @description Optional. Description. */
+                    description?: string;
+                    /** @description Optional. Master switch: when false, no trigger fires a run. */
+                    enabled?: boolean;
+                    /**
+                     * @description Output only. Resource name of the promoted (live) WorkflowVersion. Empty
+                     *     until a version is promoted. Set via PromoteWorkflowVersion, not Update.
+                     */
+                    readonly version?: string;
+                    /**
+                     * @description Optional. Persistent parameter values applied to every triggered run,
+                     *     validated against the live version's parameter schema. This is where a
+                     *     customer's configuration of a MANAGED workflow lives — it survives
+                     *     version upgrades.
+                     */
+                    config?: Record<string, never>;
+                    /**
+                     * @description Output only. Whether Pivox manages this workflow's versions (MANAGED) or
+                     *     the customer owns them (OWNED). Only OWNED workflows are structurally
+                     *     editable; a MANAGED one is configured via `config` or forked.
+                     */
+                    readonly origin?: components["schemas"]["v1WorkflowOrigin"];
+                    /** @description Output only. The identity that created this workflow. */
+                    readonly createdBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Creation time.
+                     */
+                    readonly createTime?: string;
+                    /** @description Output only. The identity that last modified this workflow. */
+                    readonly updatedBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Update time.
+                     */
+                    readonly updateTime?: string;
+                    /** @description Optional. Optimistic-concurrency tag. */
+                    etag?: string;
+                    /** @description Optional. Labels. */
+                    annotations?: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowRuns_ListWorkflowRuns2: {
+        parameters: {
+            query?: {
+                /** @description Optional. Maximum number of runs to return; the server caps at 1000. */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListWorkflowRuns call. */
+                pageToken?: string;
+                /** @description Optional. AIP-160 filter (e.g. state = "RUNNING"). */
+                filter?: string;
+                /** @description Optional. A comma-separated list of fields to order by. */
+                orderBy?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListWorkflowRunsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowRuns_GetWorkflowRun2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+                run: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowRun"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowRuns_CancelWorkflowRun2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+                run: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowRunsCancelWorkflowRunBody"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowRun"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowVersions_ListWorkflowVersions2: {
+        parameters: {
+            query?: {
+                /** @description Optional. Maximum number of versions to return; the server caps at 1000. */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListWorkflowVersions call. */
+                pageToken?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListWorkflowVersionsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowVersions_CreateWorkflowVersion2: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not create the version. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The version to create. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["v1WorkflowVersion"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowVersion"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowVersions_GetWorkflowVersion2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowVersion"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowVersions_DeleteWorkflowVersion2: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not delete the version. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_ForkWorkflow2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowsForkWorkflowBody"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_PromoteWorkflowVersion2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowsPromoteWorkflowVersionBody"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowRuns_RunWorkflow2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                space: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowRunsRunWorkflowBody"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowRun"];
                 };
             };
             /** @description An unexpected error response. */
@@ -15020,6 +17781,611 @@ export interface operations {
                         result?: components["schemas"]["v1ServerEvent"];
                         error?: components["schemas"]["rpcStatus"];
                     };
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_ListWorkflows: {
+        parameters: {
+            query?: {
+                /** @description Optional. Maximum number of Workflows to return; the server caps at 1000. */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListWorkflows call. */
+                pageToken?: string;
+                /** @description Optional. An AIP-160 filter expression. */
+                filter?: string;
+                /** @description Optional. A comma-separated list of fields to order by. */
+                orderBy?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListWorkflowsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_CreateWorkflow: {
+        parameters: {
+            query: {
+                /** @description Required. The user-assigned id for the Workflow, unique within the parent. */
+                workflowId: string;
+                /** @description Optional. If true, validate the request but do not create the Workflow. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The Workflow to create. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["v1Workflow"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_GetWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_DeleteWorkflow: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not delete the Workflow. */
+                validateOnly?: boolean;
+                /** @description Optional. The etag the client expects; used for optimistic concurrency. */
+                etag?: string;
+                /**
+                 * @description Optional. Default false refuses to delete a Workflow that has runs; true
+                 *     cascades its versions and run history.
+                 */
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_UpdateWorkflow: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not update the Workflow. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The new state of the Workflow. */
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Optional. Human-readable name. */
+                    displayName?: string;
+                    /** @description Optional. Description. */
+                    description?: string;
+                    /** @description Optional. Master switch: when false, no trigger fires a run. */
+                    enabled?: boolean;
+                    /**
+                     * @description Output only. Resource name of the promoted (live) WorkflowVersion. Empty
+                     *     until a version is promoted. Set via PromoteWorkflowVersion, not Update.
+                     */
+                    readonly version?: string;
+                    /**
+                     * @description Optional. Persistent parameter values applied to every triggered run,
+                     *     validated against the live version's parameter schema. This is where a
+                     *     customer's configuration of a MANAGED workflow lives — it survives
+                     *     version upgrades.
+                     */
+                    config?: Record<string, never>;
+                    /**
+                     * @description Output only. Whether Pivox manages this workflow's versions (MANAGED) or
+                     *     the customer owns them (OWNED). Only OWNED workflows are structurally
+                     *     editable; a MANAGED one is configured via `config` or forked.
+                     */
+                    readonly origin?: components["schemas"]["v1WorkflowOrigin"];
+                    /** @description Output only. The identity that created this workflow. */
+                    readonly createdBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Creation time.
+                     */
+                    readonly createTime?: string;
+                    /** @description Output only. The identity that last modified this workflow. */
+                    readonly updatedBy?: components["schemas"]["typesActor"];
+                    /**
+                     * Format: date-time
+                     * @description Output only. Update time.
+                     */
+                    readonly updateTime?: string;
+                    /** @description Optional. Optimistic-concurrency tag. */
+                    etag?: string;
+                    /** @description Optional. Labels. */
+                    annotations?: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowRuns_ListWorkflowRuns: {
+        parameters: {
+            query?: {
+                /** @description Optional. Maximum number of runs to return; the server caps at 1000. */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListWorkflowRuns call. */
+                pageToken?: string;
+                /** @description Optional. AIP-160 filter (e.g. state = "RUNNING"). */
+                filter?: string;
+                /** @description Optional. A comma-separated list of fields to order by. */
+                orderBy?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListWorkflowRunsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowRuns_GetWorkflowRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+                run: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowRun"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowRuns_CancelWorkflowRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+                run: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowRunsCancelWorkflowRunBody"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowRun"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowVersions_ListWorkflowVersions: {
+        parameters: {
+            query?: {
+                /** @description Optional. Maximum number of versions to return; the server caps at 1000. */
+                pageSize?: number;
+                /** @description Optional. A pagination token from a previous ListWorkflowVersions call. */
+                pageToken?: string;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1ListWorkflowVersionsResponse"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowVersions_CreateWorkflowVersion: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not create the version. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        /** @description Required. The version to create. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["v1WorkflowVersion"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowVersion"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowVersions_GetWorkflowVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowVersion"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowVersions_DeleteWorkflowVersion: {
+        parameters: {
+            query?: {
+                /** @description Optional. If true, validate the request but do not delete the version. */
+                validateOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_ForkWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowsForkWorkflowBody"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    Workflows_PromoteWorkflowVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowsPromoteWorkflowVersionBody"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Workflow"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
+    WorkflowRuns_RunWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization: string;
+                workflow: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowRunsRunWorkflowBody"];
+            };
+        };
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1WorkflowRun"];
                 };
             };
             /** @description An unexpected error response. */
