@@ -324,14 +324,14 @@ func (s *WorkflowsServer) ListWorkflows(ctx context.Context, req *workflowsv1.Li
 		PageLimit: pageSize + 1,
 	})
 	if err != nil {
-		return nil, apierr.Internal("list workflows")
+		return nil, apierr.Internal(err, "list workflows")
 	}
 
 	var nextPageToken string
 	if int32(len(rows)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		rows = rows[:pageSize]
 	}
@@ -376,7 +376,7 @@ func (s *WorkflowsServer) CreateWorkflow(ctx context.Context, req *workflowsv1.C
 
 	id, err := uuid.NewV7()
 	if err != nil {
-		return nil, apierr.Internal("generate workflow id")
+		return nil, apierr.Internal(err, "generate workflow id")
 	}
 	config, err := marshalWorkflowConfig(in.GetConfig())
 	if err != nil {
@@ -501,7 +501,7 @@ func (s *WorkflowsServer) DeleteWorkflow(ctx context.Context, req *workflowsv1.D
 		}
 		active, err := qtx.CountActiveWorkflowRuns(ctx, id)
 		if err != nil {
-			return apierr.Internal("check active runs")
+			return apierr.Internal(err, "check active runs")
 		}
 		if active > 0 {
 			if !req.GetForce() {
@@ -511,7 +511,7 @@ func (s *WorkflowsServer) DeleteWorkflow(ctx context.Context, req *workflowsv1.D
 			// cascades them away.
 			// Phase 6: also stop the River job backing each cancelled run.
 			if err := qtx.CancelActiveWorkflowRuns(ctx, id); err != nil {
-				return apierr.Internal("cancel active runs")
+				return apierr.Internal(err, "cancel active runs")
 			}
 		}
 		// Deleting the workflow cascades its versions + runs (the version_id
@@ -542,11 +542,11 @@ func (s *WorkflowsServer) ForkWorkflow(ctx context.Context, req *workflowsv1.For
 
 	newID, err := uuid.NewV7()
 	if err != nil {
-		return nil, apierr.Internal("generate workflow id")
+		return nil, apierr.Internal(err, "generate workflow id")
 	}
 	verID, err := uuid.NewV7()
 	if err != nil {
-		return nil, apierr.Internal("generate version id")
+		return nil, apierr.Internal(err, "generate version id")
 	}
 
 	row, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Workflow, error) {
@@ -637,7 +637,7 @@ func resolveForkSource(ctx context.Context, qtx db.Querier, src db.Workflow, sou
 			return db.WorkflowVersion{}, apierr.FailedPrecondition(
 				"source workflow's promoted version is unavailable; specify source_version")
 		}
-		return db.WorkflowVersion{}, apierr.Internal("load source version")
+		return db.WorkflowVersion{}, apierr.Internal(err, "load source version")
 	}
 	return ver, nil
 }
@@ -673,7 +673,7 @@ func (s *WorkflowsServer) PromoteWorkflowVersion(ctx context.Context, req *workf
 			if errors.Is(err, pgx.ErrNoRows) {
 				return db.Workflow{}, apierr.FailedPrecondition("version does not belong to this workflow")
 			}
-			return db.Workflow{}, apierr.Internal("load version")
+			return db.Workflow{}, apierr.Internal(err, "load version")
 		}
 		updated, err := qtx.SetWorkflowVersion(ctx, db.SetWorkflowVersionParams{
 			ID:        wfID,
@@ -736,14 +736,14 @@ func (s *WorkflowVersionsServer) ListWorkflowVersions(ctx context.Context, req *
 		PageLimit:  pageSize + 1,
 	})
 	if err != nil {
-		return nil, apierr.Internal("list workflow versions")
+		return nil, apierr.Internal(err, "list workflow versions")
 	}
 
 	var nextPageToken string
 	if int32(len(rows)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		rows = rows[:pageSize]
 	}
@@ -795,7 +795,7 @@ func (s *WorkflowVersionsServer) CreateWorkflowVersion(ctx context.Context, req 
 	}
 	verID, err := uuid.NewV7()
 	if err != nil {
-		return nil, apierr.Internal("generate version id")
+		return nil, apierr.Internal(err, "generate version id")
 	}
 	callerID := convert.PgUUID(server.MustUserID(ctx))
 
@@ -811,7 +811,7 @@ func (s *WorkflowVersionsServer) CreateWorkflowVersion(ctx context.Context, req 
 		}
 		next, err := qtx.NextWorkflowVersionNumber(ctx, wfID)
 		if err != nil {
-			return db.WorkflowVersion{}, apierr.Internal("allocate version number")
+			return db.WorkflowVersion{}, apierr.Internal(err, "allocate version number")
 		}
 		row, err := qtx.CreateWorkflowVersion(ctx, db.CreateWorkflowVersionParams{
 			ID:            verID,

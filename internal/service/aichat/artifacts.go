@@ -66,7 +66,7 @@ func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsReque
 
 	results, err := filter.ScanArtifacts(rows)
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -81,7 +81,7 @@ func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsReque
 	if int32(len(results)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		results = results[:pageSize]
 	}
@@ -151,7 +151,7 @@ func (s *Server) DeleteArtifact(ctx context.Context, req *aiv1.DeleteArtifactReq
 		}
 		count, err := qtx.CountArtifactVersionsByArtifact(ctx, row.ID)
 		if err != nil {
-			return apierr.Internal("database error")
+			return apierr.Internal(err, "database error")
 		}
 		if count > 0 {
 			return apierr.FailedPrecondition(fmt.Sprintf("artifact has %d version(s); set force=true to delete", count))

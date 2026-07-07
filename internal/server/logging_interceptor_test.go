@@ -79,7 +79,7 @@ func TestLoggingUnaryInterceptor_NoPgFieldsForGenericInternal(t *testing.T) {
 	// Handler returns a status error without any pg cause —
 	// PgErrorLogAttrs returns nil and the record carries no
 	// db_* keys (don't pollute logs with empty fields).
-	handlerErr := apierr.Internal("something internal exploded")
+	handlerErr := apierr.Internal(nil, "something internal exploded")
 
 	var buf bytes.Buffer
 	icp := LoggingUnaryInterceptor(captureLogger(&buf))
@@ -100,6 +100,39 @@ func TestLoggingUnaryInterceptor_NoPgFieldsForGenericInternal(t *testing.T) {
 		_, present := rec[k]
 		assert.False(t, present, "no pg cause → no db_* keys; got %q", k)
 	}
+}
+
+func TestLoggingUnaryInterceptor_PlainInternalWithCauseLogsPgAttrs(t *testing.T) {
+	// A plain apierr.Internal(pgErr, "msg") — NOT routed through
+	// HandleResourceError — must still surface the pg attrs. This
+	// pins the whole point of the Internal(cause, msg) signature:
+	// any handler passing its in-scope error gets a debuggable log
+	// while the wire response stays sanitized to "msg".
+	pgErr := &pgconn.PgError{
+		Code:       "42P01",
+		Message:    `relation "workflows" does not exist`,
+		SchemaName: "public",
+		TableName:  "workflows",
+	}
+	handlerErr := apierr.Internal(pgErr, "list workflows")
+
+	var buf bytes.Buffer
+	icp := LoggingUnaryInterceptor(captureLogger(&buf))
+	_, err := icp(
+		context.Background(),
+		nil,
+		&grpc.UnaryServerInfo{FullMethod: "/test.Service/Method"},
+		func(ctx context.Context, req any) (any, error) { return nil, handlerErr },
+	)
+	require.Error(t, err)
+
+	rec := decodeOnly(t, &buf)
+	assert.Equal(t, "ERROR", rec["level"])
+	assert.Equal(t, "Internal", rec["code"])
+	assert.Equal(t, "list workflows", rec["error"], "wire/log message stays sanitized")
+	assert.Equal(t, "42P01", rec["db_code"], "the pg cause must surface for debugging")
+	assert.Equal(t, `relation "workflows" does not exist`, rec["db_message"])
+	assert.Equal(t, "workflows", rec["db_table"])
 }
 
 func TestLoggingUnaryInterceptor_TypedClientErrorStaysWarn(t *testing.T) {

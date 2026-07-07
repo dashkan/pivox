@@ -107,7 +107,7 @@ func (s *Server) queryAssetsAtOrg(ctx context.Context, orgSlug string, pageSize,
 	for _, r := range rows {
 		row, err := assetRowToStruct(viewFromOrgRow(r), orgSlug, r.SpaceSlug)
 		if err != nil {
-			return nil, apierr.Internal("synthesize asset row")
+			return nil, apierr.Internal(err, "synthesize asset row")
 		}
 		out.Rows = append(out.Rows, row)
 	}
@@ -137,7 +137,7 @@ func (s *Server) queryAssetsAtSpace(ctx context.Context, orgSlug, spaceSlug stri
 	for _, r := range rows {
 		row, err := assetRowToStruct(viewFromSpaceRow(r), orgSlug, spaceSlug)
 		if err != nil {
-			return nil, apierr.Internal("synthesize asset row")
+			return nil, apierr.Internal(err, "synthesize asset row")
 		}
 		out.Rows = append(out.Rows, row)
 	}

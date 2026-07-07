@@ -185,14 +185,14 @@ func (s *SecretsServer) ListSecrets(ctx context.Context, req *secretsv1.ListSecr
 		PageLimit: pageSize + 1,
 	})
 	if err != nil {
-		return nil, apierr.Internal("list secrets")
+		return nil, apierr.Internal(err, "list secrets")
 	}
 
 	var nextPageToken string
 	if int32(len(rows)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		rows = rows[:pageSize]
 	}
@@ -238,12 +238,12 @@ func (s *SecretsServer) CreateSecret(ctx context.Context, req *secretsv1.CreateS
 	// the column's uuidv7 intent) so the AAD is bound to it before encrypt.
 	id, err := uuid.NewV7()
 	if err != nil {
-		return nil, apierr.Internal("generate secret id")
+		return nil, apierr.Internal(err, "generate secret id")
 	}
 	ciphertext, err := s.encryptor.Encrypt(value, secretAAD(id))
 	if err != nil {
 		slog.ErrorContext(ctx, "secrets: encrypt failed", "error", err)
-		return nil, apierr.Internal("encrypt secret value")
+		return nil, apierr.Internal(err, "encrypt secret value")
 	}
 	annotations, err := marshalAnnotations(in.GetAnnotations())
 	if err != nil {
@@ -317,7 +317,7 @@ func (s *SecretsServer) UpdateSecret(ctx context.Context, req *secretsv1.UpdateS
 		ciphertext, err := s.encryptor.Encrypt(value, secretAAD(id))
 		if err != nil {
 			slog.ErrorContext(ctx, "secrets: encrypt failed", "error", err)
-			return nil, apierr.Internal("encrypt secret value")
+			return nil, apierr.Internal(err, "encrypt secret value")
 		}
 		params.ValueCiphertext = ciphertext
 	}
@@ -373,7 +373,7 @@ func (s *SecretsServer) DeleteSecret(ctx context.Context, req *secretsv1.DeleteS
 		// write time, so naming its slug here leaks nothing.)
 		refs, err := qtx.ConnectorsReferencingSecret(ctx, id)
 		if err != nil {
-			return apierr.Internal("check secret references")
+			return apierr.Internal(err, "check secret references")
 		}
 		if len(refs) > 0 {
 			slugs := make([]string, 0, len(refs))

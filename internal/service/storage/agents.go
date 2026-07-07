@@ -103,7 +103,7 @@ func (s *AgentsServer) ListAgents(ctx context.Context, req *storagev1.ListAgents
 
 	agents, err := s.queries.ListStorageAgentsByGateway(ctx, gw.ID)
 	if err != nil {
-		return nil, apierr.Internal("failed to list agents")
+		return nil, apierr.Internal(err, "failed to list agents")
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)

@@ -52,7 +52,7 @@ func (s *Server) resolveConversationActors(ctx context.Context, rows []db.AiConv
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve conversation actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -75,7 +75,7 @@ func (s *Server) resolveArtifactActors(ctx context.Context, rows []db.AiArtifact
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve artifact actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -95,7 +95,7 @@ func (s *Server) resolveArtifactVersionActors(ctx context.Context, rows []db.AiA
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve artifact version actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }

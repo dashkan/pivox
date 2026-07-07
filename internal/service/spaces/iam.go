@@ -38,7 +38,7 @@ func (s *SpacesServer) TestIamPermissions(ctx context.Context, req *iampb.TestIa
 	allowed, err := s.resolver.TestPermissions(ctx, identity, target, req.GetPermissions())
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve test permissions failed", "resource", req.GetResource(), "error", err)
-		return nil, apierr.Internal("resolve permissions")
+		return nil, apierr.Internal(err, "resolve permissions")
 	}
 	return &iampb.TestIamPermissionsResponse{Permissions: allowed}, nil
 }

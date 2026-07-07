@@ -192,7 +192,7 @@ func (s *Server) listSpaceDashboards(ctx context.Context, req *apiv1.ListDashboa
 	for _, row := range rows {
 		d, err := convert.DashboardToProto(row, parent, nil)
 		if err != nil {
-			return nil, apierr.Internal("dashboard payload corrupt")
+			return nil, apierr.Internal(err, "dashboard payload corrupt")
 		}
 		out.Dashboards = append(out.Dashboards, d)
 	}
@@ -287,7 +287,7 @@ func (s *Server) CreateDashboard(ctx context.Context, req *apiv1.CreateDashboard
 	}
 	payload, err := convert.DashboardPayload(clean)
 	if err != nil {
-		return nil, apierr.Internal("dashboard marshal")
+		return nil, apierr.Internal(err, "dashboard marshal")
 	}
 
 	// validate_only runs the INSERT against real constraints and rolls it
@@ -416,7 +416,7 @@ func (s *Server) UpdateDashboard(ctx context.Context, req *apiv1.UpdateDashboard
 		}
 		payload, err := convert.DashboardPayload(merged)
 		if err != nil {
-			return db.Dashboard{}, apierr.Internal("dashboard marshal")
+			return db.Dashboard{}, apierr.Internal(err, "dashboard marshal")
 		}
 
 		row, err := qtx.UpdateDashboardByName(ctx, db.UpdateDashboardByNameParams{

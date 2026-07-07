@@ -77,7 +77,7 @@ func (s *AssetsServer) resolveAssetActors(ctx context.Context, rows []db.Asset) 
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve asset actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -97,7 +97,7 @@ func (s *AssetsServer) resolveAssetVersionActors(ctx context.Context, rows []db.
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve asset version actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -224,7 +224,7 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 		}
 	}
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	var nextPageToken string
@@ -346,7 +346,7 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 			ID:    row.ID,
 			State: db.AssetStateACTIVE,
 		}); err != nil {
-			return db.Asset{}, apierr.Internal("flip asset to ACTIVE")
+			return db.Asset{}, apierr.Internal(err, "flip asset to ACTIVE")
 		}
 		row.State = db.AssetStateACTIVE
 		return row, nil

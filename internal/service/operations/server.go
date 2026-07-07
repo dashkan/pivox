@@ -85,7 +85,7 @@ func (s *OperationsServer) authorizeOp(ctx context.Context, name string) (db.Ope
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.Operation{}, apierr.NotFound("Operation", name)
 		}
-		return db.Operation{}, apierr.Internal("failed to load operation")
+		return db.Operation{}, apierr.Internal(err, "failed to load operation")
 	}
 
 	allowed, err := s.callerCanSee(ctx, server.MustUserID(ctx), op)
@@ -140,14 +140,14 @@ func (s *OperationsServer) ListOperations(ctx context.Context, req *longrunningp
 		PageSize: pageSize,
 	})
 	if err != nil {
-		return nil, apierr.Internal("failed to list operations")
+		return nil, apierr.Internal(err, "failed to list operations")
 	}
 
 	ops := make([]*longrunningpb.Operation, 0, len(rows))
 	for _, row := range rows {
 		p, err := lro.OperationToProto(row)
 		if err != nil {
-			return nil, apierr.Internal("failed to convert operation")
+			return nil, apierr.Internal(err, "failed to convert operation")
 		}
 		ops = append(ops, p)
 	}

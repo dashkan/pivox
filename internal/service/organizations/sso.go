@@ -38,7 +38,7 @@ func (s *OrganizationsServer) GetSsoConfig(ctx context.Context, req *apiv1.GetSs
 			return nil, apierr.NotFound("SsoConfig", req.GetName())
 		}
 		slog.ErrorContext(ctx, "get sso config: lookup failed", "org_id", resolved.ID, "error", err)
-		return nil, apierr.Internal("lookup sso config")
+		return nil, apierr.Internal(err, "lookup sso config")
 	}
 	return convert.SsoConfigToProto(row, resolved.Slug, nil), nil
 }
@@ -97,7 +97,7 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 	creating := errors.Is(getErr, pgx.ErrNoRows)
 	if !creating && getErr != nil {
 		slog.ErrorContext(ctx, "update sso config: lookup existing row failed", "org_id", resolved.ID, "error", getErr)
-		return nil, apierr.Internal("lookup existing sso config")
+		return nil, apierr.Internal(getErr, "lookup existing sso config")
 	}
 
 	upsert := db.UpsertSsoConfigParams{
@@ -112,7 +112,7 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 		oidcJSON, err := convert.OidcConfigRowFromProto(oidc)
 		if err != nil {
 			slog.ErrorContext(ctx, "update sso config: marshal oidc config failed", "error", err)
-			return nil, apierr.Internal("marshal oidc config")
+			return nil, apierr.Internal(err, "marshal oidc config")
 		}
 		upsert.FirebaseProviderID = providerID("oidc.", resolved.Slug, existing, creating)
 		upsert.OidcConfig = oidcJSON
@@ -120,7 +120,7 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 		samlJSON, err := convert.SamlConfigRowFromProto(saml)
 		if err != nil {
 			slog.ErrorContext(ctx, "update sso config: marshal saml config failed", "error", err)
-			return nil, apierr.Internal("marshal saml config")
+			return nil, apierr.Internal(err, "marshal saml config")
 		}
 		upsert.FirebaseProviderID = providerID("saml.", resolved.Slug, existing, creating)
 		upsert.SamlConfig = samlJSON
@@ -129,7 +129,7 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 	row, err := s.queries.UpsertSsoConfig(ctx, upsert)
 	if err != nil {
 		slog.ErrorContext(ctx, "update sso config: upsert failed", "org_id", resolved.ID, "error", err)
-		return nil, apierr.Internal("upsert sso config")
+		return nil, apierr.Internal(err, "upsert sso config")
 	}
 	return convert.SsoConfigToProto(row, resolved.Slug, nil), nil
 }

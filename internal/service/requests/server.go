@@ -81,7 +81,7 @@ func (s *RequestsServer) resolveRequestActors(ctx context.Context, rows []db.Ass
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve request actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -104,7 +104,7 @@ func (s *RequestsServer) resolveLineItemActors(ctx context.Context, rows []db.As
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve line item actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -133,7 +133,7 @@ func (s *RequestsServer) resolveLineItemAssetNames(ctx context.Context, rows []d
 	pairs, err := s.queries.GetAssetNamesByIDs(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve line item asset names failed", "error", err)
-		return nil, apierr.Internal("resolve asset names")
+		return nil, apierr.Internal(err, "resolve asset names")
 	}
 	out := make(map[uuid.UUID]string, len(pairs))
 	for _, p := range pairs {
@@ -251,7 +251,7 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 	})
 	_ = req.GetShowDeleted() // soft-delete removed; flag is a no-op
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	var nextPageToken string

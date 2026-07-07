@@ -107,7 +107,7 @@ func (s *OrganizationsServer) CreateDomain(ctx context.Context, req *apiv1.Creat
 	token, err := generateVerificationToken()
 	if err != nil {
 		slog.ErrorContext(ctx, "create domain: token generation failed", "error", err)
-		return nil, apierr.Internal("generate verification token")
+		return nil, apierr.Internal(err, "generate verification token")
 	}
 
 	domain, err := s.queries.CreateDomain(ctx, db.CreateDomainParams{
@@ -125,7 +125,7 @@ func (s *OrganizationsServer) CreateDomain(ctx context.Context, req *apiv1.Creat
 			return nil, apierr.AlreadyExists("Domain", domainStr)
 		}
 		slog.ErrorContext(ctx, "create domain: insert failed", "domain", domainStr, "error", err)
-		return nil, apierr.Internal("create domain")
+		return nil, apierr.Internal(err, "create domain")
 	}
 
 	domainResource := "organizations/" + resolvedOrg.Slug + "/domains/" + domain.Domain
@@ -175,7 +175,7 @@ func (s *OrganizationsServer) GetDomain(ctx context.Context, req *apiv1.GetDomai
 			return nil, apierr.NotFound("Domain", req.GetName())
 		}
 		slog.ErrorContext(ctx, "get domain: lookup failed", "name", req.GetName(), "error", err)
-		return nil, apierr.Internal("lookup domain")
+		return nil, apierr.Internal(err, "lookup domain")
 	}
 	return convert.DomainToProto(row, resolvedOrg.Slug, nil), nil
 }
@@ -190,7 +190,7 @@ func (s *OrganizationsServer) ListDomains(ctx context.Context, req *apiv1.ListDo
 	rows, err := s.queries.ListDomainsByOrg(ctx, resolvedOrg.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "list domains: query failed", "org_id", resolvedOrg.ID, "error", err)
-		return nil, apierr.Internal("list domains")
+		return nil, apierr.Internal(err, "list domains")
 	}
 	out := make([]*apiv1.Domain, len(rows))
 	for i, r := range rows {
@@ -249,7 +249,7 @@ func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.Delet
 				return result{}, apierr.NotFound("Domain", req.GetName())
 			}
 			slog.ErrorContext(ctx, "delete domain: lookup failed", "name", req.GetName(), "error", err)
-			return result{}, apierr.Internal("lookup domain")
+			return result{}, apierr.Internal(err, "lookup domain")
 		}
 		if req.GetEtag() != "" && req.GetEtag() != row.Etag {
 			return result{}, apierr.FailedPrecondition("etag mismatch; refresh the domain and retry")
@@ -270,12 +270,12 @@ func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.Delet
 			"organizations/"+resolvedOrg.Slug+"/domains/"+domainStr)
 		if err != nil {
 			slog.ErrorContext(ctx, "delete domain: cancel in-flight LROs failed", "domain", domainStr, "error", err)
-			return result{}, apierr.Internal("cancel in-flight verification operations")
+			return result{}, apierr.Internal(err, "cancel in-flight verification operations")
 		}
 
 		if err := qtx.DeleteDomain(ctx, db.DeleteDomainParams{ID: row.ID, OrgID: resolvedOrg.ID}); err != nil {
 			slog.ErrorContext(ctx, "delete domain: delete failed", "id", row.ID, "error", err)
-			return result{}, apierr.Internal("delete domain")
+			return result{}, apierr.Internal(err, "delete domain")
 		}
 		return result{row: row, cancelledIDs: cancelledIDs}, nil
 	})
@@ -302,7 +302,7 @@ func guardLastVerifiedDomainTx(ctx context.Context, qtx db.Querier, orgID uuid.U
 			return nil // no SSO config — nothing to guard
 		}
 		slog.ErrorContext(ctx, "delete domain: lookup sso config failed", "org_id", orgID, "error", err)
-		return apierr.Internal("lookup SSO config")
+		return apierr.Internal(err, "lookup SSO config")
 	}
 	if !sso.Enabled {
 		return nil
@@ -310,7 +310,7 @@ func guardLastVerifiedDomainTx(ctx context.Context, qtx db.Querier, orgID uuid.U
 	count, err := qtx.CountVerifiedDomainsByOrg(ctx, orgID)
 	if err != nil {
 		slog.ErrorContext(ctx, "delete domain: count verified domains failed", "org_id", orgID, "error", err)
-		return apierr.Internal("count verified domains")
+		return apierr.Internal(err, "count verified domains")
 	}
 	if count <= 1 {
 		return apierr.FailedPrecondition(

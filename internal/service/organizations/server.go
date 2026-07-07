@@ -132,7 +132,7 @@ func (s *OrganizationsServer) resolveOrgActors(ctx context.Context, orgs []db.Or
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve org actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -156,7 +156,7 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 	rows, err := s.queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(identityID))
 	if err != nil {
 		slog.ErrorContext(ctx, "list organizations failed", "identity_id", identityID, "error", err)
-		return nil, apierr.Internal("list organizations")
+		return nil, apierr.Internal(err, "list organizations")
 	}
 
 	actors, err := s.resolveOrgActors(ctx, rows)
@@ -207,7 +207,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		// for new orgs from this point forward.
 		if err := bootstrapOrgRoles(ctx, qtx, org.ID, callerID); err != nil {
 			slog.ErrorContext(ctx, "bootstrap org roles failed", "org_id", org.ID, "error", err)
-			return db.Organization{}, apierr.Internal("bootstrap org roles")
+			return db.Organization{}, apierr.Internal(err, "bootstrap org roles")
 		}
 		return org, nil
 	})

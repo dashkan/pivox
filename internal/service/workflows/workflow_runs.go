@@ -94,13 +94,13 @@ func (s *WorkflowRunsServer) RunWorkflow(ctx context.Context, req *workflowsv1.R
 
 	runID, err := uuid.NewV7()
 	if err != nil {
-		return nil, apierr.Internal("generate run id")
+		return nil, apierr.Internal(err, "generate run id")
 	}
 	// Manual runs carry a MANUAL trigger. Marshalled to JSONB symmetric with
 	// the WorkflowRunToProto read path.
 	trigger, err := protojson.Marshal(&workflowsv1.RunTrigger{Kind: workflowsv1.RunTriggerKind_MANUAL})
 	if err != nil {
-		return nil, apierr.Internal("marshal trigger")
+		return nil, apierr.Internal(err, "marshal trigger")
 	}
 	input, err := marshalRunInput(req.GetParameters())
 	if err != nil {
@@ -145,7 +145,7 @@ func (s *WorkflowRunsServer) RunWorkflow(ctx context.Context, req *workflowsv1.R
 		// with the run row — no orphaned job pointing at a run that never
 		// persisted, and no persisted run that never gets picked up.
 		if _, err := s.river.InsertTx(ctx, tx, runjob.Args{RunID: runID}, nil); err != nil {
-			return db.WorkflowRun{}, apierr.Internal("enqueue workflow run")
+			return db.WorkflowRun{}, apierr.Internal(err, "enqueue workflow run")
 		}
 		return created, nil
 	})
@@ -181,7 +181,7 @@ func resolveRunVersion(ctx context.Context, qtx db.Querier, wf db.Workflow, reqV
 			if errors.Is(err, pgx.ErrNoRows) {
 				return db.WorkflowVersion{}, apierr.FailedPrecondition("version does not belong to this workflow")
 			}
-			return db.WorkflowVersion{}, apierr.Internal("load version")
+			return db.WorkflowVersion{}, apierr.Internal(err, "load version")
 		}
 		return ver, nil
 	}
@@ -193,7 +193,7 @@ func resolveRunVersion(ctx context.Context, qtx db.Querier, wf db.Workflow, reqV
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.WorkflowVersion{}, apierr.FailedPrecondition("workflow's promoted version is unavailable")
 		}
-		return db.WorkflowVersion{}, apierr.Internal("load promoted version")
+		return db.WorkflowVersion{}, apierr.Internal(err, "load promoted version")
 	}
 	return ver, nil
 }
@@ -245,14 +245,14 @@ func (s *WorkflowRunsServer) ListWorkflowRuns(ctx context.Context, req *workflow
 		PageLimit:  pageSize + 1,
 	})
 	if err != nil {
-		return nil, apierr.Internal("list workflow runs")
+		return nil, apierr.Internal(err, "list workflow runs")
 	}
 
 	var nextPageToken string
 	if int32(len(rows)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		rows = rows[:pageSize]
 	}

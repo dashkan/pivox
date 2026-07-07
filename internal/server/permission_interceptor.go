@@ -218,7 +218,7 @@ func (g *permissionGate) check(ctx context.Context, fullMethod string, req any) 
 		// as Internal so it's distinguishable from real auth denials
 		// in logs and metrics.
 		slog.ErrorContext(ctx, "permission interceptor: method has no gate registered", "method", fullMethod)
-		return nil, apierr.Internal("permission gate not configured for this method")
+		return nil, apierr.Internal(nil, "permission gate not configured for this method")
 	}
 	// AuthInterceptor + MembershipRequiredInterceptor have already run
 	// by the time we reach here, so MustUserID is safe — a missing
@@ -235,7 +235,7 @@ func (g *permissionGate) check(ctx context.Context, fullMethod string, req any) 
 		return g.checkSpaceScope(ctx, fullMethod, entry, scope, callerID)
 	default:
 		slog.ErrorContext(ctx, "permission interceptor: unknown scope kind", "method", fullMethod, "kind", scope.Kind)
-		return nil, apierr.Internal("permission gate misconfigured for this method")
+		return nil, apierr.Internal(nil, "permission gate misconfigured for this method")
 	}
 }
 
@@ -257,12 +257,12 @@ func (g *permissionGate) checkOrgScope(
 			return nil, apierr.NotFound("organization", scope.Slug)
 		}
 		slog.ErrorContext(ctx, "permission interceptor: org lookup failed", "method", fullMethod, "slug", scope.Slug, "error", err)
-		return nil, apierr.Internal("lookup organization")
+		return nil, apierr.Internal(err, "lookup organization")
 	}
 	allowed, err := g.resolver.HasPermission(ctx, callerID, permission.OrgTarget(org.ID), entry.Permission)
 	if err != nil {
 		slog.ErrorContext(ctx, "permission interceptor: resolve failed", "method", fullMethod, "permission", entry.Permission, "error", err)
-		return nil, apierr.Internal("resolve permission")
+		return nil, apierr.Internal(err, "resolve permission")
 	}
 	if !allowed {
 		return nil, apierr.PermissionDenied(fmt.Sprintf("caller lacks %q on organization %q", entry.Permission, scope.Slug))
@@ -386,7 +386,7 @@ func (g *permissionGate) checkSpaceScope(
 			return nil, apierr.NotFound("organization", scope.OrgSlug)
 		}
 		slog.ErrorContext(ctx, "permission interceptor: org lookup failed", "method", fullMethod, "slug", scope.OrgSlug, "error", err)
-		return nil, apierr.Internal("lookup organization")
+		return nil, apierr.Internal(err, "lookup organization")
 	}
 	// Soft-delete-aware lookup so a space-scoped RPC against a
 	// soft-deleted space can still reach the handler (reads during
@@ -402,12 +402,12 @@ func (g *permissionGate) checkSpaceScope(
 			return nil, apierr.NotFound("space", scope.OrgSlug+"/"+scope.Slug)
 		}
 		slog.ErrorContext(ctx, "permission interceptor: space lookup failed", "method", fullMethod, "org", scope.OrgSlug, "space", scope.Slug, "error", err)
-		return nil, apierr.Internal("lookup space")
+		return nil, apierr.Internal(err, "lookup space")
 	}
 	allowed, err := g.resolver.HasPermission(ctx, callerID, permission.SpaceTarget(space.ID), entry.Permission)
 	if err != nil {
 		slog.ErrorContext(ctx, "permission interceptor: resolve failed", "method", fullMethod, "permission", entry.Permission, "error", err)
-		return nil, apierr.Internal("resolve permission")
+		return nil, apierr.Internal(err, "resolve permission")
 	}
 	if !allowed {
 		return nil, apierr.PermissionDenied(fmt.Sprintf("caller lacks %q on space %q/%q", entry.Permission, scope.OrgSlug, scope.Slug))
@@ -511,7 +511,7 @@ func PermissionStreamInterceptor(
 		entry, ok := gate.registry[info.FullMethod]
 		if !ok {
 			slog.ErrorContext(ss.Context(), "permission interceptor: streaming method has no gate registered", "method", info.FullMethod)
-			return apierr.Internal("permission gate not configured for this method")
+			return apierr.Internal(nil, "permission gate not configured for this method")
 		}
 		// Pre-resolve caller identity so unauth callers fail fast
 		// without waiting for the first message. AuthStreamInterceptor
@@ -580,7 +580,7 @@ func (s *permissionStream) RecvMsg(m any) error {
 		newCtx, err = s.gate.checkSpaceScope(s.ctx, s.method, s.entry, scope, s.callerID)
 	default:
 		slog.ErrorContext(s.ctx, "permission interceptor: unknown scope kind on stream", "method", s.method, "kind", scope.Kind)
-		return apierr.Internal("permission gate misconfigured for this method")
+		return apierr.Internal(nil, "permission gate misconfigured for this method")
 	}
 	if err != nil {
 		return err

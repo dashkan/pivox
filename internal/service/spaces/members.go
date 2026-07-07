@@ -108,7 +108,7 @@ func (s *SpacesServer) GetMember(ctx context.Context, req *iampb.GetMemberReques
 		}
 		return convert.SpaceMemberByGroupRowToProto(row, path.orgSlug, path.spaceSlug, nil), nil
 	default:
-		return nil, apierr.Internal("unknown principal kind")
+		return nil, apierr.Internal(nil, "unknown principal kind")
 	}
 }
 
@@ -136,7 +136,7 @@ func (s *SpacesServer) ListMembers(ctx context.Context, req *iampb.ListMembersRe
 	})
 	if err != nil {
 		slog.ErrorContext(ctx, "list space members failed", "space_id", resolvedSpace.ID, "error", err)
-		return nil, apierr.Internal("list members")
+		return nil, apierr.Internal(err, "list members")
 	}
 	hasMore := len(rows) > int(pageSize)
 	if hasMore {
@@ -234,7 +234,7 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 	// atomically. Mirrors the org-scope CreateMember pattern.
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, apierr.Internal("begin transaction")
+		return nil, apierr.Internal(err, "begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
@@ -293,10 +293,10 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 		}
 		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
 	default:
-		return nil, apierr.Internal("unknown principal kind")
+		return nil, apierr.Internal(nil, "unknown principal kind")
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return nil, apierr.Internal("commit transaction")
+		return nil, apierr.Internal(err, "commit transaction")
 	}
 
 	return buildSpaceMemberProto(orgSlug, spaceSlug, role.Name, principalKind, principalID,
@@ -338,7 +338,7 @@ func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMember
 	// without a direct space-owner binding).
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, apierr.Internal("begin transaction")
+		return nil, apierr.Internal(err, "begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
@@ -379,11 +379,11 @@ func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMember
 		}
 		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
 	default:
-		return nil, apierr.Internal("unknown principal kind")
+		return nil, apierr.Internal(nil, "unknown principal kind")
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return nil, apierr.Internal("commit transaction")
+		return nil, apierr.Internal(err, "commit transaction")
 	}
 
 	return buildSpaceMemberProto(path.orgSlug, path.spaceSlug, newRole.Name, path.principalKind, path.principalID,
@@ -489,10 +489,10 @@ func (s *SpacesServer) DeleteMember(ctx context.Context, req *iampb.DeleteMember
 			GroupID: convert.PgUUID(path.principalID),
 		})
 	default:
-		return nil, apierr.Internal("unknown principal kind")
+		return nil, apierr.Internal(nil, "unknown principal kind")
 	}
 	if err2 != nil {
-		return nil, apierr.Internal("delete space member")
+		return nil, apierr.Internal(err2, "delete space member")
 	}
 	if n == 0 {
 		return nil, apierr.NotFound("Member", req.GetName())

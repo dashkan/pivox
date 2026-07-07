@@ -106,7 +106,7 @@ func trackSecretRefs(ctx context.Context, qtx db.Querier, connectorID, orgID uui
 				return apierr.InvalidArgument(apierr.FieldViolation("connector.config",
 					fmt.Sprintf("secret reference %q does not exist", name)))
 			}
-			return apierr.Internal("resolve secret reference")
+			return apierr.Internal(err, "resolve secret reference")
 		}
 		// Same scope check the Secrets service uses: the referenced secret must
 		// belong to the connector's org (and space, if space-scoped).
@@ -125,14 +125,14 @@ func trackSecretRefs(ctx context.Context, qtx db.Querier, connectorID, orgID uui
 	// On create the DELETE is a no-op; on update it drops refs removed from
 	// the config before re-inserting the current ones.
 	if err := qtx.DeleteConnectorSecretRefs(ctx, connectorID); err != nil {
-		return apierr.Internal("clear secret references")
+		return apierr.Internal(err, "clear secret references")
 	}
 	if len(ids) > 0 {
 		if err := qtx.InsertConnectorSecretRefs(ctx, db.InsertConnectorSecretRefsParams{
 			ConnectorID: connectorID,
 			SecretIds:   ids,
 		}); err != nil {
-			return apierr.Internal("track secret references")
+			return apierr.Internal(err, "track secret references")
 		}
 	}
 	return nil

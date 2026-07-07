@@ -267,7 +267,7 @@ func (s *Server) runGenerate(
 			return nil, nil, "", apierr.Aborted("Conversation", req.GetConversation(), "ACTIVE_STREAM")
 		}
 		slog.ErrorContext(ctx, "acquire lease failed", "conversation_id", conv.ID, "error", err)
-		return nil, nil, "", apierr.Internal("acquire conversation lease")
+		return nil, nil, "", apierr.Internal(err, "acquire conversation lease")
 	}
 
 	// streamCtx is a child of ctx that the heartbeat goroutine can
@@ -325,7 +325,7 @@ func (s *Server) runGenerate(
 		row, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID)
 		if err != nil {
 			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
-			return apierr.Internal("lock conversation")
+			return apierr.Internal(err, "lock conversation")
 		}
 		// Invariant check. Acquire happened microseconds ago so the
 		// holder MUST be us. The model permits exactly one active
@@ -343,7 +343,7 @@ func (s *Server) runGenerate(
 				"row_holder_valid", row.LockHolder.Valid,
 				"row_holder", uuid.UUID(row.LockHolder.Bytes).String(),
 				"row_expires_at", row.LockExpiresAt)
-			return apierr.Internal("lease invariant violation")
+			return apierr.Internal(nil, "lease invariant violation")
 		}
 		inbound := req.GetMessages()
 		if len(inbound) == 0 {
@@ -355,7 +355,7 @@ func (s *Server) runGenerate(
 			// would commit the tx as a no-op and let the assistant
 			// persist alone (a "user said nothing → assistant
 			// replied" row pair).
-			return apierr.Internal("invariant: runGenerate called with no inbound messages")
+			return apierr.Internal(nil, "invariant: runGenerate called with no inbound messages")
 		}
 		last := inbound[len(inbound)-1]
 		params, err := buildInputMessageParams(conv.ID, last)
@@ -372,7 +372,7 @@ func (s *Server) runGenerate(
 	history, err := s.loadModelHistory(ctx, conv.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "load history failed", "conversation_id", conv.ID, "error", err)
-		return nil, nil, "", apierr.Internal("failed to load history")
+		return nil, nil, "", apierr.Internal(err, "failed to load history")
 	}
 
 	// Resolve system instruction: per-call override wins; otherwise
@@ -424,7 +424,7 @@ func (s *Server) runGenerate(
 			_ = s.sendStreamErrorEmit(emit, err)
 		}
 		slog.ErrorContext(ctx, "model stream failed", "error", err)
-		return nil, nil, "", apierr.Internal("model stream")
+		return nil, nil, "", apierr.Internal(err, "model stream")
 	}
 	defer func() {
 		// Best-effort close on the model stream reader; the model
@@ -516,13 +516,13 @@ func (s *Server) runGenerate(
 	assistantPartsJSON, err := marshalParts(assistantParts)
 	if err != nil {
 		slog.ErrorContext(ctx, "marshal assistant parts failed", "conversation_id", conv.ID, "error", err)
-		return nil, nil, "", apierr.Internal("marshal assistant parts")
+		return nil, nil, "", apierr.Internal(err, "marshal assistant parts")
 	}
 	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 		row, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID)
 		if err != nil {
 			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
-			return apierr.Internal("lock conversation")
+			return apierr.Internal(err, "lock conversation")
 		}
 		// Invariant check — same shape as Tx A. By the model's
 		// design exactly one lease exists per conversation at a
@@ -538,7 +538,7 @@ func (s *Server) runGenerate(
 				"row_holder_valid", row.LockHolder.Valid,
 				"row_holder", uuid.UUID(row.LockHolder.Bytes).String(),
 				"row_expires_at", row.LockExpiresAt)
-			return apierr.Internal("lease invariant violation")
+			return apierr.Internal(nil, "lease invariant violation")
 		}
 		return persistMessageOnQtx(ctx, qtx, conv.ID, db.CreateMessageParams{
 			ConversationID: conv.ID,
@@ -552,7 +552,7 @@ func (s *Server) runGenerate(
 		// failure-path summary. Collapse to a generic Internal so we
 		// don't leak driver detail across the gRPC trailer.
 		slog.ErrorContext(ctx, "persist assistant message failed", "conversation_id", conv.ID, "error", err)
-		return nil, nil, "", apierr.Internal("persist assistant message")
+		return nil, nil, "", apierr.Internal(err, "persist assistant message")
 	}
 
 	// Full AIP-122 resource name.
@@ -583,7 +583,7 @@ func buildInputMessageParams(convID uuid.UUID, in *aiv1.InputMessage) (db.Create
 	partsJSON, err := marshalParts(parts)
 	if err != nil {
 		slog.Error("marshal parts failed", "error", err)
-		return db.CreateMessageParams{}, apierr.Internal("failed to marshal parts")
+		return db.CreateMessageParams{}, apierr.Internal(err, "failed to marshal parts")
 	}
 	return db.CreateMessageParams{
 		ConversationID: convID,
@@ -619,16 +619,16 @@ func persistMessageOnQtx(ctx context.Context, qtx db.Querier, convID uuid.UUID, 
 	nextSeq, err := qtx.GetNextSequenceForConversation(ctx, convID)
 	if err != nil {
 		slog.ErrorContext(ctx, "get sequence failed", "conversation_id", convID, "error", err)
-		return apierr.Internal("failed to get sequence")
+		return apierr.Internal(err, "failed to get sequence")
 	}
 	params.Sequence = int64(nextSeq)
 	if _, err := qtx.CreateMessage(ctx, params); err != nil {
 		slog.ErrorContext(ctx, "persist message failed", "conversation_id", convID, "error", err)
-		return apierr.Internal("failed to persist message")
+		return apierr.Internal(err, "failed to persist message")
 	}
 	if err := qtx.IncrementConversationMessageCount(ctx, convID); err != nil {
 		slog.ErrorContext(ctx, "increment message count failed", "conversation_id", convID, "error", err)
-		return apierr.Internal("increment message count")
+		return apierr.Internal(err, "increment message count")
 	}
 	return nil
 }
@@ -650,7 +650,7 @@ func dbRoleForInputMessage(r string) (string, error) {
 	case "user", "assistant", "system", "tool":
 		return r, nil
 	default:
-		return "", apierr.Internal("unexpected role reached persistence (validator should have rejected)")
+		return "", apierr.Internal(nil, "unexpected role reached persistence (validator should have rejected)")
 	}
 }
 

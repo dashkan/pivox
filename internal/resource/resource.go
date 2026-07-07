@@ -52,7 +52,7 @@ func ResolveOrgParent(ctx context.Context, queries db.Querier, parent string) (u
 		if errors.Is(err, pgx.ErrNoRows) {
 			return uuid.Nil, apierr.NotFound("parent", parent)
 		}
-		return uuid.Nil, apierr.Internal("failed to validate parent")
+		return uuid.Nil, apierr.Internal(err, "failed to validate parent")
 	}
 
 	return org.ID, nil

@@ -80,7 +80,23 @@ func FailedPrecondition(msg string) error {
 	return status.Error(codes.FailedPrecondition, msg)
 }
 
-func Internal(msg string) error {
+// Internal returns codes.Internal with a sanitized, caller-facing
+// message and an INTERNAL_ERROR ErrorInfo detail. The `cause` is
+// attached underneath the status via wrapWithCause so it never
+// reaches the wire (GRPCStatus() serializes only the sanitized
+// status) but IS recoverable from the error chain by the logging
+// interceptor — errors.As pulls a *pgconn.PgError off it for the
+// db_code/db_table/etc. slog attrs, and future consumers get the
+// cause for free.
+//
+// `cause` comes first, mirroring HandleResourceError(err, ...).
+// Pass the actual in-scope error that triggered the failure; a bare
+// Internal(nil, msg) logs only the sanitized string with zero
+// diagnosable detail (the bug this signature exists to prevent).
+// wrapWithCause is nil-safe, so the rare genuinely-causeless branch
+// (a "can't happen" invariant, a missing-dependency guard) passes
+// nil.
+func Internal(cause error, msg string) error {
 	st := status.New(codes.Internal, msg)
 	st, _ = st.WithDetails(
 		&errdetails.ErrorInfo{
@@ -88,7 +104,7 @@ func Internal(msg string) error {
 			Domain: domain,
 		},
 	)
-	return st.Err()
+	return wrapWithCause(st.Err(), cause)
 }
 
 // Unauthenticated returns codes.Unauthenticated with a canonical
@@ -202,7 +218,7 @@ func HandleResourceError(err error, resourceType, resourceName string) error {
 	// (e.g., the pgvector NULL panic that ate ~30 minutes today
 	// surfaced as `error: "database error"` with zero diagnosable
 	// detail).
-	return wrapWithCause(Internal("database error"), err)
+	return Internal(err, "database error")
 }
 
 // statusErrorWithCause carries a gRPC status (sanitized response)

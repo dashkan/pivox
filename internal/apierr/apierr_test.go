@@ -117,7 +117,7 @@ func TestFailedPrecondition(t *testing.T) {
 }
 
 func TestInternal(t *testing.T) {
-	err := Internal("unexpected failure")
+	err := Internal(nil, "unexpected failure")
 	require.Error(t, err)
 
 	st := status.Convert(err)
@@ -135,6 +135,56 @@ func TestInternal(t *testing.T) {
 		}
 	}
 	assert.True(t, foundErrorInfo, "expected ErrorInfo detail with domain pivox.ai")
+}
+
+// TestInternal_CarriesCause pins the split that motivates the
+// signature: the cause is recoverable from the error chain (so the
+// logging interceptor can pull pg attrs off it) while the wire-facing
+// status message stays the sanitized string — the cause never leaks
+// to the client.
+func TestInternal_CarriesCause(t *testing.T) {
+	pgErr := &pgconn.PgError{
+		Code:       "42P01",
+		Message:    `relation "workflows" does not exist`,
+		SchemaName: "public",
+		TableName:  "workflows",
+	}
+	err := Internal(pgErr, "list workflows")
+	require.Error(t, err)
+
+	// Wire-facing status: sanitized message only, no cause leak.
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	assert.Equal(t, "list workflows", st.Message())
+	assert.NotContains(t, st.Message(), "workflows\" does not exist",
+		"the pg cause must not leak into the client-facing status message")
+
+	// Log-facing chain: the cause is recoverable via errors.As.
+	var recovered *pgconn.PgError
+	require.True(t, errors.As(err, &recovered),
+		"the pg cause must be recoverable from the error chain")
+	assert.Equal(t, "42P01", recovered.Code)
+
+	// PgErrorLogAttrs (what the logging interceptor calls) surfaces it.
+	m := attrsToMap(t, PgErrorLogAttrs(err))
+	assert.Equal(t, "42P01", m["db_code"])
+	assert.Equal(t, "workflows", m["db_table"])
+}
+
+// TestInternal_NilCause pins that a genuinely-causeless Internal is
+// still a well-formed status error (wrapWithCause returns the status
+// unchanged) and carries no recoverable pg cause.
+func TestInternal_NilCause(t *testing.T) {
+	err := Internal(nil, "invariant violated")
+	require.Error(t, err)
+
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	assert.Equal(t, "invariant violated", st.Message())
+
+	var pgErr *pgconn.PgError
+	assert.False(t, errors.As(err, &pgErr), "nil cause → nothing to recover")
+	assert.Nil(t, PgErrorLogAttrs(err))
 }
 
 func TestQuotaExceeded(t *testing.T) {
@@ -383,7 +433,7 @@ func TestPgErrorLogAttrs(t *testing.T) {
 		}
 		// Use the Internal-fallthrough wrap directly; UniqueViolation
 		// would short-circuit to AlreadyExists.
-		wrapped := wrapWithCause(Internal("database error"), pgErr)
+		wrapped := Internal(pgErr, "database error")
 
 		attrs := PgErrorLogAttrs(wrapped)
 		m := attrsToMap(t, attrs)

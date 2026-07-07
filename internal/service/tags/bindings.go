@@ -79,7 +79,7 @@ func (s *TagBindingsServer) resolveTagBindingActors(ctx context.Context, rows []
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve tag binding actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -99,7 +99,7 @@ func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.List
 
 	results, err := filter.ScanTagBindings(rows)
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -114,7 +114,7 @@ func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.List
 	if int32(len(results)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		results = results[:pageSize]
 	}
@@ -229,7 +229,7 @@ func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.Del
 func (s *TagBindingsServer) ListEffectiveTags(ctx context.Context, req *apiv1.ListEffectiveTagsRequest) (*apiv1.ListEffectiveTagsResponse, error) {
 	rows, err := s.queries.ListEffectiveTags(ctx, req.GetParent())
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	effectiveTags := make([]*apiv1.EffectiveTag, 0, len(rows))

@@ -80,7 +80,7 @@ func AgentAuthStreamInterceptor(queries db.Querier) grpc.StreamServerInterceptor
 				return apierr.Unauthenticated(errAgentInvalidToken)
 			}
 			slog.ErrorContext(ss.Context(), "agent auth: lookup gateway failed", "error", err)
-			return apierr.Internal("lookup agent gateway")
+			return apierr.Internal(err, "lookup agent gateway")
 		}
 
 		ctx := context.WithValue(ss.Context(), agentGatewayKey{}, gateway)

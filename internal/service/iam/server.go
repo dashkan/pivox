@@ -109,7 +109,7 @@ func (s *IamServer) ListAccountOrganizations(ctx context.Context, req *iampb.Lis
 	if err != nil {
 		slog.ErrorContext(ctx, "iam: list account organizations failed",
 			"identity_id", identityID, "error", err)
-		return nil, apierr.Internal("list account organizations")
+		return nil, apierr.Internal(err, "list account organizations")
 	}
 	out := make([]*iampb.AccountOrganization, len(rows))
 	for i, r := range rows {
@@ -127,7 +127,7 @@ func (s *IamServer) ListPermissions(ctx context.Context, _ *iampb.ListPermission
 	rows, err := s.queries.ListPermissions(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "iam: list permissions failed", "error", err)
-		return nil, apierr.Internal("list permissions")
+		return nil, apierr.Internal(err, "list permissions")
 	}
 	out := make([]*iampb.Permission, len(rows))
 	for i, r := range rows {
@@ -157,7 +157,7 @@ func (s *IamServer) GetRole(ctx context.Context, req *iampb.GetRoleRequest) (*ia
 	}
 	perms, err := s.queries.RolePermissionIDs(ctx, role.ID)
 	if err != nil {
-		return nil, apierr.Internal("load role permissions")
+		return nil, apierr.Internal(err, "load role permissions")
 	}
 	return convert.RoleToProto(role, orgSlug, perms), nil
 }
@@ -177,14 +177,14 @@ func (s *IamServer) ListRoles(ctx context.Context, req *iampb.ListRolesRequest) 
 	rows, err := s.queries.ListRolesByOrg(ctx, org.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "iam: list roles failed", "org_id", org.ID, "error", err)
-		return nil, apierr.Internal("list roles")
+		return nil, apierr.Internal(err, "list roles")
 	}
 	out := make([]*iampb.Role, len(rows))
 	for i, r := range rows {
 		perms, err := s.queries.RolePermissionIDs(ctx, r.ID)
 		if err != nil {
 			slog.ErrorContext(ctx, "iam: load role permissions failed", "role_id", r.ID, "error", err)
-			return nil, apierr.Internal("load role permissions")
+			return nil, apierr.Internal(err, "load role permissions")
 		}
 		out[i] = convert.RoleToProto(r, orgSlug, perms)
 	}

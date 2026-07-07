@@ -66,7 +66,7 @@ func (s *IamServer) DeleteUser(ctx context.Context, req *iampb.DeleteUserRequest
 		if err != nil {
 			slog.ErrorContext(ctx, "delete user: sole-owner check failed",
 				"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
-			return apierr.Internal("sole-owner check")
+			return apierr.Internal(err, "sole-owner check")
 		}
 		if remainingOwners == 0 {
 			// Two cases: either the user IS the sole owner (refuse) or
@@ -84,19 +84,19 @@ func (s *IamServer) DeleteUser(ctx context.Context, req *iampb.DeleteUserRequest
 			db.DeleteOrgMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)}); err != nil {
 			slog.ErrorContext(ctx, "delete user: revoke org members failed",
 				"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
-			return apierr.Internal("revoke org memberships")
+			return apierr.Internal(err, "revoke org memberships")
 		}
 		if err := qtx.DeleteSpaceMembersForUserInOrg(ctx,
 			db.DeleteSpaceMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)}); err != nil {
 			slog.ErrorContext(ctx, "delete user: revoke space members failed",
 				"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
-			return apierr.Internal("revoke space memberships")
+			return apierr.Internal(err, "revoke space memberships")
 		}
 		if err := qtx.DeleteGroupMembersForUserInOrg(ctx,
 			db.DeleteGroupMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: userID}); err != nil {
 			slog.ErrorContext(ctx, "delete user: revoke group memberships failed",
 				"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
-			return apierr.Internal("revoke group memberships")
+			return apierr.Internal(err, "revoke group memberships")
 		}
 		return nil
 	}); err != nil {
@@ -176,7 +176,7 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 		// Read-only deployments construct IamServer with nil
 		// LROManager; fail loudly here rather than null-deref'ing
 		// inside the work fn.
-		return nil, apierr.Internal("DeleteAccount is not configured on this server (lroManager dep missing)")
+		return nil, apierr.Internal(nil, "DeleteAccount is not configured on this server (lroManager dep missing)")
 	}
 
 	identityID := server.MustUserID(ctx)

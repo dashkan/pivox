@@ -110,7 +110,7 @@ func (s *SpacesServer) resolveSpaceActors(ctx context.Context, spaces []db.Space
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve space actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -185,7 +185,7 @@ func (s *SpacesServer) ListSpaces(ctx context.Context, req *apiv1.ListSpacesRequ
 
 	results, err := filter.ScanSpaces(rows)
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -200,7 +200,7 @@ func (s *SpacesServer) ListSpaces(ctx context.Context, req *apiv1.ListSpacesRequ
 	if int32(len(results)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		results = results[:pageSize]
 	}
@@ -295,7 +295,7 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 		if err != nil {
 			slog.ErrorContext(ctx, "create space: owner role lookup failed",
 				"org_id", resolvedOrg.ID, "error", err)
-			return db.Space{}, apierr.Internal("resolve owner role")
+			return db.Space{}, apierr.Internal(err, "resolve owner role")
 		}
 		if _, err := qtx.CreateSpaceUserMember(ctx, db.CreateSpaceUserMemberParams{
 			ID:        uuid.New(),
@@ -306,7 +306,7 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 		}); err != nil {
 			slog.ErrorContext(ctx, "create space: seed founder owner binding failed",
 				"space_id", result.ID, "error", err)
-			return db.Space{}, apierr.Internal("seed founder owner binding")
+			return db.Space{}, apierr.Internal(err, "seed founder owner binding")
 		}
 		return result, nil
 	})
@@ -356,7 +356,7 @@ func (s *SpacesServer) UpdateSpace(ctx context.Context, req *apiv1.UpdateSpaceRe
 			case "labels":
 				labelsJSON, err := json.Marshal(space.GetLabels())
 				if err != nil {
-					return nil, apierr.Internal("failed to marshal labels")
+					return nil, apierr.Internal(err, "failed to marshal labels")
 				}
 				updateParams.Labels = labelsJSON
 			}

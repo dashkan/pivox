@@ -188,14 +188,14 @@ func (s *ConnectorsServer) ListConnectors(ctx context.Context, req *workflowsv1.
 		PageLimit: pageSize + 1,
 	})
 	if err != nil {
-		return nil, apierr.Internal("list connectors")
+		return nil, apierr.Internal(err, "list connectors")
 	}
 
 	var nextPageToken string
 	if int32(len(rows)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		rows = rows[:pageSize]
 	}
@@ -236,7 +236,7 @@ func (s *ConnectorsServer) CreateConnector(ctx context.Context, req *workflowsv1
 	// column's uuidv7 intent) so the caller has it before the write.
 	id, err := uuid.NewV7()
 	if err != nil {
-		return nil, apierr.Internal("generate connector id")
+		return nil, apierr.Internal(err, "generate connector id")
 	}
 	config, err := marshalConfig(in)
 	if err != nil {

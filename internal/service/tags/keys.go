@@ -84,7 +84,7 @@ func (s *TagKeysServer) resolveTagKeyActors(ctx context.Context, rows []db.TagKe
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve tag key actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -109,7 +109,7 @@ func (s *TagKeysServer) ListTagKeys(ctx context.Context, req *apiv1.ListTagKeysR
 
 	results, err := filter.ScanTagKeys(rows)
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -124,7 +124,7 @@ func (s *TagKeysServer) ListTagKeys(ctx context.Context, req *apiv1.ListTagKeysR
 	if int32(len(results)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		results = results[:pageSize]
 	}
@@ -288,7 +288,7 @@ func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKe
 		}
 		count, err := qtx.CountTagValuesByTagKey(ctx, existing.ID)
 		if err != nil {
-			return apierr.Internal("failed to check tag values")
+			return apierr.Internal(err, "failed to check tag values")
 		}
 		if count > 0 {
 			return apierr.FailedPrecondition("cannot delete tag key with existing tag values")

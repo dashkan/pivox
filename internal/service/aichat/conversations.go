@@ -74,7 +74,7 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 	results, err := filter.ScanConversations(rows)
 	if err != nil {
 		slog.ErrorContext(ctx, "scan conversations failed", "error", err)
-		return nil, apierr.Internal("scan conversations")
+		return nil, apierr.Internal(err, "scan conversations")
 	}
 
 	pageSize := req.GetPageSize()
@@ -89,7 +89,7 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 	if int32(len(results)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		results = results[:pageSize]
 	}
@@ -247,7 +247,7 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	history, err := s.loadModelHistory(ctx, row.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "load history failed", "conversation_id", row.ID, "error", err)
-		return nil, apierr.Internal("failed to load history")
+		return nil, apierr.Internal(err, "failed to load history")
 	}
 	transcript := renderTranscriptForSummary(history)
 	if transcript == "" {
@@ -271,7 +271,7 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	title, err := s.summarizeTranscript(ctx, transcript)
 	if err != nil {
 		slog.ErrorContext(ctx, "summarize failed", "conversation_id", row.ID, "error", err)
-		return nil, apierr.Internal("summarize failed")
+		return nil, apierr.Internal(err, "summarize failed")
 	}
 	title = sanitizeTitle(title)
 	if title == "" {
@@ -532,7 +532,7 @@ func (s *Server) verifyOwnerOrAllPerm(ctx context.Context, orgID, pathUser uuid.
 	allowed, err := s.resolver.HasPermission(ctx, callerUserID, permission.OrgTarget(orgID), allPerm)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve all-perm failed", "permission", allPerm, "error", err)
-		return apierr.Internal("resolve permission")
+		return apierr.Internal(err, "resolve permission")
 	}
 	if !allowed {
 		return apierr.NotFound("Conversation", "")

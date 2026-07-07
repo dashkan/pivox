@@ -91,7 +91,7 @@ func (s *ApiKeysServer) resolveApiKeyActors(ctx context.Context, rows []db.ApiKe
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve api key actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -179,7 +179,7 @@ func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest
 
 	results, err := filter.ScanApiKeys(rows)
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -194,7 +194,7 @@ func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest
 	if int32(len(results)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		results = results[:pageSize]
 	}
@@ -282,14 +282,14 @@ func (s *ApiKeysServer) UpdateKey(ctx context.Context, req *apiv1.UpdateKeyReque
 			case "annotations":
 				annotationsJSON, err := json.Marshal(key.GetAnnotations())
 				if err != nil {
-					return nil, apierr.Internal("failed to marshal annotations")
+					return nil, apierr.Internal(err, "failed to marshal annotations")
 				}
 				updateParams.Annotations = annotationsJSON
 			case "restrictions":
 				if restrictions := key.GetRestrictions(); restrictions != nil {
 					restrictionsBytes, err := protojson.Marshal(restrictions)
 					if err != nil {
-						return nil, apierr.Internal("failed to marshal restrictions")
+						return nil, apierr.Internal(err, "failed to marshal restrictions")
 					}
 					updateParams.Restrictions = restrictionsBytes
 				}

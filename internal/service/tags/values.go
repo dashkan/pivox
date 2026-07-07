@@ -86,7 +86,7 @@ func (s *TagValuesServer) resolveTagValueActors(ctx context.Context, rows []db.T
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve tag value actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -133,7 +133,7 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 
 	results, err := filter.ScanTagValues(rows)
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -148,7 +148,7 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 	if int32(len(results)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		results = results[:pageSize]
 	}
@@ -198,7 +198,7 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.NotFound("TagKey", parent)
 		}
-		return nil, apierr.Internal("failed to get parent tag key")
+		return nil, apierr.Internal(err, "failed to get parent tag key")
 	}
 
 	tagValueID := req.GetTagValueId()
@@ -306,7 +306,7 @@ func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteT
 		}
 		bindingCount, err := qtx.CountTagBindingsByTagValue(ctx, existing.ID)
 		if err != nil {
-			return apierr.Internal("failed to check tag bindings")
+			return apierr.Internal(err, "failed to check tag bindings")
 		}
 		if bindingCount > 0 {
 			return apierr.FailedPrecondition("cannot delete tag value with existing tag bindings")

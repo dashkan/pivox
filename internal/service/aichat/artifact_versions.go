@@ -66,7 +66,7 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 
 	results, err := filter.ScanArtifactVersions(rows)
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -81,7 +81,7 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 	if int32(len(results)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		results = results[:pageSize]
 	}
@@ -154,7 +154,7 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 		}
 		isOnly, err := qtx.IsOnlyArtifactVersion(ctx, art.ID)
 		if err != nil {
-			return apierr.Internal("database error")
+			return apierr.Internal(err, "database error")
 		}
 		if err := qtx.DeleteArtifactVersion(ctx, ver.ID); err != nil {
 			return apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
@@ -167,7 +167,7 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 				// held the cascade is the same atomic step as the
 				// version delete, so a partial failure leaves an
 				// inconsistent state we should surface (and roll back).
-				return apierr.Internal("cascade delete parent artifact")
+				return apierr.Internal(err, "cascade delete parent artifact")
 			}
 			cascaded = true
 		}

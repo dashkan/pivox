@@ -81,7 +81,7 @@ func (s *EndpointsServer) resolveEndpointActors(ctx context.Context, rows []db.S
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve endpoint actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -263,7 +263,7 @@ func (s *EndpointsServer) ListEndpoints(ctx context.Context, req *storagev1.List
 
 	endpoints, err := s.queries.ListStorageEndpointsByGateway(ctx, gw.ID)
 	if err != nil {
-		return nil, apierr.Internal("failed to list endpoints")
+		return nil, apierr.Internal(err, "failed to list endpoints")
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
@@ -334,7 +334,7 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 			case "annotations":
 				annotationsJSON, marshalErr := json.Marshal(endpoint.GetAnnotations())
 				if marshalErr != nil {
-					return nil, apierr.Internal("failed to marshal annotations")
+					return nil, apierr.Internal(marshalErr, "failed to marshal annotations")
 				}
 				updateParams.Annotations = annotationsJSON
 			}

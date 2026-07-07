@@ -95,7 +95,7 @@ func requireMembership(ctx context.Context, queries db.Querier, fullMethod strin
 	orgs, err := queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(identityID))
 	if err != nil {
 		slog.ErrorContext(ctx, "membership: lookup memberships failed", "identity_id", identityID, "error", err)
-		return apierr.Internal("lookup memberships")
+		return apierr.Internal(err, "lookup memberships")
 	}
 	if len(orgs) == 0 {
 		return apierr.PermissionDenied(memberlessRecoveryMessage)

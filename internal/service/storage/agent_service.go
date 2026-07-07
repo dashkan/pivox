@@ -130,7 +130,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	gateway, ok := server.AuthenticatedGateway(ctx)
 	if !ok {
 		s.logger.ErrorContext(ctx, "agent connect reached handler without authenticated gateway in context")
-		return apierr.Internal("agent gateway context missing")
+		return apierr.Internal(nil, "agent gateway context missing")
 	}
 
 	// -----------------------------------------------------------------------
@@ -139,7 +139,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	firstMsg, err := stream.Recv()
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to receive first message", "error", err)
-		return apierr.Internal("failed to receive first message")
+		return apierr.Internal(err, "failed to receive first message")
 	}
 
 	hs := firstMsg.GetHandshake()
@@ -199,7 +199,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 		})
 		if lookupErr != nil && !errors.Is(lookupErr, pgx.ErrNoRows) {
 			s.logger.ErrorContext(ctx, "failed to look up existing agent", "error", lookupErr)
-			return db.StorageAgent{}, apierr.Internal("failed to look up agent")
+			return db.StorageAgent{}, apierr.Internal(lookupErr, "failed to look up agent")
 		}
 
 		var result db.StorageAgent
@@ -213,7 +213,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 			})
 			if err != nil {
 				s.logger.ErrorContext(ctx, "failed to create agent", "error", err)
-				return db.StorageAgent{}, apierr.Internal("failed to create agent record")
+				return db.StorageAgent{}, apierr.Internal(err, "failed to create agent record")
 			}
 			result = created
 		} else {
@@ -224,7 +224,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 			})
 			if err != nil {
 				s.logger.ErrorContext(ctx, "failed to update agent state", "error", err)
-				return db.StorageAgent{}, apierr.Internal("failed to update agent state")
+				return db.StorageAgent{}, apierr.Internal(err, "failed to update agent state")
 			}
 			result = updated
 		}
@@ -249,7 +249,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 				State: db.StorageGatewayStateACTIVE,
 			}); err != nil {
 				s.logger.ErrorContext(ctx, "failed to update gateway state to ACTIVE", "error", err)
-				return db.StorageAgent{}, apierr.Internal("failed to update gateway state")
+				return db.StorageAgent{}, apierr.Internal(err, "failed to update gateway state")
 			}
 		}
 		return result, nil
@@ -269,13 +269,13 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	endpoints, err := s.queries.ListStorageEndpointsByGateway(ctx, gateway.ID)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to list endpoints", "error", err)
-		return apierr.Internal("failed to list endpoints")
+		return apierr.Internal(err, "failed to list endpoints")
 	}
 
 	endpointConfigs, err := buildEndpointConfigs(endpoints)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to build endpoint configs", "error", err)
-		return apierr.Internal("failed to build endpoint configs")
+		return apierr.Internal(err, "failed to build endpoint configs")
 	}
 
 	ack := &agentv1.ControlMessage{
@@ -305,7 +305,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	ack.TraceContext = streamtrace.Inject(ctx)
 	if err := stream.Send(ack); err != nil {
 		s.logger.ErrorContext(ctx, "failed to send handshake ack", "error", err)
-		return apierr.Internal("failed to send handshake ack")
+		return apierr.Internal(err, "failed to send handshake ack")
 	}
 
 	// -----------------------------------------------------------------------

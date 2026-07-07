@@ -251,13 +251,13 @@ type NewLroOpts struct {
 // either is nil (some tests construct a pool-less Manager).
 func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*longrunningpb.Operation, error) {
 	if m.pool == nil {
-		return nil, apierr.Internal("lro: NewLro requires Manager.Pool")
+		return nil, apierr.Internal(nil, "lro: NewLro requires Manager.Pool")
 	}
 	if m.river == nil {
-		return nil, apierr.Internal("lro: NewLro requires Manager.River")
+		return nil, apierr.Internal(nil, "lro: NewLro requires Manager.River")
 	}
 	if opts.JobArgs == nil {
-		return nil, apierr.Internal("lro: NewLro requires JobArgs")
+		return nil, apierr.Internal(nil, "lro: NewLro requires JobArgs")
 	}
 
 	var metaJSON json.RawMessage
@@ -265,7 +265,7 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 		var err error
 		metaJSON, err = marshalAny(opts.Metadata)
 		if err != nil {
-			return nil, apierr.Internal("failed to marshal operation metadata")
+			return nil, apierr.Internal(err, "failed to marshal operation metadata")
 		}
 	}
 
@@ -281,7 +281,7 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 
 	tx, err := m.pool.Begin(ctx)
 	if err != nil {
-		return nil, apierr.Internal("failed to begin tx")
+		return nil, apierr.Internal(err, "failed to begin tx")
 	}
 	// Rollback after Commit is a no-op (ErrTxClosed); intentional.
 	defer func() { _ = tx.Rollback(ctx) }()
@@ -301,11 +301,11 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 		CreatedBy: opts.CreatedBy,
 	})
 	if err != nil {
-		return nil, apierr.Internal("failed to create operation")
+		return nil, apierr.Internal(err, "failed to create operation")
 	}
 
 	if _, err := m.river.InsertTx(ctx, tx, opts.JobArgs, opts.JobOpts); err != nil {
-		return nil, apierr.Internal("failed to enqueue river job")
+		return nil, apierr.Internal(err, "failed to enqueue river job")
 	}
 
 	// validate_only: the operation row and the enqueued job both ran
@@ -317,7 +317,7 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return nil, apierr.Internal("failed to commit tx")
+		return nil, apierr.Internal(err, "failed to commit tx")
 	}
 
 	return OperationToProto(dbOp)
@@ -397,7 +397,7 @@ func (m *Manager) GetOperation(ctx context.Context, name string) (*longrunningpb
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.NotFound("Operation", name)
 		}
-		return nil, apierr.Internal("failed to get operation")
+		return nil, apierr.Internal(err, "failed to get operation")
 	}
 	return OperationToProto(dbOp)
 }
@@ -421,7 +421,7 @@ func (m *Manager) ListOperations(ctx context.Context, parent string, pageSize in
 		ParentFilter: parentFilter,
 	})
 	if err != nil {
-		return nil, apierr.Internal("failed to list operations")
+		return nil, apierr.Internal(err, "failed to list operations")
 	}
 
 	ops := make([]*longrunningpb.Operation, 0, len(dbOps))
@@ -486,13 +486,13 @@ func (m *Manager) DeleteOperation(ctx context.Context, name string) error {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apierr.NotFound("Operation", name)
 		}
-		return apierr.Internal("failed to get operation")
+		return apierr.Internal(err, "failed to get operation")
 	}
 	if !dbOp.Done {
 		return apierr.FailedPrecondition("cannot delete a running operation")
 	}
 	if err := m.queries.DeleteOperation(ctx, opID); err != nil {
-		return apierr.Internal("failed to delete operation")
+		return apierr.Internal(err, "failed to delete operation")
 	}
 	return nil
 }
@@ -526,7 +526,7 @@ func (m *Manager) CancelOperation(ctx context.Context, name string) error {
 			}
 			return nil
 		}
-		return apierr.Internal("failed to cancel operation")
+		return apierr.Internal(err, "failed to cancel operation")
 	}
 	m.notifyListeners(opID)
 	return nil

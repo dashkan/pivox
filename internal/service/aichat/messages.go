@@ -33,7 +33,7 @@ func (s *Server) GetMessage(ctx context.Context, req *aiv1.GetMessageRequest) (*
 	convFullName := buildConversationName(orgName, pathUser, convName)
 	pb, err := convert.MessageToProto(row, convFullName)
 	if err != nil {
-		return nil, apierr.Internal("failed to convert message")
+		return nil, apierr.Internal(err, "failed to convert message")
 	}
 	return pb, nil
 }
@@ -63,7 +63,7 @@ func (s *Server) ListMessages(ctx context.Context, req *aiv1.ListMessagesRequest
 
 	results, err := filter.ScanMessages(rows)
 	if err != nil {
-		return nil, apierr.Internal("database error")
+		return nil, apierr.Internal(err, "database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -78,7 +78,7 @@ func (s *Server) ListMessages(ctx context.Context, req *aiv1.ListMessagesRequest
 	if int32(len(results)) > pageSize {
 		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
 		if err != nil {
-			return nil, apierr.Internal("encode page token")
+			return nil, apierr.Internal(err, "encode page token")
 		}
 		results = results[:pageSize]
 	}

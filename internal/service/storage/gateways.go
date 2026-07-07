@@ -158,7 +158,7 @@ func (s *StorageGatewaysServer) resolveGatewayActors(ctx context.Context, rows [
 	actors, err := s.audit.Resolve(ctx, ids)
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve gateway actors failed", "error", err)
-		return nil, apierr.Internal("resolve actors")
+		return nil, apierr.Internal(err, "resolve actors")
 	}
 	return actors, nil
 }
@@ -293,7 +293,7 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 			case "annotations":
 				annotationsJSON, err := json.Marshal(gw.GetAnnotations())
 				if err != nil {
-					return nil, apierr.Internal("failed to marshal annotations")
+					return nil, apierr.Internal(err, "failed to marshal annotations")
 				}
 				updateParams.Annotations = annotationsJSON
 			}
@@ -528,7 +528,7 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	})
 	if err != nil {
 		slog.ErrorContext(ctx, "get effective org permissions for storage session", "error", err, "org_id", orgID)
-		return nil, apierr.Internal("get effective org permissions")
+		return nil, apierr.Internal(err, "get effective org permissions")
 	}
 	hasOrgWideRead := slices.Contains(orgPerms, permission.AssetsAssetsRead)
 
@@ -543,7 +543,7 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 		})
 		if err != nil {
 			slog.ErrorContext(ctx, "list space memberships for storage session", "error", err, "org_id", orgID)
-			return nil, apierr.Internal("list space memberships")
+			return nil, apierr.Internal(err, "list space memberships")
 		}
 		if len(spaces) == 0 {
 			return nil, apierr.PermissionDenied("caller has no storage access in the requested organization; storage session cannot be minted")
@@ -565,7 +565,7 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	endpointNames, err := s.queries.ListStorageEndpointShortNamesByOrg(ctx, orgID)
 	if err != nil {
 		slog.ErrorContext(ctx, "list endpoint short names for storage session", "error", err, "org_id", orgID)
-		return nil, apierr.Internal("list endpoint short names")
+		return nil, apierr.Internal(err, "list endpoint short names")
 	}
 	if len(endpointNames) == 0 {
 		// Symmetric to the no-spaces rejection above: minting a
@@ -587,16 +587,16 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	// follow-up to #27 phase 2; this defense is the in-scope
 	// mitigation.
 	if err := validatePathSegment(orgSlug, "organization slug"); err != nil {
-		return nil, apierr.Internal(err.Error())
+		return nil, apierr.Internal(err, err.Error())
 	}
 	for _, ep := range endpointNames {
 		if err := validatePathSegment(ep, "endpoint name"); err != nil {
-			return nil, apierr.Internal(err.Error())
+			return nil, apierr.Internal(err, err.Error())
 		}
 	}
 	for _, sp := range spaces {
 		if err := validatePathSegment(sp.Name, "space name"); err != nil {
-			return nil, apierr.Internal(err.Error())
+			return nil, apierr.Internal(err, err.Error())
 		}
 	}
 

@@ -96,7 +96,7 @@ func (s *OrganizationsServer) GetMember(ctx context.Context, req *iampb.GetMembe
 		}
 		return convert.OrgMemberByGroupRowToProto(row, path.orgSlug, nil), nil
 	default:
-		return nil, apierr.Internal("unknown principal kind")
+		return nil, apierr.Internal(nil, "unknown principal kind")
 	}
 }
 
@@ -123,7 +123,7 @@ func (s *OrganizationsServer) ListMembers(ctx context.Context, req *iampb.ListMe
 	})
 	if err != nil {
 		slog.ErrorContext(ctx, "list org members failed", "org_id", resolved.ID, "error", err)
-		return nil, apierr.Internal("list members")
+		return nil, apierr.Internal(err, "list members")
 	}
 	hasMore := len(rows) > int(pageSize)
 	if hasMore {
@@ -218,7 +218,7 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 	// run atomically.
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, apierr.Internal("begin transaction")
+		return nil, apierr.Internal(err, "begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
@@ -283,10 +283,10 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 		}
 		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
 	default:
-		return nil, apierr.Internal("unknown principal kind")
+		return nil, apierr.Internal(nil, "unknown principal kind")
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return nil, apierr.Internal("commit transaction")
+		return nil, apierr.Internal(err, "commit transaction")
 	}
 
 	return buildOrgMemberProto(orgSlug, role.Name, principalKind, principalID,
@@ -319,7 +319,7 @@ func (s *OrganizationsServer) UpdateMember(ctx context.Context, req *iampb.Updat
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, apierr.Internal("begin transaction")
+		return nil, apierr.Internal(err, "begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
@@ -340,7 +340,7 @@ func (s *OrganizationsServer) UpdateMember(ctx context.Context, req *iampb.Updat
 	if currentRoleName == permission.RoleOwner && newRole.Name != permission.RoleOwner {
 		count, err := qtx.CountOwnersByOrg(ctx, resolved.ID)
 		if err != nil {
-			return nil, apierr.Internal("count owners")
+			return nil, apierr.Internal(err, "count owners")
 		}
 		if count <= 1 {
 			return nil, apierr.FailedPrecondition("cannot demote the last owner; promote another member to owner first")
@@ -375,11 +375,11 @@ func (s *OrganizationsServer) UpdateMember(ctx context.Context, req *iampb.Updat
 		}
 		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
 	default:
-		return nil, apierr.Internal("unknown principal kind")
+		return nil, apierr.Internal(nil, "unknown principal kind")
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return nil, apierr.Internal("commit transaction")
+		return nil, apierr.Internal(err, "commit transaction")
 	}
 
 	return buildOrgMemberProto(path.orgSlug, newRole.Name, path.principalKind, path.principalID,
@@ -401,7 +401,7 @@ func (s *OrganizationsServer) DeleteMember(ctx context.Context, req *iampb.Delet
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, apierr.Internal("begin transaction")
+		return nil, apierr.Internal(err, "begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
@@ -413,7 +413,7 @@ func (s *OrganizationsServer) DeleteMember(ctx context.Context, req *iampb.Delet
 	if currentRoleName == permission.RoleOwner {
 		count, err := qtx.CountOwnersByOrg(ctx, resolved.ID)
 		if err != nil {
-			return nil, apierr.Internal("count owners")
+			return nil, apierr.Internal(err, "count owners")
 		}
 		if count <= 1 {
 			return nil, apierr.FailedPrecondition("cannot remove the last owner; promote another member to owner first")
@@ -433,16 +433,16 @@ func (s *OrganizationsServer) DeleteMember(ctx context.Context, req *iampb.Delet
 			GroupID: convert.PgUUID(path.principalID),
 		})
 	default:
-		return nil, apierr.Internal("unknown principal kind")
+		return nil, apierr.Internal(nil, "unknown principal kind")
 	}
 	if err != nil {
-		return nil, apierr.Internal("delete org member")
+		return nil, apierr.Internal(err, "delete org member")
 	}
 	if n == 0 {
 		return nil, apierr.NotFound("Member", req.GetName())
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return nil, apierr.Internal("commit transaction")
+		return nil, apierr.Internal(err, "commit transaction")
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -470,7 +470,7 @@ func getOrgMemberRoleName(ctx context.Context, qtx db.Querier, orgID uuid.UUID, 
 		}
 		return row.RoleName, nil
 	}
-	return "", apierr.Internal("unknown principal kind")
+	return "", apierr.Internal(nil, "unknown principal kind")
 }
 
 // principalFromMember pulls (kind, id) out of the Member proto's

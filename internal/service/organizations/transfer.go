@@ -43,7 +43,7 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, apierr.Internal("begin transaction")
+		return nil, apierr.Internal(err, "begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
@@ -59,7 +59,7 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 		if isNotFound(err) {
 			return nil, apierr.FailedPrecondition("new_owner is not a member of this organization; CreateMember first")
 		}
-		return nil, apierr.Internal("lookup target member")
+		return nil, apierr.Internal(err, "lookup target member")
 	}
 	if target.RoleName == permission.RoleOwner {
 		return nil, apierr.FailedPrecondition("new_owner is already the owner")
@@ -72,7 +72,7 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 	// binding is what makes TransferOwnership the wrong verb here.
 	owners, err := qtx.ListOrgOwnerMembers(ctx, org.ID)
 	if err != nil {
-		return nil, apierr.Internal("list owners")
+		return nil, apierr.Internal(err, "list owners")
 	}
 	for _, o := range owners {
 		if !o.UserID.Valid {
@@ -91,11 +91,11 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 	// Resolve owner + admin role IDs in this org.
 	ownerRole, err := qtx.GetSystemRole(ctx, db.GetSystemRoleParams{OrgID: org.ID, Name: permission.RoleOwner})
 	if err != nil {
-		return nil, apierr.Internal("resolve owner role")
+		return nil, apierr.Internal(err, "resolve owner role")
 	}
 	adminRole, err := qtx.GetSystemRole(ctx, db.GetSystemRoleParams{OrgID: org.ID, Name: permission.RoleAdmin})
 	if err != nil {
-		return nil, apierr.Internal("resolve admin role")
+		return nil, apierr.Internal(err, "resolve admin role")
 	}
 
 	// Atomic two-row swap. Order matters only insofar as both must
@@ -106,17 +106,17 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 		UserID: convert.PgUUID(prevOwnerID),
 		RoleID: adminRole.ID,
 	}); err != nil {
-		return nil, apierr.Internal("demote current owner")
+		return nil, apierr.Internal(err, "demote current owner")
 	}
 	if _, err := qtx.UpdateOrgUserMemberRole(ctx, db.UpdateOrgUserMemberRoleParams{
 		OrgID:  org.ID,
 		UserID: convert.PgUUID(newOwnerID),
 		RoleID: ownerRole.ID,
 	}); err != nil {
-		return nil, apierr.Internal("promote target")
+		return nil, apierr.Internal(err, "promote target")
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return nil, apierr.Internal("commit transaction")
+		return nil, apierr.Internal(err, "commit transaction")
 	}
 
 	return &apiv1.TransferOwnershipResponse{
