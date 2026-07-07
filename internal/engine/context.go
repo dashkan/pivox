@@ -3,6 +3,8 @@ package engine
 import (
 	"maps"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 // stepOutputKey is the field under which a step's output is exposed in the run
@@ -31,6 +33,14 @@ const stepOutputKey = "output"
 type RunContext struct {
 	mu sync.RWMutex
 
+	// orgID and spaceID are the run's scope, fixed at construction. spaceID is
+	// uuid.Nil for an org-scoped run. They are NOT exposed to CEL — the
+	// run-context env has no notion of scope — but are read by activities that
+	// resolve scoped resources (e.g. the http activity's Connector) to enforce
+	// that a run only reaches resources in its own scope.
+	orgID   uuid.UUID
+	spaceID uuid.UUID
+
 	// trigger and params are immutable after construction; no lock needed to
 	// read them, and concurrent map reads are safe.
 	trigger map[string]any
@@ -48,17 +58,30 @@ type RunContextConfig struct {
 	Trigger map[string]any
 	// Params are the run's input parameters.
 	Params map[string]any
+	// OrgID is the run's organization scope.
+	OrgID uuid.UUID
+	// SpaceID is the run's space scope; uuid.Nil for an org-scoped run.
+	SpaceID uuid.UUID
 }
 
 // NewRunContext builds a RunContext from cfg. The Trigger and Params maps are
 // cloned so later caller mutations can't leak into the run.
 func NewRunContext(cfg RunContextConfig) *RunContext {
 	return &RunContext{
+		orgID:   cfg.OrgID,
+		spaceID: cfg.SpaceID,
 		trigger: cloneOrEmpty(cfg.Trigger),
 		params:  cloneOrEmpty(cfg.Params),
 		steps:   map[string]any{},
 		vars:    map[string]any{},
 	}
+}
+
+// Scope returns the run's org and space. spaceID is uuid.Nil for an org-scoped
+// run. It is the seam by which an activity confirms a resource it resolves by
+// id (e.g. a Connector) actually belongs to this run's scope.
+func (rc *RunContext) Scope() (orgID, spaceID uuid.UUID) {
+	return rc.orgID, rc.spaceID
 }
 
 // SetVar assigns a run variable, readable as `vars.<name>` in CEL. Concurrent

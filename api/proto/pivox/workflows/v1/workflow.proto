@@ -21,6 +21,7 @@ import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/struct.proto";
@@ -401,6 +402,41 @@ message HttpActivity {
 
   // Optional. Request body as a CEL expression producing JSON.
   string body = 6 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. In-process retry policy for transient outcomes (network failure,
+  // 5xx, or a code in `retryable_status`). Absent = a single attempt with no
+  // retry. This retry loops the HTTP call within the activity; it is distinct
+  // from a workflow-run job retry, which only infra faults trigger.
+  RetryPolicy retry = 7 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Response status codes treated as SUCCESS in addition to the
+  // default 2xx range (e.g. 404 to treat "not found" as a normal outcome). A
+  // success produces the step output; it never retries or fails the run.
+  repeated int32 success_status = 8 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Non-success status codes treated as RETRYABLE in addition to the
+  // default 5xx range and network failures (e.g. 429 for rate limiting). A
+  // retryable code drives the `retry` policy; once retries are exhausted the
+  // activity fails terminally (it does not become a job retry).
+  repeated int32 retryable_status = 9 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// RetryPolicy configures exponential backoff for an in-process retry loop.
+// Fields left unset fall back to the engine defaults noted below.
+message RetryPolicy {
+  // Optional. Maximum number of attempts (the first try plus retries).
+  // Defaults to 1 (no retry) when unset or <= 0.
+  int32 max_attempts = 1 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Backoff before the first retry. Defaults to 100ms when unset.
+  google.protobuf.Duration initial_backoff = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Upper bound on any single backoff. Defaults to 30s when unset.
+  google.protobuf.Duration max_backoff = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Multiplier applied to the backoff after each attempt. Defaults
+  // to 2.0 when unset or <= 0.
+  double backoff_multiplier = 4 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // SetActivity assigns CEL expressions to named run variables (vars.<name>).

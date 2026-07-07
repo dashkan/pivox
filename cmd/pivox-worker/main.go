@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -29,7 +30,9 @@ import (
 	"riverqueue.com/riverpro/driver/riverpropgxv5"
 
 	"github.com/dashkan/pivox/internal/audit"
+	"github.com/dashkan/pivox/internal/crypto"
 	"github.com/dashkan/pivox/internal/engine"
+	"github.com/dashkan/pivox/internal/engine/connector"
 	"github.com/dashkan/pivox/internal/identitysync"
 	"github.com/dashkan/pivox/internal/telemetry"
 	"github.com/dashkan/pivox/internal/telemetry/rivertrace"
@@ -74,7 +77,12 @@ func main() {
 	f.String("sessions-database-url", envOrDefault("PIVOX_SESSIONS_DATABASE_URL", "postgres://localhost:5432/sessions?sslmode=disable"), "PostgreSQL connection URL for the BFF-owned web_sessions store (purge_web_sessions job)")
 	f.String("kafka-brokers", envOrDefault("PIVOX_KAFKA_BROKERS", "localhost:9092"), "Comma-separated Kafka seed brokers for the Keycloak identity-sync consumer")
 	f.String("kc-realm", envOrDefault("PIVOX_KC_REALM", "pivox"), "Keycloak realm whose events the identity-sync consumer provisions")
+	f.String("encryption-provider", envOrDefault("PIVOX_ENCRYPTION_PROVIDER", "local"), "At-rest encryption backend: local (cleartext Tink keyset) or gcp (Cloud KMS)")
+	f.String("encryption-local-keyset", envOrDefault("PIVOX_ENCRYPTION_LOCAL_KEYSET", ""), "base64 cleartext Tink keyset; required when encryption-provider=local")
+	f.String("encryption-gcp-kms-key-name", envOrDefault("PIVOX_ENCRYPTION_GCP_KMS_KEY_NAME", ""), "Cloud KMS key resource name; required when encryption-provider=gcp")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
+	f.Bool("workflow-allow-internal-networks", envOrBool("PIVOX_WORKFLOW_ALLOW_INTERNAL_NETWORKS", false), "Allow workflow HTTP activities to reach internal/private network addresses (loopback, link-local, private, metadata). Default false — REQUIRED for shared multi-tenant cloud. Set true only for single-tenant on-prem where the worker legitimately reaches internal systems.")
+	f.Int64("workflow-http-max-response-size", envOrInt64("PIVOX_WORKFLOW_HTTP_MAX_RESPONSE_SIZE", 1<<20), "Max bytes a workflow HTTP activity reads from a response body. Default 1048576 (1 MiB); clamped to [524288 (512 KiB), 10485760 (10 MiB)].")
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -87,7 +95,29 @@ func envOrDefault(key, defaultVal string) string {
 	return defaultVal
 }
 
+func envOrBool(key string, defaultVal bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return defaultVal
+}
+
+func envOrInt64(key string, defaultVal int64) int64 {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return n
+		}
+	}
+	return defaultVal
+}
+
 func mustString(s string, _ error) string { return s }
+
+func mustBool(b bool, _ error) bool { return b }
+
+func mustInt64(n int64, _ error) int64 { return n }
 
 func serve(cmd *cobra.Command, _ []string) error {
 	f := cmd.Flags()
@@ -95,7 +125,12 @@ func serve(cmd *cobra.Command, _ []string) error {
 	sessionsURL := mustString(f.GetString("sessions-database-url"))
 	kafkaBrokers := mustString(f.GetString("kafka-brokers"))
 	kcRealm := mustString(f.GetString("kc-realm"))
+	encryptionProvider := mustString(f.GetString("encryption-provider"))
+	encryptionLocalKeyset := mustString(f.GetString("encryption-local-keyset"))
+	encryptionGCPKMSKeyName := mustString(f.GetString("encryption-gcp-kms-key-name"))
 	logLevel := mustString(f.GetString("log-level"))
+	allowInternalNetworks := mustBool(f.GetBool("workflow-allow-internal-networks"))
+	maxResponseBytes := mustInt64(f.GetInt64("workflow-http-max-response-size"))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -157,19 +192,49 @@ func serve(cmd *cobra.Command, _ []string) error {
 	// jobs in this process.
 	auditResolver := audit.NewResolver(audit.Config{Queries: queries})
 
+	// At-rest encryptor — the worker needs it (unlike the pre-6c worker) because
+	// the http activity's connector broker decrypts vault Secrets to inject them
+	// into outbound requests. Constructed identically to pivox-cloud so both
+	// processes decrypt under the same key.
+	enc, err := crypto.NewEncryptor(crypto.EncryptorConfig{
+		Provider:       crypto.Provider(encryptionProvider),
+		LocalKeysetB64: encryptionLocalKeyset,
+		GCPKMSKeyName:  encryptionGCPKMSKeyName,
+	})
+	if err != nil {
+		return fmt.Errorf("initialize encryptor: %w", err)
+	}
+
 	// Workflow engine interpreter — the pure, network-free core shared across
 	// every run job. Constructed once (thread-safe: the CEL evaluator caches
-	// compiled programs under a mutex, the dispatcher is immutable). The 6b
-	// dispatcher wires only the `set` activity; `http`/`run_workflow` land in
-	// 6c/6d by extending DispatcherConfig here.
+	// compiled programs under a mutex, the dispatcher is immutable). The 6c
+	// dispatcher wires `set` + `http`; `run_workflow` lands in 6d by extending
+	// DispatcherConfig here.
+	//
+	// The connector broker is the single secret-injecting execution path: it
+	// resolves a connector's credentialed config, decrypts referenced Secrets via
+	// enc, and performs the outbound call. The http activity drives it under an
+	// in-process retry loop.
 	evaluator, err := engine.NewEvaluator()
 	if err != nil {
 		return fmt.Errorf("build workflow evaluator: %w", err)
 	}
+	broker := connector.NewBroker(connector.Config{
+		Queries:               queries,
+		Encryptor:             enc,
+		AllowInternalNetworks: allowInternalNetworks,
+		MaxResponseBytes:      maxResponseBytes,
+		Logger:                logger,
+	})
 	interpreter := engine.NewInterpreter(engine.InterpreterConfig{
 		Evaluator: evaluator,
 		Dispatcher: engine.NewDispatcher(engine.DispatcherConfig{
 			Set: engine.NewSetActivity(engine.SetActivityConfig{Evaluator: evaluator}),
+			HTTP: connector.NewHTTPActivity(connector.ActivityConfig{
+				Evaluator: evaluator,
+				Broker:    broker,
+				Store:     queries,
+			}),
 		}),
 	})
 

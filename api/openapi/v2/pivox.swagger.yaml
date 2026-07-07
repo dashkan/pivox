@@ -13363,6 +13363,32 @@ definitions:
       body:
         type: string
         description: Optional. Request body as a CEL expression producing JSON.
+      retry:
+        $ref: '#/definitions/v1RetryPolicy'
+        description: |-
+          Optional. In-process retry policy for transient outcomes (network failure,
+          5xx, or a code in `retryable_status`). Absent = a single attempt with no
+          retry. This retry loops the HTTP call within the activity; it is distinct
+          from a workflow-run job retry, which only infra faults trigger.
+      successStatus:
+        type: array
+        items:
+          type: integer
+          format: int32
+        description: |-
+          Optional. Response status codes treated as SUCCESS in addition to the
+          default 2xx range (e.g. 404 to treat "not found" as a normal outcome). A
+          success produces the step output; it never retries or fails the run.
+      retryableStatus:
+        type: array
+        items:
+          type: integer
+          format: int32
+        description: |-
+          Optional. Non-success status codes treated as RETRYABLE in addition to the
+          default 5xx range and network failures (e.g. 429 for rate limiting). A
+          retryable code drives the `retry` policy; once retries are exhausted the
+          activity fails terminally (it does not become a job retry).
     description: |-
       HttpActivity calls an HTTP endpoint through an http Connector, which
       supplies the base URL, static/credentialed headers, and execution locality.
@@ -15167,6 +15193,30 @@ definitions:
           match any of these restrictions. If no restrictions are
           specified, all targets are allowed.
     description: Describes the restrictions on the key.
+  v1RetryPolicy:
+    type: object
+    properties:
+      maxAttempts:
+        type: integer
+        format: int32
+        description: |-
+          Optional. Maximum number of attempts (the first try plus retries).
+          Defaults to 1 (no retry) when unset or <= 0.
+      initialBackoff:
+        type: string
+        description: Optional. Backoff before the first retry. Defaults to 100ms when unset.
+      maxBackoff:
+        type: string
+        description: Optional. Upper bound on any single backoff. Defaults to 30s when unset.
+      backoffMultiplier:
+        type: number
+        format: double
+        description: |-
+          Optional. Multiplier applied to the backoff after each attempt. Defaults
+          to 2.0 when unset or <= 0.
+    description: |-
+      RetryPolicy configures exponential backoff for an in-process retry loop.
+      Fields left unset fall back to the engine defaults noted below.
   v1Role:
     type: object
     properties:

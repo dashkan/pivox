@@ -90,9 +90,17 @@ func (w *RunWorkflowWorker) Work(ctx context.Context, job *river.Job[runjob.Args
 		log.WarnContext(ctx, "workflow run: load definition failed transiently; returning job to River", "error", err)
 		return err
 	}
+	// The run's scope (its workflow's org/space) is needed so the http activity
+	// can confirm a Connector it resolves belongs to this run's scope. A DB fault
+	// loading it is transient — hand the job back to River, don't fail the run.
+	orgID, spaceID, err := w.loadScope(ctx, run.WorkflowID)
+	if err != nil {
+		log.WarnContext(ctx, "workflow run: load scope failed transiently; returning job to River", "error", err)
+		return err
+	}
 	// A malformed trigger/input JSONB is our own persisted data — it won't heal
 	// on retry, so a decode failure is terminal.
-	rc, err := buildRunContext(run)
+	rc, err := buildRunContext(run, orgID, spaceID)
 	if err != nil {
 		return w.finalizeFailed(ctx, runID, nil, err, log)
 	}
@@ -206,10 +214,28 @@ func (w *RunWorkflowWorker) loadDefinition(ctx context.Context, versionID uuid.U
 	return root, nil
 }
 
+// loadScope resolves the run's org and space from its workflow row, so the
+// interpreter's activities can enforce that resources they resolve (e.g. an http
+// activity's Connector) belong to the run's scope. spaceID is uuid.Nil for an
+// org-scoped workflow. workflow_runs.workflow_id is ON DELETE CASCADE, so the
+// workflow row is present whenever the run is; a DB error is transient.
+func (w *RunWorkflowWorker) loadScope(ctx context.Context, workflowID uuid.UUID) (orgID, spaceID uuid.UUID, err error) {
+	wf, err := db.New(w.Pool).GetWorkflow(ctx, workflowID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, fmt.Errorf("load workflow %s scope: %w", workflowID, err)
+	}
+	if wf.SpaceID.Valid {
+		spaceID = wf.SpaceID.Bytes
+	}
+	return wf.OrgID, spaceID, nil
+}
+
 // buildRunContext builds the interpreter's RunContext from the run's trigger and
-// input JSONB. The trigger decodes to a map (e.g. {"kind":"MANUAL"}) readable as
-// `trigger.<field>`; the input (a google.protobuf.Struct) becomes `params`.
-func buildRunContext(run db.WorkflowRun) (*engine.RunContext, error) {
+// input JSONB and its resolved scope. The trigger decodes to a map (e.g.
+// {"kind":"MANUAL"}) readable as `trigger.<field>`; the input (a
+// google.protobuf.Struct) becomes `params`. orgID/spaceID are the run's scope
+// (not CEL-visible) used by scoped-resource resolution.
+func buildRunContext(run db.WorkflowRun, orgID, spaceID uuid.UUID) (*engine.RunContext, error) {
 	trigger, err := jsonbToMap(run.Trigger)
 	if err != nil {
 		return nil, fmt.Errorf("decode run trigger: %w", err)
@@ -221,6 +247,8 @@ func buildRunContext(run db.WorkflowRun) (*engine.RunContext, error) {
 	return engine.NewRunContext(engine.RunContextConfig{
 		Trigger: trigger,
 		Params:  params,
+		OrgID:   orgID,
+		SpaceID: spaceID,
 	}), nil
 }
 
