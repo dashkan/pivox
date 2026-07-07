@@ -318,6 +318,7 @@
       "start": [],
       "admin-cli": [],
       "account-console": [],
+      "api-docs": [],
       "broker": [
         {
           "id": "6a65cc44-6409-47df-8791-fbd94c1500c2",
@@ -834,28 +835,50 @@
         "decisionStrategy": "UNANIMOUS",
         "authorizationSchema": {
           "resourceTypes": {
+            "Roles": {
+              "type": "Roles",
+              "scopes": [
+                "map-role",
+                "map-role-composite",
+                "map-role-client-scope"
+              ],
+              "scopeAliases": {}
+            },
+            "Groups": {
+              "type": "Groups",
+              "scopes": [
+                "manage-membership-of-members",
+                "manage",
+                "manage-membership",
+                "view-members",
+                "view",
+                "impersonate-members",
+                "manage-members"
+              ],
+              "scopeAliases": {}
+            },
             "Users": {
               "type": "Users",
               "scopes": [
+                "view",
+                "reset-password",
                 "manage-group-membership",
                 "manage",
                 "map-roles",
-                "impersonate",
-                "view",
-                "reset-password"
+                "impersonate"
               ],
               "scopeAliases": {
-                "impersonate": [
-                  "impersonate-members"
-                ],
-                "manage": [
-                  "manage-members"
-                ],
                 "view": [
                   "view-members"
                 ],
                 "manage-group-membership": [
                   "manage-membership-of-members"
+                ],
+                "impersonate": [
+                  "impersonate-members"
+                ],
+                "manage": [
+                  "manage-members"
                 ]
               },
               "groupType": "Groups"
@@ -863,39 +886,77 @@
             "Clients": {
               "type": "Clients",
               "scopes": [
-                "manage",
-                "map-roles-composite",
                 "view",
                 "map-roles-client-scope",
-                "map-roles"
-              ],
-              "scopeAliases": {}
-            },
-            "Roles": {
-              "type": "Roles",
-              "scopes": [
-                "map-role-client-scope",
-                "map-role",
-                "map-role-composite"
-              ],
-              "scopeAliases": {}
-            },
-            "Groups": {
-              "type": "Groups",
-              "scopes": [
-                "impersonate-members",
-                "manage-members",
-                "manage-membership-of-members",
+                "map-roles",
                 "manage",
-                "manage-membership",
-                "view-members",
-                "view"
+                "map-roles-composite"
               ],
               "scopeAliases": {}
             }
           }
         }
       }
+    },
+    {
+      "id": "143d9662-965e-4c98-a5ab-f76f9865abf0",
+      "clientId": "api-docs",
+      "name": "",
+      "description": "",
+      "rootUrl": "",
+      "adminUrl": "",
+      "baseUrl": "",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "https://pivox.ngrok.app/api-docs*",
+        "https://pivox.ngrok.app/api-docs"
+      ],
+      "webOrigins": [
+        ""
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "realm_client": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "standard.token.exchange.enabled": "false",
+        "oauth2.jwt.authorization.grant.enabled": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "pkce.code.challenge.method": "S256",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "dpop.bound.access.tokens": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "aud",
+        "acr",
+        "roles",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "organization",
+        "microprofile-jwt"
+      ]
     },
     {
       "id": "2a235ad6-f660-4ae5-8c65-0bb871b124f9",
