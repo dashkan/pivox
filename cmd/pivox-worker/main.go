@@ -61,6 +61,12 @@ const (
 	// sessions never read again before their 30-day horizon — hourly is
 	// ample; a tighter cadence would only churn the table.
 	purgeWebSessionsInterval = 1 * time.Hour
+	// defaultWorkflowReaperInterval is the cadence of the stranded-run reaper —
+	// the backstop that finalizes runs whose River job was discarded but whose
+	// discard ErrorHandler didn't finalize them. Fast (1m) because a stranded run
+	// is stuck in a non-terminal state until reaped; overridable via
+	// --workflow-reaper-interval / PIVOX_WORKFLOW_REAPER_INTERVAL.
+	defaultWorkflowReaperInterval = 1 * time.Minute
 )
 
 var version = "dev"
@@ -83,6 +89,7 @@ func main() {
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
 	f.Bool("workflow-allow-internal-networks", envOrBool("PIVOX_WORKFLOW_ALLOW_INTERNAL_NETWORKS", false), "Allow workflow HTTP activities to reach internal/private network addresses (loopback, link-local, private, metadata). Default false — REQUIRED for shared multi-tenant cloud. Set true only for single-tenant on-prem where the worker legitimately reaches internal systems.")
 	f.Int64("workflow-http-max-response-size", envOrInt64("PIVOX_WORKFLOW_HTTP_MAX_RESPONSE_SIZE", 1<<20), "Max bytes a workflow HTTP activity reads from a response body. Default 1048576 (1 MiB); clamped to [524288 (512 KiB), 10485760 (10 MiB)].")
+	f.Duration("workflow-reaper-interval", envOrDuration("PIVOX_WORKFLOW_REAPER_INTERVAL", defaultWorkflowReaperInterval), "How often the stranded-run reaper scans for discarded workflow_run jobs whose run is still non-terminal and finalizes them FAILED. Default 1m.")
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -113,11 +120,22 @@ func envOrInt64(key string, defaultVal int64) int64 {
 	return defaultVal
 }
 
+func envOrDuration(key string, defaultVal time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+	}
+	return defaultVal
+}
+
 func mustString(s string, _ error) string { return s }
 
 func mustBool(b bool, _ error) bool { return b }
 
 func mustInt64(n int64, _ error) int64 { return n }
+
+func mustDuration(d time.Duration, _ error) time.Duration { return d }
 
 func serve(cmd *cobra.Command, _ []string) error {
 	f := cmd.Flags()
@@ -131,6 +149,7 @@ func serve(cmd *cobra.Command, _ []string) error {
 	logLevel := mustString(f.GetString("log-level"))
 	allowInternalNetworks := mustBool(f.GetBool("workflow-allow-internal-networks"))
 	maxResponseBytes := mustInt64(f.GetInt64("workflow-http-max-response-size"))
+	workflowReaperInterval := mustDuration(f.GetDuration("workflow-reaper-interval"))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -274,6 +293,10 @@ func serve(cmd *cobra.Command, _ []string) error {
 	// Workflow-run executor (Phase 6b). Enqueued by the Cloud Controller's
 	// RunWorkflow; runs the pinned version's definition through the interpreter.
 	river.AddWorker(riverWorkers, &workers.RunWorkflowWorker{Pool: pool, Interpreter: interpreter, Logger: logger})
+	// Stranded-run reaper (periodic backstop). Finalizes runs whose workflow_run
+	// job was DISCARDED but whose discard ErrorHandler didn't finalize them. The
+	// immediate path is the ErrorHandler wired into the client Config below.
+	river.AddWorker(riverWorkers, &workers.ReapStrandedRunsWorker{Pool: pool, Logger: logger})
 
 	// Periodic job registrations. RunOnStart=true so a freshly-booted
 	// replica does useful work immediately rather than waiting one
@@ -310,6 +333,11 @@ func serve(cmd *cobra.Command, _ []string) error {
 			func() (river.JobArgs, *river.InsertOpts) { return workers.PurgeWebSessionsArgs{}, nil },
 			&river.PeriodicJobOpts{RunOnStart: true},
 		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(workflowReaperInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return workers.ReapStrandedRunsArgs{}, nil },
+			&river.PeriodicJobOpts{RunOnStart: true},
+		),
 	}
 
 	client, err := riverpro.NewClient(driver, &riverpro.Config{
@@ -321,6 +349,11 @@ func serve(cmd *cobra.Command, _ []string) error {
 			Schema:       riverSchema,
 			Workers:      riverWorkers,
 			PeriodicJobs: periodic,
+			// Immediate stranded-run defense: when a workflow_run job's final
+			// attempt errors/panics (River about to discard it), finalize the run
+			// FAILED so it never dangles non-terminal. The periodic reaper above is
+			// the backstop for whatever this handler misses.
+			ErrorHandler: &workers.RunWorkflowErrorHandler{Pool: pool, Logger: logger},
 			// rivertrace (outer) restores the enqueuing request's trace context
 			// from job metadata; otelriver then opens river.work as a child of
 			// it — so api insert and worker execution share one distributed trace.

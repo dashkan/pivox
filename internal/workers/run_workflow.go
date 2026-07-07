@@ -276,12 +276,7 @@ func (w *RunWorkflowWorker) finalizeSucceeded(ctx context.Context, runID uuid.UU
 // the steps accumulated so far. Returns nil to River — a terminal failure is
 // not retried.
 func (w *RunWorkflowWorker) finalizeFailed(ctx context.Context, runID uuid.UUID, steps []byte, cause error, log *slog.Logger) error {
-	errJSON, mErr := marshalRunError(cause)
-	if mErr != nil {
-		log.WarnContext(ctx, "workflow run: error marshal failed; recording FAILED without detail", "error", mErr)
-		errJSON = nil
-	}
-	if err := w.finalize(ctx, runID, runjob.StateFailed, nil, steps, errJSON, log); err != nil {
+	if _, err := finalizeRunFailed(ctx, w.Pool, runID, steps, cause, log); err != nil {
 		log.ErrorContext(ctx, "workflow run: finalize FAILED failed", "error", err)
 		return err
 	}
@@ -289,14 +284,42 @@ func (w *RunWorkflowWorker) finalizeFailed(ctx context.Context, runID uuid.UUID,
 	return nil
 }
 
-// finalize writes a terminal state — but only when the run is still
+// finalize writes a terminal state via the shared finalizeRun helper, discarding
+// the "did it write" signal the executor doesn't need.
+func (w *RunWorkflowWorker) finalize(ctx context.Context, runID uuid.UUID, state string, output, steps, errJSON []byte, log *slog.Logger) error {
+	_, err := finalizeRun(ctx, w.Pool, runID, state, output, steps, errJSON, log)
+	return err
+}
+
+// finalizeRunFailed marks runID FAILED with cause shaped as a google.rpc.Status.
+// It is the single "finalize a run FAILED" path, reused by the executor's
+// terminal branch, the discard ErrorHandler, and the periodic reaper — none of
+// them reimplement the finalize-under-lock logic. finalized reports whether the
+// row was actually written (false when the run was already terminal/CANCELLED or
+// gone — the guard in finalizeRun).
+func finalizeRunFailed(ctx context.Context, pool *pgxpool.Pool, runID uuid.UUID, steps []byte, cause error, log *slog.Logger) (finalized bool, err error) {
+	errJSON, mErr := marshalRunError(cause)
+	if mErr != nil {
+		log.WarnContext(ctx, "workflow run: error marshal failed; recording FAILED without detail", "error", mErr)
+		errJSON = nil
+	}
+	return finalizeRun(ctx, pool, runID, runjob.StateFailed, nil, steps, errJSON, log)
+}
+
+// finalizeRun writes a terminal state — but only when the run is still
 // non-terminal. It re-reads the row under a lock so a concurrent
 // CancelWorkflowRun (state → CANCELLED) is never clobbered, and a
 // double-delivered job that already finalized is a no-op. It uses a detached
 // context so the write lands even when the job ctx is at/past its deadline.
-func (w *RunWorkflowWorker) finalize(ctx context.Context, runID uuid.UUID, state string, output, steps, errJSON []byte, log *slog.Logger) error {
+//
+// finalized reports whether the terminal state was actually written; it is false
+// on the no-op paths (already terminal, run row gone). The RunInTx closure resets
+// finalized on entry because RunInTx may replay the closure on a serialization or
+// deadlock abort — the last attempt's outcome must win.
+func finalizeRun(ctx context.Context, pool *pgxpool.Pool, runID uuid.UUID, state string, output, steps, errJSON []byte, log *slog.Logger) (finalized bool, err error) {
 	finalCtx := context.WithoutCancel(ctx)
-	return db.RunInTxVoid(finalCtx, w.Pool, func(qtx db.Querier) error {
+	err = db.RunInTxVoid(finalCtx, pool, func(qtx db.Querier) error {
+		finalized = false
 		cur, err := qtx.GetWorkflowRunForUpdate(finalCtx, runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -311,16 +334,20 @@ func (w *RunWorkflowWorker) finalize(ctx context.Context, runID uuid.UUID, state
 				"state", cur.State, "wanted", state)
 			return nil
 		}
-		_, err = qtx.UpdateWorkflowRunState(finalCtx, db.UpdateWorkflowRunStateParams{
+		if _, err := qtx.UpdateWorkflowRunState(finalCtx, db.UpdateWorkflowRunStateParams{
 			ID:      runID,
 			State:   state,
 			Output:  output,
 			Steps:   steps,
 			Error:   errJSON,
 			EndTime: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		})
-		return err
+		}); err != nil {
+			return err
+		}
+		finalized = true
+		return nil
 	})
+	return finalized, err
 }
 
 // jsonbToMap decodes a JSONB object column to a Go map. Empty/NULL → nil map,

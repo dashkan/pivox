@@ -50,3 +50,20 @@ func (h *Harness) StartRiverWorkers(t *testing.T, add func(rw *river.Workers)) *
 	})
 	return c
 }
+
+// NewRiverClient builds an UNSTARTED River client wired to the harness pool +
+// schema. It fetches and works nothing — useful for tests that only need the
+// client's read-side APIs (JobList) or direct job insertion without the
+// scheduler racing to claim jobs. Same driver/schema as production so the
+// query shape matches.
+func (h *Harness) NewRiverClient(t *testing.T) *riverpro.Client[pgx.Tx] {
+	t.Helper()
+	c, err := riverpro.NewClient(riverpropgxv5.New(h.Pool), &riverpro.Config{
+		Config: river.Config{
+			Logger: SilentLogger(),
+			Schema: "river",
+		},
+	})
+	require.NoError(t, err)
+	return c
+}
