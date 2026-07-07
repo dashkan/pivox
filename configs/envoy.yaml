@@ -91,7 +91,7 @@ static_resources:
                             - application/xml
                             - image/svg+xml
                             - font/woff2
-                  # 4. grpc_json_transcoder: REST/JSON -> gRPC for the 13
+                  # 4. grpc_json_transcoder: REST/JSON -> gRPC for the 18
                   #    services below. match_incoming_request_route keeps the
                   #    /v1 route explicit (-> grpc_main). AiChat is excluded
                   #    on purpose (SSE stays on Go). Non-matching paths
@@ -114,6 +114,11 @@ static_resources:
                         - pivox.storage.v1.Endpoints
                         - pivox.assets.v1.Assets
                         - pivox.assets.v1.Requests
+                        - pivox.secrets.v1.Secrets
+                        - pivox.workflows.v1.Connectors
+                        - pivox.workflows.v1.Workflows
+                        - pivox.workflows.v1.WorkflowVersions
+                        - pivox.workflows.v1.WorkflowRuns
                       match_incoming_request_route: true
                       auto_mapping: false
                       convert_grpc_status: true
@@ -236,7 +241,7 @@ static_resources:
                               allow_credentials: true
 
                         # --- REST -> gRPC TRANSCODED -> grpc_main (50051) ----
-                        # The 13 services above. Envoy turns JSON into gRPC and
+                        # The 18 services above. Envoy turns JSON into gRPC and
                         # routes here (match_incoming_request_route keeps the
                         # /v1 path). Replaces grpc-gateway for these.
                         - match: { prefix: "/v1/" }
