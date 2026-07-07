@@ -21,7 +21,7 @@ vi.mock('@/server/oidc/session-store', () => ({
   getSession: getSessionMock,
 }));
 
-import { readServerSession } from '../src/server/oidc-session';
+import { readServerSession } from '../src/server/oidc-session.server';
 
 /** Build an unsigned-but-well-formed JWT (header.payload.sig). */
 function makeIdToken(claims: Record<string, unknown>): string {

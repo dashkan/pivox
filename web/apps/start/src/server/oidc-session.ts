@@ -1,9 +1,7 @@
-import { decodeIdTokenClaims, type OidcClaims } from '@pivox/oidc';
+import { type OidcClaims } from '@pivox/oidc';
 import { createServerFn } from '@tanstack/react-start';
-import { getCookie } from '@tanstack/react-start/server';
 
-import { SESSION_COOKIE } from './oidc/session';
-import { getSession } from './oidc/session-store';
+import { readServerSession } from './oidc-session.server';
 
 // Re-exported so callback.ts keeps a single import site even though the decoder
 // now lives in @pivox/oidc (shared with the Electron main process).
@@ -52,18 +50,6 @@ export interface ServerSessionStatus {
   accountConsoleUrl: string | null;
 }
 
-/**
- * Derive the Keycloak account-console URL from the configured issuer. The
- * account console lives at `{issuer}/account` (e.g.
- * `https://pivox.ngrok.app/realms/acme/account`), which the browser reaches via
- * the same envoy `/realms/` proxy used for SSO login.
- */
-function accountConsoleUrl(): string | null {
-  const issuer = process.env.PIVOX_OIDC_ISSUER;
-  if (!issuer) return null;
-  return `${issuer.replace(/\/+$/, '')}/account`;
-}
-
 /** Map decoded Keycloak claims to the client-facing session shape. */
 export function toServerSession(claims: OidcClaims): ServerSession {
   return {
@@ -75,40 +61,14 @@ export function toServerSession(claims: OidcClaims): ServerSession {
 }
 
 /**
- * Read the BFF session for SSR gates. Returns `{ user, cookiePresent }` in one
- * round-trip so `beforeLoad` can branch: a present-but-unusable cookie still
- * reports `cookiePresent: true` (the caller redirects to sign-in either way; the
- * distinction is kept for parity with the Firebase gate and future recovery).
+ * `getServerSession` — the RPC bridge the SSR/CSR auth gate calls to read the
+ * BFF session before render. Its handler (`readServerSession`) lives in the
+ * sibling `oidc-session.server.ts` so the server-only imports it needs (getCookie
+ * + the Postgres session store) never reach the client bundle; the client sees
+ * only this stub. It returns `{ user, cookiePresent }` in one round-trip so
+ * `beforeLoad` can branch — a present-but-unusable cookie still reports
+ * `cookiePresent: true` (the caller redirects to sign-in either way).
  */
-/**
- * Handler body for `getServerSession`, extracted so it can be unit tested as a
- * plain `() => Promise<ServerSessionStatus>` — no `createServerFn` runtime to
- * stand up and nothing to cast out of the wrapped server fn. The server fn
- * below just wires it to `.handler(...)`.
- */
-export async function readServerSession(): Promise<ServerSessionStatus> {
-  const accountUrl = accountConsoleUrl();
-  const id = getCookie(SESSION_COOKIE);
-  if (!id)
-    return { user: null, cookiePresent: false, accountConsoleUrl: accountUrl };
-  // The cookie carries an opaque id; resolve it to the token set (lazy-expiry
-  // applied) before we can read any identity from it.
-  const tokens = await getSession(id);
-  if (!tokens)
-    return { user: null, cookiePresent: true, accountConsoleUrl: accountUrl };
-  const idToken = tokens.id_token;
-  if (!idToken)
-    return { user: null, cookiePresent: true, accountConsoleUrl: accountUrl };
-  const claims = decodeIdTokenClaims(idToken);
-  if (!claims?.sub)
-    return { user: null, cookiePresent: true, accountConsoleUrl: accountUrl };
-  return {
-    user: toServerSession(claims),
-    cookiePresent: true,
-    accountConsoleUrl: accountUrl,
-  };
-}
-
 export const getServerSession = createServerFn({ method: 'GET' }).handler(
   readServerSession,
 );
