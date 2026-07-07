@@ -350,7 +350,13 @@ type WorkflowVersion struct {
 	// Output only. The identity that created this version.
 	CreatedBy *types.Actor `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Creation time. Immutable — a version has no update time.
-	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Optional. The workflow-level error handler. Runs when `root` fails with an
+	// error that no enclosing Try caught, with the failure exposed in CEL scope
+	// (as `error`) for cleanup / notify / compensate work. The run is FAILED
+	// regardless of this sequence's own outcome. It does NOT run when `root`
+	// succeeds or when the run ends early via an `end` activity.
+	ErrorSequence *Sequence `protobuf:"bytes,8,opt,name=error_sequence,json=errorSequence,proto3" json:"error_sequence,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -430,6 +436,13 @@ func (x *WorkflowVersion) GetCreatedBy() *types.Actor {
 func (x *WorkflowVersion) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *WorkflowVersion) GetErrorSequence() *Sequence {
+	if x != nil {
+		return x.ErrorSequence
 	}
 	return nil
 }
@@ -576,6 +589,7 @@ type Step struct {
 	//	*Step_Activity
 	//	*Step_Condition
 	//	*Step_Parallel
+	//	*Step_Try
 	Kind          isStep_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -652,6 +666,15 @@ func (x *Step) GetParallel() *Parallel {
 	return nil
 }
 
+func (x *Step) GetTry() *Try {
+	if x != nil {
+		if x, ok := x.Kind.(*Step_Try); ok {
+			return x.Try
+		}
+	}
+	return nil
+}
+
 type isStep_Kind interface {
 	isStep_Kind()
 }
@@ -671,11 +694,92 @@ type Step_Parallel struct {
 	Parallel *Parallel `protobuf:"bytes,4,opt,name=parallel,proto3,oneof"`
 }
 
+type Step_Try struct {
+	// A try/catch error-handling block.
+	Try *Try `protobuf:"bytes,5,opt,name=try,proto3,oneof"`
+}
+
 func (*Step_Activity) isStep_Kind() {}
 
 func (*Step_Condition) isStep_Kind() {}
 
 func (*Step_Parallel) isStep_Kind() {}
+
+func (*Step_Try) isStep_Kind() {}
+
+// Try runs `body`; if a step in it raises a catchable error (an activity
+// failure, a `fail`, or a CEL error — but NOT an `end` or context
+// cancellation), `catch` runs with the failure exposed in CEL scope (as
+// `error`). If `catch` completes and `rethrow` is false the error is HANDLED
+// and the flow continues past the Try. If `rethrow` is true the ORIGINAL error
+// is re-raised after `catch` runs. If `catch` itself raises, that new error
+// propagates. This is the nearest error boundary between an activity's own
+// retry and the workflow-level `error_sequence`.
+type Try struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. The protected step sequence.
+	Body *Sequence `protobuf:"bytes,1,opt,name=body,proto3" json:"body,omitempty"`
+	// Optional. The handler run when `body` raises a catchable error. Absent =
+	// the error is swallowed (when `rethrow` is false) or re-raised as-is (when
+	// `rethrow` is true).
+	Catch *Sequence `protobuf:"bytes,2,opt,name=catch,proto3" json:"catch,omitempty"`
+	// Optional. When true, re-raise the original error after `catch` runs, so the
+	// handler observes and reacts but does not suppress the failure.
+	Rethrow       bool `protobuf:"varint,3,opt,name=rethrow,proto3" json:"rethrow,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Try) Reset() {
+	*x = Try{}
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Try) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Try) ProtoMessage() {}
+
+func (x *Try) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Try.ProtoReflect.Descriptor instead.
+func (*Try) Descriptor() ([]byte, []int) {
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Try) GetBody() *Sequence {
+	if x != nil {
+		return x.Body
+	}
+	return nil
+}
+
+func (x *Try) GetCatch() *Sequence {
+	if x != nil {
+		return x.Catch
+	}
+	return nil
+}
+
+func (x *Try) GetRethrow() bool {
+	if x != nil {
+		return x.Rethrow
+	}
+	return false
+}
 
 // Condition is an if / else-if / else block. The first branch whose `when`
 // evaluates true runs; if none match, `otherwise` runs when present.
@@ -691,7 +795,7 @@ type Condition struct {
 
 func (x *Condition) Reset() {
 	*x = Condition{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[5]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -703,7 +807,7 @@ func (x *Condition) String() string {
 func (*Condition) ProtoMessage() {}
 
 func (x *Condition) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[5]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -716,7 +820,7 @@ func (x *Condition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Condition.ProtoReflect.Descriptor instead.
 func (*Condition) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{5}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Condition) GetBranches() []*Branch {
@@ -746,7 +850,7 @@ type Branch struct {
 
 func (x *Branch) Reset() {
 	*x = Branch{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[6]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -758,7 +862,7 @@ func (x *Branch) String() string {
 func (*Branch) ProtoMessage() {}
 
 func (x *Branch) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[6]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -771,7 +875,7 @@ func (x *Branch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Branch.ProtoReflect.Descriptor instead.
 func (*Branch) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{6}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Branch) GetWhen() string {
@@ -800,7 +904,7 @@ type Parallel struct {
 
 func (x *Parallel) Reset() {
 	*x = Parallel{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[7]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -812,7 +916,7 @@ func (x *Parallel) String() string {
 func (*Parallel) ProtoMessage() {}
 
 func (x *Parallel) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[7]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -825,7 +929,7 @@ func (x *Parallel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Parallel.ProtoReflect.Descriptor instead.
 func (*Parallel) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{7}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Parallel) GetBranches() []*Sequence {
@@ -846,6 +950,8 @@ type Activity struct {
 	//	*Activity_Http
 	//	*Activity_Set
 	//	*Activity_RunWorkflow
+	//	*Activity_Fail
+	//	*Activity_End
 	Kind          isActivity_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -853,7 +959,7 @@ type Activity struct {
 
 func (x *Activity) Reset() {
 	*x = Activity{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[8]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -865,7 +971,7 @@ func (x *Activity) String() string {
 func (*Activity) ProtoMessage() {}
 
 func (x *Activity) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[8]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -878,7 +984,7 @@ func (x *Activity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Activity.ProtoReflect.Descriptor instead.
 func (*Activity) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{8}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Activity) GetKind() isActivity_Kind {
@@ -915,6 +1021,24 @@ func (x *Activity) GetRunWorkflow() *RunWorkflowActivity {
 	return nil
 }
 
+func (x *Activity) GetFail() *FailActivity {
+	if x != nil {
+		if x, ok := x.Kind.(*Activity_Fail); ok {
+			return x.Fail
+		}
+	}
+	return nil
+}
+
+func (x *Activity) GetEnd() *EndActivity {
+	if x != nil {
+		if x, ok := x.Kind.(*Activity_End); ok {
+			return x.End
+		}
+	}
+	return nil
+}
+
 type isActivity_Kind interface {
 	isActivity_Kind()
 }
@@ -934,11 +1058,115 @@ type Activity_RunWorkflow struct {
 	RunWorkflow *RunWorkflowActivity `protobuf:"bytes,3,opt,name=run_workflow,json=runWorkflow,proto3,oneof"`
 }
 
+type Activity_Fail struct {
+	// Raise a catchable error (fails the run unless caught by a Try).
+	Fail *FailActivity `protobuf:"bytes,4,opt,name=fail,proto3,oneof"`
+}
+
+type Activity_End struct {
+	// End the run successfully, skipping all remaining steps.
+	End *EndActivity `protobuf:"bytes,5,opt,name=end,proto3,oneof"`
+}
+
 func (*Activity_Http) isActivity_Kind() {}
 
 func (*Activity_Set) isActivity_Kind() {}
 
 func (*Activity_RunWorkflow) isActivity_Kind() {}
+
+func (*Activity_Fail) isActivity_Kind() {}
+
+func (*Activity_End) isActivity_Kind() {}
+
+// FailActivity raises a terminal, catchable error carrying `message`. It
+// propagates like any activity failure: an enclosing Try catches it, and an
+// uncaught fail runs the workflow's `error_sequence` and then FAILs the run. It
+// is never retried.
+type FailActivity struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Optional. The failure message surfaced as `error.message` to a catch or
+	// the error_sequence. A default is supplied when empty.
+	Message       string `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FailActivity) Reset() {
+	*x = FailActivity{}
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FailActivity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FailActivity) ProtoMessage() {}
+
+func (x *FailActivity) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FailActivity.ProtoReflect.Descriptor instead.
+func (*FailActivity) Descriptor() ([]byte, []int) {
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *FailActivity) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+// EndActivity ends the run immediately and SUCCESSFULLY: it unwinds every
+// enclosing block (cancelling in-flight Parallel siblings) and skips all
+// remaining steps. It is NOT an error, so a Try does not intercept it and the
+// error_sequence does not run. The run output is the current run variables.
+type EndActivity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EndActivity) Reset() {
+	*x = EndActivity{}
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndActivity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndActivity) ProtoMessage() {}
+
+func (x *EndActivity) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndActivity.ProtoReflect.Descriptor instead.
+func (*EndActivity) Descriptor() ([]byte, []int) {
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{11}
+}
 
 // HttpActivity calls an HTTP endpoint through an http Connector, which
 // supplies the base URL, static/credentialed headers, and execution locality.
@@ -976,7 +1204,7 @@ type HttpActivity struct {
 
 func (x *HttpActivity) Reset() {
 	*x = HttpActivity{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[9]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -988,7 +1216,7 @@ func (x *HttpActivity) String() string {
 func (*HttpActivity) ProtoMessage() {}
 
 func (x *HttpActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[9]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1001,7 +1229,7 @@ func (x *HttpActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HttpActivity.ProtoReflect.Descriptor instead.
 func (*HttpActivity) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{9}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HttpActivity) GetConnector() string {
@@ -1087,7 +1315,7 @@ type RetryPolicy struct {
 
 func (x *RetryPolicy) Reset() {
 	*x = RetryPolicy{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[10]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1099,7 +1327,7 @@ func (x *RetryPolicy) String() string {
 func (*RetryPolicy) ProtoMessage() {}
 
 func (x *RetryPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[10]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1112,7 +1340,7 @@ func (x *RetryPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryPolicy.ProtoReflect.Descriptor instead.
 func (*RetryPolicy) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{10}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RetryPolicy) GetMaxAttempts() int32 {
@@ -1157,7 +1385,7 @@ type SetActivity struct {
 
 func (x *SetActivity) Reset() {
 	*x = SetActivity{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[11]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1169,7 +1397,7 @@ func (x *SetActivity) String() string {
 func (*SetActivity) ProtoMessage() {}
 
 func (x *SetActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[11]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1182,7 +1410,7 @@ func (x *SetActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetActivity.ProtoReflect.Descriptor instead.
 func (*SetActivity) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{11}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SetActivity) GetAssignments() map[string]string {
@@ -1208,7 +1436,7 @@ type RunWorkflowActivity struct {
 
 func (x *RunWorkflowActivity) Reset() {
 	*x = RunWorkflowActivity{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[12]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1220,7 +1448,7 @@ func (x *RunWorkflowActivity) String() string {
 func (*RunWorkflowActivity) ProtoMessage() {}
 
 func (x *RunWorkflowActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[12]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1233,7 +1461,7 @@ func (x *RunWorkflowActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunWorkflowActivity.ProtoReflect.Descriptor instead.
 func (*RunWorkflowActivity) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{12}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RunWorkflowActivity) GetWorkflow() string {
@@ -1266,7 +1494,7 @@ type Trigger struct {
 
 func (x *Trigger) Reset() {
 	*x = Trigger{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[13]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1278,7 +1506,7 @@ func (x *Trigger) String() string {
 func (*Trigger) ProtoMessage() {}
 
 func (x *Trigger) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[13]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1291,7 +1519,7 @@ func (x *Trigger) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Trigger.ProtoReflect.Descriptor instead.
 func (*Trigger) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{13}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Trigger) GetKind() isTrigger_Kind {
@@ -1346,7 +1574,7 @@ type ResourceEventTrigger struct {
 
 func (x *ResourceEventTrigger) Reset() {
 	*x = ResourceEventTrigger{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[14]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1358,7 +1586,7 @@ func (x *ResourceEventTrigger) String() string {
 func (*ResourceEventTrigger) ProtoMessage() {}
 
 func (x *ResourceEventTrigger) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[14]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1371,7 +1599,7 @@ func (x *ResourceEventTrigger) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceEventTrigger.ProtoReflect.Descriptor instead.
 func (*ResourceEventTrigger) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{14}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{17}
 }
 
 // ScheduleTrigger fires a run on a schedule.
@@ -1383,7 +1611,7 @@ type ScheduleTrigger struct {
 
 func (x *ScheduleTrigger) Reset() {
 	*x = ScheduleTrigger{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[15]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1395,7 +1623,7 @@ func (x *ScheduleTrigger) String() string {
 func (*ScheduleTrigger) ProtoMessage() {}
 
 func (x *ScheduleTrigger) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[15]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1408,7 +1636,7 @@ func (x *ScheduleTrigger) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduleTrigger.ProtoReflect.Descriptor instead.
 func (*ScheduleTrigger) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{15}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{18}
 }
 
 // Request for ListWorkflows.
@@ -1430,7 +1658,7 @@ type ListWorkflowsRequest struct {
 
 func (x *ListWorkflowsRequest) Reset() {
 	*x = ListWorkflowsRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[16]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1442,7 +1670,7 @@ func (x *ListWorkflowsRequest) String() string {
 func (*ListWorkflowsRequest) ProtoMessage() {}
 
 func (x *ListWorkflowsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[16]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1455,7 +1683,7 @@ func (x *ListWorkflowsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkflowsRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkflowsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{16}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ListWorkflowsRequest) GetParent() string {
@@ -1506,7 +1734,7 @@ type ListWorkflowsResponse struct {
 
 func (x *ListWorkflowsResponse) Reset() {
 	*x = ListWorkflowsResponse{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[17]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1518,7 +1746,7 @@ func (x *ListWorkflowsResponse) String() string {
 func (*ListWorkflowsResponse) ProtoMessage() {}
 
 func (x *ListWorkflowsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[17]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1531,7 +1759,7 @@ func (x *ListWorkflowsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkflowsResponse.ProtoReflect.Descriptor instead.
 func (*ListWorkflowsResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{17}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListWorkflowsResponse) GetWorkflows() []*Workflow {
@@ -1559,7 +1787,7 @@ type GetWorkflowRequest struct {
 
 func (x *GetWorkflowRequest) Reset() {
 	*x = GetWorkflowRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[18]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1571,7 +1799,7 @@ func (x *GetWorkflowRequest) String() string {
 func (*GetWorkflowRequest) ProtoMessage() {}
 
 func (x *GetWorkflowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[18]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1584,7 +1812,7 @@ func (x *GetWorkflowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkflowRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkflowRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{18}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetWorkflowRequest) GetName() string {
@@ -1611,7 +1839,7 @@ type CreateWorkflowRequest struct {
 
 func (x *CreateWorkflowRequest) Reset() {
 	*x = CreateWorkflowRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[19]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1623,7 +1851,7 @@ func (x *CreateWorkflowRequest) String() string {
 func (*CreateWorkflowRequest) ProtoMessage() {}
 
 func (x *CreateWorkflowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[19]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1636,7 +1864,7 @@ func (x *CreateWorkflowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateWorkflowRequest.ProtoReflect.Descriptor instead.
 func (*CreateWorkflowRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{19}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *CreateWorkflowRequest) GetParent() string {
@@ -1682,7 +1910,7 @@ type UpdateWorkflowRequest struct {
 
 func (x *UpdateWorkflowRequest) Reset() {
 	*x = UpdateWorkflowRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[20]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1694,7 +1922,7 @@ func (x *UpdateWorkflowRequest) String() string {
 func (*UpdateWorkflowRequest) ProtoMessage() {}
 
 func (x *UpdateWorkflowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[20]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1707,7 +1935,7 @@ func (x *UpdateWorkflowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateWorkflowRequest.ProtoReflect.Descriptor instead.
 func (*UpdateWorkflowRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{20}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UpdateWorkflowRequest) GetWorkflow() *Workflow {
@@ -1749,7 +1977,7 @@ type DeleteWorkflowRequest struct {
 
 func (x *DeleteWorkflowRequest) Reset() {
 	*x = DeleteWorkflowRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[21]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1761,7 +1989,7 @@ func (x *DeleteWorkflowRequest) String() string {
 func (*DeleteWorkflowRequest) ProtoMessage() {}
 
 func (x *DeleteWorkflowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[21]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1774,7 +2002,7 @@ func (x *DeleteWorkflowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteWorkflowRequest.ProtoReflect.Descriptor instead.
 func (*DeleteWorkflowRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{21}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DeleteWorkflowRequest) GetName() string {
@@ -1826,7 +2054,7 @@ type ForkWorkflowRequest struct {
 
 func (x *ForkWorkflowRequest) Reset() {
 	*x = ForkWorkflowRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[22]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1838,7 +2066,7 @@ func (x *ForkWorkflowRequest) String() string {
 func (*ForkWorkflowRequest) ProtoMessage() {}
 
 func (x *ForkWorkflowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[22]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1851,7 +2079,7 @@ func (x *ForkWorkflowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkWorkflowRequest.ProtoReflect.Descriptor instead.
 func (*ForkWorkflowRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{22}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ForkWorkflowRequest) GetName() string {
@@ -1911,7 +2139,7 @@ type PromoteWorkflowVersionRequest struct {
 
 func (x *PromoteWorkflowVersionRequest) Reset() {
 	*x = PromoteWorkflowVersionRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[23]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1923,7 +2151,7 @@ func (x *PromoteWorkflowVersionRequest) String() string {
 func (*PromoteWorkflowVersionRequest) ProtoMessage() {}
 
 func (x *PromoteWorkflowVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[23]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1936,7 +2164,7 @@ func (x *PromoteWorkflowVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromoteWorkflowVersionRequest.ProtoReflect.Descriptor instead.
 func (*PromoteWorkflowVersionRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{23}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *PromoteWorkflowVersionRequest) GetName() string {
@@ -1975,7 +2203,7 @@ type ListWorkflowVersionsRequest struct {
 
 func (x *ListWorkflowVersionsRequest) Reset() {
 	*x = ListWorkflowVersionsRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[24]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1987,7 +2215,7 @@ func (x *ListWorkflowVersionsRequest) String() string {
 func (*ListWorkflowVersionsRequest) ProtoMessage() {}
 
 func (x *ListWorkflowVersionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[24]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2000,7 +2228,7 @@ func (x *ListWorkflowVersionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkflowVersionsRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkflowVersionsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{24}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ListWorkflowVersionsRequest) GetParent() string {
@@ -2037,7 +2265,7 @@ type ListWorkflowVersionsResponse struct {
 
 func (x *ListWorkflowVersionsResponse) Reset() {
 	*x = ListWorkflowVersionsResponse{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[25]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2049,7 +2277,7 @@ func (x *ListWorkflowVersionsResponse) String() string {
 func (*ListWorkflowVersionsResponse) ProtoMessage() {}
 
 func (x *ListWorkflowVersionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[25]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2062,7 +2290,7 @@ func (x *ListWorkflowVersionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkflowVersionsResponse.ProtoReflect.Descriptor instead.
 func (*ListWorkflowVersionsResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{25}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListWorkflowVersionsResponse) GetWorkflowVersions() []*WorkflowVersion {
@@ -2090,7 +2318,7 @@ type GetWorkflowVersionRequest struct {
 
 func (x *GetWorkflowVersionRequest) Reset() {
 	*x = GetWorkflowVersionRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[26]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2102,7 +2330,7 @@ func (x *GetWorkflowVersionRequest) String() string {
 func (*GetWorkflowVersionRequest) ProtoMessage() {}
 
 func (x *GetWorkflowVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[26]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2115,7 +2343,7 @@ func (x *GetWorkflowVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkflowVersionRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkflowVersionRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{26}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *GetWorkflowVersionRequest) GetName() string {
@@ -2140,7 +2368,7 @@ type CreateWorkflowVersionRequest struct {
 
 func (x *CreateWorkflowVersionRequest) Reset() {
 	*x = CreateWorkflowVersionRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[27]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2152,7 +2380,7 @@ func (x *CreateWorkflowVersionRequest) String() string {
 func (*CreateWorkflowVersionRequest) ProtoMessage() {}
 
 func (x *CreateWorkflowVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[27]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2165,7 +2393,7 @@ func (x *CreateWorkflowVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateWorkflowVersionRequest.ProtoReflect.Descriptor instead.
 func (*CreateWorkflowVersionRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{27}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *CreateWorkflowVersionRequest) GetParent() string {
@@ -2202,7 +2430,7 @@ type DeleteWorkflowVersionRequest struct {
 
 func (x *DeleteWorkflowVersionRequest) Reset() {
 	*x = DeleteWorkflowVersionRequest{}
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[28]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2214,7 +2442,7 @@ func (x *DeleteWorkflowVersionRequest) String() string {
 func (*DeleteWorkflowVersionRequest) ProtoMessage() {}
 
 func (x *DeleteWorkflowVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[28]
+	mi := &file_pivox_workflows_v1_workflow_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2227,7 +2455,7 @@ func (x *DeleteWorkflowVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteWorkflowVersionRequest.ProtoReflect.Descriptor instead.
 func (*DeleteWorkflowVersionRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{28}
+	return file_pivox_workflows_v1_workflow_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *DeleteWorkflowVersionRequest) GetName() string {
@@ -2272,7 +2500,7 @@ const file_pivox_workflows_v1_workflow_proto_rawDesc = "" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:\xa8\x01\xeaA\xa4\x01\n" +
-	"\x18pivox.workflows/Workflow\x121organizations/{organization}/workflows/{workflow}\x12@organizations/{organization}/spaces/{space}/workflows/{workflow}*\tworkflows2\bworkflow\"\xe5\x04\n" +
+	"\x18pivox.workflows/Workflow\x121organizations/{organization}/workflows/{workflow}\x12@organizations/{organization}/spaces/{space}/workflows/{workflow}*\tworkflows2\bworkflow\"\xaf\x05\n" +
 	"\x0fWorkflowVersion\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\x1f\n" +
 	"\x04note\x18\x02 \x01(\tB\v\xe0A\x01\xbaH\x05r\x03\x18\x80\bR\x04note\x12E\n" +
@@ -2284,7 +2512,8 @@ const file_pivox_workflows_v1_workflow_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18\x06 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
 	"\vcreate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime:\xe3\x01\xeaA\xdf\x01\n" +
+	"createTime\x12H\n" +
+	"\x0eerror_sequence\x18\b \x01(\v2\x1c.pivox.workflows.v1.SequenceB\x03\xe0A\x01R\rerrorSequence:\xe3\x01\xeaA\xdf\x01\n" +
 	"\x1fpivox.workflows/WorkflowVersion\x12Dorganizations/{organization}/workflows/{workflow}/versions/{version}\x12Sorganizations/{organization}/spaces/{space}/workflows/{workflow}/versions/{version}*\x10workflowVersions2\x0fworkflowVersion\"\xe7\x01\n" +
 	"\fParameterDef\x12\x15\n" +
 	"\x03key\x18\x01 \x01(\tB\x03\xe0A\x02R\x03key\x126\n" +
@@ -2293,13 +2522,18 @@ const file_pivox_workflows_v1_workflow_proto_rawDesc = "" +
 	"\vdescription\x18\x04 \x01(\tB\x03\xe0A\x01R\vdescription\x12@\n" +
 	"\rdefault_value\x18\x05 \x01(\v2\x16.google.protobuf.ValueB\x03\xe0A\x01R\fdefaultValue\"?\n" +
 	"\bSequence\x123\n" +
-	"\x05steps\x18\x01 \x03(\v2\x18.pivox.workflows.v1.StepB\x03\xe0A\x02R\x05steps\"\xda\x01\n" +
+	"\x05steps\x18\x01 \x03(\v2\x18.pivox.workflows.v1.StepB\x03\xe0A\x02R\x05steps\"\x87\x02\n" +
 	"\x04Step\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\x12:\n" +
 	"\bactivity\x18\x02 \x01(\v2\x1c.pivox.workflows.v1.ActivityH\x00R\bactivity\x12=\n" +
 	"\tcondition\x18\x03 \x01(\v2\x1d.pivox.workflows.v1.ConditionH\x00R\tcondition\x12:\n" +
-	"\bparallel\x18\x04 \x01(\v2\x1c.pivox.workflows.v1.ParallelH\x00R\bparallelB\x06\n" +
-	"\x04kind\"\x89\x01\n" +
+	"\bparallel\x18\x04 \x01(\v2\x1c.pivox.workflows.v1.ParallelH\x00R\bparallel\x12+\n" +
+	"\x03try\x18\x05 \x01(\v2\x17.pivox.workflows.v1.TryH\x00R\x03tryB\x06\n" +
+	"\x04kind\"\x94\x01\n" +
+	"\x03Try\x125\n" +
+	"\x04body\x18\x01 \x01(\v2\x1c.pivox.workflows.v1.SequenceB\x03\xe0A\x02R\x04body\x127\n" +
+	"\x05catch\x18\x02 \x01(\v2\x1c.pivox.workflows.v1.SequenceB\x03\xe0A\x01R\x05catch\x12\x1d\n" +
+	"\arethrow\x18\x03 \x01(\bB\x03\xe0A\x01R\arethrow\"\x89\x01\n" +
 	"\tCondition\x12;\n" +
 	"\bbranches\x18\x01 \x03(\v2\x1a.pivox.workflows.v1.BranchB\x03\xe0A\x02R\bbranches\x12?\n" +
 	"\totherwise\x18\x02 \x01(\v2\x1c.pivox.workflows.v1.SequenceB\x03\xe0A\x01R\totherwise\"X\n" +
@@ -2307,12 +2541,17 @@ const file_pivox_workflows_v1_workflow_proto_rawDesc = "" +
 	"\x04when\x18\x01 \x01(\tB\x03\xe0A\x02R\x04when\x125\n" +
 	"\x04then\x18\x02 \x01(\v2\x1c.pivox.workflows.v1.SequenceB\x03\xe0A\x02R\x04then\"I\n" +
 	"\bParallel\x12=\n" +
-	"\bbranches\x18\x01 \x03(\v2\x1c.pivox.workflows.v1.SequenceB\x03\xe0A\x02R\bbranches\"\xcd\x01\n" +
+	"\bbranches\x18\x01 \x03(\v2\x1c.pivox.workflows.v1.SequenceB\x03\xe0A\x02R\bbranches\"\xba\x02\n" +
 	"\bActivity\x126\n" +
 	"\x04http\x18\x01 \x01(\v2 .pivox.workflows.v1.HttpActivityH\x00R\x04http\x123\n" +
 	"\x03set\x18\x02 \x01(\v2\x1f.pivox.workflows.v1.SetActivityH\x00R\x03set\x12L\n" +
-	"\frun_workflow\x18\x03 \x01(\v2'.pivox.workflows.v1.RunWorkflowActivityH\x00R\vrunWorkflowB\x06\n" +
-	"\x04kind\"\xc2\x04\n" +
+	"\frun_workflow\x18\x03 \x01(\v2'.pivox.workflows.v1.RunWorkflowActivityH\x00R\vrunWorkflow\x126\n" +
+	"\x04fail\x18\x04 \x01(\v2 .pivox.workflows.v1.FailActivityH\x00R\x04fail\x123\n" +
+	"\x03end\x18\x05 \x01(\v2\x1f.pivox.workflows.v1.EndActivityH\x00R\x03endB\x06\n" +
+	"\x04kind\"-\n" +
+	"\fFailActivity\x12\x1d\n" +
+	"\amessage\x18\x01 \x01(\tB\x03\xe0A\x01R\amessage\"\r\n" +
+	"\vEndActivity\"\xc2\x04\n" +
 	"\fHttpActivity\x12?\n" +
 	"\tconnector\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x1b\n" +
 	"\x19pivox.workflows/ConnectorR\tconnector\x12\x1b\n" +
@@ -2465,7 +2704,7 @@ func file_pivox_workflows_v1_workflow_proto_rawDescGZIP() []byte {
 }
 
 var file_pivox_workflows_v1_workflow_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_pivox_workflows_v1_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_pivox_workflows_v1_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_pivox_workflows_v1_workflow_proto_goTypes = []any{
 	(WorkflowOrigin)(0),                   // 0: pivox.workflows.v1.WorkflowOrigin
 	(ParamType)(0),                        // 1: pivox.workflows.v1.ParamType
@@ -2474,111 +2713,120 @@ var file_pivox_workflows_v1_workflow_proto_goTypes = []any{
 	(*ParameterDef)(nil),                  // 4: pivox.workflows.v1.ParameterDef
 	(*Sequence)(nil),                      // 5: pivox.workflows.v1.Sequence
 	(*Step)(nil),                          // 6: pivox.workflows.v1.Step
-	(*Condition)(nil),                     // 7: pivox.workflows.v1.Condition
-	(*Branch)(nil),                        // 8: pivox.workflows.v1.Branch
-	(*Parallel)(nil),                      // 9: pivox.workflows.v1.Parallel
-	(*Activity)(nil),                      // 10: pivox.workflows.v1.Activity
-	(*HttpActivity)(nil),                  // 11: pivox.workflows.v1.HttpActivity
-	(*RetryPolicy)(nil),                   // 12: pivox.workflows.v1.RetryPolicy
-	(*SetActivity)(nil),                   // 13: pivox.workflows.v1.SetActivity
-	(*RunWorkflowActivity)(nil),           // 14: pivox.workflows.v1.RunWorkflowActivity
-	(*Trigger)(nil),                       // 15: pivox.workflows.v1.Trigger
-	(*ResourceEventTrigger)(nil),          // 16: pivox.workflows.v1.ResourceEventTrigger
-	(*ScheduleTrigger)(nil),               // 17: pivox.workflows.v1.ScheduleTrigger
-	(*ListWorkflowsRequest)(nil),          // 18: pivox.workflows.v1.ListWorkflowsRequest
-	(*ListWorkflowsResponse)(nil),         // 19: pivox.workflows.v1.ListWorkflowsResponse
-	(*GetWorkflowRequest)(nil),            // 20: pivox.workflows.v1.GetWorkflowRequest
-	(*CreateWorkflowRequest)(nil),         // 21: pivox.workflows.v1.CreateWorkflowRequest
-	(*UpdateWorkflowRequest)(nil),         // 22: pivox.workflows.v1.UpdateWorkflowRequest
-	(*DeleteWorkflowRequest)(nil),         // 23: pivox.workflows.v1.DeleteWorkflowRequest
-	(*ForkWorkflowRequest)(nil),           // 24: pivox.workflows.v1.ForkWorkflowRequest
-	(*PromoteWorkflowVersionRequest)(nil), // 25: pivox.workflows.v1.PromoteWorkflowVersionRequest
-	(*ListWorkflowVersionsRequest)(nil),   // 26: pivox.workflows.v1.ListWorkflowVersionsRequest
-	(*ListWorkflowVersionsResponse)(nil),  // 27: pivox.workflows.v1.ListWorkflowVersionsResponse
-	(*GetWorkflowVersionRequest)(nil),     // 28: pivox.workflows.v1.GetWorkflowVersionRequest
-	(*CreateWorkflowVersionRequest)(nil),  // 29: pivox.workflows.v1.CreateWorkflowVersionRequest
-	(*DeleteWorkflowVersionRequest)(nil),  // 30: pivox.workflows.v1.DeleteWorkflowVersionRequest
-	nil,                                   // 31: pivox.workflows.v1.Workflow.AnnotationsEntry
-	nil,                                   // 32: pivox.workflows.v1.HttpActivity.QueryEntry
-	nil,                                   // 33: pivox.workflows.v1.HttpActivity.HeadersEntry
-	nil,                                   // 34: pivox.workflows.v1.SetActivity.AssignmentsEntry
-	nil,                                   // 35: pivox.workflows.v1.RunWorkflowActivity.ParametersEntry
-	(*structpb.Struct)(nil),               // 36: google.protobuf.Struct
-	(*types.Actor)(nil),                   // 37: pivox.types.Actor
-	(*timestamppb.Timestamp)(nil),         // 38: google.protobuf.Timestamp
-	(*structpb.Value)(nil),                // 39: google.protobuf.Value
-	(*durationpb.Duration)(nil),           // 40: google.protobuf.Duration
-	(*fieldmaskpb.FieldMask)(nil),         // 41: google.protobuf.FieldMask
-	(*emptypb.Empty)(nil),                 // 42: google.protobuf.Empty
+	(*Try)(nil),                           // 7: pivox.workflows.v1.Try
+	(*Condition)(nil),                     // 8: pivox.workflows.v1.Condition
+	(*Branch)(nil),                        // 9: pivox.workflows.v1.Branch
+	(*Parallel)(nil),                      // 10: pivox.workflows.v1.Parallel
+	(*Activity)(nil),                      // 11: pivox.workflows.v1.Activity
+	(*FailActivity)(nil),                  // 12: pivox.workflows.v1.FailActivity
+	(*EndActivity)(nil),                   // 13: pivox.workflows.v1.EndActivity
+	(*HttpActivity)(nil),                  // 14: pivox.workflows.v1.HttpActivity
+	(*RetryPolicy)(nil),                   // 15: pivox.workflows.v1.RetryPolicy
+	(*SetActivity)(nil),                   // 16: pivox.workflows.v1.SetActivity
+	(*RunWorkflowActivity)(nil),           // 17: pivox.workflows.v1.RunWorkflowActivity
+	(*Trigger)(nil),                       // 18: pivox.workflows.v1.Trigger
+	(*ResourceEventTrigger)(nil),          // 19: pivox.workflows.v1.ResourceEventTrigger
+	(*ScheduleTrigger)(nil),               // 20: pivox.workflows.v1.ScheduleTrigger
+	(*ListWorkflowsRequest)(nil),          // 21: pivox.workflows.v1.ListWorkflowsRequest
+	(*ListWorkflowsResponse)(nil),         // 22: pivox.workflows.v1.ListWorkflowsResponse
+	(*GetWorkflowRequest)(nil),            // 23: pivox.workflows.v1.GetWorkflowRequest
+	(*CreateWorkflowRequest)(nil),         // 24: pivox.workflows.v1.CreateWorkflowRequest
+	(*UpdateWorkflowRequest)(nil),         // 25: pivox.workflows.v1.UpdateWorkflowRequest
+	(*DeleteWorkflowRequest)(nil),         // 26: pivox.workflows.v1.DeleteWorkflowRequest
+	(*ForkWorkflowRequest)(nil),           // 27: pivox.workflows.v1.ForkWorkflowRequest
+	(*PromoteWorkflowVersionRequest)(nil), // 28: pivox.workflows.v1.PromoteWorkflowVersionRequest
+	(*ListWorkflowVersionsRequest)(nil),   // 29: pivox.workflows.v1.ListWorkflowVersionsRequest
+	(*ListWorkflowVersionsResponse)(nil),  // 30: pivox.workflows.v1.ListWorkflowVersionsResponse
+	(*GetWorkflowVersionRequest)(nil),     // 31: pivox.workflows.v1.GetWorkflowVersionRequest
+	(*CreateWorkflowVersionRequest)(nil),  // 32: pivox.workflows.v1.CreateWorkflowVersionRequest
+	(*DeleteWorkflowVersionRequest)(nil),  // 33: pivox.workflows.v1.DeleteWorkflowVersionRequest
+	nil,                                   // 34: pivox.workflows.v1.Workflow.AnnotationsEntry
+	nil,                                   // 35: pivox.workflows.v1.HttpActivity.QueryEntry
+	nil,                                   // 36: pivox.workflows.v1.HttpActivity.HeadersEntry
+	nil,                                   // 37: pivox.workflows.v1.SetActivity.AssignmentsEntry
+	nil,                                   // 38: pivox.workflows.v1.RunWorkflowActivity.ParametersEntry
+	(*structpb.Struct)(nil),               // 39: google.protobuf.Struct
+	(*types.Actor)(nil),                   // 40: pivox.types.Actor
+	(*timestamppb.Timestamp)(nil),         // 41: google.protobuf.Timestamp
+	(*structpb.Value)(nil),                // 42: google.protobuf.Value
+	(*durationpb.Duration)(nil),           // 43: google.protobuf.Duration
+	(*fieldmaskpb.FieldMask)(nil),         // 44: google.protobuf.FieldMask
+	(*emptypb.Empty)(nil),                 // 45: google.protobuf.Empty
 }
 var file_pivox_workflows_v1_workflow_proto_depIdxs = []int32{
-	36, // 0: pivox.workflows.v1.Workflow.config:type_name -> google.protobuf.Struct
+	39, // 0: pivox.workflows.v1.Workflow.config:type_name -> google.protobuf.Struct
 	0,  // 1: pivox.workflows.v1.Workflow.origin:type_name -> pivox.workflows.v1.WorkflowOrigin
-	37, // 2: pivox.workflows.v1.Workflow.created_by:type_name -> pivox.types.Actor
-	38, // 3: pivox.workflows.v1.Workflow.create_time:type_name -> google.protobuf.Timestamp
-	37, // 4: pivox.workflows.v1.Workflow.updated_by:type_name -> pivox.types.Actor
-	38, // 5: pivox.workflows.v1.Workflow.update_time:type_name -> google.protobuf.Timestamp
-	31, // 6: pivox.workflows.v1.Workflow.annotations:type_name -> pivox.workflows.v1.Workflow.AnnotationsEntry
+	40, // 2: pivox.workflows.v1.Workflow.created_by:type_name -> pivox.types.Actor
+	41, // 3: pivox.workflows.v1.Workflow.create_time:type_name -> google.protobuf.Timestamp
+	40, // 4: pivox.workflows.v1.Workflow.updated_by:type_name -> pivox.types.Actor
+	41, // 5: pivox.workflows.v1.Workflow.update_time:type_name -> google.protobuf.Timestamp
+	34, // 6: pivox.workflows.v1.Workflow.annotations:type_name -> pivox.workflows.v1.Workflow.AnnotationsEntry
 	4,  // 7: pivox.workflows.v1.WorkflowVersion.parameters:type_name -> pivox.workflows.v1.ParameterDef
-	15, // 8: pivox.workflows.v1.WorkflowVersion.trigger:type_name -> pivox.workflows.v1.Trigger
+	18, // 8: pivox.workflows.v1.WorkflowVersion.trigger:type_name -> pivox.workflows.v1.Trigger
 	5,  // 9: pivox.workflows.v1.WorkflowVersion.root:type_name -> pivox.workflows.v1.Sequence
-	37, // 10: pivox.workflows.v1.WorkflowVersion.created_by:type_name -> pivox.types.Actor
-	38, // 11: pivox.workflows.v1.WorkflowVersion.create_time:type_name -> google.protobuf.Timestamp
-	1,  // 12: pivox.workflows.v1.ParameterDef.type:type_name -> pivox.workflows.v1.ParamType
-	39, // 13: pivox.workflows.v1.ParameterDef.default_value:type_name -> google.protobuf.Value
-	6,  // 14: pivox.workflows.v1.Sequence.steps:type_name -> pivox.workflows.v1.Step
-	10, // 15: pivox.workflows.v1.Step.activity:type_name -> pivox.workflows.v1.Activity
-	7,  // 16: pivox.workflows.v1.Step.condition:type_name -> pivox.workflows.v1.Condition
-	9,  // 17: pivox.workflows.v1.Step.parallel:type_name -> pivox.workflows.v1.Parallel
-	8,  // 18: pivox.workflows.v1.Condition.branches:type_name -> pivox.workflows.v1.Branch
-	5,  // 19: pivox.workflows.v1.Condition.otherwise:type_name -> pivox.workflows.v1.Sequence
-	5,  // 20: pivox.workflows.v1.Branch.then:type_name -> pivox.workflows.v1.Sequence
-	5,  // 21: pivox.workflows.v1.Parallel.branches:type_name -> pivox.workflows.v1.Sequence
-	11, // 22: pivox.workflows.v1.Activity.http:type_name -> pivox.workflows.v1.HttpActivity
-	13, // 23: pivox.workflows.v1.Activity.set:type_name -> pivox.workflows.v1.SetActivity
-	14, // 24: pivox.workflows.v1.Activity.run_workflow:type_name -> pivox.workflows.v1.RunWorkflowActivity
-	32, // 25: pivox.workflows.v1.HttpActivity.query:type_name -> pivox.workflows.v1.HttpActivity.QueryEntry
-	33, // 26: pivox.workflows.v1.HttpActivity.headers:type_name -> pivox.workflows.v1.HttpActivity.HeadersEntry
-	12, // 27: pivox.workflows.v1.HttpActivity.retry:type_name -> pivox.workflows.v1.RetryPolicy
-	40, // 28: pivox.workflows.v1.RetryPolicy.initial_backoff:type_name -> google.protobuf.Duration
-	40, // 29: pivox.workflows.v1.RetryPolicy.max_backoff:type_name -> google.protobuf.Duration
-	34, // 30: pivox.workflows.v1.SetActivity.assignments:type_name -> pivox.workflows.v1.SetActivity.AssignmentsEntry
-	35, // 31: pivox.workflows.v1.RunWorkflowActivity.parameters:type_name -> pivox.workflows.v1.RunWorkflowActivity.ParametersEntry
-	16, // 32: pivox.workflows.v1.Trigger.resource_event:type_name -> pivox.workflows.v1.ResourceEventTrigger
-	17, // 33: pivox.workflows.v1.Trigger.schedule:type_name -> pivox.workflows.v1.ScheduleTrigger
-	2,  // 34: pivox.workflows.v1.ListWorkflowsResponse.workflows:type_name -> pivox.workflows.v1.Workflow
-	2,  // 35: pivox.workflows.v1.CreateWorkflowRequest.workflow:type_name -> pivox.workflows.v1.Workflow
-	2,  // 36: pivox.workflows.v1.UpdateWorkflowRequest.workflow:type_name -> pivox.workflows.v1.Workflow
-	41, // 37: pivox.workflows.v1.UpdateWorkflowRequest.update_mask:type_name -> google.protobuf.FieldMask
-	3,  // 38: pivox.workflows.v1.ListWorkflowVersionsResponse.workflow_versions:type_name -> pivox.workflows.v1.WorkflowVersion
-	3,  // 39: pivox.workflows.v1.CreateWorkflowVersionRequest.workflow_version:type_name -> pivox.workflows.v1.WorkflowVersion
-	18, // 40: pivox.workflows.v1.Workflows.ListWorkflows:input_type -> pivox.workflows.v1.ListWorkflowsRequest
-	20, // 41: pivox.workflows.v1.Workflows.GetWorkflow:input_type -> pivox.workflows.v1.GetWorkflowRequest
-	21, // 42: pivox.workflows.v1.Workflows.CreateWorkflow:input_type -> pivox.workflows.v1.CreateWorkflowRequest
-	22, // 43: pivox.workflows.v1.Workflows.UpdateWorkflow:input_type -> pivox.workflows.v1.UpdateWorkflowRequest
-	23, // 44: pivox.workflows.v1.Workflows.DeleteWorkflow:input_type -> pivox.workflows.v1.DeleteWorkflowRequest
-	24, // 45: pivox.workflows.v1.Workflows.ForkWorkflow:input_type -> pivox.workflows.v1.ForkWorkflowRequest
-	25, // 46: pivox.workflows.v1.Workflows.PromoteWorkflowVersion:input_type -> pivox.workflows.v1.PromoteWorkflowVersionRequest
-	26, // 47: pivox.workflows.v1.WorkflowVersions.ListWorkflowVersions:input_type -> pivox.workflows.v1.ListWorkflowVersionsRequest
-	28, // 48: pivox.workflows.v1.WorkflowVersions.GetWorkflowVersion:input_type -> pivox.workflows.v1.GetWorkflowVersionRequest
-	29, // 49: pivox.workflows.v1.WorkflowVersions.CreateWorkflowVersion:input_type -> pivox.workflows.v1.CreateWorkflowVersionRequest
-	30, // 50: pivox.workflows.v1.WorkflowVersions.DeleteWorkflowVersion:input_type -> pivox.workflows.v1.DeleteWorkflowVersionRequest
-	19, // 51: pivox.workflows.v1.Workflows.ListWorkflows:output_type -> pivox.workflows.v1.ListWorkflowsResponse
-	2,  // 52: pivox.workflows.v1.Workflows.GetWorkflow:output_type -> pivox.workflows.v1.Workflow
-	2,  // 53: pivox.workflows.v1.Workflows.CreateWorkflow:output_type -> pivox.workflows.v1.Workflow
-	2,  // 54: pivox.workflows.v1.Workflows.UpdateWorkflow:output_type -> pivox.workflows.v1.Workflow
-	42, // 55: pivox.workflows.v1.Workflows.DeleteWorkflow:output_type -> google.protobuf.Empty
-	2,  // 56: pivox.workflows.v1.Workflows.ForkWorkflow:output_type -> pivox.workflows.v1.Workflow
-	2,  // 57: pivox.workflows.v1.Workflows.PromoteWorkflowVersion:output_type -> pivox.workflows.v1.Workflow
-	27, // 58: pivox.workflows.v1.WorkflowVersions.ListWorkflowVersions:output_type -> pivox.workflows.v1.ListWorkflowVersionsResponse
-	3,  // 59: pivox.workflows.v1.WorkflowVersions.GetWorkflowVersion:output_type -> pivox.workflows.v1.WorkflowVersion
-	3,  // 60: pivox.workflows.v1.WorkflowVersions.CreateWorkflowVersion:output_type -> pivox.workflows.v1.WorkflowVersion
-	42, // 61: pivox.workflows.v1.WorkflowVersions.DeleteWorkflowVersion:output_type -> google.protobuf.Empty
-	51, // [51:62] is the sub-list for method output_type
-	40, // [40:51] is the sub-list for method input_type
-	40, // [40:40] is the sub-list for extension type_name
-	40, // [40:40] is the sub-list for extension extendee
-	0,  // [0:40] is the sub-list for field type_name
+	40, // 10: pivox.workflows.v1.WorkflowVersion.created_by:type_name -> pivox.types.Actor
+	41, // 11: pivox.workflows.v1.WorkflowVersion.create_time:type_name -> google.protobuf.Timestamp
+	5,  // 12: pivox.workflows.v1.WorkflowVersion.error_sequence:type_name -> pivox.workflows.v1.Sequence
+	1,  // 13: pivox.workflows.v1.ParameterDef.type:type_name -> pivox.workflows.v1.ParamType
+	42, // 14: pivox.workflows.v1.ParameterDef.default_value:type_name -> google.protobuf.Value
+	6,  // 15: pivox.workflows.v1.Sequence.steps:type_name -> pivox.workflows.v1.Step
+	11, // 16: pivox.workflows.v1.Step.activity:type_name -> pivox.workflows.v1.Activity
+	8,  // 17: pivox.workflows.v1.Step.condition:type_name -> pivox.workflows.v1.Condition
+	10, // 18: pivox.workflows.v1.Step.parallel:type_name -> pivox.workflows.v1.Parallel
+	7,  // 19: pivox.workflows.v1.Step.try:type_name -> pivox.workflows.v1.Try
+	5,  // 20: pivox.workflows.v1.Try.body:type_name -> pivox.workflows.v1.Sequence
+	5,  // 21: pivox.workflows.v1.Try.catch:type_name -> pivox.workflows.v1.Sequence
+	9,  // 22: pivox.workflows.v1.Condition.branches:type_name -> pivox.workflows.v1.Branch
+	5,  // 23: pivox.workflows.v1.Condition.otherwise:type_name -> pivox.workflows.v1.Sequence
+	5,  // 24: pivox.workflows.v1.Branch.then:type_name -> pivox.workflows.v1.Sequence
+	5,  // 25: pivox.workflows.v1.Parallel.branches:type_name -> pivox.workflows.v1.Sequence
+	14, // 26: pivox.workflows.v1.Activity.http:type_name -> pivox.workflows.v1.HttpActivity
+	16, // 27: pivox.workflows.v1.Activity.set:type_name -> pivox.workflows.v1.SetActivity
+	17, // 28: pivox.workflows.v1.Activity.run_workflow:type_name -> pivox.workflows.v1.RunWorkflowActivity
+	12, // 29: pivox.workflows.v1.Activity.fail:type_name -> pivox.workflows.v1.FailActivity
+	13, // 30: pivox.workflows.v1.Activity.end:type_name -> pivox.workflows.v1.EndActivity
+	35, // 31: pivox.workflows.v1.HttpActivity.query:type_name -> pivox.workflows.v1.HttpActivity.QueryEntry
+	36, // 32: pivox.workflows.v1.HttpActivity.headers:type_name -> pivox.workflows.v1.HttpActivity.HeadersEntry
+	15, // 33: pivox.workflows.v1.HttpActivity.retry:type_name -> pivox.workflows.v1.RetryPolicy
+	43, // 34: pivox.workflows.v1.RetryPolicy.initial_backoff:type_name -> google.protobuf.Duration
+	43, // 35: pivox.workflows.v1.RetryPolicy.max_backoff:type_name -> google.protobuf.Duration
+	37, // 36: pivox.workflows.v1.SetActivity.assignments:type_name -> pivox.workflows.v1.SetActivity.AssignmentsEntry
+	38, // 37: pivox.workflows.v1.RunWorkflowActivity.parameters:type_name -> pivox.workflows.v1.RunWorkflowActivity.ParametersEntry
+	19, // 38: pivox.workflows.v1.Trigger.resource_event:type_name -> pivox.workflows.v1.ResourceEventTrigger
+	20, // 39: pivox.workflows.v1.Trigger.schedule:type_name -> pivox.workflows.v1.ScheduleTrigger
+	2,  // 40: pivox.workflows.v1.ListWorkflowsResponse.workflows:type_name -> pivox.workflows.v1.Workflow
+	2,  // 41: pivox.workflows.v1.CreateWorkflowRequest.workflow:type_name -> pivox.workflows.v1.Workflow
+	2,  // 42: pivox.workflows.v1.UpdateWorkflowRequest.workflow:type_name -> pivox.workflows.v1.Workflow
+	44, // 43: pivox.workflows.v1.UpdateWorkflowRequest.update_mask:type_name -> google.protobuf.FieldMask
+	3,  // 44: pivox.workflows.v1.ListWorkflowVersionsResponse.workflow_versions:type_name -> pivox.workflows.v1.WorkflowVersion
+	3,  // 45: pivox.workflows.v1.CreateWorkflowVersionRequest.workflow_version:type_name -> pivox.workflows.v1.WorkflowVersion
+	21, // 46: pivox.workflows.v1.Workflows.ListWorkflows:input_type -> pivox.workflows.v1.ListWorkflowsRequest
+	23, // 47: pivox.workflows.v1.Workflows.GetWorkflow:input_type -> pivox.workflows.v1.GetWorkflowRequest
+	24, // 48: pivox.workflows.v1.Workflows.CreateWorkflow:input_type -> pivox.workflows.v1.CreateWorkflowRequest
+	25, // 49: pivox.workflows.v1.Workflows.UpdateWorkflow:input_type -> pivox.workflows.v1.UpdateWorkflowRequest
+	26, // 50: pivox.workflows.v1.Workflows.DeleteWorkflow:input_type -> pivox.workflows.v1.DeleteWorkflowRequest
+	27, // 51: pivox.workflows.v1.Workflows.ForkWorkflow:input_type -> pivox.workflows.v1.ForkWorkflowRequest
+	28, // 52: pivox.workflows.v1.Workflows.PromoteWorkflowVersion:input_type -> pivox.workflows.v1.PromoteWorkflowVersionRequest
+	29, // 53: pivox.workflows.v1.WorkflowVersions.ListWorkflowVersions:input_type -> pivox.workflows.v1.ListWorkflowVersionsRequest
+	31, // 54: pivox.workflows.v1.WorkflowVersions.GetWorkflowVersion:input_type -> pivox.workflows.v1.GetWorkflowVersionRequest
+	32, // 55: pivox.workflows.v1.WorkflowVersions.CreateWorkflowVersion:input_type -> pivox.workflows.v1.CreateWorkflowVersionRequest
+	33, // 56: pivox.workflows.v1.WorkflowVersions.DeleteWorkflowVersion:input_type -> pivox.workflows.v1.DeleteWorkflowVersionRequest
+	22, // 57: pivox.workflows.v1.Workflows.ListWorkflows:output_type -> pivox.workflows.v1.ListWorkflowsResponse
+	2,  // 58: pivox.workflows.v1.Workflows.GetWorkflow:output_type -> pivox.workflows.v1.Workflow
+	2,  // 59: pivox.workflows.v1.Workflows.CreateWorkflow:output_type -> pivox.workflows.v1.Workflow
+	2,  // 60: pivox.workflows.v1.Workflows.UpdateWorkflow:output_type -> pivox.workflows.v1.Workflow
+	45, // 61: pivox.workflows.v1.Workflows.DeleteWorkflow:output_type -> google.protobuf.Empty
+	2,  // 62: pivox.workflows.v1.Workflows.ForkWorkflow:output_type -> pivox.workflows.v1.Workflow
+	2,  // 63: pivox.workflows.v1.Workflows.PromoteWorkflowVersion:output_type -> pivox.workflows.v1.Workflow
+	30, // 64: pivox.workflows.v1.WorkflowVersions.ListWorkflowVersions:output_type -> pivox.workflows.v1.ListWorkflowVersionsResponse
+	3,  // 65: pivox.workflows.v1.WorkflowVersions.GetWorkflowVersion:output_type -> pivox.workflows.v1.WorkflowVersion
+	3,  // 66: pivox.workflows.v1.WorkflowVersions.CreateWorkflowVersion:output_type -> pivox.workflows.v1.WorkflowVersion
+	45, // 67: pivox.workflows.v1.WorkflowVersions.DeleteWorkflowVersion:output_type -> google.protobuf.Empty
+	57, // [57:68] is the sub-list for method output_type
+	46, // [46:57] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_pivox_workflows_v1_workflow_proto_init() }
@@ -2590,13 +2838,16 @@ func file_pivox_workflows_v1_workflow_proto_init() {
 		(*Step_Activity)(nil),
 		(*Step_Condition)(nil),
 		(*Step_Parallel)(nil),
+		(*Step_Try)(nil),
 	}
-	file_pivox_workflows_v1_workflow_proto_msgTypes[8].OneofWrappers = []any{
+	file_pivox_workflows_v1_workflow_proto_msgTypes[9].OneofWrappers = []any{
 		(*Activity_Http)(nil),
 		(*Activity_Set)(nil),
 		(*Activity_RunWorkflow)(nil),
+		(*Activity_Fail)(nil),
+		(*Activity_End)(nil),
 	}
-	file_pivox_workflows_v1_workflow_proto_msgTypes[13].OneofWrappers = []any{
+	file_pivox_workflows_v1_workflow_proto_msgTypes[16].OneofWrappers = []any{
 		(*Trigger_ResourceEvent)(nil),
 		(*Trigger_Schedule)(nil),
 	}
@@ -2606,7 +2857,7 @@ func file_pivox_workflows_v1_workflow_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_workflows_v1_workflow_proto_rawDesc), len(file_pivox_workflows_v1_workflow_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   34,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

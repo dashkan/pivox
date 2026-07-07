@@ -37,6 +37,15 @@ func (e *ResponseError) Error() string {
 	return fmt.Sprintf("http request returned status %d", e.Status)
 }
 
+// HTTPStatus returns the response status code. Together with [ResponseError.HTTPBody]
+// it satisfies the engine's unexported httpErrorDetail interface, so a Try/catch
+// or the error_sequence can surface a non-success HTTP response as
+// `error.status` / `error.body` without engine importing this package.
+func (e *ResponseError) HTTPStatus() int { return e.Status }
+
+// HTTPBody returns the response body captured on the non-success response.
+func (e *ResponseError) HTTPBody() []byte { return e.Body }
+
 // newResponseError snapshots a non-success [Response] into a [ResponseError].
 func newResponseError(resp *Response) *ResponseError {
 	return &ResponseError{

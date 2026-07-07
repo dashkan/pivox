@@ -26,78 +26,143 @@ const interruptCheckFrequency = 100
 // function is connector-config-only (added in 6c), so any definition that
 // references secret() in a condition or assignment fails to compile here.
 //
-// Compiled programs are cached per expression string. cel.Program is safe for
-// concurrent evaluation, so a single Evaluator serves all Parallel branches.
+// Compiled programs are cached per (scope, expression) pair. cel.Program is safe
+// for concurrent evaluation, so a single Evaluator serves all Parallel branches.
 type Evaluator struct {
-	env *cel.Env
+	// runEnv declares the four run-context roots. catchEnv adds the scoped
+	// `error` root and is used only when a caught error is in context (a catch
+	// block or the error_sequence). Keeping `error` out of runEnv is what makes
+	// referencing it in a normal step a COMPILE error, not just a missing value.
+	runEnv   *cel.Env
+	catchEnv *cel.Env
 
-	mu       sync.Mutex
-	programs map[string]cel.Program
+	mu sync.Mutex
+	// programs is keyed first by scope so the same expression compiled under the
+	// run env and the catch env cache independently.
+	programs map[evalScope]map[string]cel.Program
 }
+
+// evalScope selects which CEL environment an expression compiles and evaluates
+// against.
+type evalScope int
+
+const (
+	// runScope is the default: the four run-context roots, no `error`.
+	runScope evalScope = iota
+	// catchScope adds the scoped `error` root for a catch / error_sequence.
+	catchScope
+)
 
 // NewEvaluator builds an Evaluator over the workflow run environment.
 func NewEvaluator() (*Evaluator, error) {
-	env, err := buildRunEnv()
+	runEnv, err := buildRunEnv()
+	if err != nil {
+		return nil, err
+	}
+	catchEnv, err := buildCatchEnv()
 	if err != nil {
 		return nil, err
 	}
 	return &Evaluator{
-		env:      env,
-		programs: map[string]cel.Program{},
+		runEnv:   runEnv,
+		catchEnv: catchEnv,
+		programs: map[evalScope]map[string]cel.Program{
+			runScope:   {},
+			catchScope: {},
+		},
 	}, nil
 }
 
-// buildRunEnv declares the run-context roots. The roots are dynamic because the
-// trigger, params, step outputs, and vars are JSON-shaped values whose concrete
-// types aren't known until run time. No `secret()` function is declared.
-func buildRunEnv() (*cel.Env, error) {
-	env, err := cel.NewEnv(
+// runEnvOptions declares the run-context roots. The roots are dynamic because
+// the trigger, params, step outputs, and vars are JSON-shaped values whose
+// concrete types aren't known until run time. No `secret()` function is
+// declared. A fresh slice is returned each call so callers may append safely.
+func runEnvOptions() []cel.EnvOption {
+	return []cel.EnvOption{
 		cel.Variable("trigger", cel.DynType),
 		cel.Variable("params", cel.DynType),
 		cel.Variable("steps", cel.DynType),
 		cel.Variable("vars", cel.DynType),
-	)
+	}
+}
+
+// buildRunEnv builds the default environment: the run-context roots, no `error`.
+func buildRunEnv() (*cel.Env, error) {
+	env, err := cel.NewEnv(runEnvOptions()...)
 	if err != nil {
 		return nil, fmt.Errorf("engine: building CEL environment: %w", err)
 	}
 	return env, nil
 }
 
-// program returns the compiled, cached program for expr. A compile error is
-// terminal (a bad expression does not become valid on retry), so it is returned
-// unwrapped — never as a RetryableError.
-func (e *Evaluator) program(expr string) (cel.Program, error) {
+// buildCatchEnv builds the catch environment: the run-context roots plus the
+// scoped `error` root. It is used only while a caught error is in context.
+func buildCatchEnv() (*cel.Env, error) {
+	opts := append(runEnvOptions(), cel.Variable("error", cel.DynType))
+	env, err := cel.NewEnv(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("engine: building CEL catch environment: %w", err)
+	}
+	return env, nil
+}
+
+// envFor returns the environment for scope.
+func (e *Evaluator) envFor(scope evalScope) *cel.Env {
+	if scope == catchScope {
+		return e.catchEnv
+	}
+	return e.runEnv
+}
+
+// program returns the compiled, cached program for (scope, expr). A compile
+// error is terminal (a bad expression does not become valid on retry), so it is
+// returned unwrapped — never as a RetryableError.
+func (e *Evaluator) program(scope evalScope, expr string) (cel.Program, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if prg, ok := e.programs[expr]; ok {
+	cache := e.programs[scope]
+	if prg, ok := cache[expr]; ok {
 		return prg, nil
 	}
 
-	ast, iss := e.env.Compile(expr)
+	ast, iss := e.envFor(scope).Compile(expr)
 	if iss != nil && iss.Err() != nil {
 		return nil, fmt.Errorf("engine: compiling CEL expression %q: %w", expr, iss.Err())
 	}
 
-	prg, err := e.env.Program(ast, cel.InterruptCheckFrequency(interruptCheckFrequency))
+	prg, err := e.envFor(scope).Program(ast, cel.InterruptCheckFrequency(interruptCheckFrequency))
 	if err != nil {
 		return nil, fmt.Errorf("engine: building CEL program for %q: %w", expr, err)
 	}
 
-	e.programs[expr] = prg
+	cache[expr] = prg
 	return prg, nil
 }
 
 // EvalAny evaluates expr against rc and returns the result as a plain Go value
 // (string, int64, float64, bool, []byte, nil, []any, or map[string]any). Both
 // compile and evaluation errors are terminal.
+//
+// When ctx carries an error scope (set by a catch block or the error_sequence),
+// the expression compiles against the catch environment and the scoped `error`
+// record is added to the activation — so `error.*` is resolvable there and
+// nowhere else. This is the single compile+eval site; the catch scope only
+// supplies one extra activation key on top of the run context.
 func (e *Evaluator) EvalAny(ctx context.Context, expr string, rc *RunContext) (any, error) {
-	prg, err := e.program(expr)
+	scope := runScope
+	activation := rc.activation()
+	if ev, ok := errorScopeFrom(ctx); ok {
+		scope = catchScope
+		activation["error"] = ev
+	}
+
+	prg, err := e.program(scope, expr)
 	if err != nil {
 		return nil, err
 	}
 
-	out, _, err := prg.ContextEval(ctx, rc.activation())
+	out, _, err := prg.ContextEval(ctx, activation)
 	if err != nil {
 		return nil, fmt.Errorf("engine: evaluating CEL expression %q: %w", expr, err)
 	}

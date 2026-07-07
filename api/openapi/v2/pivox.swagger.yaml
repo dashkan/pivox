@@ -11795,6 +11795,12 @@ definitions:
       runWorkflow:
         $ref: '#/definitions/v1RunWorkflowActivity'
         description: A sub-workflow invocation.
+      fail:
+        $ref: '#/definitions/v1FailActivity'
+        description: Raise a catchable error (fails the run unless caught by a Try).
+      end:
+        $ref: '#/definitions/v1EndActivity'
+        description: End the run successfully, skipping all remaining steps.
     description: |-
       Activity is a typed leaf operation. The connector-backed variants (http, ...)
       reference a Connector.
@@ -13083,6 +13089,13 @@ definitions:
       EmptyState is shown when a CollectionWidget's data source returns
       zero rows. It is purely presentational — the renderer composes the
       title, subtitle, icon, and primary action.
+  v1EndActivity:
+    type: object
+    description: |-
+      EndActivity ends the run immediately and SUCCESSFULLY: it unwinds every
+      enclosing block (cancelling in-flight Parallel siblings) and skips all
+      remaining steps. It is NOT an error, so a Try does not intercept it and the
+      error_sequence does not run. The run output is the current run variables.
   v1Endpoint:
     type: object
     properties:
@@ -13170,6 +13183,19 @@ definitions:
         description: |-
           The error message surfaced to the client. Should not carry
           server-internal detail.
+  v1FailActivity:
+    type: object
+    properties:
+      message:
+        type: string
+        description: |-
+          Optional. The failure message surfaced as `error.message` to a catch or
+          the error_sequence. A default is supplied when empty.
+    description: |-
+      FailActivity raises a terminal, catchable error carrying `message`. It
+      propagates like any activity failure: an enclosing Try catches it, and an
+      uncaught fail runs the workflow's `error_sequence` and then FAILs the run. It
+      is never retried.
   v1File:
     type: object
     properties:
@@ -16561,6 +16587,34 @@ definitions:
         $ref: '#/definitions/v1ScheduleTrigger'
         description: Fires on a schedule.
     description: Trigger declares what starts a run automatically.
+  v1Try:
+    type: object
+    properties:
+      body:
+        $ref: '#/definitions/v1Sequence'
+        description: Required. The protected step sequence.
+      catch:
+        $ref: '#/definitions/v1Sequence'
+        description: |-
+          Optional. The handler run when `body` raises a catchable error. Absent =
+          the error is swallowed (when `rethrow` is false) or re-raised as-is (when
+          `rethrow` is true).
+      rethrow:
+        type: boolean
+        description: |-
+          Optional. When true, re-raise the original error after `catch` runs, so the
+          handler observes and reacts but does not suppress the failure.
+    description: |-
+      Try runs `body`; if a step in it raises a catchable error (an activity
+      failure, a `fail`, or a CEL error — but NOT an `end` or context
+      cancellation), `catch` runs with the failure exposed in CEL scope (as
+      `error`). If `catch` completes and `rethrow` is false the error is HANDLED
+      and the flow continues past the Try. If `rethrow` is true the ORIGINAL error
+      is re-raised after `catch` runs. If `catch` itself raises, that new error
+      propagates. This is the nearest error boundary between an activity's own
+      retry and the workflow-level `error_sequence`.
+    required:
+      - body
   v1User:
     type: object
     properties:
@@ -16821,6 +16875,14 @@ definitions:
         format: date-time
         description: Output only. Creation time. Immutable — a version has no update time.
         readOnly: true
+      errorSequence:
+        $ref: '#/definitions/v1Sequence'
+        description: |-
+          Optional. The workflow-level error handler. Runs when `root` fails with an
+          error that no enclosing Try caught, with the failure exposed in CEL scope
+          (as `error`) for cleanup / notify / compensate work. The run is FAILED
+          regardless of this sequence's own outcome. It does NOT run when `root`
+          succeeds or when the run ends early via an `end` activity.
     description: |-
       WorkflowVersion is an IMMUTABLE definition. Editing a workflow mints a new
       one; it is a draft until promoted.
@@ -16864,6 +16926,9 @@ definitions:
       parallel:
         $ref: '#/definitions/v1Parallel'
         description: A parallel block.
+      try:
+        $ref: '#/definitions/v1Try'
+        description: A try/catch error-handling block.
     description: 'Step is one node in the flow: a leaf Activity, a Condition, or a Parallel.'
     required:
       - id

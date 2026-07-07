@@ -75,7 +75,7 @@ func (w *RunWorkflowWorker) Work(ctx context.Context, job *river.Job[runjob.Args
 	log.InfoContext(ctx, "workflow run: running",
 		"workflow_id", run.WorkflowID, "version_id", run.VersionID)
 
-	root, err := w.loadDefinition(ctx, run.VersionID)
+	root, errorSeq, err := w.loadDefinition(ctx, run.VersionID)
 	if err != nil {
 		var td *terminalDefinitionError
 		if errors.As(err, &td) {
@@ -106,7 +106,7 @@ func (w *RunWorkflowWorker) Work(ctx context.Context, job *river.Job[runjob.Args
 	}
 
 	reporter := newRunReporter(w.Pool, runID, log)
-	result, runErr := w.Interpreter.Run(ctx, root, rc, reporter)
+	result, runErr := w.Interpreter.Run(ctx, root, errorSeq, rc, reporter)
 
 	// Retryable infra fault: hand the whole job back to River. The run stays
 	// RUNNING; a later attempt re-executes from the top (begin sees RUNNING, not
@@ -187,31 +187,32 @@ type terminalDefinitionError struct{ cause error }
 func (e *terminalDefinitionError) Error() string { return e.cause.Error() }
 func (e *terminalDefinitionError) Unwrap() error { return e.cause }
 
-// loadDefinition loads the run's pinned version and lifts its root Sequence out
-// of the definition JSONB — symmetric with the workflows service's
-// marshalDefinition write path. It distinguishes terminal errors (wrapped in
-// [terminalDefinitionError]) from transient DB/ctx faults (returned bare) so the
-// caller can retry the latter instead of failing the run.
-func (w *RunWorkflowWorker) loadDefinition(ctx context.Context, versionID uuid.UUID) (*workflowsv1.Sequence, error) {
+// loadDefinition loads the run's pinned version and lifts its root Sequence and
+// optional error_sequence out of the definition JSONB — symmetric with the
+// workflows service's marshalDefinition write path. It distinguishes terminal
+// errors (wrapped in [terminalDefinitionError]) from transient DB/ctx faults
+// (returned bare) so the caller can retry the latter instead of failing the run.
+// errorSeq is nil when the version declares no error_sequence.
+func (w *RunWorkflowWorker) loadDefinition(ctx context.Context, versionID uuid.UUID) (root, errorSeq *workflowsv1.Sequence, err error) {
 	ver, err := db.New(w.Pool).GetWorkflowVersion(ctx, versionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// version_id is a NO ACTION FK while runs exist, so this is
 			// essentially unreachable — but a missing version won't reappear, so
 			// treat it as terminal rather than looping retries forever.
-			return nil, &terminalDefinitionError{fmt.Errorf("pinned version %s not found", versionID)}
+			return nil, nil, &terminalDefinitionError{fmt.Errorf("pinned version %s not found", versionID)}
 		}
-		return nil, fmt.Errorf("load pinned version %s: %w", versionID, err)
+		return nil, nil, fmt.Errorf("load pinned version %s: %w", versionID, err)
 	}
 	var scratch workflowsv1.WorkflowVersion
 	if err := protojson.Unmarshal(ver.Definition, &scratch); err != nil {
-		return nil, &terminalDefinitionError{fmt.Errorf("unmarshal version %s definition: %w", versionID, err)}
+		return nil, nil, &terminalDefinitionError{fmt.Errorf("unmarshal version %s definition: %w", versionID, err)}
 	}
-	root := scratch.GetRoot()
+	root = scratch.GetRoot()
 	if root == nil {
-		return nil, &terminalDefinitionError{fmt.Errorf("version %s has no root sequence", versionID)}
+		return nil, nil, &terminalDefinitionError{fmt.Errorf("version %s has no root sequence", versionID)}
 	}
-	return root, nil
+	return root, scratch.GetErrorSequence(), nil
 }
 
 // loadScope resolves the run's org and space from its workflow row, so the

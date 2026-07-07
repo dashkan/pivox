@@ -101,7 +101,7 @@ func TestInterpreter_LinearSequenceFlowsForward(t *testing.T) {
 		setStep("b", map[string]string{"y": "vars.x + steps.a.output.x"}),
 	)
 
-	res, err := it.Run(context.Background(), root, rc, reporter)
+	res, err := it.Run(context.Background(), root, nil, rc, reporter)
 	require.NoError(t, err)
 
 	assert.Equal(t, RunStatusCompleted, res.Status)
@@ -130,7 +130,7 @@ func TestInterpreter_SetOutputIsAssignedMap(t *testing.T) {
 		"num": "6 * 7",
 	}))
 
-	res, err := it.Run(context.Background(), root, rc, nil)
+	res, err := it.Run(context.Background(), root, nil, rc, nil)
 	require.NoError(t, err)
 	require.Len(t, res.Steps, 1)
 	assert.Equal(t, map[string]any{"msg": "hi world", "num": int64(42)}, res.Steps[0].Output)
@@ -150,7 +150,7 @@ func TestInterpreter_ConditionFirstTrueWins(t *testing.T) {
 		branch("params.n == 2", seq(setStep("dead", map[string]string{"r": `"dead"`}))),
 	))
 
-	res, err := it.Run(context.Background(), root, rc, reporter)
+	res, err := it.Run(context.Background(), root, nil, rc, reporter)
 	require.NoError(t, err)
 	assert.Equal(t, "two", res.Output["r"])
 
@@ -169,7 +169,7 @@ func TestInterpreter_ConditionOtherwiseFallback(t *testing.T) {
 		branch("params.n == 1", seq(setStep("one", map[string]string{"r": `"one"`}))),
 	))
 
-	res, err := it.Run(context.Background(), root, rc, nil)
+	res, err := it.Run(context.Background(), root, nil, rc, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "other", res.Output["r"])
 	assert.Equal(t, map[string]StepStatus{"else": StepStatusSucceeded}, statuses(res.Steps))
@@ -185,7 +185,7 @@ func TestInterpreter_ConditionNoMatchNoOtherwiseIsNoOp(t *testing.T) {
 		branch("params.n == 1", seq(setStep("one", map[string]string{"r": `"one"`}))),
 	))
 
-	res, err := it.Run(context.Background(), root, rc, nil)
+	res, err := it.Run(context.Background(), root, nil, rc, nil)
 	require.NoError(t, err)
 	assert.Equal(t, RunStatusCompleted, res.Status)
 	assert.Empty(t, res.Output)
@@ -202,7 +202,7 @@ func TestInterpreter_ConditionWhenNotBoolIsTerminal(t *testing.T) {
 		branch(`"not a bool"`, seq(setStep("x", map[string]string{"r": "1"}))),
 	))
 
-	res, err := it.Run(context.Background(), root, rc, nil)
+	res, err := it.Run(context.Background(), root, nil, rc, nil)
 	require.Error(t, err)
 	assert.Equal(t, RunStatusFailed, res.Status)
 	assert.Contains(t, err.Error(), "did not evaluate to a bool")
@@ -224,7 +224,7 @@ func TestInterpreter_ParallelRunsConcurrentlyAndJoins(t *testing.T) {
 		seq(httpStep("right")),
 	))
 
-	res, err := it.Run(context.Background(), root, rc, reporter)
+	res, err := it.Run(context.Background(), root, nil, rc, reporter)
 	require.NoError(t, err)
 	assert.Equal(t, RunStatusCompleted, res.Status)
 
@@ -251,7 +251,7 @@ func TestInterpreter_NestedConditionParallelSet(t *testing.T) {
 		)),
 	))
 
-	res, err := it.Run(context.Background(), root, rc, nil)
+	res, err := it.Run(context.Background(), root, nil, rc, nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(10), res.Output["left"])
 	assert.Equal(t, int64(20), res.Output["right"])
@@ -271,7 +271,7 @@ func TestInterpreter_ActivityErrorPropagatesAsFailedRun(t *testing.T) {
 		setStep("never", map[string]string{"b": "2"}),
 	)
 
-	res, err := it.Run(context.Background(), root, rc, reporter)
+	res, err := it.Run(context.Background(), root, nil, rc, reporter)
 	require.ErrorIs(t, err, boom)
 	assert.Equal(t, RunStatusFailed, res.Status)
 	assert.False(t, IsRetryable(err))
@@ -292,7 +292,7 @@ func TestInterpreter_RetryableActivityErrorClassified(t *testing.T) {
 	})
 	rc := NewRunContext(RunContextConfig{})
 
-	res, err := it.Run(context.Background(), seq(httpStep("flaky")), rc, nil)
+	res, err := it.Run(context.Background(), seq(httpStep("flaky")), nil, rc, nil)
 	require.Error(t, err)
 	// The run failed this attempt, but the error is flagged retryable for 6b.
 	assert.Equal(t, RunStatusFailed, res.Status)
@@ -313,7 +313,7 @@ func TestInterpreter_ParallelBranchErrorCancelsSiblings(t *testing.T) {
 		seq(httpStep("sibling")),
 	))
 
-	res, err := it.Run(context.Background(), root, rc, nil)
+	res, err := it.Run(context.Background(), root, nil, rc, nil)
 	require.ErrorIs(t, err, boom)
 	assert.Equal(t, RunStatusFailed, res.Status)
 
@@ -334,7 +334,7 @@ func TestInterpreter_ContextCancelledYieldsCancelledOutcome(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancelled before the walk starts
 
-	res, err := it.Run(ctx, seq(setStep("a", map[string]string{"x": "1"})), rc, nil)
+	res, err := it.Run(ctx, seq(setStep("a", map[string]string{"x": "1"})), nil, rc, nil)
 	require.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, RunStatusCancelled, res.Status)
 	assert.Empty(t, res.Steps, "no step should run under a pre-cancelled context")
@@ -352,7 +352,7 @@ func TestInterpreter_DuplicateStepIDIsTerminal(t *testing.T) {
 		setStep("dup", map[string]string{"b": "2"}),
 	)
 
-	res, err := it.Run(context.Background(), root, rc, reporter)
+	res, err := it.Run(context.Background(), root, nil, rc, reporter)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `duplicate step id "dup"`)
 	assert.Equal(t, RunStatusFailed, res.Status)
@@ -371,7 +371,7 @@ func TestInterpreter_DuplicateStepIDAcrossNesting(t *testing.T) {
 		parallelStep("par", seq(setStep("x", map[string]string{"b": "2"}))),
 	)
 
-	_, err := it.Run(context.Background(), root, rc, nil)
+	_, err := it.Run(context.Background(), root, nil, rc, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `duplicate step id "x"`)
 }
@@ -387,7 +387,7 @@ func TestInterpreter_UnsetActivityKindIsTerminal(t *testing.T) {
 		Kind: &workflowsv1.Step_Activity{Activity: &workflowsv1.Activity{}},
 	}
 
-	_, err := it.Run(context.Background(), seq(emptyActivity), rc, nil)
+	_, err := it.Run(context.Background(), seq(emptyActivity), nil, rc, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unset or unknown activity kind")
 	assert.False(t, IsRetryable(err))
@@ -400,7 +400,7 @@ func TestInterpreter_UnregisteredActivityIsTerminal(t *testing.T) {
 	it := newTestInterpreter(t, DispatcherConfig{})
 	rc := NewRunContext(RunContextConfig{})
 
-	_, err := it.Run(context.Background(), seq(httpStep("h")), rc, nil)
+	_, err := it.Run(context.Background(), seq(httpStep("h")), nil, rc, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not registered")
 }

@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -75,13 +74,29 @@ func NewInterpreter(cfg InterpreterConfig) *Interpreter {
 }
 
 // Run walks root against rc, emitting per-step lifecycle to reporter (which may
-// be nil), and returns the [Result] plus the propagated error. A nil error is a
-// completed run; a context cancellation yields [RunStatusCancelled]; any other
-// error yields [RunStatusFailed]. Step ids must be unique within the version —
-// a duplicate is a terminal error returned before any step runs.
+// be nil), and returns the [Result] plus the propagated error.
+//
+// Outcomes:
+//
+//   - A nil error, or an `end` success-terminate signal, yields
+//     [RunStatusCompleted]. An `end` resolves to success even though it unwinds
+//     like an error, and Run returns a nil error for it — the signal never
+//     surfaces to the caller.
+//   - A context cancellation yields [RunStatusCancelled].
+//   - Any other error yields [RunStatusFailed]. When the failure is an uncaught
+//     terminal error (not retryable), errorSeq — the workflow's
+//     `error_sequence`, which may be nil — runs with the failure exposed in CEL
+//     scope for cleanup/notify/compensate, and the run is FAILED regardless of
+//     the sequence's own outcome. errorSeq does NOT run on success, on an `end`,
+//     on cancellation, or on a retryable (infra) fault (the worker re-runs the
+//     whole job for those, so cleanup would double-fire).
+//
+// Step ids must be unique across root and errorSeq — a duplicate is a terminal
+// error returned before any step runs.
 func (it *Interpreter) Run(
 	ctx context.Context,
 	root *workflowsv1.Sequence,
+	errorSeq *workflowsv1.Sequence,
 	rc *RunContext,
 	reporter StepReporter,
 ) (Result, error) {
@@ -89,7 +104,7 @@ func (it *Interpreter) Run(
 		reporter = nopReporter{}
 	}
 
-	if err := validateUniqueStepIDs(root); err != nil {
+	if err := validateUniqueStepIDs(root, errorSeq); err != nil {
 		return Result{Status: RunStatusFailed, Output: rc.VarsSnapshot()}, err
 	}
 
@@ -102,19 +117,46 @@ func (it *Interpreter) Run(
 
 	err := r.walkSequence(ctx, root)
 
-	result := Result{
-		Steps:  r.snapshotStates(),
-		Output: rc.VarsSnapshot(),
-	}
 	switch {
 	case err == nil:
-		result.Status = RunStatusCompleted
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		result.Status = RunStatusCancelled
+		return r.result(RunStatusCompleted), nil
+	case isEndSignal(err):
+		// `end` unwinds to a successful run; the signal is not a caller error.
+		return r.result(RunStatusCompleted), nil
+	case isContextError(err):
+		return r.result(RunStatusCancelled), err
+	case IsRetryable(err):
+		// Infra fault: the worker hands the whole job back to River, so the
+		// error_sequence must NOT run — it would re-fire on the next attempt.
+		return r.result(RunStatusFailed), err
 	default:
-		result.Status = RunStatusFailed
+		// Uncaught terminal failure: run the error_sequence (if any) with the
+		// failure in CEL scope, then FAIL regardless of its own outcome.
+		r.runErrorSequence(ctx, errorSeq, err)
+		return r.result(RunStatusFailed), err
 	}
-	return result, err
+}
+
+// result snapshots the current walk state into a [Result] with the given status.
+func (r *run) result(status RunStatus) Result {
+	return Result{
+		Status: status,
+		Steps:  r.snapshotStates(),
+		Output: r.rc.VarsSnapshot(),
+	}
+}
+
+// runErrorSequence walks errorSeq (the workflow-level error handler) with cause
+// exposed as the CEL `error` record. Its purpose is best-effort cleanup, so its
+// own outcome is discarded — the run fails either way. A nil/empty errorSeq is a
+// no-op.
+func (r *run) runErrorSequence(ctx context.Context, errorSeq *workflowsv1.Sequence, cause error) {
+	if len(errorSeq.GetSteps()) == 0 {
+		return
+	}
+	ectx := withErrorScope(ctx, buildErrorValue(cause))
+	// Discard the error_sequence's outcome: the run is FAILED regardless.
+	_ = r.walkSequence(ectx, errorSeq)
 }
 
 // run holds the per-invocation walk state. Its states slice is written from
@@ -149,6 +191,8 @@ func (r *run) walkStep(ctx context.Context, step *workflowsv1.Step) error {
 		return r.runCondition(ctx, step)
 	case *workflowsv1.Step_Parallel:
 		return r.runParallel(ctx, step)
+	case *workflowsv1.Step_Try:
+		return r.runTry(ctx, step)
 	default:
 		return fmt.Errorf("engine: step %q has an unset or unknown kind", step.GetId())
 	}
@@ -161,15 +205,34 @@ func (r *run) runActivity(ctx context.Context, step *workflowsv1.Step) error {
 	output, err := r.dispatch.Execute(ctx, r.rc, step)
 	finishedAt := time.Now()
 	if err != nil {
+		// An `end` activity raises the success-terminate signal, not a failure:
+		// record the step as succeeded (it fired), then propagate the signal so
+		// it unwinds every enclosing block.
+		if isEndSignal(err) {
+			r.recordState(StepState{
+				ID:         step.GetId(),
+				Status:     StepStatusSucceeded,
+				StartedAt:  startedAt,
+				FinishedAt: finishedAt,
+			})
+			r.reporter.StepFinished(ctx, step.GetId(), nil, startedAt, finishedAt)
+			return err
+		}
+
+		// Any other activity error is a catchable failure. Wrap it with the
+		// throwing step id so a catch / error_sequence can populate error.step;
+		// the wrapper preserves the cause for errors.Is/As (retryability, HTTP
+		// detail) and message-based inspection.
+		thrown := &thrownError{stepID: step.GetId(), cause: err}
 		r.recordState(StepState{
 			ID:         step.GetId(),
 			Status:     StepStatusFailed,
-			Err:        err,
+			Err:        thrown,
 			StartedAt:  startedAt,
 			FinishedAt: finishedAt,
 		})
-		r.reporter.StepFailed(ctx, step.GetId(), err, startedAt, finishedAt)
-		return err
+		r.reporter.StepFailed(ctx, step.GetId(), thrown, startedAt, finishedAt)
+		return thrown
 	}
 
 	r.rc.SetStepOutput(step.GetId(), output)
@@ -181,6 +244,37 @@ func (r *run) runActivity(ctx context.Context, step *workflowsv1.Step) error {
 		FinishedAt: finishedAt,
 	})
 	r.reporter.StepFinished(ctx, step.GetId(), output, startedAt, finishedAt)
+	return nil
+}
+
+// runTry runs the Try body, and on a catchable failure runs the catch block with
+// the error exposed in CEL scope. An `end` signal and context cancellation are
+// NOT catchable — they unwind straight through. If the catch completes and
+// rethrow is false the failure is HANDLED and the flow continues; if rethrow is
+// true the ORIGINAL error is re-raised after the catch runs; if the catch itself
+// raises, that new error (or `end`) propagates.
+func (r *run) runTry(ctx context.Context, step *workflowsv1.Step) error {
+	try := step.GetTry()
+
+	bodyErr := r.walkSequence(ctx, try.GetBody())
+	if bodyErr == nil {
+		return nil
+	}
+	if isEndSignal(bodyErr) || isContextError(bodyErr) {
+		return bodyErr
+	}
+
+	// Run the catch handler with the caught error resolvable as `error`.
+	catchCtx := withErrorScope(ctx, buildErrorValue(bodyErr))
+	if catchErr := r.walkSequence(catchCtx, try.GetCatch()); catchErr != nil {
+		// The catch raised its own failure (or `end`); that supersedes the
+		// original and propagates.
+		return catchErr
+	}
+
+	if try.GetRethrow() {
+		return bodyErr
+	}
 	return nil
 }
 
@@ -230,12 +324,16 @@ func (r *run) snapshotStates() []StepState {
 	return out
 }
 
-// validateUniqueStepIDs enforces that every step id in the version is unique.
-// The interpreter relies on this to key step outputs (steps.<id>.output); a
-// collision is a terminal definition error.
-func validateUniqueStepIDs(root *workflowsv1.Sequence) error {
+// validateUniqueStepIDs enforces that every step id across root and errorSeq is
+// unique. The interpreter relies on this to key step outputs (steps.<id>.output)
+// — including a catch block or the error_sequence, which read prior outputs — so
+// a collision is a terminal definition error. errorSeq may be nil.
+func validateUniqueStepIDs(root, errorSeq *workflowsv1.Sequence) error {
 	seen := map[string]struct{}{}
-	return checkSequenceIDs(root, seen)
+	if err := checkSequenceIDs(root, seen); err != nil {
+		return err
+	}
+	return checkSequenceIDs(errorSeq, seen)
 }
 
 func checkSequenceIDs(seq *workflowsv1.Sequence, seen map[string]struct{}) error {
@@ -262,6 +360,14 @@ func checkSequenceIDs(seq *workflowsv1.Sequence, seen map[string]struct{}) error
 				if err := checkSequenceIDs(branch, seen); err != nil {
 					return err
 				}
+			}
+		case *workflowsv1.Step_Try:
+			try := step.GetTry()
+			if err := checkSequenceIDs(try.GetBody(), seen); err != nil {
+				return err
+			}
+			if err := checkSequenceIDs(try.GetCatch(), seen); err != nil {
+				return err
 			}
 		}
 	}

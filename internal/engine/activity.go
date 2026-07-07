@@ -70,9 +70,30 @@ func (d *Dispatcher) Execute(ctx context.Context, rc *RunContext, step *workflow
 		return dispatchTo(ctx, rc, step, d.httpActor, "http")
 	case *workflowsv1.Activity_RunWorkflow:
 		return dispatchTo(ctx, rc, step, d.runWorkflow, "run_workflow")
+	case *workflowsv1.Activity_Fail:
+		// `fail` and `end` are intrinsic control-flow activities: they carry no
+		// external dependencies, so they are handled here rather than registered
+		// via DispatcherConfig. `fail` raises a catchable [failError]; the
+		// interpreter wraps it with the throwing step id.
+		return nil, &failError{message: failMessage(activity.GetFail())}
+	case *workflowsv1.Activity_End:
+		// `end` raises the success-terminate signal; the interpreter classifies
+		// it to a COMPLETED run rather than a failure.
+		return nil, errEnd
 	default:
 		return nil, fmt.Errorf("engine: step %q has an unset or unknown activity kind", step.GetId())
 	}
+}
+
+// defaultFailMessage is used when a `fail` activity supplies no message.
+const defaultFailMessage = "workflow failed via fail activity"
+
+// failMessage returns the `fail` activity's message, or a default when empty.
+func failMessage(fail *workflowsv1.FailActivity) string {
+	if msg := fail.GetMessage(); msg != "" {
+		return msg
+	}
+	return defaultFailMessage
 }
 
 func dispatchTo(

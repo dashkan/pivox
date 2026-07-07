@@ -295,6 +295,13 @@ message WorkflowVersion {
 
   // Output only. Creation time. Immutable — a version has no update time.
   google.protobuf.Timestamp create_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. The workflow-level error handler. Runs when `root` fails with an
+  // error that no enclosing Try caught, with the failure exposed in CEL scope
+  // (as `error`) for cleanup / notify / compensate work. The run is FAILED
+  // regardless of this sequence's own outcome. It does NOT run when `root`
+  // succeeds or when the run ends early via an `end` activity.
+  Sequence error_sequence = 8 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // ParameterDef declares one input in a version's contract.
@@ -336,7 +343,38 @@ message Step {
     Condition condition = 3;
     // A parallel block.
     Parallel parallel = 4;
+    // A try/catch error-handling block.
+    // (-- api-linter: core::0140::reserved-words=disabled
+    //     aip.dev/not-precedent: `try` is the universal name for the
+    //     try/catch construct this step implements; any alternative loses the
+    //     idiom every author already knows. --)
+    Try try = 5;
   }
+}
+
+// Try runs `body`; if a step in it raises a catchable error (an activity
+// failure, a `fail`, or a CEL error — but NOT an `end` or context
+// cancellation), `catch` runs with the failure exposed in CEL scope (as
+// `error`). If `catch` completes and `rethrow` is false the error is HANDLED
+// and the flow continues past the Try. If `rethrow` is true the ORIGINAL error
+// is re-raised after `catch` runs. If `catch` itself raises, that new error
+// propagates. This is the nearest error boundary between an activity's own
+// retry and the workflow-level `error_sequence`.
+message Try {
+  // Required. The protected step sequence.
+  Sequence body = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. The handler run when `body` raises a catchable error. Absent =
+  // the error is swallowed (when `rethrow` is false) or re-raised as-is (when
+  // `rethrow` is true).
+  // (-- api-linter: core::0140::reserved-words=disabled
+  //     aip.dev/not-precedent: `catch` pairs with `try` as the standard
+  //     try/catch idiom; renaming it breaks the pairing readers expect. --)
+  Sequence catch = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. When true, re-raise the original error after `catch` runs, so the
+  // handler observes and reacts but does not suppress the failure.
+  bool rethrow = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Condition is an if / else-if / else block. The first branch whose `when`
@@ -376,8 +414,28 @@ message Activity {
     SetActivity set = 2;
     // A sub-workflow invocation.
     RunWorkflowActivity run_workflow = 3;
+    // Raise a catchable error (fails the run unless caught by a Try).
+    FailActivity fail = 4;
+    // End the run successfully, skipping all remaining steps.
+    EndActivity end = 5;
   }
 }
+
+// FailActivity raises a terminal, catchable error carrying `message`. It
+// propagates like any activity failure: an enclosing Try catches it, and an
+// uncaught fail runs the workflow's `error_sequence` and then FAILs the run. It
+// is never retried.
+message FailActivity {
+  // Optional. The failure message surfaced as `error.message` to a catch or
+  // the error_sequence. A default is supplied when empty.
+  string message = 1 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// EndActivity ends the run immediately and SUCCESSFULLY: it unwinds every
+// enclosing block (cancelling in-flight Parallel siblings) and skips all
+// remaining steps. It is NOT an error, so a Try does not intercept it and the
+// error_sequence does not run. The run output is the current run variables.
+message EndActivity {}
 
 // HttpActivity calls an HTTP endpoint through an http Connector, which
 // supplies the base URL, static/credentialed headers, and execution locality.
