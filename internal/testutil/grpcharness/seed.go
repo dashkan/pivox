@@ -118,12 +118,12 @@ func (h *Harness) LookupOrgID(t *testing.T, slug string) uuid.UUID {
 // post-Phase-7 unification the per-org user uuid IS the
 // identity_id, and there's no per-org users row to look
 // up. The orgID parameter is preserved on the signature for
-// caller compatibility but is no longer relevant: a
-// firebase_identity has the same uuid in every org.
-func (h *Harness) LookupOrgUserID(t *testing.T, orgID, firebaseIdentityID uuid.UUID) uuid.UUID {
+// caller compatibility but is no longer relevant: an
+// identity has the same uuid in every org.
+func (h *Harness) LookupOrgUserID(t *testing.T, orgID, identityID uuid.UUID) uuid.UUID {
 	t.Helper()
 	_ = orgID
-	return firebaseIdentityID
+	return identityID
 }
 
 // permission.RoleOwner / RoleAdmin / RoleEditor / RoleViewer are the

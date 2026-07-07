@@ -74,8 +74,8 @@ type CreateOrganizationParams struct {
 }
 
 // `created_by` is the founder pointer post-cleanup (single UUID FK
-// replacing the old `created_by_firebase_identity_id` + TEXT
-// `created_by` pair).
+// to identities(id), replacing the earlier composite created_by
+// identity-id + TEXT `created_by` pair).
 func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error) {
 	row := q.db.QueryRow(ctx, createOrganization,
 		arg.ID,

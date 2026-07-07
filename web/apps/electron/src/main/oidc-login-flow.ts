@@ -24,8 +24,8 @@ const FLOW_TIMEOUT_MS = 5 * 60 * 1000;
 /**
  * How the authorization redirect is caught:
  *   - loopback (default): an ephemeral 127.0.0.1 HTTP server catches Keycloak's
- *     `?code&state` GET directly (OIDC returns them in the query — no hash bounce
- *     like the old Firebase broker). Works in electron-vite dev + packaged.
+ *     `?code&state` GET directly (OIDC returns them in the query — no hash bounce).
+ *     Works in electron-vite dev + packaged.
  *   - scheme: the OIDC redirect_uri is the branded HTTPS landing page
  *     (SCHEME_LANDING_URL); that page forwards the callback params into the app
  *     via the pivox://oidc-callback custom scheme (caught by the deep-link

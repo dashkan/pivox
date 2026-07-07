@@ -7,8 +7,9 @@
       Content Security Policy for the renderer.
 
       Auth runs in the system browser (the main-process OIDC flow — see
-      main/oidc-login-flow.ts), so the renderer needs no Firebase/Google
-      origins: it only talks to the Pivox cloud and its own bundled assets.
+      main/oidc-login-flow.ts), so the renderer needs no external
+      identity-provider origins: it only talks to the Pivox cloud and its
+      own bundled assets.
 
       `connect-src` allow-list:
         - 'self'                  — vite dev server + bundled assets (+ HMR ws)

@@ -15,9 +15,9 @@ import (
 // AuthInterceptor sets. Both transports converge on the same
 // authenticateBearer core in auth_interceptor.go so they cannot drift.
 //
-// Token-type routing (Firebase ID token vs Keycloak access token) is
-// handled inside the authn.Service implementation — production wires
-// the OIDC wrapper; tests use either.
+// Token verification is handled inside the authn.Service
+// implementation — production wires the OIDC (Keycloak) verifier;
+// tests use either.
 //
 // On failure: writes 401 with the body "unauthorized" and logs the
 // reason at warn level. The body is intentionally generic so that

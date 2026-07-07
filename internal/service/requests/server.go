@@ -580,10 +580,9 @@ func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRe
 		}
 		// TODO: pass the caller's identity id through to the
 		// `assignee` column once that column also moves to UUID FK
-		// (it's currently TEXT and stores the firebase_uid). For now,
-		// only the audit `updated_by` is populated with the caller's
-		// UUID; `assignee` is left empty until the broader UUID
-		// migration covers it.
+		// (it's currently TEXT). For now, only the audit `updated_by`
+		// is populated with the caller's UUID; `assignee` is left
+		// empty until the broader UUID migration covers it.
 		//
 		// Resolved inside the closure (after the precondition check)
 		// so handler-level state-mismatch returns don't trip

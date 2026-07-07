@@ -49,7 +49,7 @@
 # gRPC by Envoy and sent to the same servers — retiring grpc-gateway.
 #
 # What still goes to the Go process on :8080 (the old gateway port):
-#   - /internal/  — plain HTTP hooks (Firebase blocking fns), not gRPC.
+#   - /internal/  — plain HTTP hooks (identity-sync / registration webhooks), not gRPC.
 #   - AiChat REST (:generateContent / :streamGenerateContent) — the SSE
 #     ai-sdk stream format is produced by Go and can't be reproduced by
 #     the generic transcoder, so AiChat is deliberately NOT transcoded.
@@ -365,7 +365,7 @@ static_resources:
                               allow_credentials: true
 
                         # --- Internal hooks -> Go gateway (8080) -------------
-                        # Plain HTTP handlers (Firebase blocking fns), NOT gRPC.
+                        # Plain HTTP handlers (identity-sync / registration webhooks), NOT gRPC.
                         # Stays on Go; transcoder passes through (no http rule).
                         - match: { prefix: "/internal/" }
                           route: { cluster: rest_gateway, timeout: 60s }

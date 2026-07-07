@@ -1,5 +1,5 @@
 # Mockery v3 config — generates testify-style mocks for interfaces
-# we mock at *external* boundaries (Firebase auth, etc.).
+# we mock at *external* boundaries (the authn.Service / OIDC token verifier, etc.).
 #
 # Internal interfaces (Querier, etc.) are NOT mocked per #71 —
 # service-layer tests use grpcharness against a real DB. Adding a

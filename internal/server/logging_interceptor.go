@@ -14,9 +14,9 @@ import (
 
 // LoggingUnaryInterceptor logs the outcome of every unary RPC: method,
 // status code, latency, and the caller's Pivox identity UUID when
-// present (the stable internal `identities.id`, not the Firebase UID).
-// On
-// failure, also logs the underlying error message. Log level is
+// present (the stable internal `identities.id`, i.e. the Keycloak
+// `sub`). On failure, also logs the underlying error message. Log
+// level is
 // chosen by status code so noisy expected client errors
 // (`NotFound`, `InvalidArgument`, ...) don't drown out real bugs:
 //

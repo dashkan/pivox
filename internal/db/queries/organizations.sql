@@ -14,8 +14,8 @@ SELECT * FROM organizations WHERE name = $1;
 
 -- name: CreateOrganization :one
 -- `created_by` is the founder pointer post-cleanup (single UUID FK
--- replacing the old `created_by_firebase_identity_id` + TEXT
--- `created_by` pair).
+-- to identities(id), replacing the earlier composite created_by
+-- identity-id + TEXT `created_by` pair).
 INSERT INTO organizations (id, name, display_name, created_by)
 VALUES ($1, $2, $3, $4)
 RETURNING *;

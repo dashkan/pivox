@@ -30,7 +30,7 @@ func SpaceTarget(spaceID uuid.UUID) Target {
 	return Target{SpaceID: spaceID}
 }
 
-// Resolver answers "does this Firebase identity have this permission
+// Resolver answers "does this identity have this permission
 // against this target scope?" by resolving the identity's effective
 // permissions through the `role_permissions` table — joining
 // org_members / space_members / group_members against role_permissions

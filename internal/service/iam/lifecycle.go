@@ -130,13 +130,14 @@ func parseUserUUID(name, expectedOrg string) (uuid.UUID, error) {
 }
 
 // ===========================================================================
-// DeleteAccount — global Pivox + Firebase account deletion (singleton).
+// DeleteAccount — global Pivox account deletion (singleton).
 // ===========================================================================
 
 // DeleteAccount deletes the authenticated caller's global Pivox
-// account, cascading through every org they're in, then deletes the
-// underlying Firebase Auth identity. The path is always
-// `accounts/me`; the caller is implicit from the auth context.
+// account, cascading through every org they're in and soft-deleting
+// their identity row. The Keycloak realm user is deleted out-of-band
+// (via Keycloak's own account console / admin flows). The path is
+// always `accounts/me`; the caller is implicit from the auth context.
 //
 // On the membership-exempt list (no permission required) so a
 // memberless caller stuck in a half-bootstrapped state can still
@@ -149,24 +150,20 @@ func parseUserUUID(name, expectedOrg string) (uuid.UUID, error) {
 //     listing them. Resolve via Organizations.TransferOwnership
 //     or Organizations.DeleteOrganization on each.
 //  2. REVOKING_MEMBERSHIPS — drop every org_members and
-//     space_members row whose principal is a per-org users row
-//     owned by this firebase_identity. Cross-org.
-//  3. DELETING_PIVOX_RECORDS — capture the Firebase UID, then
-//     soft-delete the identities row (PII blanked, is_deleted=true).
-//     The row itself stays so created_by/updated_by/deleted_by
-//     references on other tables still resolve to an Actor proto;
-//     org_members and space_members for this identity were already
-//     removed in Phase 2 (REVOKING_MEMBERSHIPS), and group_members
-//     ride on those (FK + same-tx).
-//  4. DELETING_FIREBASE_IDENTITY — Firebase Admin SDK DeleteUser.
-//     Idempotent on already-deleted UIDs so retry-from-this-phase
-//     is safe.
-//  5. COMPLETED.
+//     space_members row whose principal is this identity. Cross-org.
+//  3. DELETING_PIVOX_RECORDS — soft-delete the identities row (PII
+//     blanked, is_deleted=true). The row itself stays so
+//     created_by/updated_by/deleted_by references on other tables
+//     still resolve to an Actor proto; org_members and space_members
+//     for this identity were already removed in Phase 2
+//     (REVOKING_MEMBERSHIPS), and group_members ride on those
+//     (FK + same-tx).
+//  4. COMPLETED.
 //
-// Why Pivox owns this verb: Firebase Auth has no blocking
-// pre-delete trigger, so server-side validation of the sole-owner
-// check requires Pivox to be the entry point. The webhook for
-// direct-Firebase-Console bypass is a separate fallback.
+// Why Pivox owns this verb: the sole-owner precondition must be
+// validated server-side before any deletion, so Pivox is the entry
+// point. Removal of the Keycloak realm user is a separate,
+// out-of-band step.
 func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountRequest) (*longrunningpb.Operation, error) {
 	if req.GetName() != "accounts/me" {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",

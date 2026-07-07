@@ -66,15 +66,12 @@ func MustUserID(ctx context.Context) uuid.UUID {
 // header). Returns the context augmented with userIDKey, or
 // an apierr.Unauthenticated error.
 //
-// The interceptor doesn't know or care which kind of token this is
-// (Firebase ID token, Keycloak access token, anything else we add) —
+// The interceptor doesn't know or care about the token internals —
 // it asks `auth.VerifyToken` and trusts whatever Identity comes back.
-// Routing across token shapes lives in the authn.Service
-// implementation; in production that's the OIDC wrapper (oidcAuthService),
-// which inspects the JWT issuer and dispatches Keycloak tokens to the
-// OIDC verifier and everything else to the wrapped Firebase service.
-// Tests can pass a bare Firebase service or the wrapper — the
-// interceptor doesn't change either way.
+// Token verification lives in the authn.Service implementation; in
+// production that's the OIDC (Keycloak) verifier, which checks the
+// JWT issuer/audience and returns the caller identity. Tests can pass
+// a stub service — the interceptor doesn't change either way.
 //
 // This is the single source of truth for "bearer auth" across the
 // codebase — gRPC unary/stream interceptors and the HTTP middleware
@@ -132,8 +129,8 @@ func authenticate(ctx context.Context, auth authn.Service) (context.Context, err
 
 // AuthInterceptor returns a gRPC unary server interceptor that
 // verifies bearer tokens via the provided authn.Service. The service
-// is responsible for any token-type routing internally — production
-// wires the OIDC wrapper (Keycloak + Firebase); tests can pass either.
+// is responsible for token verification internally — production
+// wires the OIDC (Keycloak) verifier; tests can pass a stub.
 //
 // Scope: this interceptor is registered on the public gRPC server only.
 // Service-to-service traffic (e.g. AgentService) lives on a separate

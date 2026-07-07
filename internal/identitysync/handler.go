@@ -4,9 +4,8 @@
 // to the `keycloak-events` Kafka topic; this package consumes that
 // topic and keeps the `identities` table in sync.
 //
-// Why this exists: the Firebase `syncIdentity` blocking function was
-// removed, so nothing provisioned a Pivox identity at sign-up. A
-// freshly-registered Keycloak user had no `identities` row, so they
+// Why this exists: nothing else provisions a Pivox identity at
+// sign-up. A freshly-registered Keycloak user had no `identities` row, so they
 // owned no orgs and the first CreateOrganization failed the
 // `created_by` FK with a 23503. This consumer closes that gap by
 // upserting the identity (id = the Keycloak `sub`) on REGISTER, and
@@ -138,7 +137,7 @@ func (h *Handler) upsert(ctx context.Context, ev event) error {
 		if isEmailAlreadyOwned(err) {
 			// Permanently undeliverable: the email already belongs to a
 			// different sub — a duplicate Keycloak user for the same person
-			// (e.g. a Firebase-era local user alongside a brokered login).
+			// (e.g. a legacy local user alongside a brokered login).
 			// Retrying can't resolve it (the unique index will always
 			// reject), so skip-and-log rather than wedge the partition. The
 			// duplicate is reconciled at the Keycloak level, not here.

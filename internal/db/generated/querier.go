@@ -165,8 +165,8 @@ type Querier interface {
 	// group_id stays NULL.
 	CreateOrgUserMember(ctx context.Context, arg CreateOrgUserMemberParams) (CreateOrgUserMemberRow, error)
 	// `created_by` is the founder pointer post-cleanup (single UUID FK
-	// replacing the old `created_by_firebase_identity_id` + TEXT
-	// `created_by` pair).
+	// to identities(id), replacing the earlier composite created_by
+	// identity-id + TEXT `created_by` pair).
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateRequest(ctx context.Context, arg CreateRequestParams) (AssetRequest, error)
 	// Inserts a role row. Used by CreateOrganization to seed the 4 system
@@ -445,17 +445,6 @@ type Querier interface {
 	GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceMemberByGroup(ctx context.Context, arg GetSpaceMemberByGroupParams) (GetSpaceMemberByGroupRow, error)
 	GetSpaceMemberByUser(ctx context.Context, arg GetSpaceMemberByUserParams) (GetSpaceMemberByUserRow, error)
-	// GetSsoConfigByFirebaseProviderID is the query backing the
-	// POST /internal/v1/sso:getProviderConfig endpoint. The OAuth
-	// broker (web/start) calls this with a provider id (e.g. `oidc.acme`)
-	// to fetch the issuer / client_id / encrypted client_secret it needs
-	// to drive the OIDC code-flow handshake against the IdP. Joins
-	// organizations so the broker can include the org slug in the
-	// response (used in logs + as a context tag).
-	// Returns no rows when the provider id is unknown OR SsoConfig is
-	// disabled — broker-callable identifiers should both be present and
-	// enabled to drive a valid sign-in.
-	GetSsoConfigByFirebaseProviderID(ctx context.Context, firebaseProviderID string) (GetSsoConfigByFirebaseProviderIDRow, error)
 	// GetSsoConfigByOrgID looks up the SSO config row for an org, if
 	// one exists. UNIQUE(org_id) ensures at most one row. Used by
 	// GetSsoConfig to surface the current config to the caller.
@@ -821,13 +810,6 @@ type Querier interface {
 	// terminal states the caller doesn't need to act on.
 	//
 	ReleaseConversationLease(ctx context.Context, arg ReleaseConversationLeaseParams) error
-	// ResolveProviderByDomain is the query backing the
-	// POST /internal/v1/auth:resolveProvider endpoint. Joins the
-	// email's domain to the SsoConfig via the verified Domain row and
-	// returns the firebase_provider_id when SSO is enabled. Returns no
-	// rows for any of: domain not claimed, domain not VERIFIED, no
-	// SsoConfig row, SsoConfig.enabled=false.
-	ResolveProviderByDomain(ctx context.Context, domain string) (ResolveProviderByDomainRow, error)
 	// Returns the catalog permission_id strings granted to a role via
 	// role_permissions (inverse of GrantPermissionsToRole). Used to assert
 	// bootstrap/seed populated the grant rows correctly.
@@ -862,9 +844,8 @@ type Querier interface {
 	// second call surfaces ErrNoRows — the caller is expected to
 	// distinguish "real first-time tombstone" from "wrong ID / already
 	// tombstoned" rather than silently no-op-and-continue (a wrong id
-	// would otherwise let the LRO proceed to auth.DeleteUser with a
-	// firebase_uid that doesn't belong to the row we thought we
-	// deleted).
+	// would otherwise let the LRO proceed having tombstoned an identity
+	// that isn't the row we thought we deleted).
 	SoftDeleteIdentity(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	// SoftDeleteOrganization transitions an ACTIVE org to DELETE_REQUESTED.
 	// Sets delete_time=now, purge_time=now+30 days, deleted_by=$2. Refuses
@@ -977,9 +958,8 @@ type Querier interface {
 	// UpsertSsoConfig is the create-or-update for the per-org SsoConfig
 	// singleton. ON CONFLICT (org_id) DO UPDATE — UNIQUE(org_id)
 	// ensures at most one row per org, so the upsert is unambiguous.
-	// The handler decides whether to call CreateOidcProvider vs
-	// UpdateOidcProvider on Firebase based on whether a row already
-	// existed; this query is the local-state half of the operation.
+	// This persists the Pivox-side SSO metadata; Keycloak owns the
+	// upstream provider brokering.
 	//
 	// client_secret_ciphertext is the KMS-envelope-encrypted secret.
 	// The COALESCE+NULLIF on UPDATE collapses both Go nil (binds SQL

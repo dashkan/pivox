@@ -52,7 +52,7 @@ type EncryptionConfig struct {
 type OIDCConfig struct {
 	// Issuer is the exact `iss` accepted tokens must carry
 	// (e.g. https://pivox.ngrok.app/realms/pivox). Empty leaves OIDC auth off
-	// (Firebase-only) during the migration.
+	// entirely (unauthenticated; dev/test only).
 	Issuer string
 
 	// Audience the access token's `aud` must contain — the value of the

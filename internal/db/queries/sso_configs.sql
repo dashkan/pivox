@@ -23,9 +23,8 @@ SELECT * FROM sso_configs WHERE org_id = $1 FOR UPDATE;
 -- UpsertSsoConfig is the create-or-update for the per-org SsoConfig
 -- singleton. ON CONFLICT (org_id) DO UPDATE — UNIQUE(org_id)
 -- ensures at most one row per org, so the upsert is unambiguous.
--- The handler decides whether to call CreateOidcProvider vs
--- UpdateOidcProvider on Firebase based on whether a row already
--- existed; this query is the local-state half of the operation.
+-- This persists the Pivox-side SSO metadata; Keycloak owns the
+-- upstream provider brokering.
 --
 -- client_secret_ciphertext is the KMS-envelope-encrypted secret.
 -- The COALESCE+NULLIF on UPDATE collapses both Go nil (binds SQL
@@ -36,12 +35,11 @@ SELECT * FROM sso_configs WHERE org_id = $1 FOR UPDATE;
 -- callers that want to disable SSO flip `enabled=false` instead.
 -- name: UpsertSsoConfig :one
 INSERT INTO sso_configs (
-    org_id, firebase_provider_id, display_name, enabled,
+    org_id, display_name, enabled,
     oidc_config, saml_config, client_secret_ciphertext,
     created_by, updated_by
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
 ON CONFLICT (org_id) DO UPDATE SET
-    firebase_provider_id     = EXCLUDED.firebase_provider_id,
     display_name             = EXCLUDED.display_name,
     enabled                  = EXCLUDED.enabled,
     oidc_config              = EXCLUDED.oidc_config,
@@ -55,41 +53,3 @@ ON CONFLICT (org_id) DO UPDATE SET
     revision                 = sso_configs.revision + 1,
     etag                     = md5(now()::text || sso_configs.revision::text)
 RETURNING *;
-
--- ResolveProviderByDomain is the query backing the
--- POST /internal/v1/auth:resolveProvider endpoint. Joins the
--- email's domain to the SsoConfig via the verified Domain row and
--- returns the firebase_provider_id when SSO is enabled. Returns no
--- rows for any of: domain not claimed, domain not VERIFIED, no
--- SsoConfig row, SsoConfig.enabled=false.
--- name: ResolveProviderByDomain :one
-SELECT s.firebase_provider_id, s.org_id
-  FROM domains d
-  JOIN sso_configs s ON s.org_id = d.org_id
- WHERE d.domain      = $1
-   AND d.state       = 'VERIFIED'
-   AND s.enabled     = true
- LIMIT 1;
-
--- GetSsoConfigByFirebaseProviderID is the query backing the
--- POST /internal/v1/sso:getProviderConfig endpoint. The OAuth
--- broker (web/start) calls this with a provider id (e.g. `oidc.acme`)
--- to fetch the issuer / client_id / encrypted client_secret it needs
--- to drive the OIDC code-flow handshake against the IdP. Joins
--- organizations so the broker can include the org slug in the
--- response (used in logs + as a context tag).
--- Returns no rows when the provider id is unknown OR SsoConfig is
--- disabled — broker-callable identifiers should both be present and
--- enabled to drive a valid sign-in.
--- name: GetSsoConfigByFirebaseProviderID :one
-SELECT s.org_id,
-       s.firebase_provider_id,
-       s.oidc_config,
-       s.saml_config,
-       s.client_secret_ciphertext,
-       o.name AS org_slug
-  FROM sso_configs s
-  JOIN organizations o ON o.id = s.org_id
- WHERE s.firebase_provider_id = $1
-   AND s.enabled              = true
- LIMIT 1;

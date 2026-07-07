@@ -38,7 +38,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// A user within an organization. Users are synced from Firebase Auth and
+// A user within an organization. Users are synced from Keycloak and
 // are read-only via `Iam.GetUser` / `Iam.ListUsers`.
 type User struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -378,7 +378,7 @@ func (x *ListUsersResponse) GetNextPageToken() string {
 //
 // Org-scoped removal: removes a user FROM a single org. The user's
 // Pivox account itself is unaffected; their memberships in OTHER
-// orgs are unaffected; their Firebase Auth identity is unaffected.
+// orgs are unaffected; their Keycloak identity is unaffected.
 // Use `Iam.DeleteAccount` for global account deletion.
 //
 // Sole-owner blocking: if removing this user from this org would

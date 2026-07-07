@@ -24,8 +24,8 @@ services:
       - ./.docker/rustfs:/data
 
   # Local Keycloak — used as a development IDP to validate Pivox SSO
-  # configuration against a real OIDC/SAML provider before we wire up
-  # Firebase Auth provider configs. Serves at ROOT (no /keycloak base
+  # configuration against a real OIDC/SAML provider. Keycloak is the
+  # auth IDP for the stack. Serves at ROOT (no /keycloak base
   # path): envoy proxies /realms/ + /resources/ for the browser SSO
   # login flow. Admin UI is reached directly at http://localhost:8082/
   # (not via envoy). Matches the Aspire keycloak so the issuer

@@ -47,13 +47,11 @@ const (
 	DeleteAccountMetadata_VALIDATING DeleteAccountMetadata_Phase = 1
 	// Removing role / group memberships across all orgs.
 	DeleteAccountMetadata_REVOKING_MEMBERSHIPS DeleteAccountMetadata_Phase = 2
-	// Hard-deleting Pivox-side records (firebase_identities row;
-	// FK cascade removes per-org users + group_members).
+	// Soft-deleting the Pivox-side identity row (PII blanked,
+	// is_deleted=true; the row is preserved for audit references).
 	DeleteAccountMetadata_DELETING_PIVOX_RECORDS DeleteAccountMetadata_Phase = 3
-	// Deleting the Firebase Auth identity (last step).
-	DeleteAccountMetadata_DELETING_FIREBASE_IDENTITY DeleteAccountMetadata_Phase = 4
 	// Done.
-	DeleteAccountMetadata_COMPLETED DeleteAccountMetadata_Phase = 5
+	DeleteAccountMetadata_COMPLETED DeleteAccountMetadata_Phase = 4
 )
 
 // Enum value maps for DeleteAccountMetadata_Phase.
@@ -63,16 +61,14 @@ var (
 		1: "VALIDATING",
 		2: "REVOKING_MEMBERSHIPS",
 		3: "DELETING_PIVOX_RECORDS",
-		4: "DELETING_FIREBASE_IDENTITY",
-		5: "COMPLETED",
+		4: "COMPLETED",
 	}
 	DeleteAccountMetadata_Phase_value = map[string]int32{
-		"PHASE_UNSPECIFIED":          0,
-		"VALIDATING":                 1,
-		"REVOKING_MEMBERSHIPS":       2,
-		"DELETING_PIVOX_RECORDS":     3,
-		"DELETING_FIREBASE_IDENTITY": 4,
-		"COMPLETED":                  5,
+		"PHASE_UNSPECIFIED":      0,
+		"VALIDATING":             1,
+		"REVOKING_MEMBERSHIPS":   2,
+		"DELETING_PIVOX_RECORDS": 3,
+		"COMPLETED":              4,
 	}
 )
 
@@ -104,28 +100,27 @@ func (DeleteAccountMetadata_Phase) EnumDescriptor() ([]byte, []int) {
 }
 
 // Account is the singleton representing the authenticated caller's
-// global Pivox account, mirrored from Firebase Auth. The resource
-// exists as an addressing target for custom verbs Pivox legitimately
-// owns (today: DeleteAccount; future: data export, account
-// disable, etc.). Standard methods (Get, List, Update, Create) are
-// intentionally NOT exposed:
+// global Pivox account, mirrored from the Keycloak identity. The
+// resource exists as an addressing target for custom verbs Pivox
+// legitimately owns (today: DeleteAccount; future: data export,
+// account disable, etc.). Standard methods (Get, List, Update,
+// Create) are intentionally NOT exposed:
 //
 //   - Profile fields (email, display_name, photo_url, email_verified)
-//     live in Firebase Auth and are mutated through the Firebase SDK
-//     on the client. Pivox replicates them via the
-//     `auth:syncFirebaseIdentity` blocking trigger on every sign-in.
-//     Surfacing Get/Update here would either expose stale replicas or
-//     force Pivox to write through to Firebase from the server, both
-//     of which violate the "Firebase owns the account profile" rule.
+//     are owned by Keycloak and synced into Pivox via the
+//     KC→Kafka→Pivox identity-sync pipeline. Surfacing Get/Update
+//     here would either expose stale replicas or force Pivox to
+//     write through to the IdP from the server, both of which
+//     violate the "Keycloak owns the account profile" rule.
 //
-//   - Create is implicit via Firebase sign-up + the syncFirebaseIdentity
-//     trigger; not a public RPC.
+//   - Create is implicit via Keycloak registration + the identity-
+//     sync pipeline; not a public RPC.
 //
 // (-- api-linter: core::0121::resource-must-support-get=disabled
 //
-//	aip.dev/not-precedent: Account is a singleton mirroring Firebase
-//	Auth state; profile reads come from the Firebase SDK on the
-//	client. Pivox only owns delete-class verbs against this
+//	aip.dev/not-precedent: Account is a singleton mirroring the
+//	Keycloak identity; profile reads come from the identity-sync
+//	pipeline. Pivox only owns delete-class verbs against this
 //	resource. --)
 //
 // (-- api-linter: core::0121::resource-must-support-list=disabled
@@ -242,18 +237,16 @@ func (x *DeleteAccountRequest) GetName() string {
 //     them. The caller resolves by TransferOwnership or by
 //     DeleteOrganization on each.
 //  2. REVOKING_MEMBERSHIPS — drops every org_members and
-//     space_members row whose principal is a per-org users row
-//     owned by this firebase_identity. Cross-org by design.
-//  3. DELETING_PIVOX_RECORDS — hard-deletes the firebase_identities
-//     row. ON DELETE CASCADE removes per-org users + their
-//     group_members.
-//  4. DELETING_FIREBASE_IDENTITY — calls Firebase Admin SDK
-//     DeleteUser(uid). Idempotent on already-deleted UIDs so a
-//     retry from this phase is safe.
-//  5. COMPLETED.
+//     space_members row whose principal is this identity.
+//     Cross-org by design.
+//  3. DELETING_PIVOX_RECORDS — soft-deletes the identities row
+//     (PII blanked, is_deleted=true). The row itself is preserved
+//     so audit *_by references still resolve.
+//  4. COMPLETED.
 //
-// The Firebase identity is deleted LAST so a partial failure leaves
-// a recoverable provider account rather than orphaned Pivox state.
+// The Keycloak realm user is deleted out-of-band (via Keycloak's own
+// account console / admin flows), so the LRO owns only the Pivox-side
+// records.
 type DeleteAccountMetadata struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. Current phase of the cascade.
@@ -522,18 +515,17 @@ const file_pivox_iam_v1_accounts_proto_rawDesc = "" +
 	"\x11pivox.iam/Account\x12\x12accounts/{account}*\baccounts2\aaccount\"K\n" +
 	"\x14DeleteAccountRequest\x123\n" +
 	"\x04name\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
-	"\x11pivox.iam/Account\xbaH\x03\xc8\x01\x01R\x04name\"\x92\x02\n" +
+	"\x11pivox.iam/Account\xbaH\x03\xc8\x01\x01R\x04name\"\xf1\x01\n" +
 	"\x15DeleteAccountMetadata\x12D\n" +
 	"\x05phase\x18\x01 \x01(\x0e2).pivox.iam.v1.DeleteAccountMetadata.PhaseB\x03\xe0A\x03R\x05phase\x12\x1d\n" +
-	"\aaccount\x18\x02 \x01(\tB\x03\xe0A\x03R\aaccount\"\x93\x01\n" +
+	"\aaccount\x18\x02 \x01(\tB\x03\xe0A\x03R\aaccount\"s\n" +
 	"\x05Phase\x12\x15\n" +
 	"\x11PHASE_UNSPECIFIED\x10\x00\x12\x0e\n" +
 	"\n" +
 	"VALIDATING\x10\x01\x12\x18\n" +
 	"\x14REVOKING_MEMBERSHIPS\x10\x02\x12\x1a\n" +
-	"\x16DELETING_PIVOX_RECORDS\x10\x03\x12\x1e\n" +
-	"\x1aDELETING_FIREBASE_IDENTITY\x10\x04\x12\r\n" +
-	"\tCOMPLETED\x10\x05\"\x9a\x01\n" +
+	"\x16DELETING_PIVOX_RECORDS\x10\x03\x12\r\n" +
+	"\tCOMPLETED\x10\x04\"\x9a\x01\n" +
 	"\x13AccountOrganization\x12B\n" +
 	"\forganization\x18\x01 \x01(\tB\x1e\xe0A\x03\xfaA\x18\n" +
 	"\x16pivox.api/OrganizationR\forganization\x12&\n" +

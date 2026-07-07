@@ -372,7 +372,7 @@ func serve(cmd *cobra.Command, _ []string) error {
 
 	// Keycloak → Pivox identity-sync consumer. Provisions / tombstones
 	// `identities` rows from the keycloak-events Kafka topic (the
-	// replacement for the removed Firebase syncIdentity blocking fn).
+	// KC event-sync that replaced the old sign-in identity hook).
 	// Runs on the pivox pool; shuts down when ctx cancels (it polls with
 	// ctx and closes its kgo client on return).
 	brokers := strings.Split(kafkaBrokers, ",")

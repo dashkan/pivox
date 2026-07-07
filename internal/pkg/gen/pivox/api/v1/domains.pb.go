@@ -51,8 +51,8 @@ const (
 	// associated `CreateDomain` LRO is either in flight or expired.
 	Domain_PENDING Domain_State = 1
 	// The DNS TXT record was observed and matches the issued
-	// `verification_token`. The domain participates in
-	// `auth:resolveProvider` lookups (and any other consumers).
+	// `verification_token`. The domain routes to the org's SSO
+	// config when SSO is enabled.
 	Domain_VERIFIED Domain_State = 2
 	// Verification failed unrecoverably (e.g. token mismatch
 	// detected after a previous VERIFIED state, or the LRO expired

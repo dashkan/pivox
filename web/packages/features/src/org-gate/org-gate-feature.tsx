@@ -9,7 +9,7 @@ import type { ApiClient } from '@pivox/client';
 /**
  * Gates the authenticated app shell on the user having ≥1 organization.
  *
- *   - While Firebase auth is settling or the list call is in flight,
+ *   - While Keycloak/OIDC auth is settling or the list call is in flight,
  *     renders a tiny "Loading your organizations…" splash.
  *   - When the user has zero orgs, returns a `<Navigate />` to
  *     `/auth/create-org`. The router primitive is Strict-Mode-safe

@@ -51,13 +51,13 @@ const (
 // considers `pivox.types` a shared types namespace.
 //
 // Resolution is performed server-side via the audit.Resolver, which
-// batches lookups against firebase_identities and caches recent
+// batches lookups against identities and caches recent
 // results. When the underlying identity is soft-deleted the resolver
 // blanks out PII (display_name, email) and sets is_deleted=true while
 // preserving the id so that historical references remain stable.
 type Actor struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The identity's stable UUID (firebase_identities.id). Always
+	// The identity's stable UUID (identities.id). Always
 	// populated when the column is non-null in the database, even for
 	// soft-deleted identities.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`

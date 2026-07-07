@@ -26,7 +26,7 @@ import (
 )
 
 // ===========================================================================
-// DeleteAccount — global Pivox + Firebase cascade.
+// DeleteAccount — global Pivox account cascade.
 // ===========================================================================
 
 // TestE2E_DeleteAccount_SoleOwnerBlocked pins cross-org sole-owner
@@ -152,7 +152,7 @@ func TestE2E_DeleteAccount_RejectsNonMeName(t *testing.T) {
 // TestE2E_DeleteUser_AdminRemovesUserFromOrg pins the happy path:
 // an org admin removes another user from their org. The user's
 // per-org bindings + users row in this org are gone, but their
-// firebase_identity is untouched and they remain a member of OTHER
+// identity is untouched and they remain a member of OTHER
 // orgs (proving the cascade is org-scoped).
 func TestE2E_DeleteUser_AdminRemovesUserFromOrg(t *testing.T) {
 	if testing.Short() {

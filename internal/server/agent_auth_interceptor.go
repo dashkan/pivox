@@ -55,7 +55,7 @@ func WithAuthenticatedGateway(ctx context.Context, gateway db.StorageGateway) co
 //
 // Scope: this interceptor is registered on the service-to-service gRPC
 // server only (cmd/pivox-cloud/main.go). The public gRPC server has a
-// separate chain that enforces Firebase bearer auth. Network-level
+// separate chain that enforces OIDC bearer auth. Network-level
 // isolation between the two surfaces means this interceptor doesn't need
 // to filter methods — every stream that reaches it must authenticate.
 func AgentAuthStreamInterceptor(queries db.Querier) grpc.StreamServerInterceptor {

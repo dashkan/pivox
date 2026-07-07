@@ -26,9 +26,16 @@ import (
 // VALIDATING (sole-owner check) → REVOKING_MEMBERSHIPS (drop org +
 // space members) → DELETING_PIVOX_RECORDS (soft-delete identity).
 //
-// The Keycloak realm user is deleted out-of-band (via Keycloak's own
-// admin flows / account console), so the LRO only owns the Pivox-side
-// records. Each phase does its own short tx; River's retry contract
+// The Keycloak realm user is currently deleted out-of-band (via
+// Keycloak's own admin flows / account console), so the LRO only owns
+// the Pivox-side records.
+//
+// TODO(kc): add a phase to this LRO that deletes the Keycloak realm user
+// via the KC Admin API, so account deletion is complete rather than
+// requiring an out-of-band step. Make it replay-safe like the others —
+// treat an already-absent KC user as success.
+//
+// Each phase does its own short tx; River's retry contract
 // means the whole Work() may run more than once, so each phase is
 // replay-safe (idempotent on already-applied state — see e.g. the
 // soft-delete-already-tombstoned guard in Phase 3).

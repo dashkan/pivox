@@ -16,7 +16,7 @@ import { useAppShellContext } from './app-shell.context';
 
 /**
  * Shape the user needs to be displayable in the menu. Matches the
- * relevant subset of Firebase's `User` (or our hydrated
+ * relevant subset of the authenticated user profile (or our hydrated
  * `ServerSession`) — name + email + avatar URL.
  */
 export interface NavUserUser {
@@ -66,7 +66,7 @@ export function AppShellNavUser() {
               // rendering the <img>, but useLayoutEffect doesn't run
               // during SSR — so SSR renders the fallback initials, then
               // hydration swaps to the image. The flash is jarring and
-              // pointless for our use case: Firebase photoURLs are
+              // pointless for our use case: provider photo URLs are
               // reliable OAuth-provider URLs (Google/Apple/GitHub).
               // Render the image directly so SSR HTML includes it.
               <img

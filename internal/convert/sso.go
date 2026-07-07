@@ -20,18 +20,17 @@ import (
 // client_secret is NEVER returned to clients (per the proto's
 // OUTPUT_ONLY-by-design treatment). The KMS ciphertext stays at
 // rest; UpdateSsoConfig is the only path that decrypts it, and only
-// to forward to Firebase Admin SDK.
+// to hand to the SSO broker.
 func SsoConfigToProto(s db.SsoConfig, orgSlug string, actors map[uuid.UUID]*typespb.Actor) *apiv1.SsoConfig {
 	pb := &apiv1.SsoConfig{
-		Name:               "organizations/" + orgSlug + "/ssoConfig",
-		FirebaseProviderId: s.FirebaseProviderID,
-		DisplayName:        s.DisplayName,
-		Enabled:            s.Enabled,
-		Etag:               s.Etag,
-		CreatedBy:          actorOrNil(actors, s.CreatedBy),
-		CreateTime:         timestamppb.New(s.CreateTime),
-		UpdatedBy:          actorOrNil(actors, s.UpdatedBy),
-		UpdateTime:         timestamppb.New(s.UpdateTime),
+		Name:        "organizations/" + orgSlug + "/ssoConfig",
+		DisplayName: s.DisplayName,
+		Enabled:     s.Enabled,
+		Etag:        s.Etag,
+		CreatedBy:   actorOrNil(actors, s.CreatedBy),
+		CreateTime:  timestamppb.New(s.CreateTime),
+		UpdatedBy:   actorOrNil(actors, s.UpdatedBy),
+		UpdateTime:  timestamppb.New(s.UpdateTime),
 	}
 
 	// Unmarshal whichever JSONB column is set. CHECK constraint
@@ -114,8 +113,8 @@ func (r samlConfigRow) toProto() *apiv1.SamlConfig {
 }
 
 // SamlConfigRowFromProto builds the JSONB row shape from a proto
-// SamlConfig. RpEntityId and CallbackUrl are server-derived
-// (Firebase-managed) and not persisted on the local row.
+// SamlConfig. RpEntityId and CallbackUrl are server-derived (from
+// the SSO broker) and not persisted on the local row.
 func SamlConfigRowFromProto(p *apiv1.SamlConfig) ([]byte, error) {
 	row := samlConfigRow{
 		IdpEntityID:           p.GetIdpEntityId(),

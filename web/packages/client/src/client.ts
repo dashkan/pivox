@@ -5,8 +5,8 @@ import type { paths } from '@/generated/types.gen';
 /**
  * Returns the current bearer token, or null/undefined if the caller is
  * unauthenticated. May be sync or async — the auth middleware awaits the
- * return value before each request, so refreshing tokens (e.g. Firebase
- * `getIdToken(forceRefresh)`) happens transparently.
+ * return value before each request, so refreshing tokens (e.g. an OIDC
+ * refresh from the session) happens transparently.
  */
 export type AuthTokenGetter = () =>
   | Promise<string | null | undefined>

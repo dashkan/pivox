@@ -157,7 +157,7 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// ...and a *different* sub (a duplicate KC user for the same person —
-		// e.g. a Firebase-era local user alongside a brokered login) registers
+		// e.g. a legacy local user alongside a brokered login) registers
 		// the same email. This is permanently undeliverable: the email unique
 		// index will always reject it. Handle MUST skip it (return nil to
 		// advance the offset), not wedge the partition by returning the error.

@@ -21,7 +21,7 @@ export interface OrgGateActions {
 
 /**
  * Bootstraps the user's org membership after sign-in. Asks the cloud
- * for the user's active organizations once Firebase has a user; passes
+ * for the user's active organizations once auth has a user; passes
  * through unauthenticated renders so an outer auth gate can drive its
  * own redirect.
  *

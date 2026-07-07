@@ -66,8 +66,8 @@ func requireAuthn(t *testing.T, err error, substr string) {
 
 // A verified Keycloak access token carries the caller's identity id as its
 // `sub`, surfaced as Identity.UID. The interceptor parses it and resolves the
-// caller onto the context. (sub == identities.id — the whole point of the
-// Firebase->Keycloak cutover; there is no custom claim.)
+// caller onto the context. (sub == identities.id — the KC `sub` IS the
+// Pivox identity id; there is no separate custom claim.)
 func TestAuthInterceptor_ValidToken(t *testing.T) {
 	auth := authnmock.NewMockService(t)
 	sub := uuid.New()

@@ -58,19 +58,13 @@ type SsoConfig struct {
 	// The resource name of the SsoConfig. Format:
 	// `organizations/{organization}/ssoConfig`.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Output only. The Firebase Auth provider id. Server-managed; the
-	// server creates / updates the underlying Firebase provider config
-	// when this SsoConfig is updated. Format: `oidc.<slug>` for OIDC,
-	// `saml.<slug>` for SAML.
-	FirebaseProviderId string `protobuf:"bytes,2,opt,name=firebase_provider_id,json=firebaseProviderId,proto3" json:"firebase_provider_id,omitempty"`
 	// Required. Human-readable display name shown on the sign-in
-	// screen and in the Firebase console.
-	DisplayName string `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	// screen and in the org's SSO settings.
+	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// Optional. Whether SSO is currently active. When `false`, the
-	// SsoConfig remains stored but `auth:resolveProvider` returns
-	// NOT_FOUND for the org's domains and no Firebase provider is
-	// exposed.
-	Enabled bool `protobuf:"varint,4,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// SsoConfig remains stored but the org's verified domains do not
+	// route to SSO and no login brokering is exposed.
+	Enabled bool `protobuf:"varint,3,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	// Required. The provider type and its configuration. Exactly one
 	// of `oidc` or `saml` is set; enforced by the protobuf wire format.
 	//
@@ -80,16 +74,16 @@ type SsoConfig struct {
 	//	*SsoConfig_Saml
 	Config isSsoConfig_Config `protobuf_oneof:"config"`
 	// Output only. The identity that created this SSO config.
-	CreatedBy *types.Actor `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedBy *types.Actor `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when the SsoConfig was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Output only. The identity that last modified this SSO config.
-	UpdatedBy *types.Actor `protobuf:"bytes,9,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
+	UpdatedBy *types.Actor `protobuf:"bytes,8,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when the SsoConfig was last modified.
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// Output only. A checksum computed by the server based on the
 	// current value of the SsoConfig resource.
-	Etag          string `protobuf:"bytes,11,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag          string `protobuf:"bytes,10,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -127,13 +121,6 @@ func (*SsoConfig) Descriptor() ([]byte, []int) {
 func (x *SsoConfig) GetName() string {
 	if x != nil {
 		return x.Name
-	}
-	return ""
-}
-
-func (x *SsoConfig) GetFirebaseProviderId() string {
-	if x != nil {
-		return x.FirebaseProviderId
 	}
 	return ""
 }
@@ -219,23 +206,22 @@ type isSsoConfig_Config interface {
 type SsoConfig_Oidc struct {
 	// OIDC provider configuration. Set when the IDP supports OAuth
 	// 2.0 / OpenID Connect.
-	Oidc *OidcConfig `protobuf:"bytes,5,opt,name=oidc,proto3,oneof"`
+	Oidc *OidcConfig `protobuf:"bytes,4,opt,name=oidc,proto3,oneof"`
 }
 
 type SsoConfig_Saml struct {
 	// SAML 2.0 provider configuration. Set when the IDP only speaks
 	// SAML.
-	Saml *SamlConfig `protobuf:"bytes,6,opt,name=saml,proto3,oneof"`
+	Saml *SamlConfig `protobuf:"bytes,5,opt,name=saml,proto3,oneof"`
 }
 
 func (*SsoConfig_Oidc) isSsoConfig_Config() {}
 
 func (*SsoConfig_Saml) isSsoConfig_Config() {}
 
-// OIDC provider configuration. Maps onto Firebase Admin SDK's
-// `OIDCProviderConfig` shape — server reads these fields and calls
-// `CreateOIDCProviderConfig` / `UpdateOIDCProviderConfig` against
-// Firebase Auth on Update.
+// OIDC provider configuration. Describes the customer IdP that
+// Keycloak brokers the organization's SSO logins to; the server
+// persists these fields on the SsoConfig row.
 type OidcConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The IDP issuer URL. Must support OIDC discovery at
@@ -254,8 +240,8 @@ type OidcConfig struct {
 	// Travels cleartext over TLS to the server, which envelope-encrypts
 	// it via Cloud KMS before persisting.
 	ClientSecret string `protobuf:"bytes,3,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
-	// Required. The OIDC response type the IDP returns to Firebase
-	// Auth's callback. Most production setups use `code` (authorization-
+	// Required. The OIDC response type the IDP returns to the OIDC
+	// callback. Most production setups use `code` (authorization-
 	// code flow with `client_secret`). `id_token` is the implicit flow
 	// and does not require a secret.
 	ResponseType  *OidcConfig_ResponseType `protobuf:"bytes,4,opt,name=response_type,json=responseType,proto3" json:"response_type,omitempty"`
@@ -321,13 +307,12 @@ func (x *OidcConfig) GetResponseType() *OidcConfig_ResponseType {
 	return nil
 }
 
-// SAML provider configuration. Maps onto Firebase Admin SDK's
-// `SAMLProviderConfig` shape — server reads these fields and calls
-// `CreateSAMLProviderConfig` / `UpdateSAMLProviderConfig` against
-// Firebase Auth on Update.
+// SAML provider configuration. Describes the customer IdP that
+// Keycloak brokers the organization's SSO logins to; the server
+// persists these fields on the SsoConfig row.
 //
 // `rp_entity_id` and `callback_url` are output-only — the server
-// derives them from the org's resource name and Firebase Auth's
+// derives them from the org's resource name and the SSO broker's
 // hosted callback endpoint, respectively.
 type SamlConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -341,7 +326,7 @@ type SamlConfig struct {
 	// SAML responses. At least one is required; multiple may be
 	// provided during cert rotation.
 	X509Certificates []string `protobuf:"bytes,3,rep,name=x509_certificates,json=x509Certificates,proto3" json:"x509_certificates,omitempty"`
-	// Optional. Whether the IDP requires the SP (Pivox/Firebase) to
+	// Optional. Whether the IDP requires the SP (Pivox) to
 	// sign AuthnRequests. Set this to match the IDP's
 	// `WantAuthnRequestsSigned` metadata flag.
 	RequestSigningEnabled bool `protobuf:"varint,4,opt,name=request_signing_enabled,json=requestSigningEnabled,proto3" json:"request_signing_enabled,omitempty"`
@@ -349,9 +334,9 @@ type SamlConfig struct {
 	// IDP. Server-derived from the org's resource name; configure your
 	// IDP to expect this value.
 	RpEntityId string `protobuf:"bytes,5,opt,name=rp_entity_id,json=rpEntityId,proto3" json:"rp_entity_id,omitempty"`
-	// Output only. The Pivox/Firebase callback URL (ACS endpoint) the
-	// IDP should redirect to after authentication. Server-derived from
-	// the Firebase Auth project's hosted handler.
+	// Output only. The callback URL (ACS endpoint) the IDP should
+	// redirect to after authentication. Server-derived from the SSO
+	// broker's hosted handler.
 	CallbackUrl   string `protobuf:"bytes,6,opt,name=callback_url,json=callbackUrl,proto3" json:"callback_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -479,9 +464,9 @@ func (x *GetSsoConfigRequest) GetName() string {
 // Request message for `Organizations.UpdateSsoConfig`.
 //
 // Updates the per-organization SSO/IDP configuration. The server
-// applies changes by calling Firebase Auth Admin SDK to update the
-// underlying provider config, then persists the local SsoConfig row.
-// `client_secret` is encrypted at rest via Cloud KMS before storage.
+// persists the local SsoConfig row; Keycloak owns the upstream
+// provider brokering. `client_secret` is encrypted at rest via
+// Cloud KMS before storage.
 //
 // (-- api-linter: core::0134::response-message-name=disabled
 //
@@ -543,8 +528,7 @@ func (x *UpdateSsoConfigRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 	return nil
 }
 
-// OIDC response_type bitfield. Maps directly onto Firebase Admin
-// SDK's `OIDCProviderConfig.ResponseType` struct.
+// OIDC response_type bitfield.
 type OidcConfig_ResponseType struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Optional. Authorization-code flow. Requires `client_secret`.
@@ -604,24 +588,23 @@ var File_pivox_api_v1_sso_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_sso_proto_rawDesc = "" +
 	"\n" +
-	"\x16pivox/api/v1/sso.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17pivox/types/actor.proto\"\xfb\x04\n" +
+	"\x16pivox/api/v1/sso.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17pivox/types/actor.proto\"\xc4\x04\n" +
 	"\tSsoConfig\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x125\n" +
-	"\x14firebase_provider_id\x18\x02 \x01(\tB\x03\xe0A\x03R\x12firebaseProviderId\x12/\n" +
-	"\fdisplay_name\x18\x03 \x01(\tB\f\xe0A\x02\xbaH\x06r\x04\x10\x01\x18?R\vdisplayName\x12\x1d\n" +
-	"\aenabled\x18\x04 \x01(\bB\x03\xe0A\x01R\aenabled\x12.\n" +
-	"\x04oidc\x18\x05 \x01(\v2\x18.pivox.api.v1.OidcConfigH\x00R\x04oidc\x12.\n" +
-	"\x04saml\x18\x06 \x01(\v2\x18.pivox.api.v1.SamlConfigH\x00R\x04saml\x126\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12/\n" +
+	"\fdisplay_name\x18\x02 \x01(\tB\f\xe0A\x02\xbaH\x06r\x04\x10\x01\x18?R\vdisplayName\x12\x1d\n" +
+	"\aenabled\x18\x03 \x01(\bB\x03\xe0A\x01R\aenabled\x12.\n" +
+	"\x04oidc\x18\x04 \x01(\v2\x18.pivox.api.v1.OidcConfigH\x00R\x04oidc\x12.\n" +
+	"\x04saml\x18\x05 \x01(\v2\x18.pivox.api.v1.SamlConfigH\x00R\x04saml\x126\n" +
 	"\n" +
-	"created_by\x18\a \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
-	"\vcreate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"created_by\x18\x06 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x126\n" +
 	"\n" +
-	"updated_by\x18\t \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
-	"\vupdate_time\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"updated_by\x18\b \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"\vupdate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x17\n" +
-	"\x04etag\x18\v \x01(\tB\x03\xe0A\x03R\x04etag:W\xeaAT\n" +
+	"\x04etag\x18\n" +
+	" \x01(\tB\x03\xe0A\x03R\x04etag:W\xeaAT\n" +
 	"\x13pivox.api/SsoConfig\x12&organizations/{organization}/ssoConfig*\n" +
 	"ssoConfigs2\tssoConfigB\b\n" +
 	"\x06config\"\xf1\x02\n" +

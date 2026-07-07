@@ -66,7 +66,7 @@ export async function handleLogout({ request }: { request: Request }): Promise<R
   // on a shared browser keeps the previous user's ACTIVE_ORG: the `_app`
   // SSR prefetch would then fetch that org's spaces with the NEW user's
   // token — leaking the prior user's org slug + a wrong-org first paint
-  // (and a 403 for non-members). The former Firebase clearSession cleared
+  // (and a 403 for non-members). The former clearSession path cleared
   // this too; preserve that. Add any future user-scoped cookies here.
   headers.append(
     'set-cookie',

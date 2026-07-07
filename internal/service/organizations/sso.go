@@ -48,10 +48,8 @@ func (s *OrganizationsServer) GetSsoConfig(ctx context.Context, req *apiv1.GetSs
 //
 //  1. Validate the request shape (org slug match, exactly one of
 //     OIDC/SAML set, OIDC required fields populated).
-//  2. Look up the existing row to keep a stable provider id
-//     ("oidc.<org-slug>") across the row's lifetime.
-//  3. Upsert the local row (provider_id + display_name + enabled +
-//     oidc_config / saml_config JSONB).
+//  2. Upsert the local row (display_name + enabled + oidc_config /
+//     saml_config JSONB).
 //
 // The client_secret is NOT persisted here — Keycloak owns the upstream
 // provider (including its secret) now, so this handler only stores the
@@ -91,15 +89,6 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 		}
 	}
 
-	// Read the existing row so we keep a stable provider_id across
-	// updates. UNIQUE(org_id) keeps the lookup at most-one-row.
-	existing, getErr := s.queries.GetSsoConfigByOrgID(ctx, resolved.ID)
-	creating := errors.Is(getErr, pgx.ErrNoRows)
-	if !creating && getErr != nil {
-		slog.ErrorContext(ctx, "update sso config: lookup existing row failed", "org_id", resolved.ID, "error", getErr)
-		return nil, apierr.Internal(getErr, "lookup existing sso config")
-	}
-
 	upsert := db.UpsertSsoConfigParams{
 		OrgID:       resolved.ID,
 		DisplayName: cfg.GetDisplayName(),
@@ -114,7 +103,6 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 			slog.ErrorContext(ctx, "update sso config: marshal oidc config failed", "error", err)
 			return nil, apierr.Internal(err, "marshal oidc config")
 		}
-		upsert.FirebaseProviderID = providerID("oidc.", resolved.Slug, existing, creating)
 		upsert.OidcConfig = oidcJSON
 	default: // saml != nil
 		samlJSON, err := convert.SamlConfigRowFromProto(saml)
@@ -122,7 +110,6 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 			slog.ErrorContext(ctx, "update sso config: marshal saml config failed", "error", err)
 			return nil, apierr.Internal(err, "marshal saml config")
 		}
-		upsert.FirebaseProviderID = providerID("saml.", resolved.Slug, existing, creating)
 		upsert.SamlConfig = samlJSON
 	}
 
@@ -134,24 +121,11 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 	return convert.SsoConfigToProto(row, resolved.Slug, nil), nil
 }
 
-// providerID returns the stable provider id stored on the SsoConfig
-// row. It's derived from the org slug ("oidc.<slug>" / "saml.<slug>")
-// on first create and preserved from the existing row thereafter so a
-// re-Update never changes it. Vestigial: Keycloak owns the upstream
-// provider now, but the column is retained on the row for forward
-// compatibility.
-func providerID(prefix, orgSlug string, existing db.SsoConfig, creating bool) string {
-	if !creating && existing.FirebaseProviderID != "" {
-		return existing.FirebaseProviderID
-	}
-	return prefix + orgSlug
-}
-
 // validateSaml enforces the request-side SAML invariants beyond
 // what protovalidate covers: idp_entity_id, sso_url, and at least
-// one x509_certificate are mandatory. Firebase rejects
-// missing-required errors with opaque messages, so catching them
-// here gives the caller a clearer InvalidArgument.
+// one x509_certificate are mandatory. Catching them here gives the
+// caller a clear InvalidArgument at write time rather than a later
+// opaque brokering failure.
 func validateSaml(s *apiv1.SamlConfig) error {
 	if strings.TrimSpace(s.GetIdpEntityId()) == "" {
 		return apierr.InvalidArgument(apierr.FieldViolation("sso_config.saml.idp_entity_id", "must not be empty"))
@@ -186,8 +160,7 @@ func assertSsoConfigName(name, expectedOrg string) error {
 // be set, and code-flow requires a client_secret on first create.
 // (The handler can't easily check "first create" here — the create-
 // vs-update branch fires later — so we only enforce the response-
-// type-must-be-non-empty rule and let Firebase reject a code-flow-
-// without-secret combination authoritatively.)
+// type-must-be-non-empty rule here.)
 func validateOidc(o *apiv1.OidcConfig) error {
 	rt := o.GetResponseType()
 	if !rt.GetCode() && !rt.GetIdToken() {

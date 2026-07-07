@@ -1154,7 +1154,6 @@ type SpaceMember struct {
 type SsoConfig struct {
 	ID                     uuid.UUID   `json:"id"`
 	OrgID                  uuid.UUID   `json:"org_id"`
-	FirebaseProviderID     string      `json:"firebase_provider_id"`
 	DisplayName            string      `json:"display_name"`
 	Enabled                bool        `json:"enabled"`
 	OidcConfig             []byte      `json:"oidc_config"`

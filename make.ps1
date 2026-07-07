@@ -84,14 +84,6 @@ switch ($Target) {
     "docker-up"   { docker compose up -d }
     "docker-down" { docker compose down }
 
-    # Firebase
-    "firebase-emu" {
-        firebase emulators:start --import=.firebase-data --export-on-exit=.firebase-data --inspect-functions
-    }
-    "firebase-deploy" {
-        pnpm --dir ./deployments/firebase/functions run deploy
-    }
-
     # Proxy
     "proxy-nginx"      { nginx -c "$PWD/configs/nginx.conf" -e stderr }
     "proxy-nginx-stop" { nginx -c "$PWD/configs/nginx.conf" -s stop }
@@ -106,7 +98,6 @@ Test:      test, tidy, lint, lint-fix, fmt
 Proto:     lint-proto, proto-format, proto-breaking, proto-generate, api-lint
 Database:  db-up, db-down, db-migrate, db-force, db-seed, db-clear, db-drop, db-create
 Docker:    docker-up, docker-down
-Firebase:  firebase-emu, firebase-deploy
 Proxy:     proxy-nginx, proxy-nginx-stop, proxy-ngrok
 "@
     }

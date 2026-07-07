@@ -84,7 +84,7 @@ const (
 //	carries no additional information beyond what the catalog
 //	already exposes. --)
 type IamClient interface {
-	// Gets a user by resource name. Users are synced from Firebase Auth
+	// Gets a user by resource name. Users are synced from Keycloak
 	// and are read-only through this API.
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*User, error)
 	// Lists users in an organization.
@@ -92,15 +92,15 @@ type IamClient interface {
 	// Removes a user from an organization. Sync hard-delete: drops
 	// the user's `org_members`, `space_members` (for spaces in this
 	// org), and `group_members` (for groups in this org) rows. The
-	// user's Pivox account (`firebase_identities` row), Firebase Auth
-	// identity, content they own (audit-column references survive),
-	// and memberships in other orgs are untouched. Use `DeleteAccount`
+	// user's Pivox account (`identities` row), Keycloak identity,
+	// content they own (audit-column references survive), and
+	// memberships in other orgs are untouched. Use `DeleteAccount`
 	// for full account deletion.
 	//
 	// Why sync, not LRO: this is a tiny pointer-row removal. Recovery
 	// from a mistake is just re-running `Iam.CreateMember` to re-add
 	// the user — their content is preserved because everything is
-	// keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+	// keyed on `identities.id`. The org/space-delete LRO+grace
 	// pattern is reserved for ops where the cascade is destructive and
 	// unrecoverable without a grace window.
 	//
@@ -109,7 +109,7 @@ type IamClient interface {
 	// returns FAILED_PRECONDITION. Resolve via
 	// `Organizations.TransferOwnership` first.
 	//
-	// The {user} segment is `firebase_identities.id`. The literal `me`
+	// The {user} segment is `identities.id`. The literal `me`
 	// is not a valid {user} segment; v1 has no self-leave-org.
 	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Lists the active organizations the authenticated caller has
@@ -136,15 +136,15 @@ type IamClient interface {
 	//	address. Parallels the same disable on DeleteAccount. --)
 	ListAccountOrganizations(ctx context.Context, in *ListAccountOrganizationsRequest, opts ...grpc.CallOption) (*ListAccountOrganizationsResponse, error)
 	// Deletes the authenticated caller's Pivox account (LRO). Cascades
-	// through Pivox-side state across every org the caller is in, then
-	// deletes the underlying Firebase Auth identity. Cross-org by
-	// design — this is the only Pivox RPC that legitimately reaches
-	// across orgs.
+	// through Pivox-side state across every org the caller is in and
+	// soft-deletes their identity row. Cross-org by design — this is
+	// the only Pivox RPC that legitimately reaches across orgs. The
+	// Keycloak realm user is deleted out-of-band.
 	//
-	// Why Pivox-owned: Firebase Auth has no blocking pre-delete
-	// trigger, so server-side validation (sole-owner check) requires
-	// Pivox to be the entry point. The webhook for direct-Console
-	// bypass is a separate fallback path.
+	// Why Pivox-owned: the sole-owner precondition must be validated
+	// server-side before any deletion, so Pivox is the entry point.
+	// Removal of the Keycloak realm user is a separate, out-of-band
+	// step.
 	//
 	// Sole-owner blocking: if the caller is the sole owner of any
 	// active org, the LRO completes with FAILED_PRECONDITION listing
@@ -387,7 +387,7 @@ func (c *iamClient) ListGroupMembers(ctx context.Context, in *ListGroupMembersRe
 //	carries no additional information beyond what the catalog
 //	already exposes. --)
 type IamServer interface {
-	// Gets a user by resource name. Users are synced from Firebase Auth
+	// Gets a user by resource name. Users are synced from Keycloak
 	// and are read-only through this API.
 	GetUser(context.Context, *GetUserRequest) (*User, error)
 	// Lists users in an organization.
@@ -395,15 +395,15 @@ type IamServer interface {
 	// Removes a user from an organization. Sync hard-delete: drops
 	// the user's `org_members`, `space_members` (for spaces in this
 	// org), and `group_members` (for groups in this org) rows. The
-	// user's Pivox account (`firebase_identities` row), Firebase Auth
-	// identity, content they own (audit-column references survive),
-	// and memberships in other orgs are untouched. Use `DeleteAccount`
+	// user's Pivox account (`identities` row), Keycloak identity,
+	// content they own (audit-column references survive), and
+	// memberships in other orgs are untouched. Use `DeleteAccount`
 	// for full account deletion.
 	//
 	// Why sync, not LRO: this is a tiny pointer-row removal. Recovery
 	// from a mistake is just re-running `Iam.CreateMember` to re-add
 	// the user — their content is preserved because everything is
-	// keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+	// keyed on `identities.id`. The org/space-delete LRO+grace
 	// pattern is reserved for ops where the cascade is destructive and
 	// unrecoverable without a grace window.
 	//
@@ -412,7 +412,7 @@ type IamServer interface {
 	// returns FAILED_PRECONDITION. Resolve via
 	// `Organizations.TransferOwnership` first.
 	//
-	// The {user} segment is `firebase_identities.id`. The literal `me`
+	// The {user} segment is `identities.id`. The literal `me`
 	// is not a valid {user} segment; v1 has no self-leave-org.
 	DeleteUser(context.Context, *DeleteUserRequest) (*emptypb.Empty, error)
 	// Lists the active organizations the authenticated caller has
@@ -439,15 +439,15 @@ type IamServer interface {
 	//	address. Parallels the same disable on DeleteAccount. --)
 	ListAccountOrganizations(context.Context, *ListAccountOrganizationsRequest) (*ListAccountOrganizationsResponse, error)
 	// Deletes the authenticated caller's Pivox account (LRO). Cascades
-	// through Pivox-side state across every org the caller is in, then
-	// deletes the underlying Firebase Auth identity. Cross-org by
-	// design — this is the only Pivox RPC that legitimately reaches
-	// across orgs.
+	// through Pivox-side state across every org the caller is in and
+	// soft-deletes their identity row. Cross-org by design — this is
+	// the only Pivox RPC that legitimately reaches across orgs. The
+	// Keycloak realm user is deleted out-of-band.
 	//
-	// Why Pivox-owned: Firebase Auth has no blocking pre-delete
-	// trigger, so server-side validation (sole-owner check) requires
-	// Pivox to be the entry point. The webhook for direct-Console
-	// bypass is a separate fallback path.
+	// Why Pivox-owned: the sole-owner precondition must be validated
+	// server-side before any deletion, so Pivox is the entry point.
+	// Removal of the Keycloak realm user is a separate, out-of-band
+	// step.
 	//
 	// Sole-owner blocking: if the caller is the sole owner of any
 	// active org, the LRO completes with FAILED_PRECONDITION listing

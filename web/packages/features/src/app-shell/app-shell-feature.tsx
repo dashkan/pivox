@@ -25,7 +25,7 @@ import type { AppShellContextValue, NavMainItem } from '@pivox/ui/app-shell';
  * client-side useAuth() resolves. Identical to the AuthContext user
  * subset useAppShell already projects — passing it through lets the
  * shell paint the avatar / display name / email on first SSR render
- * instead of flashing an empty state until Firebase JS hydrates.
+ * instead of flashing an empty state until the client auth hydrates.
  */
 export interface InitialAppShellUser {
   displayName: string | null;

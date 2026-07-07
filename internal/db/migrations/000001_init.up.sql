@@ -480,7 +480,7 @@ CREATE INDEX idx_api_keys_org ON api_keys (org_id) WHERE delete_time IS NULL;
 CREATE INDEX idx_api_keys_key_string ON api_keys (key_string) WHERE delete_time IS NULL;
 
 -- ============================================================================
--- identities (global Firebase Auth cache — internal, no proto)
+-- identities (global identity cache synced from Keycloak — internal, no proto)
 -- ============================================================================
 CREATE TABLE identities (
     -- id IS the Keycloak `sub` (a UUID) for KC-provisioned principals,
@@ -532,7 +532,7 @@ CREATE UNIQUE INDEX idx_identities_email_unique ON identities (email)
 --     re-parent commit that ships alongside this one)
 --
 -- Membership in an org = the existence of at least one `org_members`
--- row binding the firebase_identity to that org via a role. Removing
+-- row binding the identity to that org via a role. Removing
 -- a user from an org is a hard-delete of those `org_members`/
 -- `space_members`/`group_members` rows; the `identities`
 -- row itself is unaffected.
@@ -880,8 +880,6 @@ CREATE TABLE sso_configs (
     id                         UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     org_id                     UUID NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
-    -- identity
-    firebase_provider_id       TEXT NOT NULL DEFAULT '',
     -- domain
     display_name               TEXT NOT NULL DEFAULT '',
     enabled                    BOOLEAN NOT NULL DEFAULT false,

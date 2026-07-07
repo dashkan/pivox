@@ -122,10 +122,10 @@ type OrganizationsClient interface {
 	//	sub-resource read; the parent org disambiguates the singleton. --)
 	GetSsoConfig(ctx context.Context, in *GetSsoConfigRequest, opts ...grpc.CallOption) (*SsoConfig, error)
 	// Updates the SSO configuration for an organization (AIP-156
-	// singleton sub-resource). The server applies changes by calling
-	// Firebase Admin SDK to update the underlying provider config,
-	// then persists the local SsoConfig row. `client_secret` (when
-	// provided) is encrypted at rest via Cloud KMS before storage.
+	// singleton sub-resource). The server persists the local SsoConfig
+	// row; Keycloak owns the upstream provider brokering.
+	// `client_secret` (when provided) is encrypted at rest via Cloud
+	// KMS before storage.
 	//
 	// (-- api-linter: core::0134::response-message-name=disabled
 	//
@@ -548,10 +548,10 @@ type OrganizationsServer interface {
 	//	sub-resource read; the parent org disambiguates the singleton. --)
 	GetSsoConfig(context.Context, *GetSsoConfigRequest) (*SsoConfig, error)
 	// Updates the SSO configuration for an organization (AIP-156
-	// singleton sub-resource). The server applies changes by calling
-	// Firebase Admin SDK to update the underlying provider config,
-	// then persists the local SsoConfig row. `client_secret` (when
-	// provided) is encrypted at rest via Cloud KMS before storage.
+	// singleton sub-resource). The server persists the local SsoConfig
+	// row; Keycloak owns the upstream provider brokering.
+	// `client_secret` (when provided) is encrypted at rest via Cloud
+	// KMS before storage.
 	//
 	// (-- api-linter: core::0134::response-message-name=disabled
 	//

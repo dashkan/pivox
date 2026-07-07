@@ -21,10 +21,9 @@ export interface LoginState {
    * (unconditionally, including any previously stored value from
    * another sign-in path) when false. Defaults to true.
    *
-   * This is NOT a "stay signed in" flag — Firebase Auth's default web
-   * persistence (`browserLocalPersistence`) already keeps the user
-   * signed in across browser restarts. "Remember me" here is purely
-   * the email-autofill UX.
+   * This is NOT a "stay signed in" flag — the OIDC session's default
+   * persistence already keeps the user signed in across browser
+   * restarts. "Remember me" here is purely the email-autofill UX.
    */
   rememberEmail: boolean;
   /**

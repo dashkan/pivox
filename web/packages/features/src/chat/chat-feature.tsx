@@ -16,7 +16,7 @@ import type { UseChatFeatureOptions } from './use-chat-feature';
  *
  *   <ChatFeature
  *     parent={`organizations/${orgSlug}/users/${userId}`}
- *     getAuthToken={getFirebaseIdToken}
+ *     getAuthToken={getAuthToken}
  *   >
  *     <Chat.Header>...</Chat.Header>
  *     <Chat.Thread />

@@ -25,7 +25,7 @@ const (
 
 // membershipExemptMethods is the bootstrap allowlist — RPCs that an
 // authenticated caller with zero org memberships is permitted to call.
-// All methods reaching this interceptor have already passed Firebase
+// All methods reaching this interceptor have already passed the
 // AuthInterceptor; service-to-service surfaces (AgentService) live on a
 // separate gRPC server and never reach this chain.
 //
@@ -58,8 +58,8 @@ var membershipExemptMethods = map[string]bool{
 	"/pivox.api.v1.Organizations/GetInvitation":      true,
 	"/pivox.iam.v1.Iam/ListAccountOrganizations":     true,
 	// DeleteAccount targets accounts/me, the caller's own account —
-	// no org scope. A user stuck in a half-bootstrapped state (firebase
-	// identity exists, no org memberships) must still be able to
+	// no org scope. A user stuck in a half-bootstrapped state (identity
+	// exists, no org memberships) must still be able to
 	// delete their account; gating this on membership would lock
 	// them out of recovery.
 	"/pivox.iam.v1.Iam/DeleteAccount": true,
@@ -108,10 +108,10 @@ func requireMembership(ctx context.Context, queries db.Querier, fullMethod strin
 // has at least one org membership before any RPC outside the bootstrap
 // allowlist is dispatched.
 //
-// Why this exists: registration is non-atomic across Firebase Auth and
-// Pivox (Firebase create-user can succeed and then Pivox
-// CreateOrganization can fail or never get called — the password-
-// isolation rule means we can't bundle them server-side). Without this
+// Why this exists: registration is non-atomic across Keycloak and
+// Pivox (KC user creation + identity-sync can land and then Pivox
+// CreateOrganization can fail or never get called — KC owns
+// registration, so we can't bundle them server-side). Without this
 // interceptor, the half-registered "account exists, no membership"
 // state would let callers touch resources they have no claim to. With
 // it, those callers can only reach allowlisted methods, which exist

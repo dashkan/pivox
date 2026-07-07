@@ -434,7 +434,7 @@ func (g *permissionGate) checkSpaceScope(
 //  2. Methods absent from the registry return Internal (server
 //     misconfiguration: forgetting to register a new RPC fails closed
 //     and surfaces loudly to operators).
-//  3. The caller's firebase_identity is resolved via the supplied
+//  3. The caller's identity is resolved via the supplied
 //     MustUserID from the verified context — by the time the
 //     gate runs, AuthInterceptor has already populated the claim.
 //  4. The registered ScopeExtractor pulls a ScopeRef from the

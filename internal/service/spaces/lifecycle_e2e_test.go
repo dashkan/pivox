@@ -194,7 +194,7 @@ func TestE2E_SoftDeletedSpace_BlocksMutationsAtGate(t *testing.T) {
 
 // TestE2E_UpdateSpace_RecordsCallerIdentity pins audit MED #4 for
 // spaces: handler-side audit columns (updated_by) reflect the
-// caller's firebase_identity, not an empty string. Verified
+// caller's identity, not an empty string. Verified
 // indirectly: subsequent Get returns the row whose etag must change
 // after the update, and the update succeeds — proving the handler
 // actually populated the audit field rather than violating the

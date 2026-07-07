@@ -18,7 +18,7 @@ import type { UIMessage } from 'ai';
  * Resolves the bearer token forwarded to the gRPC AuthInterceptor on
  * every request. Stale tokens surface as 401s the user can recover
  * from by re-auth — assistant-ui retries — so getters should NOT
- * cache aggressively. Web: `firebase.auth().currentUser.getIdToken()`.
+ * cache aggressively. Web: `getAuthToken()` from the OIDC session.
  * Electron: IPC to main for the keychain-backed token.
  */
 export type GetAuthToken = () => Promise<string>;

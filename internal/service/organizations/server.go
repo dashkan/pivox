@@ -139,8 +139,8 @@ func (s *OrganizationsServer) resolveOrgActors(ctx context.Context, orgs []db.Or
 
 // ListOrganizations is the post-signin "which orgs am I in?" query.
 // Always caller-scoped: returns only orgs the authenticated user has
-// a membership row for. Memberless callers (and freshly-Firebase-
-// registered users whose firebase_identity row hasn't been synced yet)
+// a membership row for. Memberless callers (and freshly-registered
+// users whose identity row hasn't been synced yet)
 // get an empty list, which the native client uses to detect the
 // zero-membership state and route to the org-creation screen.
 //

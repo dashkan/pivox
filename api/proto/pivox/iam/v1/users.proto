@@ -23,7 +23,7 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "pivox/iam/v1;iampb";
 
-// A user within an organization. Users are synced from Firebase Auth and
+// A user within an organization. Users are synced from Keycloak and
 // are read-only via `Iam.GetUser` / `Iam.ListUsers`.
 message User {
   option (google.api.resource) = {
@@ -140,7 +140,7 @@ message ListUsersResponse {
 //
 // Org-scoped removal: removes a user FROM a single org. The user's
 // Pivox account itself is unaffected; their memberships in OTHER
-// orgs are unaffected; their Firebase Auth identity is unaffected.
+// orgs are unaffected; their Keycloak identity is unaffected.
 // Use `Iam.DeleteAccount` for global account deletion.
 //
 // Sole-owner blocking: if removing this user from this org would

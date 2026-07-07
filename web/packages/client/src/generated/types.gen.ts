@@ -16,14 +16,14 @@ export interface paths {
         post?: never;
         /**
          * Deletes the authenticated caller's Pivox account (LRO). Cascades
-         *     through Pivox-side state across every org the caller is in, then
-         *     deletes the underlying Firebase Auth identity. Cross-org by
-         *     design — this is the only Pivox RPC that legitimately reaches
-         *     across orgs.
-         * @description Why Pivox-owned: Firebase Auth has no blocking pre-delete
-         *     trigger, so server-side validation (sole-owner check) requires
-         *     Pivox to be the entry point. The webhook for direct-Console
-         *     bypass is a separate fallback path.
+         *     through Pivox-side state across every org the caller is in and
+         *     soft-deletes their identity row. Cross-org by design — this is
+         *     the only Pivox RPC that legitimately reaches across orgs. The
+         *     Keycloak realm user is deleted out-of-band.
+         * @description Why Pivox-owned: the sole-owner precondition must be validated
+         *     server-side before any deletion, so Pivox is the entry point.
+         *     Removal of the Keycloak realm user is a separate, out-of-band
+         *     step.
          *
          *     Sole-owner blocking: if the caller is the sole owner of any
          *     active org, the LRO completes with FAILED_PRECONDITION listing
@@ -1936,10 +1936,10 @@ export interface paths {
         head?: never;
         /**
          * Updates the SSO configuration for an organization (AIP-156
-         *     singleton sub-resource). The server applies changes by calling
-         *     Firebase Admin SDK to update the underlying provider config,
-         *     then persists the local SsoConfig row. `client_secret` (when
-         *     provided) is encrypted at rest via Cloud KMS before storage.
+         *     singleton sub-resource). The server persists the local SsoConfig
+         *     row; Keycloak owns the upstream provider brokering.
+         *     `client_secret` (when provided) is encrypted at rest via Cloud
+         *     KMS before storage.
          */
         patch: operations["Organizations_UpdateSsoConfig"];
         trace?: never;
@@ -2403,7 +2403,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Gets a user by resource name. Users are synced from Firebase Auth
+         * Gets a user by resource name. Users are synced from Keycloak
          *     and are read-only through this API.
          */
         get: operations["Iam_GetUser"];
@@ -2413,14 +2413,14 @@ export interface paths {
          * Removes a user from an organization. Sync hard-delete: drops
          *     the user's `org_members`, `space_members` (for spaces in this
          *     org), and `group_members` (for groups in this org) rows. The
-         *     user's Pivox account (`firebase_identities` row), Firebase Auth
-         *     identity, content they own (audit-column references survive),
-         *     and memberships in other orgs are untouched. Use `DeleteAccount`
+         *     user's Pivox account (`identities` row), Keycloak identity,
+         *     content they own (audit-column references survive), and
+         *     memberships in other orgs are untouched. Use `DeleteAccount`
          *     for full account deletion.
          * @description Why sync, not LRO: this is a tiny pointer-row removal. Recovery
          *     from a mistake is just re-running `Iam.CreateMember` to re-add
          *     the user — their content is preserved because everything is
-         *     keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+         *     keyed on `identities.id`. The org/space-delete LRO+grace
          *     pattern is reserved for ops where the cascade is destructive and
          *     unrecoverable without a grace window.
          *
@@ -2429,7 +2429,7 @@ export interface paths {
          *     returns FAILED_PRECONDITION. Resolve via
          *     `Organizations.TransferOwnership` first.
          *
-         *     The {user} segment is `firebase_identities.id`. The literal `me`
+         *     The {user} segment is `identities.id`. The literal `me`
          *     is not a valid {user} segment; v1 has no self-leave-org.
          */
         delete: operations["Iam_DeleteUser"];
@@ -3268,10 +3268,7 @@ export interface components {
          * @enum {string}
          */
         IconConfigIconSize: "ICON_SIZE_UNSPECIFIED" | "SMALL" | "MEDIUM" | "LARGE" | "EXTRA_LARGE";
-        /**
-         * @description OIDC response_type bitfield. Maps directly onto Firebase Admin
-         *     SDK's `OIDCProviderConfig.ResponseType` struct.
-         */
+        /** @description OIDC response_type bitfield. */
         OidcConfigResponseType: {
             /** @description Optional. Authorization-code flow. Requires `client_secret`. */
             code?: boolean;
@@ -3866,14 +3863,14 @@ export interface components {
          *     considers `pivox.types` a shared types namespace.
          *
          *     Resolution is performed server-side via the audit.Resolver, which
-         *     batches lookups against firebase_identities and caches recent
+         *     batches lookups against identities and caches recent
          *     results. When the underlying identity is soft-deleted the resolver
          *     blanks out PII (display_name, email) and sets is_deleted=true while
          *     preserving the id so that historical references remain stable.
          */
         typesActor: {
             /**
-             * @description The identity's stable UUID (firebase_identities.id). Always
+             * @description The identity's stable UUID (identities.id). Always
              *     populated when the column is non-null in the database, even for
              *     soft-deleted identities.
              */
@@ -4958,8 +4955,8 @@ export interface components {
          *      - PENDING: Domain row exists; verification has not yet succeeded. The
          *     associated `CreateDomain` LRO is either in flight or expired.
          *      - VERIFIED: The DNS TXT record was observed and matches the issued
-         *     `verification_token`. The domain participates in
-         *     `auth:resolveProvider` lookups (and any other consumers).
+         *     `verification_token`. The domain routes to the org's SSO
+         *     config when SSO is enabled.
          *      - FAILED: Verification failed unrecoverably (e.g. token mismatch
          *     detected after a previous VERIFIED state, or the LRO expired
          *     without a successful check). Caller can retry via a fresh
@@ -6213,10 +6210,9 @@ export interface components {
             callProviderMetadata?: Record<string, never>;
         };
         /**
-         * @description OIDC provider configuration. Maps onto Firebase Admin SDK's
-         *     `OIDCProviderConfig` shape — server reads these fields and calls
-         *     `CreateOIDCProviderConfig` / `UpdateOIDCProviderConfig` against
-         *     Firebase Auth on Update.
+         * @description OIDC provider configuration. Describes the customer IdP that
+         *     Keycloak brokers the organization's SSO logins to; the server
+         *     persists these fields on the SsoConfig row.
          */
         v1OidcConfig: {
             /**
@@ -6242,8 +6238,8 @@ export interface components {
              */
             clientSecret?: string;
             /**
-             * @description Required. The OIDC response type the IDP returns to Firebase
-             *     Auth's callback. Most production setups use `code` (authorization-
+             * @description Required. The OIDC response type the IDP returns to the OIDC
+             *     callback. Most production setups use `code` (authorization-
              *     code flow with `client_secret`). `id_token` is the implicit flow
              *     and does not require a secret.
              */
@@ -6798,13 +6794,12 @@ export interface components {
             accessKey?: components["schemas"]["v1S3AccessKeyCredentials"];
         };
         /**
-         * @description SAML provider configuration. Maps onto Firebase Admin SDK's
-         *     `SAMLProviderConfig` shape — server reads these fields and calls
-         *     `CreateSAMLProviderConfig` / `UpdateSAMLProviderConfig` against
-         *     Firebase Auth on Update.
+         * @description SAML provider configuration. Describes the customer IdP that
+         *     Keycloak brokers the organization's SSO logins to; the server
+         *     persists these fields on the SsoConfig row.
          *
          *     `rp_entity_id` and `callback_url` are output-only — the server
-         *     derives them from the org's resource name and Firebase Auth's
+         *     derives them from the org's resource name and the SSO broker's
          *     hosted callback endpoint, respectively.
          */
         v1SamlConfig: {
@@ -6825,7 +6820,7 @@ export interface components {
              */
             x509Certificates: string[];
             /**
-             * @description Optional. Whether the IDP requires the SP (Pivox/Firebase) to
+             * @description Optional. Whether the IDP requires the SP (Pivox) to
              *     sign AuthnRequests. Set this to match the IDP's
              *     `WantAuthnRequestsSigned` metadata flag.
              */
@@ -6837,9 +6832,9 @@ export interface components {
              */
             readonly rpEntityId?: string;
             /**
-             * @description Output only. The Pivox/Firebase callback URL (ACS endpoint) the
-             *     IDP should redirect to after authentication. Server-derived from
-             *     the Firebase Auth project's hosted handler.
+             * @description Output only. The callback URL (ACS endpoint) the IDP should
+             *     redirect to after authentication. Server-derived from the SSO
+             *     broker's hosted handler.
              */
             readonly callbackUrl?: string;
         };
@@ -7135,22 +7130,14 @@ export interface components {
              */
             name?: string;
             /**
-             * @description Output only. The Firebase Auth provider id. Server-managed; the
-             *     server creates / updates the underlying Firebase provider config
-             *     when this SsoConfig is updated. Format: `oidc.<slug>` for OIDC,
-             *     `saml.<slug>` for SAML.
-             */
-            readonly firebaseProviderId?: string;
-            /**
              * @description Required. Human-readable display name shown on the sign-in
-             *     screen and in the Firebase console.
+             *     screen and in the org's SSO settings.
              */
             displayName: string;
             /**
              * @description Optional. Whether SSO is currently active. When `false`, the
-             *     SsoConfig remains stored but `auth:resolveProvider` returns
-             *     NOT_FOUND for the org's domains and no Firebase provider is
-             *     exposed.
+             *     SsoConfig remains stored but the org's verified domains do not
+             *     route to SSO and no login brokering is exposed.
              */
             enabled?: boolean;
             /**
@@ -7751,7 +7738,7 @@ export interface components {
             rethrow?: boolean;
         };
         /**
-         * @description A user within an organization. Users are synced from Firebase Auth and
+         * @description A user within an organization. Users are synced from Keycloak and
          *     are read-only via `Iam.GetUser` / `Iam.ListUsers`.
          */
         v1User: {
@@ -15177,22 +15164,14 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description Output only. The Firebase Auth provider id. Server-managed; the
-                     *     server creates / updates the underlying Firebase provider config
-                     *     when this SsoConfig is updated. Format: `oidc.<slug>` for OIDC,
-                     *     `saml.<slug>` for SAML.
-                     */
-                    readonly firebaseProviderId?: string;
-                    /**
                      * @description Required. Human-readable display name shown on the sign-in
-                     *     screen and in the Firebase console.
+                     *     screen and in the org's SSO settings.
                      */
                     displayName: string;
                     /**
                      * @description Optional. Whether SSO is currently active. When `false`, the
-                     *     SsoConfig remains stored but `auth:resolveProvider` returns
-                     *     NOT_FOUND for the org's domains and no Firebase provider is
-                     *     exposed.
+                     *     SsoConfig remains stored but the org's verified domains do not
+                     *     route to SSO and no login brokering is exposed.
                      */
                     enabled?: boolean;
                     /**

@@ -62,9 +62,8 @@ SELECT * FROM identities WHERE id = ANY(@ids::uuid[]);
 -- second call surfaces ErrNoRows — the caller is expected to
 -- distinguish "real first-time tombstone" from "wrong ID / already
 -- tombstoned" rather than silently no-op-and-continue (a wrong id
--- would otherwise let the LRO proceed to auth.DeleteUser with a
--- firebase_uid that doesn't belong to the row we thought we
--- deleted).
+-- would otherwise let the LRO proceed having tombstoned an identity
+-- that isn't the row we thought we deleted).
 -- name: SoftDeleteIdentity :one
 UPDATE identities SET
     is_deleted     = true,

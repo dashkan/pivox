@@ -192,7 +192,7 @@ await rustfs.waitFor(otelCollector);
 //
 // Keycloak persists in Postgres (not the dev H2 file) so realms/users/clients
 // are durable + inspectable via SQL — much easier for adding accounts and for
-// the Firebase->KC migration. KC creates its own SCHEMA on boot but NOT the
+// inspecting the identity-sync (KC event-sync) state. KC creates its own SCHEMA on boot but NOT the
 // database; the `keycloak` db is created by the pg image's init script.
 //
 // JDBC URL the keycloak CONTAINER uses to reach the postgres CONTAINER. Both
@@ -358,7 +358,7 @@ await builder
   // worker needs that connection in addition to the app DB.
   .withEnvironment("PIVOX_SESSIONS_DATABASE_URL", sessionsDatabaseUrl)
   // identity-sync consumer reads the keycloak-events topic to provision
-  // `identities` rows (replaces the removed Firebase syncIdentity fn). The
+  // `identities` rows (the identity-sync hook / KC event-sync). The
   // worker is a host process, so it reaches the kafka container on the host
   // listener (:9092), not the internal kafka:9093 advertised to containers.
   .withEnvironment("PIVOX_KAFKA_BROKERS", "localhost:9092")

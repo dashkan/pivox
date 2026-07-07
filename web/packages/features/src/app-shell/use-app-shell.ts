@@ -74,7 +74,7 @@ export function useAppShell(input: {
     initialActiveOrganization,
   } = input;
   const { user, signOut } = useAuth();
-  // Prefer the live Firebase user once useAuth resolves (mutations
+  // Prefer the live authenticated user once useAuth resolves (mutations
   // on the account update displayName/photoURL in IndexedDB before
   // they round-trip through Pivox). Fall back to the SSR-seeded
   // user when still loading.

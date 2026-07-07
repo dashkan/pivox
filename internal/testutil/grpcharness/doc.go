@@ -25,5 +25,5 @@
 // metadata that subsequent gRPC calls carry. This avoids the
 // per-call `metadata.AppendToOutgoingContext` boilerplate at every
 // call site and matches the production semantic where the token
-// uniquely identifies one Firebase user.
+// uniquely identifies one Keycloak user.
 package grpcharness

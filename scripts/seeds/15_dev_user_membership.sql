@@ -14,28 +14,26 @@
 -- "user is already an owner of acme."
 --
 -- Idempotent:
---   - identities.ON CONFLICT (firebase_uid) preserves any
---     blocking-fn-populated state (display_name, email_verified,
---     last_login_time) from a real sign-in.
+--   - identities.ON CONFLICT (id) preserves any state populated by
+--     a real Keycloak sign-in (display_name, email_verified,
+--     last_login_time).
 --   - org_members.WHERE NOT EXISTS sidesteps the UNIQUE(org_id,
 --     user_id, role_id) constraint so re-running the seed is a
 --     no-op rather than a constraint error.
 --
 -- UUIDs are PINNED, not uuidv7()-minted:
 --
---   The Firebase blocking function stamps a `pivox_user_id` custom
---   claim onto the user's ID token at sign-in, with the value of
---   `identities.id`. A reseed that re-mints that UUID invalidates
---   every Firebase ID token cached client-side (Firebase SDK keeps
---   them in IndexedDB), and token refresh does NOT re-issue
---   custom claims — only a fresh sign-in does. So a `make db-seed`
---   silently broke every dev's signed-in session and made spaces
---   list 403 until they signed out + back in.
+--   Under Keycloak, `identities.id` IS the user's `sub` (the KC
+--   principal id carried in every access token). A reseed that
+--   re-mints that UUID would desync the seeded identity from the
+--   real KC login: the token's `sub` would no longer match any
+--   identities row, so membership lookups 403 until the row is
+--   re-matched by hand.
 --
---   Pinning ashkan's identity UUID to the value his current
---   Firebase ID token already carries makes reseeds non-invalidating.
---   Membership rows use synthetic deterministic UUIDs derived from
---   (org_slug, user) so they also survive reseeds.
+--   Pinning ashkan's identity UUID to his real KC `sub` makes
+--   reseeds non-invalidating. Membership rows use synthetic
+--   deterministic UUIDs derived from (org_slug, user) so they also
+--   survive reseeds.
 --
 -- To bind ashkan to an additional dev org: add a (slug, member_uuid)
 -- pair to `_dev_org_memberships` below AND add a roles INSERT block
@@ -48,7 +46,7 @@
 -- runs against a partial schema.
 --
 -- To bind additional dev users: copy the DO block, replace
--- `_ashkan_firebase_uid` + the identity values + the org list.
+-- `_ashkan_id` + the identity values + the org list.
 
 -- Runs inside the outer transaction from scripts/seed.sql — no
 -- inner BEGIN/COMMIT (those would close the wrapping tx and leave
@@ -60,9 +58,9 @@ DECLARE
     -- Pinned identity UUID. Under Keycloak this IS the user's `sub`
     -- (identities.id == KC sub), so it's frozen to the real KC login
     -- for ashkan.daie@gmail.com — a fresh seed then maps straight to
-    -- that login with no manual remap. (Electron still resolves via
-    -- _ashkan_firebase_uid above: the blocking fn stamps this id as the
-    -- Firebase token's pivox_user_id, so both logins hit one identity.)
+    -- that login with no manual remap. (The web and Electron apps
+    -- authenticate against the same KC realm, so both logins resolve
+    -- to this one identity.)
     -- DO NOT regenerate — every change forces re-matching the live KC
     -- user across every dev environment using this seed.
     _ashkan_id CONSTANT UUID := '4814ec27-5e21-4756-ad98-e17f69c5a166';

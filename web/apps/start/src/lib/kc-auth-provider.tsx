@@ -7,7 +7,7 @@ import { useCallback, useMemo } from 'react';
  * Keycloak BFF auth provider for the web app.
  *
  * Supplies the platform-neutral `AuthContext` the shared app shell + gates
- * consume. Unlike the Firebase `AuthProvider` (Electron), there is NO client
+ * consume. Unlike the Electron `AuthProvider`, there is NO client
  * auth SDK here: the session lives entirely in the httpOnly `__pivox_oidc`
  * cookie, and the SSR gate (`_app` / `create-org` `beforeLoad`) resolves the
  * user before render. So `user` is injected as a prop (already known by the
