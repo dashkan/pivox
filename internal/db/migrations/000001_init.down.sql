@@ -28,7 +28,6 @@ DROP TABLE IF EXISTS asset_versions;
 DROP TABLE IF EXISTS assets;
 
 -- Auth / IAM / org
-DROP TABLE IF EXISTS delegated_auth_sessions;
 DROP TABLE IF EXISTS sso_configs;
 DROP TABLE IF EXISTS domains;
 DROP TABLE IF EXISTS public_email_domains;
@@ -64,7 +63,6 @@ DROP TYPE IF EXISTS rendition_type;
 DROP TYPE IF EXISTS asset_media_type;
 DROP TYPE IF EXISTS asset_state;
 DROP TYPE IF EXISTS tag_binding_origin;
-DROP TYPE IF EXISTS delegated_auth_session_state;
 DROP TYPE IF EXISTS endpoint_state;
 DROP TYPE IF EXISTS agent_state;
 DROP TYPE IF EXISTS eviction_policy;

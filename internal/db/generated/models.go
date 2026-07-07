@@ -194,50 +194,6 @@ func (ns NullCertState) Value() (driver.Value, error) {
 	return string(ns.CertState), nil
 }
 
-type DelegatedAuthSessionState string
-
-const (
-	DelegatedAuthSessionStatePENDING  DelegatedAuthSessionState = "PENDING"
-	DelegatedAuthSessionStateAPPROVED DelegatedAuthSessionState = "APPROVED"
-	DelegatedAuthSessionStateDENIED   DelegatedAuthSessionState = "DENIED"
-	DelegatedAuthSessionStateEXPIRED  DelegatedAuthSessionState = "EXPIRED"
-)
-
-func (e *DelegatedAuthSessionState) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = DelegatedAuthSessionState(s)
-	case string:
-		*e = DelegatedAuthSessionState(s)
-	default:
-		return fmt.Errorf("unsupported scan type for DelegatedAuthSessionState: %T", src)
-	}
-	return nil
-}
-
-type NullDelegatedAuthSessionState struct {
-	DelegatedAuthSessionState DelegatedAuthSessionState `json:"delegated_auth_session_state"`
-	Valid                     bool                      `json:"valid"` // Valid is true if DelegatedAuthSessionState is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullDelegatedAuthSessionState) Scan(value interface{}) error {
-	if value == nil {
-		ns.DelegatedAuthSessionState, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.DelegatedAuthSessionState.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullDelegatedAuthSessionState) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.DelegatedAuthSessionState), nil
-}
-
 type DomainState string
 
 const (
@@ -937,14 +893,6 @@ type Dashboard struct {
 	UpdateTime     time.Time          `json:"update_time"`
 	DeleteTime     pgtype.Timestamptz `json:"delete_time"`
 	PurgeTime      pgtype.Timestamptz `json:"purge_time"`
-}
-
-type DelegatedAuthSession struct {
-	Code        uuid.UUID                 `json:"code"`
-	State       DelegatedAuthSessionState `json:"state"`
-	CustomToken pgtype.Text               `json:"custom_token"`
-	CreateTime  time.Time                 `json:"create_time"`
-	ExpireTime  time.Time                 `json:"expire_time"`
 }
 
 type Domain struct {

@@ -371,7 +371,7 @@ The exact feature set available during offline operation needs deeper analysis:
 
 | Context | Method |
 |---|---|
-| Operator → Cloud UI | OAuth2 / OIDC (see docs/authn.md for auth architecture) |
+| Operator → Cloud UI | OAuth2 / OIDC (Keycloak; see AGENTS.md for the auth model) |
 | Operator → Local UI (online) | Same — proxied through cloud auth |
 | Operator → Local UI (offline) | Cached auth tokens with local validation |
 | Playout Agent → Cloud Controller | mTLS with org-scoped certificates |

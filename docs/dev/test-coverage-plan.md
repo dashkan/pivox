@@ -11,7 +11,7 @@
 
 ## Goal
 
-90%+ coverage for every hand-written Go package. Generated code (`internal/db/generated/`, `internal/pkg/gen/`) is excluded — it's exercised indirectly through integration tests. (This plan predates the Keycloak migration; the external SDK wrapper `internal/firebase/` it also excluded has since been **deleted** — auth is now the `internal/oidc` Keycloak verifier, covered by its own unit tests.)
+90%+ coverage for every hand-written Go package. Generated code (`internal/db/generated/`, `internal/pkg/gen/`) is excluded — it's exercised indirectly through integration tests.
 
 ## Current State (unit tests only, `-short` mode)
 
@@ -34,14 +34,14 @@
 | `internal/service/storage` | **54.5%** | AgentService Connect + updates |
 | `internal/service/organizations` | **51.8%** | CreateOrg + List need integration |
 | `internal/filter` | **40.5%** | Query/Scan need real DB, transpiler edges |
-| `internal/server` | **40.8%** | InternalHooks entirely untested |
+| `internal/server` | **40.8%** | interceptor chain |
 | `internal/authn` | — | Interface-only, no logic |
 | `internal/config` | — | Plain structs, no logic |
 
 ## Prerequisites (all done)
 
 - [x] `db.Querier` interface — every service accepts it
-- [x] `authn.Service` interface — IDP-agnostic auth, replaces `*firebase.AuthService`
+- [x] `authn.Service` interface — IDP-agnostic auth (Keycloak)
 - [x] `LROManager` interface — in `operations/server.go`, mockable
 - [x] `TxBeginner` interface — in `organizations/server.go`, mockable
 - [x] `testutil/db.go` — testcontainers `pgvector/pgvector:pg18` + pgvector types + migrations
@@ -100,45 +100,6 @@ Each existing `*_integration_test.go` file already sets up testcontainers + bufc
 This also covers `filter.Query`, all `filter.Scan*` functions, and `filter.ParseOrderBy`.
 
 **After this phase**: services should jump to 75-85%, filter to ~60%.
-
-### Phase 2: Server InternalHooks
-
-All `InternalHooks` methods are 0% covered. They are HTTP handlers testable with `httptest`, `MockQuerier`, and a mock `authn.Service`.
-
-Create **`internal/server/internal_hooks_test.go`** with `//go:build dev` tag:
-
-```go
-type mockAuthService struct{ mock.Mock }
-func (m *mockAuthService) VerifyToken(ctx context.Context, token string) (*authn.Identity, error) { ... }
-func (m *mockAuthService) CreateCustomToken(ctx context.Context, uid string) (string, error) { ... }
-func (m *mockAuthService) CreateTenant(ctx context.Context, displayName string) (string, error) { ... }
-func (m *mockAuthService) DeleteTenant(ctx context.Context, tenantID string) error { ... }
-```
-
-Tests:
-- `TestNewInternalHooks` — constructor returns non-nil
-- `TestRegister` — verify routes registered (call each path, expect non-404)
-- `TestSyncAccount_Success` — POST valid JSON → 200, mock UpsertAccount called
-- `TestSyncAccount_InvalidJSON` — bad body → 400
-- `TestSyncAccount_MissingUID` — empty firebase_uid → 400
-- `TestSyncAccount_DBError` — UpsertAccount returns error → 500
-- `TestExchangeToken_Success` — valid bearer → VerifyToken + CreateCustomToken, return JSON with custom_token
-- `TestExchangeToken_MissingHeader` — no Authorization → 401
-- `TestExchangeToken_InvalidToken` — VerifyToken returns error → 401
-- `TestExchangeToken_CustomTokenError` — CreateCustomToken fails → 500
-- `TestDepositToken_Success` — valid token → VerifyToken + CreateAuthTokenCode, return code
-- `TestDepositToken_InvalidToken` — VerifyToken fails → 401
-- `TestDepositToken_EmptyBody` — missing id_token → 400
-- `TestConsumeToken_Success` — valid code → ConsumeAuthTokenCode, return id_token
-- `TestConsumeToken_InvalidCode` — bad UUID → 400
-- `TestConsumeToken_ExpiredCode` — ConsumeAuthTokenCode returns error → 401
-- `TestRateLimit_Allow` — under limit → handler called
-- `TestRateLimit_Block` — over limit → 429
-- `TestRequireSecret_Valid` — correct secret → handler called
-- `TestRequireSecret_Invalid` — wrong secret → 401
-- `TestIPRateLimiter` — newIPRateLimiter + allow behavior
-
-**After this phase**: `server` should jump from 41% to ~75%.
 
 ### Phase 3: Storage AgentService + helper functions
 
@@ -262,7 +223,6 @@ For every function below 90%, write a targeted test hitting the uncovered branch
 | `storageagent.newS3Client` | Needs real S3/minio backend |
 | `storageagent.ListenAndServe` | Binds network port |
 | `storageagent.version` | Returns build-time constant |
-| ~~`firebase.*`~~ | Removed — the Firebase SDK wrapper was deleted in the Keycloak migration; auth is now `internal/oidc` (JWKS-verified), tested directly |
 | `internal/db/generated/*` | sqlc-generated — exercised via integration tests |
 | `internal/pkg/gen/*` | protoc-generated gRPC/proto code |
 

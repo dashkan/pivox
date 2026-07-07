@@ -22,18 +22,16 @@ Refer to components by their canonical names, not their tech stack:
   Cloud Controller.
 - **Playout Agent** — on-prem agent installed alongside engines.
 
-> **Removed:** Firebase is gone across the stack — auth is
-> Keycloak-only. Firebase Cloud Functions (auth-time blocking hooks
-> for identity sync) are removed; identity provisioning now flows from
-> Keycloak (KC→Kafka→Pivox event sync), not Firebase auth hooks. Both
-> web apps are Keycloak: `start` via a server-side BFF (openid-client +
-> httpOnly cookie session), and the Electron app via a public PKCE
-> client whose OIDC flow runs in the **main process** (system-browser
-> Authorization Code + PKCE, loopback/`pivox://` redirect capture,
-> tokens in `safeStorage`) — see `web/apps/electron/src/main/`. The
-> shared OIDC core (discovery, PKCE, code exchange, refresh,
-> end-session, id-token claims) lives in `@pivox/oidc`, consumed by
-> both the `start` server and the Electron main process.
+> **Auth model.** Auth is **Keycloak-only**. Identity provisioning flows
+> from Keycloak (KC→Kafka→Pivox event sync). Both web apps are Keycloak:
+> `start` via a server-side BFF (openid-client + httpOnly cookie
+> session), and the Electron app via a public PKCE client whose OIDC
+> flow runs in the **main process** (system-browser Authorization Code +
+> PKCE, loopback/`pivox://` redirect capture, tokens in `safeStorage`) —
+> see `web/apps/electron/src/main/`. The shared OIDC core (discovery,
+> PKCE, code exchange, refresh, end-session, id-token claims) lives in
+> `@pivox/oidc`, consumed by both the `start` server and the Electron
+> main process.
 
 Tech-stack references ("Go backend", "Rust engine") are appropriate
 in build docs / architecture decisions where the technology is the
@@ -47,13 +45,7 @@ Rate limiting is the edge proxy's responsibility (Cloudflare, GCLB,
 nginx — whatever sits in front of pivox-cloud in production). App-level
 abuse defenses live in:
 
-- Single-use codes with short TTLs (`auth_token_codes`,
-  `delegated_auth_sessions`)
 - Auth on every endpoint that can be authenticated
-- Response-shape uniformity on pre-auth endpoints (e.g.,
-  `:resolveProvider` collapses "domain not configured", "domain not
-  verified", and "SsoConfig disabled" into the same `200 + {}`
-  response — empty body is indistinguishable across all three causes)
 - Keycloak brokering the SSO/OAuth flow to customer IdPs — KC owns the
   OAuth state token + PKCE now; the app-level custom broker was removed
 
@@ -273,10 +265,7 @@ Conventions and gotchas (each was paid for once; don't relearn them):
   `https://pivox.ngrok.app/realms/acme`. This issuer lives in **two**
   places that must agree: `scripts/seeds/02_acme_sso.sql` and the live
   `sso_configs.oidc_config` row (re-seed an empty DB, or `UPDATE` in
-  place — the seed only runs on first use). (Pre-Firebase-removal a
-  third place — the Firebase console `oidc.acme` provider — also had
-  to agree; that federation is gone now that the cloud verifies
-  Keycloak tokens directly.)
+  place — the seed only runs on first use).
 - **ngrok** claims `pivox.ngrok.app`; only one agent session per domain,
   so stop `make proxy-ngrok` before `aspire start`.
 

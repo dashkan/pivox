@@ -6,7 +6,7 @@ Monorepo for the Pivox Broadcast Platform. Go control plane, storage gateway age
 
 | Feature | Status | Description |
 |---|---|---|
-| **Auth** | Built | Firebase Auth, custom storage JWT, Electron OAuth flow |
+| **Auth** | Built | Keycloak (OIDC) — server-side BFF (web) + main-process PKCE (Electron) |
 | **Organizations** | Services built | Multi-tenant org management. Needs UI + validation |
 | **Projects** | Services built | Project-scoped workspaces. Needs UI + validation |
 | **Tagging** | Services built | Tag keys, values, bindings. Needs UI + validation |
@@ -76,7 +76,6 @@ docs/                      # Architecture & design documentation
 - pnpm
 - PostgreSQL 18 (via Docker or Homebrew)
 - [rustfs](https://github.com/rustfs/rustfs) (S3-compatible storage, via Homebrew)
-- Firebase CLI (`firebase-tools`)
 
 ### Setup
 
@@ -138,7 +137,6 @@ See `docs/` for detailed documentation:
 
 - [Architecture](docs/architecture.md) — system overview, deployment tiers
 - [Storage](docs/storage.md) — storage gateway, S3 proxy, caching, session auth
-- [Authentication](docs/authn.md) — Firebase Auth, Electron OAuth flow
 - [Control Plane](docs/control-plane.md) — asset management, playout control
 - [Engine](docs/engine.md) — rendering engine, CEF, FFmpeg, Rive
 - [Protocols](docs/protocols.md) — gRPC, REST, WebSocket

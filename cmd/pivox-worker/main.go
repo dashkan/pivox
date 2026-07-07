@@ -56,7 +56,6 @@ const (
 	purgeSpacesInterval    = 5 * time.Minute
 	verifyDomainsInterval  = 2 * time.Minute
 	reapOperationsInterval = 5 * time.Minute
-	cleanupAuthInterval    = 1 * time.Minute
 	// Web sessions lazy-expire on read, so this is pure GC of rows for
 	// sessions never read again before their 30-day horizon — hourly is
 	// ample; a tighter cadence would only churn the table.
@@ -278,7 +277,6 @@ func serve(cmd *cobra.Command, _ []string) error {
 	river.AddWorker(riverWorkers, &workers.PurgeSpacesWorker{Queries: queries, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.VerifyDomainsWorker{Queries: queries, Resolver: dnsResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.ReapOperationsWorker{Queries: queries, Logger: logger})
-	river.AddWorker(riverWorkers, &workers.CleanupAuthWorker{Queries: queries, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.PurgeWebSessionsWorker{Pool: sessionsPool, Logger: logger})
 	// LRO (on-demand) workers — invoked by lro.Manager.NewLro from
 	// pivox-cloud's RPC handlers. Each handles one logical step;
@@ -321,11 +319,6 @@ func serve(cmd *cobra.Command, _ []string) error {
 		river.NewPeriodicJob(
 			river.PeriodicInterval(reapOperationsInterval),
 			func() (river.JobArgs, *river.InsertOpts) { return workers.ReapOperationsArgs{}, nil },
-			&river.PeriodicJobOpts{RunOnStart: true},
-		),
-		river.NewPeriodicJob(
-			river.PeriodicInterval(cleanupAuthInterval),
-			func() (river.JobArgs, *river.InsertOpts) { return workers.CleanupAuthArgs{}, nil },
 			&river.PeriodicJobOpts{RunOnStart: true},
 		),
 		river.NewPeriodicJob(

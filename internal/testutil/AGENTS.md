@@ -39,7 +39,7 @@ Both helpers depend on the docker-compose stack defined in
 | Pure-function test (validators, parsers, transformers) | Plain `go test`, no helpers |
 | Asserting River job enqueue | `rivertest.RequireInsertedTx` against the harness's pool |
 | Hard-to-induce DB error (closed tx, deadlock) | `pgxmock` |
-| Asserting Firebase Auth provider calls | `authnmock.NewMockService(t)` (or `grpcharness.NewMockedFirebaseAuth(t)`) |
+| Asserting auth (Keycloak) provider calls | `authnmock.NewMockService(t)` |
 
 Anti-patterns refused on review:
 

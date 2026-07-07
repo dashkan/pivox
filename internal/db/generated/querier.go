@@ -67,20 +67,11 @@ type Querier interface {
 	// transitioned row so the caller can fire local LRO Manager
 	// cancels for goroutines running on this replica.
 	CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) ([]uuid.UUID, error)
-	// Transitions a pending session to approved and stores the minted custom token.
-	// Only unexpired pending sessions match — a no-row result means the session
-	// was never created, already completed, or has expired.
-	CompleteDelegatedAuthSession(ctx context.Context, arg CompleteDelegatedAuthSessionParams) (DelegatedAuthSession, error)
 	CompleteOperation(ctx context.Context, arg CompleteOperationParams) (Operation, error)
 	// The DeleteSecret guard's lookup: connectors that reference a given secret,
 	// with enough identity (slug + scope) to name them in the FailedPrecondition
 	// error. Ordered by slug for a stable, readable message.
 	ConnectorsReferencingSecret(ctx context.Context, secretID uuid.UUID) ([]ConnectorsReferencingSecretRow, error)
-	// Atomically deletes an approved session and returns its custom token. This is
-	// the poll path — a single statement ensures the token is single-use even
-	// under concurrent pollers. No-row result means the session is still pending,
-	// already consumed, or expired; callers distinguish pending via GetDelegatedAuthSessionState.
-	ConsumeDelegatedAuthSession(ctx context.Context, code uuid.UUID) (pgtype.Text, error)
 	// Counts a workflow's runs in an active state (RUNNING or WAITING). Used by
 	// DeleteWorkflow's force guard: with force=false a nonzero count blocks the
 	// delete (the caller must cancel the runs or pass force=true).
@@ -143,9 +134,6 @@ type Querier interface {
 	// is stored as a column so the SYSTEM_MANAGED-mutation guard can
 	// gate without unmarshaling JSONB on the hot path.
 	CreateDashboard(ctx context.Context, arg CreateDashboardParams) (Dashboard, error)
-	// Creates a new delegated auth session. The code and expiry are chosen by the
-	// server so we can control both TTL and the entropy source (crypto/rand).
-	CreateDelegatedAuthSession(ctx context.Context, arg CreateDelegatedAuthSessionParams) (DelegatedAuthSession, error)
 	// CreateDomain inserts a new PENDING domain. UNIQUE(domain) is a
 	// global single-claim constraint — a duplicate insert returns
 	// pgconn unique-violation, which the handler maps to ALREADY_EXISTS
@@ -216,8 +204,6 @@ type Querier interface {
 	// (cancel in-flight LROs, last-VERIFIED-domain-on-enabled-SSO check)
 	// before this fires.
 	DeleteDomain(ctx context.Context, arg DeleteDomainParams) error
-	// Cleanup: remove sessions past their expiry. Run periodically.
-	DeleteExpiredDelegatedAuthSessions(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
 	DeleteExpiredStorageAgentAudit(ctx context.Context) (int64, error)
 	// DeleteGroupMembersForIdentity removes the identity from every
@@ -355,9 +341,6 @@ type Querier interface {
 	// which need the row pinned for the duration of the surrounding tx
 	// so a concurrent mutation can't race the etag check.
 	GetDashboardByNameForUpdate(ctx context.Context, arg GetDashboardByNameForUpdateParams) (Dashboard, error)
-	// Returns the state of a session without mutating it. Used by pollers to
-	// distinguish "still pending" from "expired/unknown" after a failed consume.
-	GetDelegatedAuthSessionState(ctx context.Context, code uuid.UUID) (DelegatedAuthSessionState, error)
 	// GetDomainByID looks up a domain row by primary key, scoped to an
 	// org. Used by the CreateDomain LRO's polling work fn and by
 	// GetDomain handler.
