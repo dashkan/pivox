@@ -1,7 +1,0 @@
-{
-  "profiles": {
-    "Pivox.WinUI (Package)": {
-      "commandName": "MsixPackage"
-    }
-  }
-}
