@@ -65,15 +65,9 @@
         "description": "${role_default-roles}",
         "composite": true,
         "composites": {
-          "realm": [
-            "offline_access",
-            "uma_authorization"
-          ],
+          "realm": ["offline_access", "uma_authorization"],
           "client": {
-            "account": [
-              "manage-account",
-              "view-profile"
-            ]
+            "account": ["manage-account", "view-profile"]
           }
         },
         "clientRole": false,
@@ -108,9 +102,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "realm-management": [
-                "query-clients"
-              ]
+              "realm-management": ["query-clients"]
             }
           },
           "clientRole": true,
@@ -265,10 +257,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "realm-management": [
-                "query-groups",
-                "query-users"
-              ]
+              "realm-management": ["query-groups", "query-users"]
             }
           },
           "clientRole": true,
@@ -358,9 +347,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "account": [
-                "manage-account-links"
-              ]
+              "account": ["manage-account-links"]
             }
           },
           "clientRole": true,
@@ -383,9 +370,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "account": [
-                "view-consent"
-              ]
+              "account": ["view-consent"]
             }
           },
           "clientRole": true,
@@ -435,9 +420,7 @@
     "id": "66347610-e9b5-422e-a93b-1c1937e7d543",
     "clientId": "admin-permissions"
   },
-  "requiredCredentials": [
-    "password"
-  ],
+  "requiredCredentials": ["password"],
   "otpPolicyType": "totp",
   "otpPolicyAlgorithm": "HmacSHA1",
   "otpPolicyInitialCounter": 0,
@@ -452,10 +435,7 @@
   ],
   "localizationTexts": {},
   "webAuthnPolicyRpEntityName": "keycloak",
-  "webAuthnPolicySignatureAlgorithms": [
-    "ES256",
-    "RS256"
-  ],
+  "webAuthnPolicySignatureAlgorithms": ["ES256", "RS256"],
   "webAuthnPolicyRpId": "",
   "webAuthnPolicyAttestationConveyancePreference": "not specified",
   "webAuthnPolicyAuthenticatorAttachment": "not specified",
@@ -466,10 +446,7 @@
   "webAuthnPolicyAcceptableAaguids": [],
   "webAuthnPolicyExtraOrigins": [],
   "webAuthnPolicyPasswordlessRpEntityName": "keycloak",
-  "webAuthnPolicyPasswordlessSignatureAlgorithms": [
-    "ES256",
-    "RS256"
-  ],
+  "webAuthnPolicyPasswordlessSignatureAlgorithms": ["ES256", "RS256"],
   "webAuthnPolicyPasswordlessRpId": "",
   "webAuthnPolicyPasswordlessAttestationConveyancePreference": "not specified",
   "webAuthnPolicyPasswordlessAuthenticatorAttachment": "not specified",
@@ -482,19 +459,14 @@
   "scopeMappings": [
     {
       "clientScope": "offline_access",
-      "roles": [
-        "offline_access"
-      ]
+      "roles": ["offline_access"]
     }
   ],
   "clientScopeMappings": {
     "account": [
       {
         "client": "account-console",
-        "roles": [
-          "manage-account",
-          "view-groups"
-        ]
+        "roles": ["manage-account", "view-groups"]
       }
     ]
   },
@@ -509,9 +481,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "/realms/pivox/account/*"
-      ],
+      "redirectUris": ["/realms/pivox/account/*"],
       "webOrigins": [],
       "notBefore": 0,
       "bearerOnly": false,
@@ -556,9 +526,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "/realms/pivox/account/*"
-      ],
+      "redirectUris": ["/realms/pivox/account/*"],
       "webOrigins": [],
       "notBefore": 0,
       "bearerOnly": false,
@@ -835,14 +803,16 @@
         "decisionStrategy": "UNANIMOUS",
         "authorizationSchema": {
           "resourceTypes": {
-            "Clients": {
-              "type": "Clients",
+            "Groups": {
+              "type": "Groups",
               "scopes": [
-                "map-roles-composite",
-                "view",
-                "map-roles-client-scope",
-                "map-roles",
-                "manage"
+                "view-members",
+                "manage-membership",
+                "manage",
+                "manage-membership-of-members",
+                "manage-members",
+                "impersonate-members",
+                "view"
               ],
               "scopeAliases": {}
             },
@@ -850,47 +820,37 @@
               "type": "Roles",
               "scopes": [
                 "map-role",
-                "map-role-composite",
-                "map-role-client-scope"
+                "map-role-client-scope",
+                "map-role-composite"
               ],
               "scopeAliases": {}
             },
-            "Groups": {
-              "type": "Groups",
+            "Clients": {
+              "type": "Clients",
               "scopes": [
-                "impersonate-members",
-                "manage-members",
-                "manage-membership-of-members",
+                "map-roles-client-scope",
+                "view",
+                "map-roles-composite",
                 "manage",
-                "manage-membership",
-                "view-members",
-                "view"
+                "map-roles"
               ],
               "scopeAliases": {}
             },
             "Users": {
               "type": "Users",
               "scopes": [
-                "map-roles",
-                "impersonate",
-                "view",
                 "reset-password",
-                "manage-group-membership",
-                "manage"
+                "view",
+                "impersonate",
+                "map-roles",
+                "manage",
+                "manage-group-membership"
               ],
               "scopeAliases": {
-                "manage": [
-                  "manage-members"
-                ],
-                "view": [
-                  "view-members"
-                ],
-                "manage-group-membership": [
-                  "manage-membership-of-members"
-                ],
-                "impersonate": [
-                  "impersonate-members"
-                ]
+                "manage-group-membership": ["manage-membership-of-members"],
+                "view": ["view-members"],
+                "manage": ["manage-members"],
+                "impersonate": ["impersonate-members"]
               },
               "groupType": "Groups"
             }
@@ -914,9 +874,7 @@
         "${IMPORT_KC_APP_URL}/api-docs*",
         "${IMPORT_KC_APP_URL}/api-docs"
       ],
-      "webOrigins": [
-        ""
-      ],
+      "webOrigins": [""],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1019,9 +977,7 @@
         "pivox://oidc-callback",
         "http://127.0.0.1/oidc/callback"
       ],
-      "webOrigins": [
-        ""
-      ],
+      "webOrigins": [""],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1080,10 +1036,7 @@
         "https://vscode.dev/redirect",
         "http://127.0.0.1:33418/"
       ],
-      "webOrigins": [
-        "http://127.0.0.1:33418",
-        "https://vscode.dev"
-      ],
+      "webOrigins": ["http://127.0.0.1:33418", "https://vscode.dev"],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": true,
@@ -1143,12 +1096,8 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "https://oauth.pstmn.io/v1/callback"
-      ],
-      "webOrigins": [
-        ""
-      ],
+      "redirectUris": ["https://oauth.pstmn.io/v1/callback"],
+      "webOrigins": [""],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1244,12 +1193,8 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "/admin/pivox/console/*"
-      ],
-      "webOrigins": [
-        "+"
-      ],
+      "redirectUris": ["/admin/pivox/console/*"],
+      "webOrigins": ["+"],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1320,9 +1265,7 @@
         "${IMPORT_KC_APP_URL}/auth/callback",
         "http://localhost:3000/auth/callback)"
       ],
-      "webOrigins": [
-        ""
-      ],
+      "webOrigins": [""],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -2184,10 +2127,7 @@
   "adminTheme": "",
   "emailTheme": "",
   "eventsEnabled": true,
-  "eventsListeners": [
-    "kafka",
-    "jboss-logging"
-  ],
+  "eventsListeners": ["kafka", "jboss-logging"],
   "enabledEventTypes": [
     "UPDATE_CONSENT_ERROR",
     "UPDATE_TOTP",
@@ -2486,9 +2426,7 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
-          "host-sending-registration-request-must-match": [
-            "false"
-          ],
+          "host-sending-registration-request-must-match": ["false"],
           "trusted-hosts": [
             "127.0.0.1",
             "https://claude.ai/*",
@@ -2496,9 +2434,7 @@
             "https://vscode.dev/redirect/*",
             "localhost"
           ],
-          "client-uris-must-match": [
-            "true"
-          ]
+          "client-uris-must-match": ["true"]
         }
       },
       {
@@ -2508,9 +2444,7 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
-          "max-clients": [
-            "200"
-          ]
+          "max-clients": ["200"]
         }
       },
       {
@@ -2555,13 +2489,14 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
-          "allow-default-scopes": [
-            "true"
-          ],
+          "allow-default-scopes": ["true"],
           "allowed-client-scopes": [
+            "offline_access",
+            "mcp:resources",
+            "service_account",
+            "openid",
             "mcp:tools",
-            "organization",
-            "mcp:resources"
+            "organization"
           ]
         }
       },
@@ -2588,8 +2523,26 @@
         "subType": "authenticated",
         "subComponents": {},
         "config": {
-          "allow-default-scopes": [
-            "true"
+          "allow-default-scopes": ["true"],
+          "allowed-client-scopes": [
+            "openid",
+            "address",
+            "mcp:tools",
+            "acr",
+            "email",
+            "aud",
+            "offline_access",
+            "role_list",
+            "saml_organization",
+            "service_account",
+            "phone",
+            "microprofile-jwt",
+            "web-origins",
+            "mcp:resources",
+            "organization",
+            "roles",
+            "basic",
+            "profile"
           ]
         }
       }
@@ -3656,9 +3609,7 @@
             "condition": "client-id-uri",
             "configuration": {
               "is-negative-logic": false,
-              "client-id-uri-scheme": [
-                "https"
-              ],
+              "client-id-uri-scheme": ["https"],
               "client-id-uri-allow-permitted-domains": [
                 "vscode.dev",
                 "*.vscode.dev"
@@ -3666,9 +3617,7 @@
             }
           }
         ],
-        "profiles": [
-          "cimd-profile"
-        ]
+        "profiles": ["cimd-profile"]
       }
     ]
   }
