@@ -239,6 +239,7 @@ const keycloak = await builder
   .withBuildArg("GITHUB_PAT", process.env.PIVOX_KEYCLOAK_SPI_GITHUB_PAT ?? "")
   // Use Postgres (KC_DB) instead of the start-dev default H2; the db is created
   // by the pg init script and KC auto-migrates its schema into it on boot.
+  .withEnabledFeatures(["preview", "cimd", "opentelemetry-metrics"])
   .withEnvironment("KC_DB", "postgres")
   .withEnvironment("KC_DB_URL", keycloakDbUrl)
   .withEnvironment("KC_DB_USERNAME", pgUsername)
@@ -251,10 +252,6 @@ const keycloak = await builder
   // Enable CIMD (Client ID Metadata Documents) so MCP clients (VS Code) can auth
   // via a hosted client-metadata URL instead of DCR. start-dev picks it up at
   // boot; organizations (default-on in 26.x, drives the org picker) stays on.
-  .withEnvironment(
-    "KC_FEATURES",
-    "preview,cimd,opentelemetry-logs,opentelemetry-metrics",
-  )
   // .withEnvironment("KC_METRICS_ENABLED", "true")
   // .withEnvironment("KC_TELEMETRY_METRICS_ENABLED", "true")
   // .withEnvironment("KC_TELEMETRY_LOGS_ENABLED", "true")
