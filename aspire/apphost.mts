@@ -248,6 +248,16 @@ const keycloak = await builder
   .withEnvironment("KC_PROXY_HEADERS", "xforwarded")
   .withEnvironment("KC_HOSTNAME_STRICT", "false")
   .withEnvironment("KC_HTTP_ENABLED", "true")
+  // Enable CIMD (Client ID Metadata Documents) so MCP clients (VS Code) can auth
+  // via a hosted client-metadata URL instead of DCR. start-dev picks it up at
+  // boot; organizations (default-on in 26.x, drives the org picker) stays on.
+  .withEnvironment(
+    "KC_FEATURES",
+    "preview,cimd,opentelemetry-logs,opentelemetry-metrics",
+  )
+  // .withEnvironment("KC_METRICS_ENABLED", "true")
+  // .withEnvironment("KC_TELEMETRY_METRICS_ENABLED", "true")
+  // .withEnvironment("KC_TELEMETRY_LOGS_ENABLED", "true")
   // Secrets/IDs referenced by the realm-import JSON via ${...} placeholders (the
   // committed realm files carry no plaintext secrets). Forwarded 1:1 from .envrc
   // into the container so KC can resolve them on --import-realm. The IMPORT_
