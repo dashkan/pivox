@@ -803,56 +803,56 @@
         "decisionStrategy": "UNANIMOUS",
         "authorizationSchema": {
           "resourceTypes": {
-            "Groups": {
-              "type": "Groups",
-              "scopes": [
-                "view-members",
-                "manage-membership",
-                "manage",
-                "manage-membership-of-members",
-                "manage-members",
-                "impersonate-members",
-                "view"
-              ],
-              "scopeAliases": {}
-            },
-            "Roles": {
-              "type": "Roles",
-              "scopes": [
-                "map-role",
-                "map-role-client-scope",
-                "map-role-composite"
-              ],
-              "scopeAliases": {}
-            },
             "Clients": {
               "type": "Clients",
               "scopes": [
-                "map-roles-client-scope",
-                "view",
                 "map-roles-composite",
                 "manage",
-                "map-roles"
+                "map-roles",
+                "map-roles-client-scope",
+                "view"
               ],
               "scopeAliases": {}
             },
             "Users": {
               "type": "Users",
               "scopes": [
-                "reset-password",
-                "view",
                 "impersonate",
                 "map-roles",
                 "manage",
-                "manage-group-membership"
+                "manage-group-membership",
+                "reset-password",
+                "view"
               ],
               "scopeAliases": {
-                "manage-group-membership": ["manage-membership-of-members"],
-                "view": ["view-members"],
                 "manage": ["manage-members"],
-                "impersonate": ["impersonate-members"]
+                "impersonate": ["impersonate-members"],
+                "manage-group-membership": ["manage-membership-of-members"],
+                "view": ["view-members"]
               },
               "groupType": "Groups"
+            },
+            "Groups": {
+              "type": "Groups",
+              "scopes": [
+                "manage-membership-of-members",
+                "manage-members",
+                "impersonate-members",
+                "view",
+                "view-members",
+                "manage-membership",
+                "manage"
+              ],
+              "scopeAliases": {}
+            },
+            "Roles": {
+              "type": "Roles",
+              "scopes": [
+                "map-role-client-scope",
+                "map-role-composite",
+                "map-role"
+              ],
+              "scopeAliases": {}
             }
           }
         }
@@ -1060,7 +1060,7 @@
         "backchannel.logout.session.required": "true",
         "consent.screen.text": "The client's hostname is vscode.dev",
         "display.on.consent.screen": "true",
-        "cimd.cache.expiry.time.in.sec": "1783486976"
+        "cimd.cache.expiry.time.in.sec": "1783492393"
       },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": false,
@@ -2523,27 +2523,7 @@
         "subType": "authenticated",
         "subComponents": {},
         "config": {
-          "allow-default-scopes": ["true"],
-          "allowed-client-scopes": [
-            "openid",
-            "address",
-            "mcp:tools",
-            "acr",
-            "email",
-            "aud",
-            "offline_access",
-            "role_list",
-            "saml_organization",
-            "service_account",
-            "phone",
-            "microprofile-jwt",
-            "web-origins",
-            "mcp:resources",
-            "organization",
-            "roles",
-            "basic",
-            "profile"
-          ]
+          "allow-default-scopes": ["true"]
         }
       }
     ],
