@@ -498,7 +498,16 @@ const envoy = await builder
 await builder
   .addContainer("ngrok", "ngrok/ngrok:latest")
   .withEnvironment("NGROK_AUTHTOKEN", process.env.NGROK_AUTHTOKEN ?? "")
-  .withArgs(["http", "host.docker.internal:8081", "--url", "pivox.ngrok.app"])
+  // --log=stdout switches ngrok off its interactive TUI so its agent logs
+  // (tunnel status + request lines) surface in `aspire logs ngrok`. Add
+  // --log-level=debug for more verbosity if needed.
+  .withArgs([
+    "http",
+    "host.docker.internal:8081",
+    "--url",
+    "pivox.ngrok.app",
+    "--log=stdout",
+  ])
   .waitFor(envoy);
 
 await builder.build().run();
