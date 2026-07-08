@@ -254,6 +254,7 @@ const keycloak = await builder
   // prefix avoids KC's own KC_*/KEYCLOAK_* config-option parsing. These names
   // must match the ${...} placeholders in the realm JSONs EXACTLY (all use the
   // _CLIENT_ID / _CLIENT_SECRET form).
+  .withEnvironment("IMPORT_KC_APP_URL", process.env.IMPORT_KC_APP_URL ?? "")
   .withEnvironment(
     "IMPORT_KC_START_CLIENT_ID",
     process.env.IMPORT_KC_START_CLIENT_ID ?? "",
