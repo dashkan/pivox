@@ -37,6 +37,7 @@ import (
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
+	"github.com/dashkan/pivox/internal/mcp"
 	"github.com/dashkan/pivox/internal/oidc"
 	"github.com/dashkan/pivox/internal/permission"
 	"github.com/dashkan/pivox/internal/server"
@@ -112,6 +113,11 @@ func main() {
 	f.Bool("disable-oidc-audience-validation", envOrBool("PIVOX_DISABLE_OIDC_AUDIENCE_VALIDATION", false), "Opt out of OIDC audience validation (fail-closed otherwise)")
 	f.Duration("oidc-jwks-refresh-interval", envOrDuration("PIVOX_OIDC_JWKS_REFRESH_INTERVAL", 5*time.Minute), "How often to background-refresh the issuer's JWKS (0 = fetch once at startup, never refresh)")
 
+	// Remote MCP server (optional). Empty disables the /mcp endpoint. The
+	// resource URL is also the audience MCP tokens must carry — distinct from
+	// PIVOX_OIDC_AUDIENCE (the anti-confusion boundary).
+	f.String("mcp-resource-url", envOrDefault("PIVOX_MCP_RESOURCE_URL", ""), "MCP server resource URL / token audience (e.g. https://host/mcp); empty disables the /mcp endpoint")
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -162,6 +168,9 @@ func serve(cmd *cobra.Command, args []string) error {
 			Audience:                  must(f.GetString("oidc-audience")),
 			DisableAudienceValidation: disableOIDCAud,
 			JWKSRefreshInterval:       jwksRefreshInterval,
+		},
+		MCP: config.MCPConfig{
+			ResourceURL: must(f.GetString("mcp-resource-url")),
 		},
 		Encryption: config.EncryptionConfig{
 			Provider:      must(f.GetString("encryption-provider")),
@@ -287,6 +296,31 @@ func serve(cmd *cobra.Command, args []string) error {
 	)
 	if cfg.OIDC.DisableAudienceValidation {
 		logger.Warn("OIDC audience validation DISABLED — any token this realm signs (including ID tokens minted for other clients) will be accepted; set PIVOX_OIDC_AUDIENCE to re-enable")
+	}
+
+	// Optional MCP server surface (mounted on httpMux below when enabled). Its
+	// verifier is a SECOND oidc.Verifier pinned to the MCP resource-URL audience —
+	// the anti-confusion boundary vs the main API audience. Audience validation is
+	// always ON here (DisableAudienceValidation is never plumbed through): a
+	// disabled check would let any realm-signed token reach /mcp.
+	var mcpHandler http.Handler
+	if cfg.MCP.ResourceURL != "" {
+		mcpVerifier, verr := oidc.NewVerifier(ctx, oidc.Config{
+			Issuer:              cfg.OIDC.Issuer,
+			JWKSURL:             strings.TrimRight(cfg.OIDC.Issuer, "/") + "/protocol/openid-connect/certs",
+			Audience:            cfg.MCP.ResourceURL,
+			JWKSRefreshInterval: cfg.OIDC.JWKSRefreshInterval,
+		})
+		if verr != nil {
+			return fmt.Errorf("initialize MCP OIDC verifier: %w", verr)
+		}
+		mcpHandler = mcp.NewHandler(mcp.Config{
+			Queries:     queries,
+			Verifier:    mcpVerifier,
+			ResourceURL: cfg.MCP.ResourceURL,
+			Issuer:      cfg.OIDC.Issuer,
+		})
+		logger.Info("MCP server enabled", "resource_url", cfg.MCP.ResourceURL)
 	}
 
 	// gRPC server
@@ -682,6 +716,14 @@ func serve(cmd *cobra.Command, args []string) error {
 	// cost is ~1ms and worth the "set and forget" simplicity.
 	authMW := server.RequireAuth(authChainSvc, logger)
 	httpMux.Handle("/", authMW(gwMux))
+
+	// MCP server: the Streamable transport (bearer-protected inside the handler)
+	// plus the public Protected Resource Metadata discovery doc. Both patterns are
+	// more specific than "/", so they win over the gateway catch-all above.
+	if mcpHandler != nil {
+		httpMux.Handle("/mcp", mcpHandler)
+		httpMux.Handle("/mcp/", mcpHandler)
+	}
 
 	// SSE bypasses HTTP auth on purpose. The handler is a thin proxy
 	// to AiChat.StreamGenerateContent over the in-process bufconn

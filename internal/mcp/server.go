@@ -30,8 +30,13 @@ const (
 // mcpScopes are advertised in the PRM as the scopes a client should request. The
 // bare `organization` scope drives Keycloak's org picker (binding the token to
 // one org); the `mcp:*` scopes carry the resource-URL audience via their KC
-// audience mappers.
-var mcpScopes = []string{"organization", "mcp:tools", "mcp:resources"}
+// audience mappers. `offline_access` is here because clients (e.g. Claude Code)
+// register a DCR client with EXACTLY these scopes as its optional set, then
+// append `offline_access` at authorize time (KC's AS metadata advertises it, for
+// token refresh). If it's not in the DCR client's scopes, KC rejects the
+// authorize with invalid_scope — so the PRM must advertise it to keep the
+// DCR-registered client and the authorize request in sync.
+var mcpScopes = []string{"organization", "mcp:tools", "mcp:resources", "offline_access"}
 
 // Config configures the MCP HTTP handler.
 type Config struct {
@@ -108,7 +113,19 @@ func NewHandler(cfg Config) http.Handler {
 	}, srv.readActiveOrganization)
 
 	streamable := mcpsdk.NewStreamableHTTPHandler(
-		func(*http.Request) *mcpsdk.Server { return mcpServer }, nil)
+		func(*http.Request) *mcpsdk.Server { return mcpServer },
+		&mcpsdk.StreamableHTTPOptions{
+			// This is a REMOTE MCP server: the process listens on loopback and sits
+			// behind envoy/ngrok, so every request legitimately arrives with
+			// Host=pivox.ngrok.app (non-loopback). The SDK's default DNS-rebinding
+			// guard rejects exactly that shape — loopback listener + non-loopback
+			// Host — with 403. That guard protects *local* MCP servers from a browser
+			// being DNS-rebound onto localhost; it does not fit a remote,
+			// bearer-authenticated server behind a reverse proxy, where it only
+			// produces false 403s. CSRF is already mitigated by the required bearer
+			// token (an attacker cannot obtain it cross-origin).
+			DisableLocalhostProtection: true,
+		})
 
 	prm := &oauthex.ProtectedResourceMetadata{
 		Resource:               cfg.ResourceURL,
@@ -118,6 +135,13 @@ func NewHandler(cfg Config) http.Handler {
 	}
 	bearer := auth.RequireBearerToken(NewTokenVerifier(cfg.Verifier), &auth.RequireBearerTokenOptions{
 		ResourceMetadataURL: cfg.ResourceURL + "/.well-known/oauth-protected-resource",
+		// NOTE: we intentionally do NOT set Scopes here. Advertising them in the
+		// WWW-Authenticate challenge does not help — observed clients (Claude Code)
+		// ignore both the challenge `scope` and the PRM `scopes_supported` and send
+		// no `scope` at authorize. The reliable lever is the client's per-server
+		// `oauth.scopes` config. Setting Scopes here would also ENFORCE them, which
+		// risks a spurious 403 (e.g. offline_access may be absent from the access
+		// token's scope claim). The audience check already gates the transport.
 	})
 
 	mux := http.NewServeMux()

@@ -28,6 +28,9 @@ type Config struct {
 
 	// Encryption selects the at-rest encryption backend (KEK source).
 	Encryption EncryptionConfig
+
+	// MCP configures the optional remote Model Context Protocol server.
+	MCP MCPConfig
 }
 
 // EncryptionConfig selects the at-rest encryption backend. All backends
@@ -71,4 +74,16 @@ type OIDCConfig struct {
 	// verifiers converge after a rotation. 0 = fetch once at startup, never
 	// refresh. There is no on-demand refresh (see internal/oidc.Verifier).
 	JWKSRefreshInterval time.Duration
+}
+
+// MCPConfig configures the optional remote Model Context Protocol (MCP) server
+// mounted at /mcp. Empty ResourceURL leaves the MCP surface off entirely.
+type MCPConfig struct {
+	// ResourceURL is the MCP server's canonical resource identifier and the
+	// audience its access tokens MUST carry (e.g. https://pivox.ngrok.app/mcp),
+	// bound via a Keycloak mcp:* client scope + audience mapper. This audience is
+	// deliberately distinct from OIDCConfig.Audience — the anti-confusion boundary
+	// that stops a token minted for the main API from being replayed at /mcp, and
+	// vice-versa. Empty disables the MCP endpoint.
+	ResourceURL string
 }

@@ -386,6 +386,30 @@ static_resources:
                             - header: { key: x-forwarded-proto, value: https }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
 
+                        # --- Remote MCP server -> api REST (rest_gateway) ----
+                        # /mcp (Streamable transport) + /mcp/.well-known/... (public
+                        # PRM discovery). timeout/idle 0s for the long-lived SSE
+                        # stream. Precedes the "/" catch-all (envoy = first match wins).
+                        - match: { prefix: "/mcp" }
+                          route: { cluster: rest_gateway, timeout: 0s, idle_timeout: 0s }
+
+                        # --- OAuth/OIDC AS metadata discovery -> Keycloak ----
+                        # MCP clients fetch the authorization-server metadata at the
+                        # host-root or RFC-8414 path-inserted well-known, but Keycloak
+                        # only serves it under /realms/{realm}/. Rewrite both forms to
+                        # the realm endpoint so discovery succeeds. Realm pinned: pivox.
+                        - match:
+                            safe_regex:
+                              regex: '^/\.well-known/(oauth-authorization-server|openid-configuration)(/.*)?$'
+                          route:
+                            cluster: keycloak
+                            timeout: 0s
+                            idle_timeout: 0s
+                            regex_rewrite:
+                              pattern:
+                                regex: '^/\.well-known/([^/]+)(/.*)?$'
+                              substitution: /realms/pivox/.well-known/\1
+
                         # --- TanStack DevTools SSE -> web app (3000) --------
                         - match: { prefix: "/__tsd/" }
                           route: { cluster: web_app, timeout: 0s, idle_timeout: 0s }

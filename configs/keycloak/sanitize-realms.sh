@@ -8,15 +8,25 @@
 #
 #   1. Strips the realm key-provider components — Keycloak regenerates fresh
 #      signing/encryption keys on import, so no key material lands in the repo.
-#   2. Replaces the KNOWN externally-configured credentials with ${IMPORT_KC_*}
+#   2. Drops dynamically-registered (DCR) clients — MCP clients (Claude Code,
+#      VS Code, ...) register ephemeral OAuth clients via DCR, each with a UUID
+#      clientId. They are per-install throwaways created on demand at connect
+#      time, NOT part of the committable realm baseline; leaving them in would
+#      recreate stale registrations on every fresh --import-realm. Matched by the
+#      UUID-shaped clientId (no static client uses that shape). Also drops their
+#      orphaned .roles.client.<uuid> role-map entries so the baseline has no
+#      dangling references to clients that no longer exist. Only UUID-KEYED map
+#      entries are removed — the UUID *values* elsewhere (.id/.containerId/... on
+#      flows, scopes, roles, orgs) are Keycloak's internal object ids, kept.
+#   3. Replaces the KNOWN externally-configured credentials with ${IMPORT_KC_*}
 #      placeholders that KC resolves from env vars at --import-realm:
 #        pivox: the `start` client + the github / google / oidc.acme IdPs.
 #        acme:  the `pivox` client (counterpart of pivox's oidc.acme IdP — they
 #               share one credential).
-#   3. DENY-BY-DEFAULT: removes every OTHER client secret, IdP clientSecret, and
+#   4. DENY-BY-DEFAULT: removes every OTHER client secret, IdP clientSecret, and
 #      smtp password so nothing real rides along. KC regenerates internal client
 #      secrets (e.g. admin-permissions) on import.
-#   4. FAILS LOUD: after transforming, it scans the output and ABORTS if any
+#   5. FAILS LOUD: after transforming, it scans the output and ABORTS if any
 #      secret-ish value survives that is neither empty nor an ${IMPORT_KC_*}
 #      placeholder — so a newly-added secret-bearing field (a new confidential
 #      client, LDAP bindCredential, SAML signing key, etc.) can't silently leak;
@@ -83,6 +93,10 @@ sanitize() { # sanitize <file> <transform-filter>
 
 sanitize pivox-realm.json '
   del(.components["org.keycloak.keys.KeyProvider"])
+  | (if has("clients") then .clients |= map(select((.clientId // "")
+      | test("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") | not)) else . end)
+  | (if (.roles.client | type) == "object" then .roles.client |= with_entries(select(.key
+      | test("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") | not)) else . end)
   | (if has("clients") then .clients |= map(
       if .clientId == "start"
         then .clientId = "${IMPORT_KC_START_CLIENT_ID}" | .secret = "${IMPORT_KC_START_CLIENT_SECRET}"
@@ -99,6 +113,10 @@ sanitize pivox-realm.json '
 
 sanitize acme-realm.json '
   del(.components["org.keycloak.keys.KeyProvider"])
+  | (if has("clients") then .clients |= map(select((.clientId // "")
+      | test("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") | not)) else . end)
+  | (if (.roles.client | type) == "object" then .roles.client |= with_entries(select(.key
+      | test("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") | not)) else . end)
   | (if has("clients") then .clients |= map(
       if .clientId == "pivox"
         then .clientId = "${IMPORT_KC_IDP_OIDC_ACME_CLIENT_ID}" | .secret = "${IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET}"

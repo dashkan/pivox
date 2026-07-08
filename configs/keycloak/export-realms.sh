@@ -63,6 +63,27 @@ docker exec "$KC" rm -rf "$EXPORT_DIR" 2>/dev/null || true
   exit 1
 }
 
+# sanitize-realms.sh strips dynamically-registered (DCR) clients from the realm
+# baseline. But MCP clients require consent, so any user who authed to one holds
+# a dangling clientConsents entry — on a fresh --import-realm KC aborts with
+# "Unable to find client consent mappings for client: <uuid>". Strip those
+# consents from the (gitignored, local-reimport) user files so they stay
+# importable against the sanitized realm. Matches DCR clients by UUID-shaped
+# clientId, same rule as sanitize-realms.sh.
+echo "stripping DCR client consents from user files…"
+uuid_re='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+for uf in ./*-users-*.json; do
+  [ -f "$uf" ] || continue
+  utmp="$(mktemp "${uf}.XXXXXX")"
+  jq --arg re "$uuid_re" '
+    .users |= map(
+      if has("clientConsents")
+      then (.clientConsents |= map(select((.clientId // "") | test($re) | not)))
+           | (if (.clientConsents | length) == 0 then del(.clientConsents) else . end)
+      else . end)
+  ' "$uf" >"$utmp" && mv "$utmp" "$uf" && echo "  cleaned $uf"
+done
+
 echo "sanitizing realm files…"
 ./sanitize-realms.sh
 

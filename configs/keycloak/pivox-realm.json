@@ -65,9 +65,15 @@
         "description": "${role_default-roles}",
         "composite": true,
         "composites": {
-          "realm": ["offline_access", "uma_authorization"],
+          "realm": [
+            "offline_access",
+            "uma_authorization"
+          ],
           "client": {
-            "account": ["manage-account", "view-profile"]
+            "account": [
+              "manage-account",
+              "view-profile"
+            ]
           }
         },
         "clientRole": false,
@@ -85,6 +91,21 @@
       }
     ],
     "client": {
+      "security-admin-console": [],
+      "account-console": [],
+      "admin-permissions": [
+        {
+          "id": "b7d3e04e-00fb-49e8-af8d-841b807cef36",
+          "name": "uma_protection",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "66347610-e9b5-422e-a93b-1c1937e7d543",
+          "attributes": {}
+        }
+      ],
+      "postman": [],
+      "electron": [],
+      "admin-cli": [],
       "realm-management": [
         {
           "id": "33df8426-d085-400b-ad2b-f3d28c1e678b",
@@ -102,7 +123,9 @@
           "composite": true,
           "composites": {
             "client": {
-              "realm-management": ["query-clients"]
+              "realm-management": [
+                "query-clients"
+              ]
             }
           },
           "clientRole": true,
@@ -257,7 +280,10 @@
           "composite": true,
           "composites": {
             "client": {
-              "realm-management": ["query-groups", "query-users"]
+              "realm-management": [
+                "query-groups",
+                "query-users"
+              ]
             }
           },
           "clientRole": true,
@@ -292,22 +318,7 @@
           "attributes": {}
         }
       ],
-      "admin-permissions": [
-        {
-          "id": "b7d3e04e-00fb-49e8-af8d-841b807cef36",
-          "name": "uma_protection",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "66347610-e9b5-422e-a93b-1c1937e7d543",
-          "attributes": {}
-        }
-      ],
-      "postman": [],
-      "security-admin-console": [],
-      "electron": [],
       "start": [],
-      "admin-cli": [],
-      "account-console": [],
       "api-docs": [],
       "broker": [
         {
@@ -346,7 +357,9 @@
           "composite": true,
           "composites": {
             "client": {
-              "account": ["manage-account-links"]
+              "account": [
+                "manage-account-links"
+              ]
             }
           },
           "clientRole": true,
@@ -369,7 +382,9 @@
           "composite": true,
           "composites": {
             "client": {
-              "account": ["view-consent"]
+              "account": [
+                "view-consent"
+              ]
             }
           },
           "clientRole": true,
@@ -419,7 +434,9 @@
     "id": "66347610-e9b5-422e-a93b-1c1937e7d543",
     "clientId": "admin-permissions"
   },
-  "requiredCredentials": ["password"],
+  "requiredCredentials": [
+    "password"
+  ],
   "otpPolicyType": "totp",
   "otpPolicyAlgorithm": "HmacSHA1",
   "otpPolicyInitialCounter": 0,
@@ -434,7 +451,10 @@
   ],
   "localizationTexts": {},
   "webAuthnPolicyRpEntityName": "keycloak",
-  "webAuthnPolicySignatureAlgorithms": ["ES256", "RS256"],
+  "webAuthnPolicySignatureAlgorithms": [
+    "ES256",
+    "RS256"
+  ],
   "webAuthnPolicyRpId": "",
   "webAuthnPolicyAttestationConveyancePreference": "not specified",
   "webAuthnPolicyAuthenticatorAttachment": "not specified",
@@ -445,7 +465,10 @@
   "webAuthnPolicyAcceptableAaguids": [],
   "webAuthnPolicyExtraOrigins": [],
   "webAuthnPolicyPasswordlessRpEntityName": "keycloak",
-  "webAuthnPolicyPasswordlessSignatureAlgorithms": ["ES256", "RS256"],
+  "webAuthnPolicyPasswordlessSignatureAlgorithms": [
+    "ES256",
+    "RS256"
+  ],
   "webAuthnPolicyPasswordlessRpId": "",
   "webAuthnPolicyPasswordlessAttestationConveyancePreference": "not specified",
   "webAuthnPolicyPasswordlessAuthenticatorAttachment": "not specified",
@@ -458,14 +481,19 @@
   "scopeMappings": [
     {
       "clientScope": "offline_access",
-      "roles": ["offline_access"]
+      "roles": [
+        "offline_access"
+      ]
     }
   ],
   "clientScopeMappings": {
     "account": [
       {
         "client": "account-console",
-        "roles": ["manage-account", "view-groups"]
+        "roles": [
+          "manage-account",
+          "view-groups"
+        ]
       }
     ]
   },
@@ -480,7 +508,9 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": ["/realms/pivox/account/*"],
+      "redirectUris": [
+        "/realms/pivox/account/*"
+      ],
       "webOrigins": [],
       "notBefore": 0,
       "bearerOnly": false,
@@ -525,7 +555,9 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": ["/realms/pivox/account/*"],
+      "redirectUris": [
+        "/realms/pivox/account/*"
+      ],
       "webOrigins": [],
       "notBefore": 0,
       "bearerOnly": false,
@@ -802,54 +834,62 @@
         "decisionStrategy": "UNANIMOUS",
         "authorizationSchema": {
           "resourceTypes": {
-            "Users": {
-              "type": "Users",
-              "scopes": [
-                "manage-group-membership",
-                "reset-password",
-                "view",
-                "impersonate",
-                "map-roles",
-                "manage"
-              ],
-              "scopeAliases": {
-                "impersonate": ["impersonate-members"],
-                "manage-group-membership": ["manage-membership-of-members"],
-                "view": ["view-members"],
-                "manage": ["manage-members"]
-              },
-              "groupType": "Groups"
-            },
             "Groups": {
               "type": "Groups",
               "scopes": [
-                "view",
-                "view-members",
                 "manage-membership",
-                "manage",
-                "manage-membership-of-members",
+                "view-members",
+                "view",
+                "impersonate-members",
                 "manage-members",
-                "impersonate-members"
+                "manage-membership-of-members",
+                "manage"
+              ],
+              "scopeAliases": {}
+            },
+            "Users": {
+              "type": "Users",
+              "scopes": [
+                "view",
+                "reset-password",
+                "manage-group-membership",
+                "manage",
+                "map-roles",
+                "impersonate"
+              ],
+              "scopeAliases": {
+                "manage-group-membership": [
+                  "manage-membership-of-members"
+                ],
+                "impersonate": [
+                  "impersonate-members"
+                ],
+                "manage": [
+                  "manage-members"
+                ],
+                "view": [
+                  "view-members"
+                ]
+              },
+              "groupType": "Groups"
+            },
+            "Clients": {
+              "type": "Clients",
+              "scopes": [
+                "view",
+                "map-roles-client-scope",
+                "map-roles",
+                "manage",
+                "map-roles-composite"
               ],
               "scopeAliases": {}
             },
             "Roles": {
               "type": "Roles",
               "scopes": [
-                "map-role-composite",
                 "map-role",
+                "map-role-composite",
                 "map-role-client-scope"
-              ],
-              "scopeAliases": {}
-            },
-            "Clients": {
-              "type": "Clients",
-              "scopes": [
-                "manage",
-                "map-roles",
-                "map-roles-client-scope",
-                "view",
-                "map-roles-composite"
               ],
               "scopeAliases": {}
             }
@@ -870,10 +910,12 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "https://pivox.ngrok.app/api-docs*",
-        "https://pivox.ngrok.app/api-docs"
+        "${IMPORT_KC_APP_URL}/api-docs*",
+        "${IMPORT_KC_APP_URL}/api-docs"
       ],
-      "webOrigins": [""],
+      "webOrigins": [
+        ""
+      ],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -972,11 +1014,13 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "https://pivox.ngrok.app/launch",
+        "${IMPORT_KC_APP_URL}/launch",
         "pivox://oidc-callback",
         "http://127.0.0.1/oidc/callback"
       ],
-      "webOrigins": [""],
+      "webOrigins": [
+        ""
+      ],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1034,8 +1078,12 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": ["https://oauth.pstmn.io/v1/callback"],
-      "webOrigins": [""],
+      "redirectUris": [
+        "https://oauth.pstmn.io/v1/callback"
+      ],
+      "webOrigins": [
+        ""
+      ],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1130,8 +1178,12 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": ["/admin/pivox/console/*"],
-      "webOrigins": ["+"],
+      "redirectUris": [
+        "/admin/pivox/console/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1199,10 +1251,12 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "${IMPORT_KC_START_CLIENT_SECRET}",
       "redirectUris": [
-        "https://pivox.ngrok.app/auth/callback",
+        "${IMPORT_KC_APP_URL}/auth/callback",
         "http://localhost:3000/auth/callback)"
       ],
-      "webOrigins": [""],
+      "webOrigins": [
+        ""
+      ],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
@@ -1218,7 +1272,7 @@
         "client.secret.creation.time": "1782623859",
         "standard.token.exchange.enabled": "false",
         "oauth2.jwt.authorization.grant.enabled": "false",
-        "post.logout.redirect.uris": "https://pivox.ngrok.app/##http://localhost:3000/",
+        "post.logout.redirect.uris": "${IMPORT_KC_APP_URL}/##http://localhost:3000/",
         "frontchannel.logout.session.required": "true",
         "oauth2.device.authorization.grant.enabled": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
@@ -1603,6 +1657,35 @@
       ]
     },
     {
+      "id": "0304ce13-8135-4d19-8e98-43595eaff192",
+      "name": "mcp:tools",
+      "description": "Model Context Protocol Tools",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "true",
+        "gui.order": "",
+        "consent.screen.text": "",
+        "include.in.openid.provider.metadata": "true"
+      },
+      "protocolMappers": [
+        {
+          "id": "acf165c7-4c35-459a-ac2f-92d5c6f244c9",
+          "name": "mcp audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "id.token.claim": "false",
+            "lightweight.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "included.custom.audience": "${IMPORT_KC_APP_URL}/mcp"
+          }
+        }
+      ]
+    },
+    {
       "id": "95a946d2-5542-4adf-a44b-f3d37f7bab96",
       "name": "email",
       "description": "OpenID Connect built-in scope: email",
@@ -1879,6 +1962,35 @@
       ]
     },
     {
+      "id": "cb2258c7-44e3-44e8-9d6f-64a9da9ddcda",
+      "name": "mcp:resources",
+      "description": "Model Context Protocol Resources",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "true",
+        "gui.order": "",
+        "consent.screen.text": "",
+        "include.in.openid.provider.metadata": "true"
+      },
+      "protocolMappers": [
+        {
+          "id": "8732a69a-ba9c-4f86-88ed-b92b3b90abc6",
+          "name": "mcp audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "id.token.claim": "false",
+            "lightweight.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "included.custom.audience": "${IMPORT_KC_APP_URL}/mcp"
+          }
+        }
+      ]
+    },
+    {
       "id": "af6b52be-51d3-4129-9d6b-01a2ce88ff10",
       "name": "microprofile-jwt",
       "description": "Microprofile - JWT built-in scope",
@@ -1985,7 +2097,9 @@
     "address",
     "phone",
     "microprofile-jwt",
-    "organization"
+    "organization",
+    "mcp:resources",
+    "mcp:tools"
   ],
   "browserSecurityHeaders": {
     "contentSecurityPolicyReportOnly": "",
@@ -2002,7 +2116,10 @@
   "adminTheme": "",
   "emailTheme": "",
   "eventsEnabled": true,
-  "eventsListeners": ["kafka", "jboss-logging"],
+  "eventsListeners": [
+    "kafka",
+    "jboss-logging"
+  ],
   "enabledEventTypes": [
     "UPDATE_CONSENT_ERROR",
     "UPDATE_TOTP",
@@ -2150,6 +2267,7 @@
       "storeToken": false,
       "linkOnly": false,
       "hideOnLogin": false,
+      "postBrokerLoginFlowAlias": "post broker org select",
       "config": {
         "githubJsonFormat": "true",
         "clientId": "${IMPORT_KC_IDP_GITHUB_CLIENT_ID}",
@@ -2201,15 +2319,15 @@
       "hideOnLogin": true,
       "config": {
         "acceptsPromptNoneForwardFromClient": "false",
-        "tokenUrl": "https://pivox.ngrok.app/realms/acme/protocol/openid-connect/token",
+        "tokenUrl": "${IMPORT_KC_APP_URL}/realms/acme/protocol/openid-connect/token",
         "isAccessTokenJWT": "false",
-        "jwksUrl": "https://pivox.ngrok.app/realms/acme/protocol/openid-connect/certs",
+        "jwksUrl": "${IMPORT_KC_APP_URL}/realms/acme/protocol/openid-connect/certs",
         "showInAccountConsole": "ALWAYS",
         "filteredByClaim": "false",
         "jwtAuthorizationGrantEnabled": "false",
         "backchannelSupported": "false",
         "caseSensitiveOriginalUsername": "false",
-        "issuer": "https://pivox.ngrok.app/realms/acme",
+        "issuer": "${IMPORT_KC_APP_URL}/realms/acme",
         "pkceMethod": "S256",
         "loginHint": "true",
         "clientAuthMethod": "client_secret_post",
@@ -2219,7 +2337,7 @@
         "clientSecret": "${IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET}",
         "requiresShortStateParameter": "false",
         "allowedClockSkew": "0",
-        "userInfoUrl": "https://pivox.ngrok.app/realms/acme/protocol/openid-connect/userinfo",
+        "userInfoUrl": "${IMPORT_KC_APP_URL}/realms/acme/protocol/openid-connect/userinfo",
         "validateSignature": "true",
         "clientId": "${IMPORT_KC_IDP_OIDC_ACME_CLIENT_ID}",
         "uiLocales": "true",
@@ -2227,13 +2345,13 @@
         "useJwksUrl": "true",
         "kc.org.broker.redirect.mode.email-matches": "true",
         "kc.org.domain": "acme.com",
-        "tokenIntrospectionUrl": "https://pivox.ngrok.app/realms/acme/protocol/openid-connect/token/introspect",
+        "tokenIntrospectionUrl": "${IMPORT_KC_APP_URL}/realms/acme/protocol/openid-connect/token/introspect",
         "sendClientIdOnLogout": "false",
-        "metadataDescriptorUrl": "https://pivox.ngrok.app/realms/acme/.well-known/openid-configuration",
+        "metadataDescriptorUrl": "${IMPORT_KC_APP_URL}/realms/acme/.well-known/openid-configuration",
         "pkceEnabled": "true",
-        "authorizationUrl": "https://pivox.ngrok.app/realms/acme/protocol/openid-connect/auth",
+        "authorizationUrl": "${IMPORT_KC_APP_URL}/realms/acme/protocol/openid-connect/auth",
         "disableUserInfo": "false",
-        "logoutUrl": "https://pivox.ngrok.app/realms/acme/protocol/openid-connect/logout",
+        "logoutUrl": "${IMPORT_KC_APP_URL}/realms/acme/protocol/openid-connect/logout",
         "sendIdTokenOnLogout": "true",
         "passMaxAge": "false",
         "disableTypeClaimCheck": "false"
@@ -2298,8 +2416,19 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
-          "host-sending-registration-request-must-match": ["true"],
-          "client-uris-must-match": ["true"]
+          "host-sending-registration-request-must-match": [
+            "false"
+          ],
+          "trusted-hosts": [
+            "https://vscode.dev/redirect/*",
+            "https://chatgpt.com/*",
+            "127.0.0.1",
+            "https://claude.ai/*",
+            "localhost"
+          ],
+          "client-uris-must-match": [
+            "true"
+          ]
         }
       },
       {
@@ -2309,7 +2438,9 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
-          "max-clients": ["200"]
+          "max-clients": [
+            "200"
+          ]
         }
       },
       {
@@ -2354,7 +2485,14 @@
         "subType": "anonymous",
         "subComponents": {},
         "config": {
-          "allow-default-scopes": ["true"]
+          "allow-default-scopes": [
+            "true"
+          ],
+          "allowed-client-scopes": [
+            "mcp:tools",
+            "mcp:resources",
+            "organization"
+          ]
         }
       },
       {
@@ -2380,7 +2518,9 @@
         "subType": "authenticated",
         "subComponents": {},
         "config": {
-          "allow-default-scopes": ["true"]
+          "allow-default-scopes": [
+            "true"
+          ]
         }
       }
     ],
@@ -3411,7 +3551,13 @@
   "adminPermissionsEnabled": true,
   "scimApiEnabled": false,
   "clientProfiles": {
-    "profiles": []
+    "profiles": [
+      {
+        "name": "cimd-profile",
+        "description": "",
+        "executors": []
+      }
+    ]
   },
   "clientPolicies": {
     "policies": []
