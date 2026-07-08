@@ -656,7 +656,7 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "${IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET}",
       "redirectUris": [
-        "https://pivox.ngrok.app/realms/pivox/broker/oidc.acme/endpoint"
+        "${IMPORT_KC_APP_URL}/realms/pivox/broker/oidc.acme/endpoint"
       ],
       "webOrigins": ["/*"],
       "notBefore": 0,
@@ -675,7 +675,7 @@
         "standard.token.exchange.enabled": "false",
         "oauth2.jwt.authorization.grant.enabled": "false",
         "frontchannel.logout.session.required": "true",
-        "post.logout.redirect.uris": "+##https://pivox.ngrok.app/realms/pivox/broker/oidc.acme/endpoint/logout_response",
+        "post.logout.redirect.uris": "+##${IMPORT_KC_APP_URL}/realms/pivox/broker/oidc.acme/endpoint/logout_response",
         "oauth2.device.authorization.grant.enabled": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
         "realm_client": "false",
@@ -825,7 +825,7 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "https://pivox.ngrok.app/realms/test/broker/oidc.acme/endpoint"
+        "${IMPORT_KC_APP_URL}/realms/test/broker/oidc.acme/endpoint"
       ],
       "webOrigins": [""],
       "notBefore": 0,
@@ -843,7 +843,7 @@
         "client.secret.creation.time": "1782790386",
         "standard.token.exchange.enabled": "false",
         "oauth2.jwt.authorization.grant.enabled": "false",
-        "post.logout.redirect.uris": "https://pivox.ngrok.app/realms/test/broker/oidc.acme/endpoint/logout_response",
+        "post.logout.redirect.uris": "${IMPORT_KC_APP_URL}/realms/test/broker/oidc.acme/endpoint/logout_response",
         "frontchannel.logout.session.required": "true",
         "oauth2.device.authorization.grant.enabled": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
@@ -1620,14 +1620,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "saml-user-attribute-mapper",
-            "oidc-full-name-mapper",
+            "oidc-usermodel-attribute-mapper",
             "oidc-sha256-pairwise-sub-mapper",
             "saml-user-property-mapper",
-            "oidc-address-mapper",
+            "saml-user-attribute-mapper",
+            "saml-role-list-mapper",
             "oidc-usermodel-property-mapper",
-            "oidc-usermodel-attribute-mapper",
-            "saml-role-list-mapper"
+            "oidc-full-name-mapper",
+            "oidc-address-mapper"
           ]
         }
       },
@@ -1686,14 +1686,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-sha256-pairwise-sub-mapper",
+            "oidc-full-name-mapper",
             "oidc-address-mapper",
             "saml-role-list-mapper",
+            "oidc-sha256-pairwise-sub-mapper",
+            "oidc-usermodel-property-mapper",
             "saml-user-attribute-mapper",
             "saml-user-property-mapper",
-            "oidc-full-name-mapper",
-            "oidc-usermodel-attribute-mapper",
-            "oidc-usermodel-property-mapper"
+            "oidc-usermodel-attribute-mapper"
           ]
         }
       }

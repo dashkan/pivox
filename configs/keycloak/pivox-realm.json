@@ -91,21 +91,6 @@
       }
     ],
     "client": {
-      "security-admin-console": [],
-      "account-console": [],
-      "admin-permissions": [
-        {
-          "id": "b7d3e04e-00fb-49e8-af8d-841b807cef36",
-          "name": "uma_protection",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "66347610-e9b5-422e-a93b-1c1937e7d543",
-          "attributes": {}
-        }
-      ],
-      "postman": [],
-      "electron": [],
-      "admin-cli": [],
       "realm-management": [
         {
           "id": "33df8426-d085-400b-ad2b-f3d28c1e678b",
@@ -318,7 +303,9 @@
           "attributes": {}
         }
       ],
+      "security-admin-console": [],
       "start": [],
+      "account-console": [],
       "api-docs": [],
       "broker": [
         {
@@ -331,6 +318,20 @@
           "attributes": {}
         }
       ],
+      "https://vscode.dev/oauth/client-metadata.json": [],
+      "admin-permissions": [
+        {
+          "id": "b7d3e04e-00fb-49e8-af8d-841b807cef36",
+          "name": "uma_protection",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "66347610-e9b5-422e-a93b-1c1937e7d543",
+          "attributes": {}
+        }
+      ],
+      "postman": [],
+      "electron": [],
+      "admin-cli": [],
       "account": [
         {
           "id": "1fd0a3df-7af7-4469-a9b9-66a17385562f",
@@ -669,7 +670,7 @@
       "protocol": "openid-connect",
       "attributes": {
         "realm_client": "false",
-        "client.secret.creation.time": "1783404930"
+        "client.secret.creation.time": "1783480571"
       },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": true,
@@ -712,10 +713,10 @@
             "uris": [],
             "scopes": [
               {
-                "name": "manage-group-membership"
+                "name": "view"
               },
               {
-                "name": "view"
+                "name": "manage-group-membership"
               },
               {
                 "name": "impersonate"
@@ -834,53 +835,14 @@
         "decisionStrategy": "UNANIMOUS",
         "authorizationSchema": {
           "resourceTypes": {
-            "Groups": {
-              "type": "Groups",
-              "scopes": [
-                "manage-membership",
-                "view-members",
-                "view",
-                "impersonate-members",
-                "manage-members",
-                "manage-membership-of-members",
-                "manage"
-              ],
-              "scopeAliases": {}
-            },
-            "Users": {
-              "type": "Users",
-              "scopes": [
-                "view",
-                "reset-password",
-                "manage-group-membership",
-                "manage",
-                "map-roles",
-                "impersonate"
-              ],
-              "scopeAliases": {
-                "manage-group-membership": [
-                  "manage-membership-of-members"
-                ],
-                "impersonate": [
-                  "impersonate-members"
-                ],
-                "manage": [
-                  "manage-members"
-                ],
-                "view": [
-                  "view-members"
-                ]
-              },
-              "groupType": "Groups"
-            },
             "Clients": {
               "type": "Clients",
               "scopes": [
+                "map-roles-composite",
                 "view",
                 "map-roles-client-scope",
                 "map-roles",
-                "manage",
-                "map-roles-composite"
+                "manage"
               ],
               "scopeAliases": {}
             },
@@ -892,6 +854,45 @@
                 "map-role-client-scope"
               ],
               "scopeAliases": {}
+            },
+            "Groups": {
+              "type": "Groups",
+              "scopes": [
+                "impersonate-members",
+                "manage-members",
+                "manage-membership-of-members",
+                "manage",
+                "manage-membership",
+                "view-members",
+                "view"
+              ],
+              "scopeAliases": {}
+            },
+            "Users": {
+              "type": "Users",
+              "scopes": [
+                "map-roles",
+                "impersonate",
+                "view",
+                "reset-password",
+                "manage-group-membership",
+                "manage"
+              ],
+              "scopeAliases": {
+                "manage": [
+                  "manage-members"
+                ],
+                "view": [
+                  "view-members"
+                ],
+                "manage-group-membership": [
+                  "manage-membership-of-members"
+                ],
+                "impersonate": [
+                  "impersonate-members"
+                ]
+              },
+              "groupType": "Groups"
             }
           }
         }
@@ -1067,6 +1068,70 @@
       ]
     },
     {
+      "id": "f50af81c-0cba-41d5-a0fd-99b2717eed11",
+      "clientId": "https://vscode.dev/oauth/client-metadata.json",
+      "name": "Visual Studio Code",
+      "baseUrl": "https://vscode.dev/product",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "none",
+      "redirectUris": [
+        "https://vscode.dev/redirect",
+        "http://127.0.0.1:33418/"
+      ],
+      "webOrigins": [
+        "http://127.0.0.1:33418",
+        "https://vscode.dev"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "standard.token.exchange.enabled": "false",
+        "oauth2.jwt.authorization.grant.enabled": "false",
+        "frontchannel.logout.session.required": "false",
+        "oauth2.device.authorization.grant.enabled": "true",
+        "logoUri": "https://code.visualstudio.com/assets/branding/code-stable.png",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "use.refresh.tokens": "true",
+        "realm_client": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "consent.screen.text": "The client's hostname is vscode.dev",
+        "display.on.consent.screen": "true",
+        "cimd.cache.expiry.time.in.sec": "1783486976"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": false,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "aud",
+        "acr",
+        "roles",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "organization",
+        "mcp:tools",
+        "microprofile-jwt",
+        "mcp:resources"
+      ]
+    },
+    {
       "id": "6e674c26-00f5-4bf4-a268-9e476047df71",
       "clientId": "postman",
       "name": "Postman",
@@ -1101,6 +1166,7 @@
         "backchannel.logout.session.required": "true",
         "standard.token.exchange.enabled": "false",
         "oauth2.jwt.authorization.grant.enabled": "false",
+        "post.logout.redirect.uris": "+",
         "oauth2.device.authorization.grant.enabled": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
         "dpop.bound.access.tokens": "false"
@@ -1678,9 +1744,10 @@
           "config": {
             "id.token.claim": "false",
             "lightweight.claim": "false",
-            "access.token.claim": "true",
             "introspection.token.claim": "true",
-            "included.custom.audience": "${IMPORT_KC_APP_URL}/mcp"
+            "access.token.claim": "true",
+            "included.custom.audience": "${IMPORT_KC_APP_URL}/mcp",
+            "userinfo.token.claim": "false"
           }
         }
       ]
@@ -1983,9 +2050,10 @@
           "config": {
             "id.token.claim": "false",
             "lightweight.claim": "false",
-            "access.token.claim": "true",
             "introspection.token.claim": "true",
-            "included.custom.audience": "${IMPORT_KC_APP_URL}/mcp"
+            "access.token.claim": "true",
+            "included.custom.audience": "${IMPORT_KC_APP_URL}/mcp",
+            "userinfo.token.claim": "false"
           }
         }
       ]
@@ -2277,7 +2345,8 @@
         "filteredByClaim": "false",
         "syncMode": "IMPORT",
         "clientSecret": "${IMPORT_KC_IDP_GITHUB_CLIENT_SECRET}",
-        "caseSensitiveOriginalUsername": "false"
+        "caseSensitiveOriginalUsername": "false",
+        "guiOrder": "2"
       },
       "types": []
     },
@@ -2302,7 +2371,8 @@
         "clientSecret": "${IMPORT_KC_IDP_GOOGLE_CLIENT_SECRET}",
         "caseSensitiveOriginalUsername": "false",
         "issuer": "https://accounts.google.com",
-        "jwtAuthorizationGrantMaxAllowedAssertionExpiration": "3600"
+        "jwtAuthorizationGrantMaxAllowedAssertionExpiration": "3600",
+        "guiOrder": "1"
       },
       "types": []
     },
@@ -2398,14 +2468,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "saml-user-attribute-mapper",
-            "oidc-full-name-mapper",
-            "oidc-address-mapper",
             "oidc-sha256-pairwise-sub-mapper",
+            "oidc-full-name-mapper",
             "saml-user-property-mapper",
+            "oidc-usermodel-property-mapper",
+            "oidc-address-mapper",
             "oidc-usermodel-attribute-mapper",
-            "saml-role-list-mapper",
-            "oidc-usermodel-property-mapper"
+            "saml-user-attribute-mapper",
+            "saml-role-list-mapper"
           ]
         }
       },
@@ -2420,10 +2490,10 @@
             "false"
           ],
           "trusted-hosts": [
-            "https://vscode.dev/redirect/*",
-            "https://chatgpt.com/*",
             "127.0.0.1",
             "https://claude.ai/*",
+            "https://chatgpt.com/*",
+            "https://vscode.dev/redirect/*",
             "localhost"
           ],
           "client-uris-must-match": [
@@ -2467,14 +2537,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
+            "saml-user-property-mapper",
             "saml-role-list-mapper",
-            "oidc-sha256-pairwise-sub-mapper",
-            "oidc-usermodel-attribute-mapper",
-            "oidc-usermodel-property-mapper",
-            "saml-user-attribute-mapper",
             "oidc-full-name-mapper",
             "oidc-address-mapper",
-            "saml-user-property-mapper"
+            "oidc-sha256-pairwise-sub-mapper",
+            "saml-user-attribute-mapper",
+            "oidc-usermodel-attribute-mapper",
+            "oidc-usermodel-property-mapper"
           ]
         }
       },
@@ -2490,8 +2560,8 @@
           ],
           "allowed-client-scopes": [
             "mcp:tools",
-            "mcp:resources",
-            "organization"
+            "organization",
+            "mcp:resources"
           ]
         }
       },
@@ -3555,11 +3625,51 @@
       {
         "name": "cimd-profile",
         "description": "",
-        "executors": []
+        "executors": [
+          {
+            "executor": "client-id-metadata-document",
+            "configuration": {
+              "cimd-allow-http-scheme": "true",
+              "cimd-allow-permitted-domains": [
+                "vscode.dev",
+                "*.vscode.dev",
+                "code.visualstudio.com",
+                "127.0.0.1"
+              ],
+              "cimd-restrict-same-domain": false,
+              "cimd-required-properties": [],
+              "only-allow-confidential-client": false
+            }
+          }
+        ]
       }
     ]
   },
   "clientPolicies": {
-    "policies": []
+    "policies": [
+      {
+        "name": "cimd-policy",
+        "description": "",
+        "enabled": true,
+        "conditions": [
+          {
+            "condition": "client-id-uri",
+            "configuration": {
+              "is-negative-logic": false,
+              "client-id-uri-scheme": [
+                "https"
+              ],
+              "client-id-uri-allow-permitted-domains": [
+                "vscode.dev",
+                "*.vscode.dev"
+              ]
+            }
+          }
+        ],
+        "profiles": [
+          "cimd-profile"
+        ]
+      }
+    ]
   }
 }

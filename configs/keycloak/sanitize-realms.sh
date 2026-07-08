@@ -26,7 +26,11 @@
 #   4. DENY-BY-DEFAULT: removes every OTHER client secret, IdP clientSecret, and
 #      smtp password so nothing real rides along. KC regenerates internal client
 #      secrets (e.g. admin-permissions) on import.
-#   5. FAILS LOUD: after transforming, it scans the output and ABORTS if any
+#   5. Parameterizes the app URL: replaces the live host (https://pivox.ngrok.app)
+#      with the ${IMPORT_KC_APP_URL} placeholder in every string value (audience
+#      mappers, IdP broker endpoints, redirect URIs, ...) so the baseline isn't
+#      pinned to one host; KC resolves it from env at --import-realm.
+#   6. FAILS LOUD: after transforming, it scans the output and ABORTS if any
 #      secret-ish value survives that is neither empty nor an ${IMPORT_KC_*}
 #      placeholder — so a newly-added secret-bearing field (a new confidential
 #      client, LDAP bindCredential, SAML signing key, etc.) can't silently leak;
@@ -109,6 +113,7 @@ sanitize pivox-realm.json '
       elif (.config | type == "object" and has("clientSecret")) and ((.config.clientSecret // "") | startswith("${IMPORT_KC_") | not) then del(.config.clientSecret)
       else . end) else . end)
   | (if (.smtpServer | type == "object" and has("password")) and ((.smtpServer.password // "") | startswith("${IMPORT_KC_") | not) then del(.smtpServer.password) else . end)
+  | walk(if type == "string" then gsub("https://pivox\\.ngrok\\.app"; "${IMPORT_KC_APP_URL}") else . end)
 '
 
 sanitize acme-realm.json '
@@ -125,6 +130,7 @@ sanitize acme-realm.json '
   | (if has("identityProviders") then .identityProviders |= map(
       if (.config | type == "object" and has("clientSecret")) and ((.config.clientSecret // "") | startswith("${IMPORT_KC_") | not) then del(.config.clientSecret) else . end) else . end)
   | (if (.smtpServer | type == "object" and has("password")) and ((.smtpServer.password // "") | startswith("${IMPORT_KC_") | not) then del(.smtpServer.password) else . end)
+  | walk(if type == "string" then gsub("https://pivox\\.ngrok\\.app"; "${IMPORT_KC_APP_URL}") else . end)
 '
 
 echo "done — review the diff before committing."
