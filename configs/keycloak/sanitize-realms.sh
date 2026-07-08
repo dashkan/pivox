@@ -76,11 +76,44 @@ LEAK_SCAN='
     | ($p | map(tostring) | join(".")) ]
 '
 
+# Canonical ordering so re-exports diff cleanly instead of churning on
+# Keycloak's random export order (both object-key order and array-element order
+# vary run-to-run). Applied AFTER the transform so placeholders (e.g.
+# ${IMPORT_KC_START_CLIENT_ID}) are already in place when sorting.
+#
+#   - Objects: keys sorted alphabetically. Sorting keys DURING the walk (not just
+#     at output via -S) is load-bearing: it makes each element's `tojson` stable,
+#     which the array tiebreaker below relies on.
+#   - Arrays of objects: sorted by a stable, UNIQUE key. A non-unique key would
+#     leave ties in Keycloak's random order and re-introduce churn — so we sort
+#     by the natural identifier then break ties on the full canonical `tojson`.
+#     EXCEPTION: authentication executions are ordered by their `priority` field
+#     (Keycloak honors that, not array position), so those sort by priority.
+#   - Scalar arrays (event types, algorithms, scope-name lists): all sets, sorted
+#     directly.
+#
+# Purely reordering — no scalar value changes — so the realm imports identically
+# and the leak scan (which walks paths, order-independent) still holds.
+NORMALIZE='
+  walk(
+    if type == "object" then (to_entries | sort_by(.key) | from_entries)
+    elif type == "array" and (length > 1) then
+      if all(.[]; type == "object") then
+        (if all(.[]; has("priority"))
+           then sort_by([.priority, tojson])
+           else sort_by([(.clientId // .name // .alias // .username // .containerId // .id // ""), tojson])
+         end)
+      elif all(.[]; (type | IN("string","number","boolean"))) then sort
+      else . end
+    else . end
+  )
+'
+
 sanitize() { # sanitize <file> <transform-filter>
   local file="$1" filter="$2" leaks
   [ -f "$file" ] || { echo "error: $file not found — export the realm into this directory first" >&2; exit 1; }
   tmp="$(mktemp "${file}.XXXXXX")"
-  jq "$filter" "$file" >"$tmp" || { echo "error: jq transform failed on $file" >&2; exit 1; }
+  jq "$filter | ($NORMALIZE)" "$file" >"$tmp" || { echo "error: jq transform failed on $file" >&2; exit 1; }
   leaks="$(jq -r "$LEAK_SCAN | .[]" "$tmp")" || { echo "error: jq scan failed on $file" >&2; exit 1; }
   if [ -n "$leaks" ]; then
     echo "error: $file still has non-placeholder secret(s) at:" >&2
