@@ -66,6 +66,17 @@ const (
 	// is stuck in a non-terminal state until reaped; overridable via
 	// --workflow-reaper-interval / PIVOX_WORKFLOW_REAPER_INTERVAL.
 	defaultWorkflowReaperInterval = 1 * time.Minute
+
+	// River fetch-poll cadence + its bounds. River picks up newly-inserted jobs
+	// immediately via LISTEN/NOTIFY, so this poll is only the fallback for missed
+	// notifications — so a long default keeps the worker quiet (an idle poll is a
+	// DB query, i.e. an otelpgx span + log every tick) at no job-latency cost.
+	// Overridable via --river-poll-interval / PIVOX_WORKER_RIVER_POLL_INTERVAL,
+	// clamped to [min, max] so a stray value can't disable the fallback (too long)
+	// or hammer the DB (too short).
+	defaultRiverPollInterval = 5 * time.Minute
+	minRiverPollInterval     = 30 * time.Second
+	maxRiverPollInterval     = 10 * time.Minute
 )
 
 var version = "dev"
@@ -89,6 +100,7 @@ func main() {
 	f.Bool("workflow-allow-internal-networks", envOrBool("PIVOX_WORKFLOW_ALLOW_INTERNAL_NETWORKS", false), "Allow workflow HTTP activities to reach internal/private network addresses (loopback, link-local, private, metadata). Default false — REQUIRED for shared multi-tenant cloud. Set true only for single-tenant on-prem where the worker legitimately reaches internal systems.")
 	f.Int64("workflow-http-max-response-size", envOrInt64("PIVOX_WORKFLOW_HTTP_MAX_RESPONSE_SIZE", 1<<20), "Max bytes a workflow HTTP activity reads from a response body. Default 1048576 (1 MiB); clamped to [524288 (512 KiB), 10485760 (10 MiB)].")
 	f.Duration("workflow-reaper-interval", envOrDuration("PIVOX_WORKFLOW_REAPER_INTERVAL", defaultWorkflowReaperInterval), "How often the stranded-run reaper scans for discarded workflow_run jobs whose run is still non-terminal and finalizes them FAILED. Default 1m.")
+	f.Duration("river-poll-interval", envOrDuration("PIVOX_WORKER_RIVER_POLL_INTERVAL", defaultRiverPollInterval), "River fetch-poll interval — the FALLBACK cadence for picking up jobs (new jobs arrive instantly via LISTEN/NOTIFY, so a long value only delays recovery from a missed notification, and keeps the worker quiet). Default 5m; clamped to [30s, 10m].")
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -136,6 +148,13 @@ func mustInt64(n int64, _ error) int64 { return n }
 
 func mustDuration(d time.Duration, _ error) time.Duration { return d }
 
+// clampRiverPollInterval bounds the River fetch-poll interval to
+// [minRiverPollInterval, maxRiverPollInterval] so an out-of-range flag/env value
+// can neither disable the poll fallback (too long) nor hammer the DB (too short).
+func clampRiverPollInterval(d time.Duration) time.Duration {
+	return min(max(d, minRiverPollInterval), maxRiverPollInterval)
+}
+
 func serve(cmd *cobra.Command, _ []string) error {
 	f := cmd.Flags()
 	databaseURL := mustString(f.GetString("database-url"))
@@ -149,6 +168,7 @@ func serve(cmd *cobra.Command, _ []string) error {
 	allowInternalNetworks := mustBool(f.GetBool("workflow-allow-internal-networks"))
 	maxResponseBytes := mustInt64(f.GetInt64("workflow-http-max-response-size"))
 	workflowReaperInterval := mustDuration(f.GetDuration("workflow-reaper-interval"))
+	riverPollInterval := clampRiverPollInterval(mustDuration(f.GetDuration("river-poll-interval")))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -336,6 +356,9 @@ func serve(cmd *cobra.Command, _ []string) error {
 	client, err := riverpro.NewClient(driver, &riverpro.Config{
 		Config: river.Config{
 			Logger: logger,
+			// Fallback fetch cadence — LISTEN/NOTIFY picks up new jobs instantly, so
+			// a long interval keeps idle-poll spans/logs down at no latency cost.
+			FetchPollInterval: riverPollInterval,
 			Queues: map[string]river.QueueConfig{
 				river.QueueDefault: {MaxWorkers: 10},
 			},
