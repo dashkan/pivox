@@ -41,6 +41,7 @@ the cloud.`,
 	addControlPlaneFlag(f)
 	f.String("role", envOrDefault("PIVOX_ROLE", "both"), "Agent role: both, serve, worker")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
+	telemetry.RegisterOtelFlags(f)
 	f.Bool("plaintext", envOrDefault("PIVOX_PLAINTEXT", "false") == "true", "Use plaintext (no TLS) for the control plane gRPC connection")
 
 	// NOTE: token is required but NOT via cmd.MarkFlagRequired — that only
@@ -74,6 +75,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	logger, otelShutdown, err := telemetry.Setup(context.Background(), telemetry.Config{
 		ServiceName: "pivox-agent",
 		LogLevel:    logLevel,
+		Otel:        telemetry.OtelConfigFromFlags(f),
 	})
 	if err != nil {
 		return fmt.Errorf("setup telemetry: %w", err)

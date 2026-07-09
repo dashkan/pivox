@@ -41,16 +41,23 @@ import (
 // can't hang process shutdown.
 const shutdownTimeout = 5 * time.Second
 
-// Config is the small amount of identity each binary supplies; everything
-// else (endpoint, protocol, sampling) is read from OTEL_* env.
+// Config is what each binary supplies. Transport (endpoint, protocol, service
+// name, metric export interval) is read from the standard OTEL_* env (the Aspire
+// AppHost injects it); Config carries identity, the STDOUT log level, and the
+// Pivox per-signal OTel export policy.
 type Config struct {
 	// ServiceName is the fallback service.name (e.g. "pivox-cloud") used when
 	// OTEL_SERVICE_NAME is not set in the environment, and the instrumentation
 	// scope name for the slog->OTel bridge.
 	ServiceName string
-	// LogLevel is the slog level: "debug" | "info" | "warn" | "error".
-	// Empty or unrecognized falls back to info.
+	// LogLevel is the STDOUT slog level: "debug" | "info" | "warn" | "error".
+	// Empty or unrecognized falls back to info. The OTel *export* log level is
+	// separate — see Otel.LogLevel — so debug can stay local.
 	LogLevel string
+	// Otel is the per-signal OTLP export policy (master + per-signal enables +
+	// levers). Build it via OtelConfigFromFlags so the defaults are on; the zero
+	// value disables all export.
+	Otel OtelConfig
 }
 
 // Setup builds the process logger, installs the global OTel providers (traces +
@@ -76,7 +83,9 @@ func Setup(ctx context.Context, cfg Config) (*slog.Logger, func(context.Context)
 		propagation.Baggage{},
 	))
 
-	if !enabled() {
+	// Master gate: the OTLP endpoint must be present AND export must be enabled.
+	// Either off => stdout-only logging, no providers installed.
+	if !cfg.Otel.Enabled || !enabled() {
 		logger := slog.New(jsonHandler)
 		slog.SetDefault(logger)
 		return logger, func(context.Context) error { return nil }, nil
@@ -91,67 +100,103 @@ func Setup(ctx context.Context, cfg Config) (*slog.Logger, func(context.Context)
 
 	res := newResource(ctx, cfg, bootstrap)
 
-	spanExporter, err := autoexport.NewSpanExporter(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("create otlp span exporter: %w", err)
-	}
-	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithResource(res),
-		sdktrace.WithBatcher(spanExporter),
-	)
-	otel.SetTracerProvider(tracerProvider)
-
-	metricReader, err := autoexport.NewMetricReader(ctx)
-	if err != nil {
-		// Roll back what we already installed so we don't leave the process
-		// half-instrumented.
-		_ = tracerProvider.Shutdown(ctx)
-		return nil, nil, fmt.Errorf("create otlp metric reader: %w", err)
-	}
-	meterProvider := sdkmetric.NewMeterProvider(
-		sdkmetric.WithResource(res),
-		sdkmetric.WithReader(metricReader),
-	)
-	otel.SetMeterProvider(meterProvider)
-
-	// Go runtime metrics (GC pauses, goroutine count, heap) — cheap and
-	// high-value; non-fatal if it fails.
-	if err := otelruntime.Start(otelruntime.WithMeterProvider(meterProvider)); err != nil {
-		bootstrap.Warn("opentelemetry runtime metrics failed to start", "error", err)
+	// Accumulate per-signal shutdowns; on a mid-setup failure roll back only what
+	// we've installed so the process isn't left half-instrumented. The rollback
+	// is bounded by shutdownTimeout, exactly like the success path — a half-built
+	// setup whose one live exporter points at a slow/dead endpoint must not hang
+	// startup. NOTE: the otel.Set*Provider globals may already point at a provider
+	// we're about to shut down; that's safe only because every caller aborts on
+	// the returned (nil, nil, err) and never emits telemetry after a failed Setup.
+	var shutdowns []func(context.Context) error
+	rollback := func() {
+		ctx, cancel := context.WithTimeout(ctx, shutdownTimeout)
+		defer cancel()
+		for _, s := range shutdowns {
+			_ = s(ctx)
+		}
 	}
 
-	logExporter, err := autoexport.NewLogExporter(ctx)
-	if err != nil {
-		_ = tracerProvider.Shutdown(ctx)
-		_ = meterProvider.Shutdown(ctx)
-		return nil, nil, fmt.Errorf("create otlp log exporter: %w", err)
+	if cfg.Otel.TracesEnabled {
+		spanExporter, err := autoexport.NewSpanExporter(ctx)
+		if err != nil {
+			rollback()
+			return nil, nil, fmt.Errorf("create otlp span exporter: %w", err)
+		}
+		tracerProvider := sdktrace.NewTracerProvider(
+			sdktrace.WithResource(res),
+			sdktrace.WithBatcher(spanExporter),
+			// Head sampling. ParentBased so a sampled parent keeps its children
+			// (and vice-versa) — one trace isn't split across the ratio.
+			sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(cfg.Otel.TraceSampleRatio))),
+		)
+		otel.SetTracerProvider(tracerProvider)
+		shutdowns = append(shutdowns, tracerProvider.Shutdown)
 	}
-	loggerProvider := sdklog.NewLoggerProvider(
-		sdklog.WithResource(res),
-		sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)),
-	)
-	otellogglobal.SetLoggerProvider(loggerProvider)
 
-	// Fan out: JSON to stdout (local readability + container log capture) AND
-	// the OTel bridge (collector/dashboard + trace correlation).
-	logger := slog.New(slog.NewMultiHandler(
-		jsonHandler,
-		otelslog.NewHandler(cfg.ServiceName, otelslog.WithLoggerProvider(loggerProvider)),
-	))
+	if cfg.Otel.MetricsEnabled {
+		// Export interval comes from the standard OTEL_METRIC_EXPORT_INTERVAL env.
+		metricReader, err := autoexport.NewMetricReader(ctx)
+		if err != nil {
+			rollback()
+			return nil, nil, fmt.Errorf("create otlp metric reader: %w", err)
+		}
+		meterProvider := sdkmetric.NewMeterProvider(
+			sdkmetric.WithResource(res),
+			sdkmetric.WithReader(metricReader),
+		)
+		otel.SetMeterProvider(meterProvider)
+		// Go runtime metrics (GC pauses, goroutine count, heap) — cheap and
+		// high-value; non-fatal if it fails.
+		if err := otelruntime.Start(otelruntime.WithMeterProvider(meterProvider)); err != nil {
+			bootstrap.Warn("opentelemetry runtime metrics failed to start", "error", err)
+		}
+		shutdowns = append(shutdowns, meterProvider.Shutdown)
+	}
+
+	// Logs: stdout always; the OTel bridge is added — at its OWN level floor
+	// (Otel.LogLevel), independent of stdout — only when log export is enabled.
+	logHandler := slog.Handler(jsonHandler)
+	if cfg.Otel.LogsEnabled {
+		logExporter, err := autoexport.NewLogExporter(ctx)
+		if err != nil {
+			rollback()
+			return nil, nil, fmt.Errorf("create otlp log exporter: %w", err)
+		}
+		loggerProvider := sdklog.NewLoggerProvider(
+			sdklog.WithResource(res),
+			sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)),
+		)
+		otellogglobal.SetLoggerProvider(loggerProvider)
+		shutdowns = append(shutdowns, loggerProvider.Shutdown)
+
+		logHandler = slog.NewMultiHandler(jsonHandler, minLevelHandler{
+			Handler: otelslog.NewHandler(cfg.ServiceName, otelslog.WithLoggerProvider(loggerProvider)),
+			min:     parseLevel(cfg.Otel.LogLevel),
+		})
+	}
+
+	logger := slog.New(logHandler)
 	slog.SetDefault(logger)
-
-	logger.Info("opentelemetry enabled", "service", cfg.ServiceName)
+	// "configured", not "enabled": the master gate + endpoint passed, but an
+	// operator can still have turned every individual signal off — the per-signal
+	// fields report the truth without the line contradicting itself.
+	logger.Info("opentelemetry configured",
+		"service", cfg.ServiceName,
+		"logs", cfg.Otel.LogsEnabled,
+		"traces", cfg.Otel.TracesEnabled,
+		"metrics", cfg.Otel.MetricsEnabled,
+	)
 
 	return logger, func(ctx context.Context) error {
 		ctx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 		defer cancel()
 		// errors.Join so a failure shutting down one provider still runs the
 		// others and all surface to the caller.
-		return errors.Join(
-			tracerProvider.Shutdown(ctx),
-			meterProvider.Shutdown(ctx),
-			loggerProvider.Shutdown(ctx),
-		)
+		errs := make([]error, 0, len(shutdowns))
+		for _, s := range shutdowns {
+			errs = append(errs, s(ctx))
+		}
+		return errors.Join(errs...)
 	}, nil
 }
 

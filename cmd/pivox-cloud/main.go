@@ -96,6 +96,7 @@ func main() {
 	f.String("rest-port", envOrDefault("PIVOX_REST_PORT", ":8080"), "REST gateway listen address")
 	f.String("debug-port", envOrDefault("PIVOX_DEBUG_PORT", ":9090"), "Debug/health listen address")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
+	telemetry.RegisterOtelFlags(f)
 	f.Bool("enable-reflection", envOrBool("PIVOX_ENABLE_REFLECTION", false), "Register gRPC server reflection for dev tooling (grpcurl, buf curl). OFF by default — never enable in production; it exposes the full API surface to unauthenticated callers.")
 	f.Duration("storage-session-max-ttl", envOrDuration("PIVOX_STORAGE_SESSION_MAX_TTL", 8*time.Hour), "Cap on CreateStorageSession TTL; caller-requested values above this are silently clamped")
 	f.String("storage-session-cookie-domain", envOrDefault("PIVOX_STORAGE_SESSION_COOKIE_DOMAIN", ""), "Domain attribute for the storage-session Set-Cookie header (e.g. \".pivox.app\"). Empty omits Domain= so the cookie scopes to the response origin only — right default for self-hosted; SaaS deployments configure per-tenant subdomain.")
@@ -188,6 +189,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	logger, otelShutdown, err := telemetry.Setup(ctx, telemetry.Config{
 		ServiceName: "pivox-cloud",
 		LogLevel:    cfg.LogLevel,
+		Otel:        telemetry.OtelConfigFromFlags(f),
 	})
 	if err != nil {
 		return fmt.Errorf("setup telemetry: %w", err)

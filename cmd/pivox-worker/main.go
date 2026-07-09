@@ -101,6 +101,7 @@ func main() {
 	f.Int64("workflow-http-max-response-size", envOrInt64("PIVOX_WORKFLOW_HTTP_MAX_RESPONSE_SIZE", 1<<20), "Max bytes a workflow HTTP activity reads from a response body. Default 1048576 (1 MiB); clamped to [524288 (512 KiB), 10485760 (10 MiB)].")
 	f.Duration("workflow-reaper-interval", envOrDuration("PIVOX_WORKFLOW_REAPER_INTERVAL", defaultWorkflowReaperInterval), "How often the stranded-run reaper scans for discarded workflow_run jobs whose run is still non-terminal and finalizes them FAILED. Default 1m.")
 	f.Duration("river-poll-interval", envOrDuration("PIVOX_WORKER_RIVER_POLL_INTERVAL", defaultRiverPollInterval), "River fetch-poll interval — the FALLBACK cadence for picking up jobs (new jobs arrive instantly via LISTEN/NOTIFY, so a long value only delays recovery from a missed notification, and keeps the worker quiet). Default 5m; clamped to [30s, 10m].")
+	telemetry.RegisterOtelFlags(f)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -179,6 +180,7 @@ func serve(cmd *cobra.Command, _ []string) error {
 	logger, otelShutdown, err := telemetry.Setup(ctx, telemetry.Config{
 		ServiceName: "pivox-worker",
 		LogLevel:    logLevel,
+		Otel:        telemetry.OtelConfigFromFlags(f),
 	})
 	if err != nil {
 		return fmt.Errorf("setup telemetry: %w", err)
