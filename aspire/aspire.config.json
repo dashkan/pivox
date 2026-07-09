@@ -1,27 +1,5 @@
 {
   "appHost": {
-    "path": "apphost.mts",
-    "language": "typescript/nodejs"
-  },
-  "sdk": {
-    "version": "13.4.6"
-  },
-  "channel": "stable",
-  "profiles": {
-    "https": {
-      "applicationUrl": "https://aspire.dev.localhost:17179;http://aspire.dev.localhost:15241",
-      "environmentVariables": {
-        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://aspire.dev.localhost:21299",
-        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://aspire.dev.localhost:22217"
-      }
-    }
-  },
-  "packages": {
-    "Aspire.Hosting.PostgreSQL": "13.4.6",
-    "Aspire.Hosting.Go": "13.4.6-preview.1.26319.6",
-    "Aspire.Hosting.Keycloak": "13.4.6-preview.1.26319.6",
-    "Aspire.Hosting.JavaScript": "13.4.6",
-    "CommunityToolkit.Aspire.Hosting.OpenTelemetryCollector": "13.4.0",
-    "Aspire.Hosting.Kafka": "13.4.6"
+    "path": "apphost.cs"
   }
 }
