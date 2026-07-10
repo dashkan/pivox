@@ -15,14 +15,14 @@
     "@keycloak/keycloak-account-ui": "catalog:",
     "@keycloak/keycloak-ui-shared": "catalog:",
     "@pivox/primitives": "workspace:*",
-    "i18next": "26.3.4",
+    "i18next": "26.3.6",
     "i18next-fetch-backend": "7.0.0",
     "keycloak-js": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-hook-form": "7.81.0",
-    "react-i18next": "17.0.8",
+    "react-i18next": "17.0.9",
     "react-router-dom": "7.18.1"
   },
   "devDependencies": {
