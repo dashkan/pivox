@@ -10,6 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/plugin/kotel"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 // stubHandler lets a test inject Handle failures by record value, and
@@ -85,4 +89,35 @@ func TestProcessPartitionRecords(t *testing.T) {
 		assert.Empty(t, committable)
 		assert.Equal(t, []string{"A"}, h.handled)
 	})
+}
+
+// Each attempted record gets a kotel "process" span; a failed Handle records the
+// error on its span so a stuck partition is visible in traces, not only logs.
+func TestProcessPartitionRecordsProcessSpans(t *testing.T) {
+	sr := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
+	c := &Consumer{
+		handler: &stubHandler{failValues: map[string]bool{"B": true}},
+		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+		tracer:  kotel.NewTracer(kotel.TracerProvider(tp)),
+	}
+
+	// A handled OK, B fails — processPartitionRecords attempts both, stops at B.
+	_, _, failed := c.processPartitionRecords(context.Background(), makeRecords(10, "A", "B"))
+	assert.True(t, failed)
+
+	spans := sr.Ended()
+	require.Len(t, spans, 2, "one process span per attempted record (A ok, B failed)")
+
+	var errSpans, okSpans int
+	for _, s := range spans {
+		if s.Status().Code == codes.Error {
+			errSpans++
+			assert.NotEmpty(t, s.Events(), "failed span should record the error as an event")
+		} else {
+			okSpans++
+		}
+	}
+	assert.Equal(t, 1, errSpans, "exactly the failed record's span carries error status")
+	assert.Equal(t, 1, okSpans)
 }

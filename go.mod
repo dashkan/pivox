@@ -32,6 +32,7 @@ require (
 	github.com/tink-crypto/tink-go-gcpkms/v2 v2.3.0
 	github.com/tink-crypto/tink-go/v2 v2.7.0
 	github.com/twmb/franz-go v1.21.5
+	github.com/twmb/franz-go/plugin/kotel v1.7.0
 	go.einride.tech/aip v0.86.3
 	go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
 	go.opentelemetry.io/contrib/exporters/autoexport v0.69.0

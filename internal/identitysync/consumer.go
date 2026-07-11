@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/plugin/kotel"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 const (
@@ -37,6 +40,9 @@ type Consumer struct {
 	client  *kgo.Client
 	handler eventHandler
 	logger  *slog.Logger
+	// tracer opens a per-record "process" span around each Handle. Nil in the
+	// offset-logic tests that build Consumer directly (handle() falls through).
+	tracer *kotel.Tracer
 }
 
 // ConsumerConfig configures Consumer. All fields are required.
@@ -63,6 +69,20 @@ func NewConsumer(cfg ConsumerConfig) (*Consumer, error) {
 		panic("identitysync: ConsumerConfig.Logger is required")
 	}
 
+	// OpenTelemetry via kotel: hooks add fetch/commit spans + consumer metrics
+	// (consumer lag, fetch/record rates). It reads the global providers +
+	// propagator that telemetry.Setup installs — no-op providers when export is
+	// disabled, so this is free in that case. Per-record process spans are opened
+	// separately in handle().
+	tracer := kotel.NewTracer(
+		kotel.TracerProvider(otel.GetTracerProvider()),
+		kotel.TracerPropagator(otel.GetTextMapPropagator()),
+	)
+	kt := kotel.NewKotel(
+		kotel.WithTracer(tracer),
+		kotel.WithMeter(kotel.NewMeter(kotel.MeterProvider(otel.GetMeterProvider()))),
+	)
+
 	client, err := kgo.NewClient(
 		kgo.SeedBrokers(cfg.Brokers...),
 		kgo.ConsumerGroup(consumerGroup),
@@ -70,6 +90,7 @@ func NewConsumer(cfg ConsumerConfig) (*Consumer, error) {
 		// We commit explicitly (only successfully-handled records) and
 		// rewind the consume position on a handler error — see Run.
 		kgo.DisableAutoCommit(),
+		kgo.WithHooks(kt.Hooks()...),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("identitysync: new kafka client: %w", err)
@@ -79,6 +100,7 @@ func NewConsumer(cfg ConsumerConfig) (*Consumer, error) {
 		client:  client,
 		handler: cfg.Handler,
 		logger:  cfg.Logger,
+		tracer:  tracer,
 	}, nil
 }
 
@@ -160,7 +182,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 // after the failed one are left unprocessed; they replay after the rewind.
 func (c *Consumer) processPartitionRecords(ctx context.Context, recs []*kgo.Record) (committable []*kgo.Record, rewindTo int64, failed bool) {
 	for _, rec := range recs {
-		if err := c.handler.Handle(ctx, rec.Value); err != nil {
+		if err := c.handle(ctx, rec); err != nil {
 			c.logger.ErrorContext(ctx, "identitysync: handle failed; rewinding partition to retry",
 				"topic", rec.Topic, "partition", rec.Partition, "offset", rec.Offset, "error", err)
 			return committable, rec.Offset, true
@@ -168,4 +190,25 @@ func (c *Consumer) processPartitionRecords(ctx context.Context, recs []*kgo.Reco
 		committable = append(committable, rec)
 	}
 	return committable, 0, false
+}
+
+// handle applies one record's handler under a kotel "process" span — linked to
+// the producing side's trace when the record carries W3C traceparent headers,
+// otherwise a root span. The handler runs under the span's context so its own
+// DB spans nest beneath it. Handler errors are recorded on the span.
+//
+// tracer is nil in the offset-logic unit tests that construct Consumer directly;
+// fall through to a bare Handle so those tests need no OTel setup.
+func (c *Consumer) handle(ctx context.Context, rec *kgo.Record) error {
+	if c.tracer == nil {
+		return c.handler.Handle(ctx, rec.Value)
+	}
+	ctx, span := c.tracer.WithProcessSpan(rec)
+	defer span.End()
+	err := c.handler.Handle(ctx, rec.Value)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
+	return err
 }
