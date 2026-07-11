@@ -42,8 +42,6 @@ catalog:
   "@assistant-ui/react": "0.14.26"
   "@assistant-ui/react-ai-sdk": "1.3.40"
   "@fontsource-variable/roboto": "5.2.10"
-  "@keycloak/keycloak-account-ui": "^26.7.0"
-  "@keycloak/keycloak-ui-shared": "^26.7.0"
   "@tailwindcss/cli": "4.3.2"
   "@tailwindcss/vite": "4.3.2"
   "@tanstack/devtools-vite": "0.8.1"

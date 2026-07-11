@@ -1,7 +1,7 @@
 import type {
   UserProfileAttributeMetadata,
   UserProfileMetadata,
-} from "@keycloak/keycloak-account-ui";
+} from "@/user-profile/keycloak-types";
 import type { TFunction } from "i18next";
 import type { Path } from "react-hook-form";
 

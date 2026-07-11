@@ -36,7 +36,7 @@ import {
   type UserProfileFormValues,
 } from "./utils";
 
-import type { UserProfileAttributeMetadata } from "@keycloak/keycloak-account-ui";
+import type { UserProfileAttributeMetadata } from "@/user-profile/keycloak-types";
 import type { TFunction } from "i18next";
 
 type Attr = UserProfileAttributeMetadata;
