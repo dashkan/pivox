@@ -1,8 +1,8 @@
 # Envoy ingress proxy — replaces configs/nginx.conf (Phase 1) and the
 # Go grpc-gateway for the REST surface (Phase 2).
 #
-# ngrok terminates TLS at pivox.ngrok.app and forwards plain HTTP to
-# localhost:8081 (configs/ngrok.yml). This listener owns 8081. Run /
+# The tunnel (Cloudflare) terminates TLS at the public host and forwards plain
+# HTTP to localhost:8081. This listener owns 8081. Run /
 # validate via the `proxy-envoy*` Makefile targets.
 #
 # THREE client surfaces share this one listener:
@@ -21,7 +21,7 @@
 # Behavioral notes carried over from Phase 1: Envoy streams responses
 # natively (no proxy_buffering to port; we disable route+idle timeouts
 # on SSE/long-poll routes instead), and x-forwarded-proto is forced to
-# https on Keycloak/River/storage-agent (ngrok is always https).
+# https on Keycloak/River/storage-agent (the tunnel is always https).
 
 admin:
   address:

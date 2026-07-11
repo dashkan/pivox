@@ -49,14 +49,14 @@ export function getOidcConfig(): Promise<oidc.Configuration> {
 export const OIDC_SCOPE = 'openid profile email'
 
 /**
- * Allowed public origins (PIVOX_PUBLIC_ORIGINS, comma-separated). When set, the
+ * Allowed public origins (PIVOX_ALLOWED_ORIGINS, comma-separated). When set, the
  * BFF only builds redirect/logout URLs for these origins — defense-in-depth over
  * Keycloak's redirect-URI registration, so a spoofed Host (or a future wildcard
  * KC misconfig) can't turn into a redirect to an attacker origin. Unset = allow
  * the request's own origin (dev convenience).
  */
 function allowedOrigins(): string[] | null {
-  const raw = process.env.PIVOX_PUBLIC_ORIGINS
+  const raw = process.env.PIVOX_ALLOWED_ORIGINS
   if (!raw) return null
   return raw
     .split(',')
@@ -70,11 +70,11 @@ function firstHeaderValue(request: Request, name: string): string | undefined {
 }
 
 /**
- * The public origin the browser actually used. envoy/ngrok terminate TLS and
+ * The public origin the browser actually used. envoy/the tunnel terminate TLS and
  * forward to `start` over http, so the request's own protocol is wrong — the real
  * scheme comes from x-forwarded-proto, and the public host from x-forwarded-host
  * (or the preserved Host, since envoy doesn't rewrite it). Falls back to the
- * request URL for direct access. Validated against PIVOX_PUBLIC_ORIGINS so we
+ * request URL for direct access. Validated against PIVOX_ALLOWED_ORIGINS so we
  * never build a redirect to an unexpected origin.
  *
  * This is THE origin that must match the `start` client's registered redirect
@@ -89,7 +89,7 @@ export function publicOrigin(request: Request): string {
 
   const allow = allowedOrigins()
   if (allow && !allow.includes(origin)) {
-    throw new Error(`oidc: request origin ${origin} is not in PIVOX_PUBLIC_ORIGINS`)
+    throw new Error(`oidc: request origin ${origin} is not in PIVOX_ALLOWED_ORIGINS`)
   }
   return origin
 }

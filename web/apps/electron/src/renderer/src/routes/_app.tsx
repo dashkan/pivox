@@ -60,7 +60,7 @@ function AppLayoutRoute() {
 // configured remote via VITE_BASE_URL — same as the rest of the
 // renderer's transport plumbing.
 const CHAT_BASE_URL =
-  import.meta.env.VITE_BASE_URL ?? 'https://pivox.ngrok.app';
+  import.meta.env.VITE_BASE_URL ?? 'http://localhost:8081';
 
 /**
  * Floating chat FAB, mounted in the authed shell so chat is reachable

@@ -19951,8 +19951,8 @@ components:
       type: oauth2
       flows:
         authorizationCode:
-          authorizationUrl: https://pivox.ngrok.app/realms/pivox/protocol/openid-connect/auth
-          tokenUrl: https://pivox.ngrok.app/realms/pivox/protocol/openid-connect/token
+          authorizationUrl: https://pivox.example/realms/pivox/protocol/openid-connect/auth
+          tokenUrl: https://pivox.example/realms/pivox/protocol/openid-connect/token
           scopes:
             email: Email address
             openid: OpenID Connect

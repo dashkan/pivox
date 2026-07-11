@@ -13,21 +13,20 @@
 
       `connect-src` allow-list:
         - 'self'                  — vite dev server + bundled assets (+ HMR ws)
-        - https://pivox.ngrok.app — Pivox cloud (REST + chat SSE + OTLP traces).
-                                    Matches the BASE_URL default in api-client.ts
-                                    so a fresh clone without VITE_BASE_URL set
-                                    still works. Search-replace when the
-                                    production origin is provisioned.
-        - %VITE_BASE_URL%         — Vite substitutes from the env at build time,
-                                    letting direnv etc. override the cloud URL.
-                                    Unset → CSP ignores the unknown token.
-        - http://localhost:* / ws — vite dev server + HMR.
+        - %VITE_BASE_URL%         — the Pivox cloud origin (REST + chat SSE +
+                                    OTLP traces). Vite substitutes from the env
+                                    at build time; set VITE_BASE_URL to the
+                                    public host. Unset → CSP drops the token and
+                                    the localhost default below applies.
+        - http://localhost:* / ws — vite dev server + HMR, and the
+                                    http://localhost:8081 default cloud origin
+                                    used when VITE_BASE_URL is unset.
 
       Reference: https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; frame-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://pivox.ngrok.app %VITE_BASE_URL% http://localhost:* ws://localhost:*"
+      content="default-src 'self'; script-src 'self'; frame-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' %VITE_BASE_URL% http://localhost:* ws://localhost:*"
     />
     <!--
       Pre-React storage bootstrap. Loaded synchronously in <head> so

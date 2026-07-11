@@ -1,9 +1,9 @@
 import { createReactQueryApi } from '@pivox/client/react-query';
 import { createPivoxApiClient } from '@pivox/features/api';
 
-// Same env var the main process reads; falls back to the dev ngrok
-// tunnel when unset. See env.d.ts + electron.vite.config.ts.
-const BASE_URL = import.meta.env.VITE_BASE_URL || 'https://pivox.ngrok.app';
+// Same env var the main process reads; falls back to the local dev
+// origin (localhost:8081) when unset. See env.d.ts + electron.vite.config.ts.
+const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8081';
 
 /**
  * Authenticated Pivox REST client for the Electron renderer. Points at the Pivox

@@ -4,7 +4,7 @@ import "github.com/spf13/pflag"
 
 // cloudHost is the production gRPC endpoint for the Pivox cloud API.
 // Operators override via --server / PIVOX_CLOUD_HOST when pointing
-// the agent at a non-default deployment (staging, an ngrok tunnel,
+// the agent at a non-default deployment (staging, a tunnel,
 // a self-hosted instance).
 var cloudHost = "api.pivox.app"
 

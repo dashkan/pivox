@@ -35,7 +35,12 @@ migrate -path /migrations \
 	-database "postgres://${POSTGRES_USER}@/pivox?host=/var/run/postgresql&sslmode=disable" \
 	up
 
+# Public host for dev seed URLs (storage-gateway /files/ origins). PIVOX_HOSTNAME
+# (e.g. pivox.app) is forwarded by the apphost; default to localhost:8081 so a bare
+# checkout still seeds. Passed to psql as :public_host, consumed by the seeds.
+public_host="${PIVOX_HOSTNAME:-localhost:8081}"
+
 # seed.sql does `\i scripts/seeds/*.sql` (paths relative to the working dir), so
 # run it from / where the mounted scripts dir lives at /scripts.
 cd /
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname pivox -f /scripts/seed.sql
+psql -v ON_ERROR_STOP=1 -v public_host="$public_host" --username "$POSTGRES_USER" --dbname pivox -f /scripts/seed.sql

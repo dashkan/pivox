@@ -21,7 +21,7 @@ installErrorReporters();
 // to the collector). VITE_OTEL_TRACES_URL always wins; a PRODUCTION build with
 // no override stays a no-op, so packaged apps never auto-ship spans to a dev
 // tunnel.
-const backendBaseUrl = import.meta.env.VITE_BASE_URL || 'https://pivox.ngrok.app';
+const backendBaseUrl = import.meta.env.VITE_BASE_URL || 'http://localhost:8081';
 installWebTracing({
   // Electron isn't an Aspire resource, but keep the bare-name convention
   // (start / electron) consistent with the Aspire-named services.

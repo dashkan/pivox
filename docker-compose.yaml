@@ -29,10 +29,10 @@ services:
   # path): envoy proxies /realms/ + /resources/ for the browser SSO
   # login flow. Admin UI is reached directly at http://localhost:8082/
   # (not via envoy). Matches the Aspire keycloak so the issuer
-  # (https://pivox.ngrok.app/realms/acme) is identical across both.
+  # ($PIVOX_PUBLIC_HOST/realms/acme) is identical across both.
   #
   # Bootstrap admin: admin / admin (DEV ONLY — change before exposing
-  # this beyond localhost / private ngrok tunnel).
+  # this beyond localhost / a private tunnel).
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     command: start-dev

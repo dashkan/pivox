@@ -77,7 +77,7 @@ func TestViewFromOrgRow_CopiesAllFields(t *testing.T) {
 				LatestVersionNumber:   1,
 				LatestVersionMimeType: "image/png",
 				EndpointSlug:          pgtype.Text{String: "primary", Valid: true},
-				GatewayHostname:       pgtype.Text{String: "pivox.ngrok.app", Valid: true},
+				GatewayHostname:       pgtype.Text{String: "pivox.example", Valid: true},
 			},
 			want: assetView{
 				NameSlug:        "logo-final",
@@ -91,7 +91,7 @@ func TestViewFromOrgRow_CopiesAllFields(t *testing.T) {
 				VersionNumber:   1,
 				MimeType:        "image/png",
 				EndpointSlug:    "primary",
-				GatewayHostname: "pivox.ngrok.app",
+				GatewayHostname: "pivox.example",
 			},
 		},
 		{
@@ -220,7 +220,7 @@ func TestViewFromSpaceRow_CopiesAllFields(t *testing.T) {
 				LatestVersionNumber:   1,
 				LatestVersionMimeType: "image/png",
 				EndpointSlug:          pgtype.Text{String: "primary", Valid: true},
-				GatewayHostname:       pgtype.Text{String: "pivox.ngrok.app", Valid: true},
+				GatewayHostname:       pgtype.Text{String: "pivox.example", Valid: true},
 			},
 			want: assetView{
 				NameSlug:        "logo-final",
@@ -234,7 +234,7 @@ func TestViewFromSpaceRow_CopiesAllFields(t *testing.T) {
 				VersionNumber:   1,
 				MimeType:        "image/png",
 				EndpointSlug:    "primary",
-				GatewayHostname: "pivox.ngrok.app",
+				GatewayHostname: "pivox.example",
 			},
 		},
 		{
@@ -360,9 +360,9 @@ func TestComposeStorageURL(t *testing.T) {
 		assetID    = "0192a000-0030-7000-8000-310001000001"
 		orgSlug    = "meridian-broad"
 		spaceSlug  = "corp-site"
-		gwHost     = "pivox.ngrok.app"
+		gwHost     = "pivox.example"
 		epSlug     = "meridian-hq-west"
-		expectedOK = "https://pivox.ngrok.app/files/meridian-hq-west/meridian-broad/corp-site/assets/0192a000-0030-7000-8000-310001000001/v1/thumb_md.webp"
+		expectedOK = "https://pivox.example/files/meridian-hq-west/meridian-broad/corp-site/assets/0192a000-0030-7000-8000-310001000001/v1/thumb_md.webp"
 	)
 
 	base := assetView{
@@ -422,7 +422,7 @@ func TestComposeStorageURL(t *testing.T) {
 				v.ContentType = "image/svg+xml"
 				v.MimeType = "image/svg+xml"
 			}),
-			want: "https://pivox.ngrok.app/files/meridian-hq-west/meridian-broad/corp-site/assets/0192a000-0030-7000-8000-310001000001/v1/thumb_md.webp",
+			want: "https://pivox.example/files/meridian-hq-west/meridian-broad/corp-site/assets/0192a000-0030-7000-8000-310001000001/v1/thumb_md.webp",
 		},
 		{
 			name: "NULL media_type + image/webp — content-type prefix fallback (asset …000009)",
@@ -431,7 +431,7 @@ func TestComposeStorageURL(t *testing.T) {
 				v.ContentType = "image/webp"
 				v.MimeType = "image/webp"
 			}),
-			want: "https://pivox.ngrok.app/files/meridian-hq-west/meridian-broad/corp-site/assets/0192a000-0030-7000-8000-310001000001/v1/thumb_md.webp",
+			want: "https://pivox.example/files/meridian-hq-west/meridian-broad/corp-site/assets/0192a000-0030-7000-8000-310001000001/v1/thumb_md.webp",
 		},
 		{
 			name: "empty content_type — neither enum nor prefix qualifies (asset …00000a)",

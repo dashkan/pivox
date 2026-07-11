@@ -9,7 +9,7 @@ import { createConfigProvider, type ConfigProvider } from '@pivox/oidc';
  * import.meta.env), defaulting to the dev tunnel + realm.
  */
 
-const BASE_URL = import.meta.env.VITE_BASE_URL || 'https://pivox.ngrok.app';
+const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8081';
 const ISSUER =
   import.meta.env.VITE_OIDC_ISSUER || `${BASE_URL.replace(/\/+$/, '')}/realms/pivox`;
 const CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID || 'electron';

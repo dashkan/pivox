@@ -23,18 +23,27 @@
          is needed. The generated OpenAPI v3 doc lives next to this file at
          api/openapi/v3/pivox.yaml and is exposed at /api-docs/pivox.yaml. -->
     <script>
+      // OAuth endpoints are derived from the origin serving these docs, so the
+      // "Authorize" flow always targets the same Keycloak that fronts this page
+      // (envoy proxies /realms/ same-origin). No hardcoded host and no build-time
+      // env substitution — it adapts to whatever host serves /api-docs
+      // (pivox.app in dev, prod origin in prod). Overrides the spec's placeholder
+      // authorizationUrl/tokenUrl (Scalar honors these — see its config docs).
+      const kcOidc = `${window.location.origin}/realms/pivox/protocol/openid-connect`;
       Scalar.createApiReference('#app', {
         url: '/api-docs/pivox.yaml',
         // Pre-fill the public "api-docs" Keycloak client (realm pivox) so the
         // OAuth2 panel is one-click. x-usePkce 'SHA-256' marks it a public
         // client (no secret sent). The redirect URI defaults to this page's own
-        // URL — register that in Keycloak (dev: https://pivox.ngrok.app/api-docs).
+        // URL — register that in Keycloak (e.g. https://<this-host>/api-docs).
         authentication: {
           preferredSecurityScheme: 'OAuth2',
           securitySchemes: {
             OAuth2: {
               flows: {
                 authorizationCode: {
+                  authorizationUrl: `${kcOidc}/auth`,
+                  tokenUrl: `${kcOidc}/token`,
                   'x-scalar-client-id': 'api-docs',
                   selectedScopes: ['openid', 'profile', 'email'],
                   'x-usePkce': 'SHA-256',

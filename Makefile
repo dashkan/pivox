@@ -8,7 +8,7 @@
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload \
-	proxy-envoy proxy-envoy-validate envoy-descriptor proxy-ngrok \
+	proxy-envoy proxy-envoy-validate envoy-descriptor \
 	web-build web-build-watch web-build-start \
 	web-clean web-start web-start-preview electron-start
 
@@ -230,9 +230,6 @@ proxy-envoy: envoy-descriptor
 proxy-envoy-validate: envoy-descriptor
 	envoy --mode validate -c $(PWD)/configs/envoy.yaml
 
-proxy-ngrok:
-	ngrok start --config configs/ngrok.yml --all
-
 # Dev loop
 
 # ollama-serve runs the Ollama daemon in the foreground. Pivox's
@@ -309,8 +306,8 @@ electron-start: web-build
 	pnpm run --dir web electron:start
 
 # dev runs every component of the local loop in one terminal: the
-# pivox-cloud + pivox-worker air watchers, the nginx + ngrok ingress
-# proxies, and the web watchers + dev
+# pivox-cloud + pivox-worker air watchers, the envoy ingress proxy
+# (the public cloudflared tunnel runs as its own service), and the web watchers + dev
 # server. `concurrently` color-codes each prefix and `--kill-others`
 # tears the rest down the moment any one process exits — so a crashed
 # binary or Ctrl-C cleans up cleanly instead of leaving zombies.
@@ -321,22 +318,20 @@ electron-start: web-build
 dev: web-build
 	pnpx concurrently \
 		--kill-others \
-		--names "cloud,worker,envoy,ngrok,packages,start" \
-		--prefix-colors "yellow,green,cyan,magenta,blue,gray,white" \
+		--names "cloud,worker,envoy,packages,start" \
+		--prefix-colors "yellow,green,cyan,blue,gray" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
 		"$(MAKE) proxy-envoy" \
-		"$(MAKE) proxy-ngrok" \
 		"$(MAKE) web-build-watch" \
 		"$(MAKE) web-start"
 
 dev-preview: web-build-start
 	pnpx concurrently \
 		--kill-others \
-		--names "cloud,worker,envoy,ngrok,build,start" \
-		--prefix-colors "yellow,green,cyan,magenta,white" \
+		--names "cloud,worker,envoy,start" \
+		--prefix-colors "yellow,green,cyan,white" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
 		"$(MAKE) proxy-envoy" \
-		"$(MAKE) proxy-ngrok" \
 		"$(MAKE) web-start-preview"

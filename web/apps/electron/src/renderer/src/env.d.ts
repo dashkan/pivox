@@ -6,10 +6,10 @@
 interface ImportMetaEnv {
   /** Pivox app origin — REST gateway + SPA. */
   readonly VITE_BASE_URL?: string;
-  /** OIDC issuer, e.g. https://pivox.ngrok.app/realms/pivox. Defaults from VITE_BASE_URL. */
+  /** OIDC issuer, e.g. https://pivox.example/realms/pivox. Defaults from VITE_BASE_URL. */
   readonly VITE_OIDC_ISSUER?: string;
   // Absolute OTLP/HTTP traces endpoint for browser tracing (e.g.
-  // "https://pivox.ngrok.app/v1/traces"). Unset => tracing disabled. Must be
+  // "https://pivox.example/v1/traces"). Unset => tracing disabled. Must be
   // absolute — the renderer origin is app://, so relative URLs can't resolve.
   readonly VITE_OTEL_TRACES_URL?: string;
 }

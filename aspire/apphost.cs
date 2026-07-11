@@ -8,6 +8,7 @@
 
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using Aspire.Hosting.ApplicationModel;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -41,6 +42,12 @@ var postgres = builder
   .WithInitFiles("postgres-init")
   .WithBindMount("../internal/db/migrations", "/migrations", true)
   .WithBindMount("../scripts", "/scripts", true)
+  // Forwarded to the first-init seed (postgres-init/00-init.sh): the dev
+  // storage-gateway rows build /files/ URLs against the real public host
+  // (PIVOX_HOSTNAME, e.g. pivox.app — bare host, no scheme) instead of a
+  // hardcoded one, so a fresh checkout works on any dev's tunnel domain.
+  // Empty => the seed defaults to localhost:8081.
+  .WithEnvironment("PIVOX_HOSTNAME", Environment.GetEnvironmentVariable("PIVOX_HOSTNAME") ?? "")
   // Stable alias so other CONTAINERS (keycloak) can reach postgres over the
   // Aspire container network at `postgres:5432` — host.docker.internal only
   // works for host processes.
@@ -147,29 +154,6 @@ if (!string.IsNullOrWhiteSpace(rustfsLogLevel))
 }
 rustfs.WaitFor(otelCollector);
 
-// --- keycloak (dev IDP) ---
-// Pinned to host :8082 to match envoy's keycloak cluster. Data persisted.
-// Served at ROOT (no KC_HTTP_RELATIVE_PATH): envoy proxies /realms/ and
-// /resources/ to it, and the admin console is reached directly via the Aspire
-// proxy — so keycloak never needs a base-path prefix. Serving at root also
-// keeps the integration's built-in health probe (root OIDC discovery) green.
-// KC_PROXY_HEADERS is load-bearing: envoy sets x-forwarded-proto=https, and
-// keycloak only trusts it (+ Host) to build public https issuer/token URLs when
-// this is set; otherwise discovery advertises non-https and the broker's
-// requireSecureIssuer rejects it. No KC_HOSTNAME — derived from forwarded host.
-//
-// Keycloak persists in Postgres (not the dev H2 file) so realms/users/clients
-// are durable + inspectable via SQL — much easier for adding accounts and for
-// inspecting the identity-sync (KC event-sync) state. KC creates its own SCHEMA on boot but NOT the
-// database; the `keycloak` db is created by the pg image's init script.
-//
-// JDBC URL the keycloak CONTAINER uses to reach the postgres CONTAINER. Both
-// are containers on the Aspire network, so connect via postgres's network alias
-// + its INTERNAL port (5432) — NOT host.docker.internal (host processes only).
-// Credentials go in KC_DB_* below.
-var keycloakDbUrl = "jdbc:postgresql://postgres:5432/keycloak";
-
-
 // --- kafka — Keycloak event stream for Pivox identity sync ---
 // The keycloak-kafka SPI (baked into the KC image, aspire/keycloak/Dockerfile)
 // produces user + admin events here; a Pivox consumer will sync identities/orgs
@@ -227,9 +211,9 @@ var keycloak = builder
     "/opt/keycloak/themes/pivox",
     true
   )
-  .WithEnabledFeatures(["preview", "cimd", "opentelemetry-metrics"])
+  .WithEnabledFeatures(["cimd", "opentelemetry-logs", "opentelemetry-metrics", "token-exchange"])
   .WithEnvironment("KC_DB", "postgres")
-  .WithEnvironment("KC_DB_URL", keycloakDbUrl)
+  .WithEnvironment("KC_DB_URL", keycloakDb.Resource.JdbcConnectionString)
   .WithEnvironment("KC_DB_USERNAME", pgUsername)
   .WithEnvironment("KC_DB_PASSWORD", pgPassword)
   // Pin the Keycloak server image. Keeps the running server in lockstep with
@@ -274,6 +258,17 @@ var keycloak = builder
   .WithEnvironment(
     "KAFKA_EVENTS",
     "REGISTER,UPDATE_PROFILE,UPDATE_EMAIL,DELETE_ACCOUNT,LOGIN,LOGOUT"
+  )
+  // Trace the KC->Kafka producer. The SPI maps KAFKA_INTERCEPTOR_CLASS to the
+  // producer's interceptor.classes; the OTel TracingProducerInterceptor (bundled
+  // in the SPI jar v1.0.2+) opens a produce span + injects W3C traceparent into
+  // the record headers, so the worker's identity-sync consume span links to the
+  // originating KC event as one distributed trace. It binds KC's Quarkus-OTel
+  // GlobalOpenTelemetry (the api ships on lib/main; the SPI bundles only the
+  // kafka-clients instrumentation, not a duplicate api).
+  .WithEnvironment(
+    "KAFKA_INTERCEPTOR_CLASS",
+    "io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor"
   )
   // Secrets/IDs referenced by the realm-import JSON via ${...} placeholders (the
   // committed realm files carry no plaintext secrets). Forwarded 1:1 from .envrc
@@ -420,7 +415,7 @@ builder
   .WithEnvironment("PIVOX_SESSIONS_DATABASE_URL", sessionsDatabaseUrl)
   // Browser OpenTelemetry: the app exports spans to this same-origin path,
   // which envoy routes to the otel-collector (-> dashboard). Relative so it
-  // resolves against whatever origin serves the app (pivox.ngrok.app).
+  // resolves against whatever origin serves the app (the tunnel host).
   .WithEnvironment("VITE_OTEL_TRACES_URL", "/v1/traces")
   // Server-side (SSR) OpenTelemetry. --import loads the Node OTel SDK before the
   // Nitro/TanStack server (no server-entry hook in 1.168). It exports to the
@@ -441,7 +436,7 @@ builder
 // --- envoy (L7 ingress) ---
 // Uses the Aspire-specific config (clusters -> host.docker.internal). Mounts
 // the gitignored proto descriptor for grpc_json_transcoder. Pinned to host
-// :8081 so ngrok can reach it. Its OTel tracer exports to the collector above
+// :8081 so the tunnel (cloudflared) can reach it. Its OTel tracer exports to the collector above
 // (otel-collector:4317). TODO: verify/bump the envoy image tag.
 // apphost-generated config: tracing block stripped unless ASPIRE_OTEL_ENVOY_ENABLED.
 var envoyConfigMount = WriteEffectiveEnvoyConfig();
@@ -459,25 +454,66 @@ var envoy = builder
   .WithHttpEndpoint(port: 8081, targetPort: 8081, name: "http")
   .WaitFor(otelCollector);
 
-// --- ngrok (public tunnel -> pivox.ngrok.app) ---
-// Tunnels to envoy via host.docker.internal:8081. NGROK_AUTHTOKEN comes from
-// your direnv .envrc — the apphost process inherits it, but containers don't,
-// so forward it explicitly. Stop `make proxy-ngrok` first: ngrok allows one
-// agent session per reserved domain.
-builder
-  .AddContainer("ngrok", "ngrok/ngrok:latest")
-  .WithEnvironment("NGROK_AUTHTOKEN", Environment.GetEnvironmentVariable("NGROK_AUTHTOKEN") ?? "")
-  // --log=stdout switches ngrok off its interactive TUI so its agent logs
-  // (tunnel status + request lines) surface in `aspire logs ngrok`. Add
-  // --log-level=debug for more verbosity if needed.
-  .WithArgs([
-    "http",
-    "host.docker.internal:8081",
-    "--url",
-    "pivox.ngrok.app",
-    "--log=stdout",
-  ])
-  .WaitFor(envoy);
+// --- public tunnel ---
+// The public HTTPS origin (PIVOX_PUBLIC_HOST) is fronted by a
+// Cloudflare Tunnel that forwards to envoy on localhost:8081. cloudflared runs
+// as a host service (`brew services start cloudflared`, config in
+// ~/.cloudflared/config.yml) — NOT an Aspire resource — so it's independent of
+// the stack lifecycle and shared across dev machines via each dev's own zone.
+// Nothing to declare here.
+
+// --- diag — network diagnostics sidecar (latest Ubuntu LTS + net tools) ---
+// A throwaway container for poking the dev stack from *inside* the Aspire
+// container network. Built from aspire/diag/Dockerfile (ubuntu:latest + ping/
+// dig/ss/nc/curl/traceroute/mtr/tcpdump/psql/kcat/...). It gets a WithReference
+// to every OTHER resource below, so their connection strings + service-
+// discovery endpoints are injected as env:
+//   docker exec -it <diag-container> bash
+//   env | sort | grep -Ei 'ConnectionStrings|services__'   # probe targets
+// No WaitFor: it starts immediately so you can exec in and watch the rest come
+// up. Stays alive via `sleep infinity` (see the Dockerfile).
+var diag = builder
+  .AddDockerfile("diag", "diag")
+  .WithContainerNetworkAlias("diag");
+
+// Reference every OTHER resource. Iterating the model (rather than hand-listing
+// them) keeps this correct as resources are added/removed. Parameters are
+// skipped — they're secrets, not network targets. The capability interface a
+// resource implements picks the ref kind AND disambiguates the WithReference
+// overload: connection-string resources (postgres + its DBs, kafka) inject
+// ConnectionStrings__<name>; endpoint-bearing resources (keycloak, rustfs,
+// envoy, otel-collector, kafka-ui, the host apps, ...) inject
+// services__<name>__<endpoint>__N. Resources that implement neither (e.g. a
+// pure one-shot executable with no endpoints) contribute nothing and are the
+// only ones left unreferenced.
+foreach (var resource in builder.Resources.ToList())
+{
+  if (resource == diag.Resource || resource is ParameterResource)
+  {
+    continue;
+  }
+  if (resource is IResourceWithConnectionString cs)
+  {
+    // postgres + its DBs, kafka → ConnectionStrings__<name> (+ property env).
+    diag.WithReference(builder.CreateResourceBuilder(cs));
+  }
+  else if (resource is IResourceWithServiceDiscovery sd)
+  {
+    // keycloak (KeycloakResource is service-discovery-aware) → all endpoints
+    // as services__<name>__<endpoint>__N.
+    diag.WithReference(builder.CreateResourceBuilder(sd));
+  }
+  else if (resource is IResourceWithEndpoints ep)
+  {
+    // Plain containers (rustfs, envoy, otel-collector, kafka-ui) + the vite app
+    // (start) expose endpoints but aren't service-discovery resources, so
+    // reference each endpoint individually → services__<name>__<endpoint>__N.
+    foreach (var endpoint in ep.GetEndpoints())
+    {
+      diag.WithReference(endpoint);
+    }
+  }
+}
 
 builder.Build().Run();
 

@@ -491,7 +491,7 @@ func promoteToIngestedAsset(
 // pair directly via SQL. Returns (gatewayHostname, endpointSlug,
 // endpointID). Hostname matches the dev seed flip
 // (10_storage_gateways.sql) so the e2e assertion shape parallels what
-// the dev Library would produce against rustfs through ngrok →
+// the dev Library would produce against rustfs through the tunnel →
 // nginx /files/ → agent. Inline rather than via a fixture because
 // the thumbnail-URL test is the only consumer; promote to
 // internal/testutil/fixtures when a second consumer arrives.
@@ -504,7 +504,7 @@ func seedThumbnailGateway(
 	ctx := context.Background()
 	gwID := uuid.New()
 	endpointID = uuid.New()
-	gwHostname = "pivox.ngrok.app"
+	gwHostname = "pivox.example"
 	endpointSlug = "primary"
 
 	_, err := h.Pool.Exec(ctx, `

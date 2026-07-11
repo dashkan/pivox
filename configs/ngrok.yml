@@ -1,7 +1,0 @@
-version: "3"
-
-tunnels:
-  proxy:
-    proto: http
-    addr: 8081
-    url: pivox.ngrok.app

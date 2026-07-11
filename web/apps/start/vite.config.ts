@@ -11,6 +11,15 @@ import viteReact from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { nitro } from 'nitro/vite';
 
+// Hosts the dev server accepts (Vite blocks unknown Host headers as a DNS-rebind
+// defense). Explicit comma-separated list from VITE_ALLOWED_HOSTS (.envrc) —
+// e.g. "localhost,pivox.app". No derivation from URLs; defaults to localhost for
+// bare local dev when the var is unset.
+const allowedHosts = (process.env.VITE_ALLOWED_HOSTS ?? 'localhost')
+  .split(',')
+  .map((host) => host.trim())
+  .filter(Boolean);
+
 const config = defineConfig({
   server: {
     // Pin to IPv4 loopback so the dev server's bind doesn't depend on
@@ -19,7 +28,7 @@ const config = defineConfig({
     // breaking the envoy `web_app` upstream (which targets 127.0.0.1,
     // like every other cluster). Deterministic now, regardless of OS.
     host: '127.0.0.1',
-    allowedHosts: ['localhost', 'pivox.ngrok.app'],
+    allowedHosts,
   },
   build: {
     rollupOptions: {

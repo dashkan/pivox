@@ -54,7 +54,7 @@ type EncryptionConfig struct {
 // OAuth code exchange), not the resource server.
 type OIDCConfig struct {
 	// Issuer is the exact `iss` accepted tokens must carry
-	// (e.g. https://pivox.ngrok.app/realms/pivox). Empty leaves OIDC auth off
+	// (e.g. https://pivox.example/realms/pivox). Empty leaves OIDC auth off
 	// entirely (unauthenticated; dev/test only).
 	Issuer string
 
@@ -80,7 +80,7 @@ type OIDCConfig struct {
 // mounted at /mcp. Empty ResourceURL leaves the MCP surface off entirely.
 type MCPConfig struct {
 	// ResourceURL is the MCP server's canonical resource identifier and the
-	// audience its access tokens MUST carry (e.g. https://pivox.ngrok.app/mcp),
+	// audience its access tokens MUST carry (e.g. https://pivox.example/mcp),
 	// bound via a Keycloak mcp:* client scope + audience mapper. This audience is
 	// deliberately distinct from OIDCConfig.Audience — the anti-confusion boundary
 	// that stops a token minted for the main API from being replayed at /mcp, and

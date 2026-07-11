@@ -52,7 +52,7 @@ func TestNewTokenVerifier(t *testing.T) {
 		},
 		{
 			name:      "verification failure returns ErrInvalidToken",
-			verifyErr: errors.New(`oidc: token audience does not include "https://pivox.ngrok.app/mcp"`),
+			verifyErr: errors.New(`oidc: token audience does not include "https://pivox.example/mcp"`),
 			wantErrIs: auth.ErrInvalidToken,
 		},
 		{

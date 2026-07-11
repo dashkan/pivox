@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isTokenFresh, readSessionId, refreshSession, sessionClearCookie } from '@/server/oidc/session'
 import { deleteSession, getSession } from '@/server/oidc/session-store'
 
-/** Backend origin the BFF forwards to (e.g. https://pivox.ngrok.app). */
+/** Backend origin the BFF forwards to (e.g. https://pivox.example). */
 const BACKEND = process.env.PIVOX_API_URL
 
 // Client-spoofable / hop-by-hop request headers we never forward upstream. Envoy

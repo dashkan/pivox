@@ -26,7 +26,7 @@
 #   4. DENY-BY-DEFAULT: removes every OTHER client secret, IdP clientSecret, and
 #      smtp password so nothing real rides along. KC regenerates internal client
 #      secrets (e.g. admin-permissions) on import.
-#   5. Parameterizes the app URL: replaces the live host (https://pivox.ngrok.app)
+#   5. Parameterizes the app URL: replaces the live host (https://$PIVOX_HOSTNAME)
 #      with the ${IMPORT_KC_APP_URL} placeholder in every string value (audience
 #      mappers, IdP broker endpoints, redirect URIs, ...) so the baseline isn't
 #      pinned to one host; KC resolves it from env at --import-realm.
@@ -48,6 +48,12 @@
 # carry password hashes and are gitignored (see .gitignore), not committed.
 # Create dev users out of band (admin console / a seed), not via the baseline.
 set -euo pipefail
+
+# The live public host to strip out of the exports (replaced with the
+# ${IMPORT_KC_APP_URL} placeholder). Same host the running KC served on —
+# PIVOX_HOSTNAME (e.g. pivox.app) — so the committed baseline is never pinned
+# to a specific dev's domain. Required.
+: "${PIVOX_HOSTNAME:?set PIVOX_HOSTNAME to the public host to sanitize out}"
 cd "$(dirname "$0")"
 
 command -v jq >/dev/null 2>&1 || { echo "error: jq is required (brew install jq)" >&2; exit 1; }
@@ -146,7 +152,7 @@ sanitize pivox-realm.json '
       elif (.config | type == "object" and has("clientSecret")) and ((.config.clientSecret // "") | startswith("${IMPORT_KC_") | not) then del(.config.clientSecret)
       else . end) else . end)
   | (if (.smtpServer | type == "object" and has("password")) and ((.smtpServer.password // "") | startswith("${IMPORT_KC_") | not) then del(.smtpServer.password) else . end)
-  | walk(if type == "string" then gsub("https://pivox\\.ngrok\\.app"; "${IMPORT_KC_APP_URL}") else . end)
+  | walk(if type == "string" then gsub("https://" + (env.PIVOX_HOSTNAME | gsub("[.]"; "\\.")); "${IMPORT_KC_APP_URL}") else . end)
 '
 
 sanitize acme-realm.json '
@@ -163,7 +169,7 @@ sanitize acme-realm.json '
   | (if has("identityProviders") then .identityProviders |= map(
       if (.config | type == "object" and has("clientSecret")) and ((.config.clientSecret // "") | startswith("${IMPORT_KC_") | not) then del(.config.clientSecret) else . end) else . end)
   | (if (.smtpServer | type == "object" and has("password")) and ((.smtpServer.password // "") | startswith("${IMPORT_KC_") | not) then del(.smtpServer.password) else . end)
-  | walk(if type == "string" then gsub("https://pivox\\.ngrok\\.app"; "${IMPORT_KC_APP_URL}") else . end)
+  | walk(if type == "string" then gsub("https://" + (env.PIVOX_HOSTNAME | gsub("[.]"; "\\.")); "${IMPORT_KC_APP_URL}") else . end)
 '
 
 echo "done — review the diff before committing."

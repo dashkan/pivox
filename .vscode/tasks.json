@@ -100,25 +100,6 @@
         "panel": "shared"
       },
       "problemMatcher": []
-    },
-    {
-      "label": "Start ngrok",
-      "type": "shell",
-      "command": "ngrok",
-      "isBackground": true,
-      "args": [
-        "start",
-        "--config",
-        "${workspaceFolder}/configs/ngrok.yml",
-        "--all"
-      ],
-      "presentation": {
-        "echo": true,
-        "reveal": "always",
-        "focus": true,
-        "panel": "shared"
-      },
-      "problemMatcher": []
     }
   ]
 }

@@ -8,14 +8,14 @@
 # build target (-Dkeycloak.version) AND the runtime base image, so they can't
 # drift. Declared global (before any FROM) so the stage-2 FROM can interpolate
 # it, and re-declared inside each stage that needs it.
-ARG KC_VERSION=26.6.4
+ARG KC_VERSION=26.7.0
 ARG KAFKA_VERSION=4.3.1
 # PIVOX_KC_SPI_VERSION is the single knob for the SPI: it selects the git tag to
 # build (v$VERSION, a reproducible ref — not main/HEAD) AND the jar version
 # (-Drevision, since the pom uses ${revision}). Bump it to pull + bake a new SPI
 # release; the change busts the clone/build cache so the new tag is actually
 # fetched. Must match a pushed `v<version>` tag on dashkan/pivox-keycloak-spi.
-ARG PIVOX_KC_SPI_VERSION=1.0.1
+ARG PIVOX_KC_SPI_VERSION=1.0.3
 
 # --- Stage 1: build the SPI fat jar (KC 26 requires JDK 21) ---
 FROM maven:3.9-eclipse-temurin-21 AS spi

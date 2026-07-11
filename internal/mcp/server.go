@@ -47,7 +47,7 @@ type Config struct {
 	// minted for the main Pivox API from being replayed here. Required.
 	Verifier authn.Service
 	// ResourceURL is this server's canonical resource identifier and token
-	// audience, e.g. https://pivox.ngrok.app/mcp. Required.
+	// audience, e.g. https://pivox.example/mcp. Required.
 	ResourceURL string
 	// Issuer is the Keycloak realm issuer URL, advertised to clients as the
 	// authorization server in the Protected Resource Metadata. Required.
@@ -116,8 +116,8 @@ func NewHandler(cfg Config) http.Handler {
 		func(*http.Request) *mcpsdk.Server { return mcpServer },
 		&mcpsdk.StreamableHTTPOptions{
 			// This is a REMOTE MCP server: the process listens on loopback and sits
-			// behind envoy/ngrok, so every request legitimately arrives with
-			// Host=pivox.ngrok.app (non-loopback). The SDK's default DNS-rebinding
+			// behind envoy/the tunnel, so every request legitimately arrives with
+			// Host=pivox.example (non-loopback). The SDK's default DNS-rebinding
 			// guard rejects exactly that shape — loopback listener + non-loopback
 			// Host — with 403. That guard protects *local* MCP servers from a browser
 			// being DNS-rebound onto localhost; it does not fit a remote,

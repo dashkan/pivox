@@ -22,7 +22,7 @@ import { getSession } from './oidc/session-store';
 /**
  * Derive the Keycloak account-console URL from the configured issuer. The
  * account console lives at `{issuer}/account` (e.g.
- * `https://pivox.ngrok.app/realms/acme/account`), which the browser reaches via
+ * `https://pivox.example/realms/acme/account`), which the browser reaches via
  * the same envoy `/realms/` proxy used for SSO login.
  */
 function accountConsoleUrl(): string | null {
