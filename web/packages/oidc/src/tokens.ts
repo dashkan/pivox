@@ -6,13 +6,13 @@ import type { TokenEndpointResponse } from 'openid-client';
  * (the start BFF) or an encrypted blob on disk (the Electron main process)
  * without a codec.
  */
-export interface SessionTokens {
+export type SessionTokens = {
   access_token: string;
   refresh_token?: string;
   id_token?: string;
   /** Epoch milliseconds at which the access token expires. */
   expires_at: number;
-}
+};
 
 /** Refresh the access token when it's within this window of expiry. */
 export const EXPIRY_SKEW_MS = 30_000;

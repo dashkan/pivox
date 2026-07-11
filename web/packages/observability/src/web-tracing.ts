@@ -56,6 +56,12 @@ export function installWebTracing(config: WebTracingConfig): void {
 }
 
 async function setupWebTracing(config: WebTracingConfig): Promise<void> {
+  // `otlpTracesUrl` is guaranteed non-empty by installWebTracing's early return.
+  // Capturing + guarding it narrows the optional to `string` for the type system
+  // (the branch is unreachable) without an assertion, and the local survives the
+  // `await` below where property narrowing would not.
+  const otlpTracesUrl = config.otlpTracesUrl;
+  if (!otlpTracesUrl) return;
   try {
     const [
       { WebTracerProvider, BatchSpanProcessor, StackContextManager },
@@ -73,8 +79,7 @@ async function setupWebTracing(config: WebTracingConfig): Promise<void> {
       import('@opentelemetry/semantic-conventions'),
     ]);
 
-    // `otlpTracesUrl` is guaranteed non-empty by installWebTracing.
-    const url = resolveTracesUrl(config.otlpTracesUrl as string);
+    const url = resolveTracesUrl(otlpTracesUrl);
 
     const provider = new WebTracerProvider({
       resource: resourceFromAttributes({
@@ -107,7 +112,7 @@ async function setupWebTracing(config: WebTracingConfig): Promise<void> {
           // trace list and browser (CSR) spans are distinguishable from the
           // server (SSR) undici spans that share the `start` resource.
           applyCustomAttributesOnSpan: (span, request, result) => {
-            const url =
+            const spanUrl =
               result instanceof Response
                 ? result.url
                 : request instanceof Request
@@ -117,7 +122,7 @@ async function setupWebTracing(config: WebTracingConfig): Promise<void> {
               request instanceof Request
                 ? request.method
                 : (request.method ?? 'GET');
-            const name = httpSpanName(url, method);
+            const name = httpSpanName(spanUrl, method);
             if (name) span.updateName(`CSR ${name}`);
           },
         },

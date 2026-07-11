@@ -156,8 +156,25 @@ export async function refreshSession(id: string): Promise<SessionTokens> {
 
 // --- login transaction (PKCE + state) ---
 
+// Validates the deserialized TX cookie against the LoginTx shape. The cookie is
+// attacker-influenced (it round-trips through the browser), so the JSON boundary
+// is narrowed by runtime checks rather than an unchecked assertion.
+function isLoginTx(value: unknown): value is LoginTx {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'code_verifier' in value &&
+    typeof value.code_verifier === 'string' &&
+    'state' in value &&
+    typeof value.state === 'string' &&
+    'return_to' in value &&
+    typeof value.return_to === 'string'
+  )
+}
+
 export function readLoginTx(request: Request): LoginTx | undefined {
-  return readJsonCookie(request, TX_COOKIE) as LoginTx | undefined
+  const value = readJsonCookie(request, TX_COOKIE)
+  return isLoginTx(value) ? value : undefined
 }
 
 export function loginTxSetCookie(request: Request, tx: LoginTx): string {

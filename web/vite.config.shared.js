@@ -14,44 +14,25 @@
  *     `cjs: false` to tanstack; removing the branch slims this file ~40
  *     lines and removes a confusion vector.
  *
- * What's left mirrors tanstack: dts() for declaration generation,
- * externalizeDeps() for runtime-dep externalization, build.lib for
- * library mode with preserveModules.
+ * What's left mirrors tanstack: declaration generation (now via the
+ * native TS7 compiler — see vite-tsgo-dts.js), externalizeDeps() for
+ * runtime-dep externalization, build.lib for library mode with
+ * preserveModules.
  */
 
 import { defineConfig } from 'vite';
-import dts from 'unplugin-dts/vite';
 import { externalizeDeps } from './vite-externalize-deps.js';
-
-/**
- * Rewrites relative import specifiers in .d.ts output to include the
- * `.js` extension. Required for downstream consumers under
- * "moduleResolution": "Bundler" / "NodeNext" — TS resolves declaration
- * imports against the on-disk filename, not the bare specifier.
- *
- * @param {{ content: string }} args
- */
-function ensureImportFileExtension({ content }) {
-  content = content.replace(
-    /(im|ex)port\s[\w{}/*\s,]+from\s['"](?:\.\.?\/)+?[^.'"]+(?=['"];?)/gm,
-    '$&.js',
-  );
-  content = content.replace(
-    /import\(['"](?:\.\.?\/)+?[^.'"]+(?=['"];?)/gm,
-    '$&.js',
-  );
-  return content;
-}
+import { tsgoDts } from './vite-tsgo-dts.js';
 
 /**
  * @param {{
  *   entry: string | string[],
  *   srcDir: string,
  *   outDir?: string,
+ *   tsconfig?: string,
  *   externalDeps?: (string | RegExp)[],
  *   bundledDeps?: (string | RegExp)[],
  *   exclude?: string[],
- *   beforeWriteDeclarationFile?: (filePath: string, content: string) => string | undefined,
  * }} options
  */
 export function pivoxViteConfig(options) {
@@ -70,41 +51,17 @@ export function pivoxViteConfig(options) {
         include: options.externalDeps ?? [],
         except: options.bundledDeps ?? [],
       }),
-      dts({
-        // vite-plugin-dts v5 renamed `outDir` → `outDirs` (plural,
-        // single or array). Old `outDir` is silently ignored and the
-        // plugin defaults to emitting at `dist/` instead of
-        // `dist/esm/`, which breaks every consumer that resolves
-        // types via the `exports.types` paths in package.json.
-        outDirs: `${outDir}/esm`,
-        entryRoot: options.srcDir,
-        include: options.srcDir,
-        exclude: options.exclude,
-        compilerOptions: {
-          // ts.ModuleKind.ESNext === 99
-          module: 99,
-          declarationMap: false,
-        },
-        beforeWriteFile: (filePath, content) => {
-          content =
-            options.beforeWriteDeclarationFile?.(filePath, content) || content;
-          return {
-            filePath,
-            content: ensureImportFileExtension({ content }),
-          };
-        },
-        afterDiagnostic: (diagnostics) => {
-          if (diagnostics.length > 0) {
-            console.error('Please fix the above type errors');
-            // In the watch dev loop a type error — including a
-            // half-saved edit — must NOT kill the watcher: the process
-            // would stop rebuilding for the rest of the session and the
-            // package would silently go stale. Log and keep watching;
-            // the IDE + `test:types` + CI gate real errors. One-shot /
-            // CI / publish builds still hard-fail so bad types can't ship.
-            if (!isWatch) process.exit(1);
-          }
-        },
+      // Declarations emit into `${outDir}/esm` (mirroring the
+      // preserveModules JS layout) so consumers resolve types via the
+      // `exports.types` paths in package.json. tsgo does the emit; the
+      // plugin then rewrites `@/*` → relative + `.js`. Type checking is
+      // the `test:types` gate, so we emit with `--noCheck` for speed —
+      // in watch this also means a half-saved edit never kills the loop.
+      tsgoDts({
+        tsconfig: options.tsconfig ?? './tsconfig.json',
+        srcDir: options.srcDir,
+        outDir,
+        noCheck: true,
       }),
     ],
     build: {

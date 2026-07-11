@@ -48,10 +48,15 @@ function NavItem({
 
 export function App() {
   const { t } = useTranslation();
-  const claims = keycloak.tokenParsed as
-    | { name?: string; preferred_username?: string }
-    | undefined;
-  const displayName = claims?.name ?? claims?.preferred_username ?? "";
+  // KeycloakTokenParsed carries arbitrary claims via an index signature, so read
+  // the display claims and narrow each to a string.
+  const claims = keycloak.tokenParsed;
+  const name = typeof claims?.name === "string" ? claims.name : undefined;
+  const username =
+    typeof claims?.preferred_username === "string"
+      ? claims.preferred_username
+      : undefined;
+  const displayName = name ?? username ?? "";
 
   return (
     <div className="flex min-h-screen flex-col">

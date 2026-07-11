@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "jsx-a11y", "import", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/build/**",
+    "**/out/**",
+    "**/.output/**",
+    "**/node_modules/**",
+    "**/coverage/**",
+    "**/shadcn/**",
+    "**/vercel/**",
+    "packages/primitives/**",
+    "**/*.gen.{ts,tsx}",
+    "**/*.config.{js,ts,mjs,cjs}",
+    "**/*.config.*.{js,ts,mjs,cjs}",
+    "**/public/**",
+    "**/keycloak-theme/**"
+  ],
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "no-underscore-dangle": "off",
+    "import/no-unassigned-import": ["warn", { "allow": ["**/*.css"] }],
+    "typescript/no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrorsIgnorePattern": "^_" }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/tests/**"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off",
+        "no-unsafe-optional-chaining": "off"
+      }
+    }
+  ],
+  "env": { "builtin": true }
+}

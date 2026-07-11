@@ -16,6 +16,10 @@ import type {
 
 function isMacPlatform(): boolean {
   if (typeof navigator === 'undefined') return false;
+  // `navigator.userAgentData` (User-Agent Client Hints) is non-standard and
+  // absent from lib.dom's `Navigator`, so reading it requires asserting the
+  // shape at this untyped platform boundary.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- non-standard navigator.userAgentData is not in lib.dom's Navigator type
   const uaData = (navigator as { userAgentData?: { platform?: string } })
     .userAgentData;
   if (uaData?.platform) {
@@ -54,11 +58,12 @@ function createKeyHandler(
     const key = event.key.toLowerCase();
 
     // Ignore if focused on an input element
-    const target = event.target as HTMLElement;
+    const target = event.target;
     if (
-      target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA' ||
-      target.isContentEditable
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable)
     ) {
       return;
     }
@@ -174,7 +179,7 @@ export function useImageEditorFeature(
 
   // Register keyboard shortcuts
   useEffect(() => {
-    if (disableKeyboardShortcuts) return;
+    if (disableKeyboardShortcuts) return undefined;
     const handler = createKeyHandler(editorState.actions, isMac);
     document.addEventListener('keydown', handler);
     return () => {

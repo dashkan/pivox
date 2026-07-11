@@ -64,11 +64,11 @@ export function useOrgGate(input: { apiClient: ApiClient }): OrgGateState & {
   useEffect(() => {
     // Wait for auth to settle; the derived status reads 'loading'
     // while we do.
-    if (authLoading) return;
+    if (authLoading) return undefined;
     // No user — the surrounding auth gate (LoginFeature redirect,
     // etc.) drives the redirect to sign-in. The derived status reads
     // 'ready' so we don't block render.
-    if (!user) return;
+    if (!user) return undefined;
 
     let cancelled = false;
     void apiClient

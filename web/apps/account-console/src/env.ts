@@ -15,6 +15,7 @@ export type Environment = {
   referrerName?: string;
   referrerUrl?: string;
   features?: Features;
+  locale?: string;
 };
 
 export type Features = {
@@ -29,6 +30,7 @@ function readEnvironment(): Environment {
   const el = document.getElementById("environment");
   if (el?.textContent) {
     try {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Keycloak's index.ftl injects the environment as JSON in the `#environment` <script> tag; JSON.parse returns `any` at this DOM boundary and is guarded by the surrounding try/catch.
       return JSON.parse(el.textContent) as Environment;
     } catch {
       // fall through to defaults

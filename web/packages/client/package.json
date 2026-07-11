@@ -26,9 +26,9 @@
   "scripts": {
     "build": "vite build",
     "clean": "premove ./build ./dist",
-    "gen:types": "openapi-typescript ../../../api/openapi/v3/pivox.yaml --output ./src/generated/types.gen.ts",
+    "gen:types": "pnpm dlx openapi-typescript@7.13.0 ../../../api/openapi/v3/pivox.yaml --output ./src/generated/types.gen.ts",
     "test:build": "publint --strict",
-    "test:eslint": "eslint ./src",
+    "test:lint": "oxlint --type-aware ./src",
     "test:lib": "vitest --passWithNoTests",
     "test:lib:dev": "pnpm test:lib --watch",
     "test:types": "tsc && tsc -p tests/tsconfig.json"
@@ -48,7 +48,6 @@
   "devDependencies": {
     "@tanstack/react-query": "catalog:",
     "@types/react": "catalog:",
-    "openapi-typescript": "7.13.0",
     "react": "catalog:",
     "vite": "catalog:"
   },

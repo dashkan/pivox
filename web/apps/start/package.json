@@ -9,9 +9,9 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint ./src",
+    "lint": "oxlint --type-aware ./src",
     "test": "vitest run",
-    "test:eslint": "eslint ./src",
+    "test:lint": "oxlint --type-aware ./src",
     "test:types": "tsc"
   },
   "dependencies": {

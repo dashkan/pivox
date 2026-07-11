@@ -25,7 +25,7 @@ const DEFAULT_LOCALE = "en";
 
 type KeyValue = { key: string; value: string };
 
-const locale = (environment as { locale?: string }).locale || DEFAULT_LOCALE;
+const locale = environment.locale || DEFAULT_LOCALE;
 
 export const i18n = createInstance({
   lng: locale,
@@ -39,6 +39,7 @@ export const i18n = createInstance({
   backend: {
     loadPath: `${authServerUrl}/resources/${environment.realm}/account/{{lng}}`,
     parse(data: string) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- KC's theme resources endpoint serves the account message bundle as a JSON array of {key,value}; JSON.parse returns `any` at this fetch-backend boundary.
       const messages = JSON.parse(data) as KeyValue[];
       return Object.fromEntries(messages.map(({ key, value }) => [key, value]));
     },

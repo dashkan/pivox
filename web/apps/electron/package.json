@@ -7,11 +7,11 @@
   "homepage": "https://pivox.app",
   "scripts": {
     "format": "prettier --write .",
-    "lint": "eslint --cache .",
+    "lint": "oxlint --type-aware .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck:test": "tsc --noEmit -p tests/tsconfig.json --composite false",
-    "test:eslint": "pnpm lint",
+    "test:lint": "pnpm lint",
     "test:types": "pnpm typecheck",
     "test:lib": "vitest run",
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web && pnpm run typecheck:test",

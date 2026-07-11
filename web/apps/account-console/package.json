@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:types": "tsc --noEmit",
-    "test:eslint": "eslint ./src"
+    "test:lint": "oxlint --type-aware ./src"
   },
   "dependencies": {
     "@fontsource-variable/roboto": "catalog:",

@@ -140,11 +140,15 @@ function ImageEditorToolbar({
 /*  ResizeModePicker                                                  */
 /* ------------------------------------------------------------------ */
 
-const RESIZE_MODE_DESCRIPTIONS: Record<string, string> = {
+const RESIZE_MODE_DESCRIPTIONS: Record<ResizeMode, string> = {
   crop: 'Exact crop area, no scaling',
   cover: 'Scale to fill, crop overflow',
   fit: 'Scale to fit, may add bars',
 };
+
+function isResizeMode(value: string): value is ResizeMode {
+  return value in RESIZE_MODE_DESCRIPTIONS;
+}
 
 function ImageEditorResizeModePicker({ className }: { className?: string }) {
   const { state, actions } = useImageEditorContext();
@@ -156,7 +160,7 @@ function ImageEditorResizeModePicker({ className }: { className?: string }) {
       <Tabs
         value={state.resizeMode}
         onValueChange={(v) => {
-          actions.setResizeMode(v as ResizeMode);
+          if (isResizeMode(v)) actions.setResizeMode(v);
         }}
       >
         <TabsList>

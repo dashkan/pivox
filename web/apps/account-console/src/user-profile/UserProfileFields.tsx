@@ -95,7 +95,7 @@ function AttributeField({
   t: TFunction;
 }) {
   const annotations = (attribute.annotations ?? {});
-  const name = fieldName(attribute.name) as FieldName;
+  const name = fieldName(attribute.name);
   const inputType = determineInputType(attribute);
   const helper = asString(annotations.inputHelperTextBefore);
   const error = form.getFieldState(name, form.formState).error?.message;
@@ -337,6 +337,7 @@ function optionLabel(
   annotations: Annotations,
   value: string,
 ): string {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- KC UP attribute annotation `inputOptionLabels` is a string→string option-label map from the account REST metadata; annotations are typed `Record<string, unknown>` at this boundary.
   const labels = (annotations.inputOptionLabels ?? {}) as Record<string, string>;
   const prefix = asString(annotations.inputOptionLabelsI18nPrefix);
   return label(t, labels[value], value, prefix);

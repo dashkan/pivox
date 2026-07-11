@@ -17,18 +17,18 @@ type Tag = ((strings: TemplateStringsArray, ...values: unknown[]) => Promise<unk
 };
 
 const { factory, state } = vi.hoisted(() => {
-  const state: { calls: TaggedCall[]; results: unknown[][] } = { calls: [], results: [] };
+  const mockState: { calls: TaggedCall[]; results: unknown[][] } = { calls: [], results: [] };
   const tag: Tag = Object.assign(
     (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]> => {
-      state.calls.push({ text: Array.from(strings).join('?'), values });
-      return Promise.resolve(state.results.shift() ?? []);
+      mockState.calls.push({ text: Array.from(strings).join('?'), values });
+      return Promise.resolve(mockState.results.shift() ?? []);
     },
     // Mirrors postgres.js `sql.json(v)`: marks a value as a jsonb parameter so
     // the test can prove the token blob is bound, not string-interpolated.
     { json: (value: unknown) => ({ __json: value }) },
   );
-  const factory = vi.fn(() => tag);
-  return { factory, state };
+  const mockFactory = vi.fn(() => tag);
+  return { factory: mockFactory, state: mockState };
 });
 
 vi.mock('postgres', () => ({ default: factory }));

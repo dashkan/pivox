@@ -81,6 +81,22 @@ type ChangePayload = {
 };
 
 /**
+ * Narrows an arbitrary BroadcastChannel `MessageEvent.data` to a
+ * {@link ChangePayload}. What arrives is whatever anyone posted to the
+ * same channel name — stale cross-deploy tabs, third-party code — so the
+ * shape must be validated at runtime before use. Only `name` is required
+ * (the routing key); `value` is read defensively (`?? null`) downstream.
+ */
+function isChangePayload(data: unknown): data is ChangePayload {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'name' in data &&
+    typeof data.name === 'string'
+  );
+}
+
+/**
  * In-memory cache of the most-recently-seen raw value per item.
  * Populated by:
  *   - `notifyChange`, called from `operations.ts` after every local
@@ -225,19 +241,11 @@ function getChannel(): BroadcastChannel | null {
   // check below is the runtime narrowing back to ChangePayload.
   channel.addEventListener('message', (ev: MessageEvent<unknown>) => {
     try {
-      const data = ev.data;
       // Defensive: validate the payload shape before destructuring.
       // The `name` field is required; `value` may be string or null.
-      if (
-        data === null ||
-        typeof data !== 'object' ||
-        !('name' in data) ||
-        typeof data.name !== 'string'
-      ) {
-        return;
-      }
-      const payload = data as ChangePayload;
-      writeCache(payload.name, payload.value ?? null);
+      const data = ev.data;
+      if (!isChangePayload(data)) return;
+      writeCache(data.name, data.value ?? null);
     } catch (err) {
       console.error(
         '[@pivox/storage] channel-level cache update failed for payload:',
@@ -326,15 +334,8 @@ export function subscribeToChanges(
     // third-party code on the same channel name shouldn't crash the
     // per-subscriber handler.
     const data = ev.data;
-    if (
-      data === null ||
-      typeof data !== 'object' ||
-      !('name' in data) ||
-      typeof data.name !== 'string'
-    ) {
-      return;
-    }
-    if ((data as ChangePayload).name === itemName) handler();
+    if (!isChangePayload(data)) return;
+    if (data.name === itemName) handler();
   };
   ch.addEventListener('message', listener);
   return () => {

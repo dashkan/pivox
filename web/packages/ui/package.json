@@ -77,7 +77,7 @@
     "build": "vite build",
     "clean": "premove ./build ./dist",
     "test:build": "publint --strict",
-    "test:eslint": "eslint ./src",
+    "test:lint": "oxlint --type-aware ./src",
     "test:lib": "vitest --passWithNoTests",
     "test:lib:dev": "pnpm test:lib --watch",
     "test:types": "tsc"

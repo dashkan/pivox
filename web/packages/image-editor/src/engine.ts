@@ -154,6 +154,16 @@ function hitTestHandles(
 
 const CANVAS_PADDING = 16;
 
+/**
+ * Normalize a degree value to the nearest quarter turn. Arithmetic on the
+ * `0 | 90 | 180 | 270` rotation union widens to `number`, so this maps back
+ * to the union via literal branches — no unchecked assertion.
+ */
+function quarterTurn(deg: number): 0 | 90 | 180 | 270 {
+  const n = ((deg % 360) + 360) % 360;
+  return n === 90 ? 90 : n === 180 ? 180 : n === 270 ? 270 : 0;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Engine                                                            */
 /* ------------------------------------------------------------------ */
@@ -444,13 +454,17 @@ export class ImageEditorEngine {
   }
 
   rotateClockwise(): void {
-    const rotation = ((this._state.rotation + 90) % 360) as 0 | 90 | 180 | 270;
-    this.applyRotationChange(rotation, this._state.straighten);
+    this.applyRotationChange(
+      quarterTurn(this._state.rotation + 90),
+      this._state.straighten,
+    );
   }
 
   rotateCounterClockwise(): void {
-    const rotation = ((this._state.rotation + 270) % 360) as 0 | 90 | 180 | 270;
-    this.applyRotationChange(rotation, this._state.straighten);
+    this.applyRotationChange(
+      quarterTurn(this._state.rotation + 270),
+      this._state.straighten,
+    );
   }
 
   setStraighten(degrees: number): void {

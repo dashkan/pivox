@@ -166,7 +166,7 @@ function LoginCardPasswordInput({
   const containerRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container) return undefined;
     const raf = window.requestAnimationFrame(() => {
       const el = container.querySelector<HTMLInputElement>(
         'input[name="password"]',

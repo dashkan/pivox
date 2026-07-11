@@ -7,7 +7,7 @@ import {
 } from "@pivox/primitives/card";
 import { FieldError } from "@pivox/primitives/field";
 import { useEffect, useState } from "react";
-import { type Path, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 
 import { getPersonalInfo, RequestError, savePersonalInfo } from "@/api/account";
@@ -40,6 +40,7 @@ export function PersonalInfo() {
   useEffect(() => {
     getPersonalInfo()
       .then((info) => {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- KC account REST `/?userProfileMetadata=true` response carries this blob, typed `unknown` at the API boundary (UserRepresentation.userProfileMetadata).
         const meta = info.userProfileMetadata as ProfileMetadata | undefined;
         setMetadata(meta ?? null);
         // KC returns every attribute as a string[]; unwrap single-valued ones so
@@ -84,12 +85,12 @@ export function PersonalInfo() {
         // Read-only fields report `undefined` from RHF — skip them so we never
         // send `[null]` (KC ignores read-only on update anyway).
         if (v == null) continue;
-        const values = (Array.isArray(v) ? v : [v]).filter(
+        const fieldValues = (Array.isArray(v) ? v : [v]).filter(
           (s): s is string => typeof s === "string" && s !== "",
         );
         // Send even when empty so clearing an optional field persists, matching
         // KC's own console (which posts the full form).
-        attributes[debeerify(k)] = values;
+        attributes[debeerify(k)] = fieldValues;
       }
       await savePersonalInfo({ ...data, attributes });
       await keycloak.updateToken(30);
@@ -98,13 +99,12 @@ export function PersonalInfo() {
       setStatus("error");
       // KC returns field-level validation errors as JSON on 400 — surface them
       // under each field (like account-ui) instead of a bare status.
-      const data = err instanceof RequestError ? err.responseData : undefined;
-      if (data && typeof data === "object") {
+      const errorData = err instanceof RequestError ? err.responseData : undefined;
+      if (errorData && typeof errorData === "object") {
         applyServerErrors(
-          data,
+          errorData,
           (field, fieldError) => {
-            // fieldName() returns a string; narrow to RHF's field-path type.
-            form.setError(field as Path<UserProfileFormValues>, fieldError);
+            form.setError(field, fieldError);
           },
           t,
         );

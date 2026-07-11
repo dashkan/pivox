@@ -34,8 +34,8 @@ export async function handleLogout({ request }: { request: Request }): Promise<R
   // Origin != the internal request URL). SameSite=Lax already withholds the
   // session cookie on cross-site POST, so this is defense-in-depth.
   const self = new URL(request.url).origin
-  const origin = request.headers.get('origin')
-  const sameOrigin = origin === self || request.headers.get('sec-fetch-site') === 'same-origin'
+  const originHeader = request.headers.get('origin')
+  const sameOrigin = originHeader === self || request.headers.get('sec-fetch-site') === 'same-origin'
   if (!sameOrigin) return new Response('forbidden', { status: 403 })
 
   // Resolve the row for the id_token end-session hint, THEN delete it so

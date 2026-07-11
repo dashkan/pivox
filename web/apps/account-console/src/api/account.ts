@@ -54,7 +54,14 @@ export class RequestError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+// Like RequestInit, but restricts `headers` to a plain string map — every
+// caller in this module passes a plain object (never a Headers/array), so the
+// spread below stays a straightforward object merge.
+type JsonRequestInit = Omit<RequestInit, "headers"> & {
+  headers?: Record<string, string>;
+};
+
+async function request<T>(path: string, init?: JsonRequestInit): Promise<T> {
   const token = await freshToken();
   const res = await fetch(accountApiBase + path, {
     ...init,
@@ -62,7 +69,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers as Record<string, string> | undefined),
+      ...init?.headers,
     },
   });
   if (!res.ok) {
@@ -76,6 +83,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new RequestError(res.status, res.statusText, responseData);
   }
   const text = await res.text();
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- KC account REST response body: JSON.parse returns `any`, cast to the caller-declared T; there is no runtime schema validator for these responses.
   return (text ? JSON.parse(text) : undefined) as T;
 }
 

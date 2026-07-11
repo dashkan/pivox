@@ -78,6 +78,7 @@ export function AppShellOrgPicker() {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
+          {/* oxlint-disable jsx-a11y/prefer-tag-over-role -- SidebarMenuButton is a styled design-system component that cannot render as <output>; role="status" is the correct live-region role for this loading placeholder, paired with aria-busy + aria-label. */}
           <SidebarMenuButton
             size="lg"
             disabled
@@ -91,6 +92,7 @@ export function AppShellOrgPicker() {
               <Skeleton className="h-3 w-24" />
             </div>
           </SidebarMenuButton>
+          {/* oxlint-enable jsx-a11y/prefer-tag-over-role */}
         </SidebarMenuItem>
       </SidebarMenu>
     );

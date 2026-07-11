@@ -43,7 +43,13 @@ const STARTED = Symbol.for('pivox.nodeTracingStarted');
  * Set PIVOX_OTEL_DEBUG=1 for verbose SDK logging.
  */
 export function installNodeTracing(config: NodeTracingConfig = {}): void {
-  const globals = globalThis as unknown as Record<symbol, boolean>;
+  // The started flag lives on globalThis under a `Symbol.for` key so tracing
+  // dedups across duplicate module copies (multiple bundles / realms).
+  // globalThis has no symbol index signature in lib.dom, and a global
+  // augmentation for a computed Symbol.for key isn't expressible, so this global
+  // boundary is asserted.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- globalThis has no symbol index signature; augmenting it for a computed Symbol.for key is impractical
+  const globals = globalThis as Record<symbol, boolean>;
   if (globals[STARTED] || isTruthy(process.env.OTEL_SDK_DISABLED)) return;
 
   const tracesUrl =

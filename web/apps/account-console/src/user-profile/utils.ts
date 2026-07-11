@@ -3,6 +3,7 @@ import type {
   UserProfileMetadata,
 } from "@keycloak/keycloak-account-ui";
 import type { TFunction } from "i18next";
+import type { Path } from "react-hook-form";
 
 /**
  * User Profile rendering helpers, ported from Keycloak's ui-shared
@@ -71,8 +72,10 @@ export function debeerify(name: string): string {
 }
 
 /** The react-hook-form field path for an attribute. */
-export function fieldName(name?: string): string {
-  return `${isRootAttribute(name) ? "" : "attributes."}${beerify(name ?? "")}`;
+export function fieldName(name?: string): Path<UserProfileFormValues> {
+  const path = `${isRootAttribute(name) ? "" : "attributes."}${beerify(name ?? "")}`;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- react-hook-form's Path<> is a compile-time-only template-literal brand; this string is a valid UserProfileFormValues path (root name or `attributes.<beerified>`) but TS can't prove it from the template.
+  return path as Path<UserProfileFormValues>;
 }
 
 export type ServerFieldError = {
@@ -91,12 +94,18 @@ export type ServerFieldError = {
  */
 export function applyServerErrors(
   responseData: unknown,
-  setError: (field: string, error: { message: string; type: string }) => void,
+  setError: (
+    field: Path<UserProfileFormValues>,
+    error: { message: string; type: string },
+  ) => void,
   t: TFunction,
 ): void {
-  const errors =
-    (responseData as { errors?: ServerFieldError[] }).errors ??
-    [responseData as ServerFieldError];
+  // The KC 400 body is either `{ errors: ServerFieldError[] }` or a single
+  // ServerFieldError; the intersection lets us read `.errors` when present and
+  // otherwise wrap the body itself, without a second assertion.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- KC account REST 400 validation body; shape is documented on RequestError and there is no runtime schema validator for it.
+  const body = responseData as { errors?: ServerFieldError[] } & ServerFieldError;
+  const errors = body.errors ?? [body];
   for (const e of errors) {
     // KC's `params` array becomes positional interpolation values keyed by
     // index (0, 1, …); ${bundle.key} params are unwrapped + translated.
@@ -139,7 +148,10 @@ const INPUT_TYPES = [
 export type InputType = (typeof INPUT_TYPES)[number];
 
 function isInputType(value: unknown): value is InputType {
-  return INPUT_TYPES.includes(value as InputType);
+  return (
+    typeof value === "string" &&
+    (INPUT_TYPES as readonly string[]).includes(value)
+  );
 }
 
 /**

@@ -25,7 +25,6 @@
     "noErrorTruncation": true
   },
   "include": [
-    "eslint.config.js",
     "prettier.config.js",
     "scripts",
     "vitest.workspace.js"

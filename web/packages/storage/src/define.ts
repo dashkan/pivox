@@ -140,6 +140,11 @@ export function defineItem<T>(opts: {
     scope: opts.scope ?? 'device',
     ...(opts.onBoot ? { onBoot: opts.onBoot } : {}),
   });
+  // StorageItem<T> is invariant in T (T appears in parse's return AND onBoot's
+  // parameter), so StorageItem<T> is not assignable to StorageItem<unknown>. The
+  // registry only ever exposes T-independent read fields (name/path) to its
+  // consumers, so erasing T at this storage boundary is sound.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- StorageItem<T> is invariant in T; the registry only exposes T-independent fields to consumers
   registry.set(opts.name, item as StorageItem<unknown>);
   return item;
 }

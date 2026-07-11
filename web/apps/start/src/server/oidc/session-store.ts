@@ -47,14 +47,12 @@ let sqlInstance: postgres.Sql | undefined
 
 /**
  * Binds the token set as a jsonb parameter. `SessionTokens` is JSON-safe by
- * construction (string/number/optional fields only), but its interface type
- * lacks the index signature postgres.js's `json()` expects, so we cast at this
- * serialization boundary — deriving the exact expected type from the method
- * signature rather than naming an internal driver type.
+ * construction (string/number/optional fields only) and, being a type alias
+ * (not an interface), carries the implicit index signature postgres.js's
+ * `json()` parameter requires — so it binds directly with no assertion.
  */
-type JsonParam = Parameters<postgres.Sql['json']>[0]
 function jsonTokens(db: postgres.Sql, tokens: SessionTokens): ReturnType<postgres.Sql['json']> {
-  return db.json(tokens as unknown as JsonParam)
+  return db.json(tokens)
 }
 
 /**
