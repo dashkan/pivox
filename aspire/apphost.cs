@@ -286,6 +286,15 @@ var keycloak = builder
   // must match the ${...} placeholders in the realm JSONs EXACTLY (all use the
   // _CLIENT_ID / _CLIENT_SECRET form).
   .WithEnvironment("IMPORT_KC_APP_URL", Environment.GetEnvironmentVariable("IMPORT_KC_APP_URL") ?? "")
+  // Shared password for every dev user in the committed *-users-*.json baseline.
+  // The exports carry only a ${IMPORT_KC_DEV_PASSWORD} placeholder (no hashes —
+  // see configs/keycloak/sanitize-realms.sh); KC resolves it here and hashes it on
+  // import. Unset => the placeholder resolves to empty and the dev logins fail,
+  // which is the loud failure we want rather than a silently unusable realm.
+  .WithEnvironment(
+    "IMPORT_KC_DEV_PASSWORD",
+    Environment.GetEnvironmentVariable("IMPORT_KC_DEV_PASSWORD") ?? ""
+  )
   .WithEnvironment(
     "IMPORT_KC_START_CLIENT_ID",
     Environment.GetEnvironmentVariable("IMPORT_KC_START_CLIENT_ID") ?? ""

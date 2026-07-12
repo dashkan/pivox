@@ -1,4 +1,7 @@
-# Keycloak user exports carry password hashes — never commit them. The realm
-# CONFIG (sanitized via sanitize-realms.sh) is committed; dev users are created
-# out of band (admin console / seed), not from the baseline.
-*-users-*.json
+# Keycloak user exports ARE committed, but only after sanitize-realms.sh has
+# replaced every password credential with the ${IMPORT_KC_DEV_PASSWORD}
+# placeholder — a raw export carries argon2 password hashes and must never land
+# here. The scan in sanitize-realms.sh fails loud if a real credential survives.
+#
+# Nothing is ignored in this directory today. If you export by hand, run
+# sanitize-realms.sh BEFORE staging.

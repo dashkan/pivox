@@ -1,0 +1,145 @@
+{
+  "realm": "pivox",
+  "users": [
+    {
+      "attributes": {
+        "photoUrl": [
+          "https://lh3.googleusercontent.com/a/ACg8ocKn23cExKdQDwoET4xXfJdgC40GdAL3d_i0hLK_KUKof9DDi589bw=s96-c"
+        ]
+      },
+      "clientConsents": [
+        {
+          "clientId": "https://vscode.dev/oauth/client-metadata.json",
+          "createdDate": 1783756268915,
+          "grantedClientScopes": [
+            "email",
+            "https://vscode.dev/oauth/client-metadata.json",
+            "mcp:resources",
+            "mcp:tools",
+            "offline_access",
+            "organization",
+            "profile",
+            "roles"
+          ],
+          "lastUpdatedDate": 1783756268918
+        }
+      ],
+      "createdTimestamp": 1782631146358,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${IMPORT_KC_DEV_PASSWORD}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "email": "ashkan.daie@gmail.com",
+      "emailVerified": true,
+      "enabled": true,
+      "federatedIdentities": [
+        {
+          "identityProvider": "github",
+          "userId": "1415513",
+          "userName": "dashkan"
+        },
+        {
+          "identityProvider": "google",
+          "userId": "105545207471266148891",
+          "userName": "ashkan.daie@gmail.com"
+        }
+      ],
+      "firstName": "Ashkan",
+      "groups": [],
+      "id": "4814ec27-5e21-4756-ad98-e17f69c5a166",
+      "lastName": "Daie",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-pivox"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "ashkan.daie@gmail.com"
+    },
+    {
+      "createdTimestamp": 1783452280677,
+      "credentials": [],
+      "disableableCredentialTypes": [],
+      "email": "ashkan@acme.com",
+      "emailVerified": true,
+      "enabled": true,
+      "federatedIdentities": [
+        {
+          "identityProvider": "oidc.acme",
+          "userId": "3e6bcf8c-5042-4f05-8f66-2da8dd7d2dfd",
+          "userName": "ashkan@acme.com"
+        }
+      ],
+      "firstName": "Ashkan",
+      "groups": [],
+      "id": "c657427a-cbe7-479f-954d-d7b1e7256357",
+      "lastName": "Daie",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-pivox"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "ashkan@acme.com"
+    },
+    {
+      "attributes": {
+        "photoUrl": [
+          "https://lh3.googleusercontent.com/a/ACg8ocKTy5ub8Mv7BCAFflulL2IGz6wCwZuT3uVpaR9BFzZM_KZlp7E=s96-c"
+        ],
+        "test": [
+          "12"
+        ]
+      },
+      "createdTimestamp": 1782868444296,
+      "credentials": [],
+      "disableableCredentialTypes": [],
+      "email": "ashkan@eqdsoft.com",
+      "emailVerified": true,
+      "enabled": true,
+      "federatedIdentities": [
+        {
+          "identityProvider": "google",
+          "userId": "115040942975953011688",
+          "userName": "ashkan@eqdsoft.com"
+        }
+      ],
+      "firstName": "Ashkan",
+      "groups": [],
+      "id": "1a8f962f-f804-4bbb-be39-b873e7a09ac5",
+      "lastName": "Daie",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-pivox"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "ashkan@eqdsoft.com"
+    },
+    {
+      "clientRoles": {
+        "admin-permissions": [
+          "uma_protection"
+        ]
+      },
+      "createdTimestamp": 1782686199129,
+      "credentials": [],
+      "disableableCredentialTypes": [],
+      "emailVerified": false,
+      "enabled": true,
+      "groups": [],
+      "id": "6f15f611-64d4-4127-a5e7-e91bc44788f6",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-pivox"
+      ],
+      "requiredActions": [],
+      "serviceAccountClientId": "admin-permissions",
+      "totp": false,
+      "username": "service-account-admin-permissions"
+    }
+  ]
+}

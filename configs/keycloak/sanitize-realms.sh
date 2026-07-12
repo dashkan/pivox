@@ -36,17 +36,30 @@
 #      client, LDAP bindCredential, SAML signing key, etc.) can't silently leak;
 #      you'll be told the exact path to handle.
 #
+#   7. USER exports (*-users-*.json): replaces every password credential with a
+#      single ${IMPORT_KC_DEV_PASSWORD} placeholder, so the dev users can be
+#      committed alongside the realms instead of being recreated by hand on every
+#      fresh import.
+#
+#      A raw export writes passwords as argon2 hashes (secretData + credentialData
+#      + a per-credential id and createdDate). Committing those would put password
+#      hashes in the repo AND churn the diff on every re-export (fresh salt, fresh
+#      id, fresh timestamp). KC accepts a PLAINTEXT `value` on import and hashes it
+#      itself, so the whole credential array collapses to one deterministic entry —
+#      no secret, no churn. One shared dev password across all accounts is the
+#      deliberate trade (dev-only realms; the real value lives in .envrc).
+#
+#      Users with an EMPTY credentials array are left alone: those are
+#      federated-only identities (social / SSO), and minting a local password for
+#      them would change how they authenticate.
+#
 # The ${IMPORT_KC_*} names must match the apphost `withEnvironment` forwards and
 # the .envrc exports. The real values live only in .envrc.
 #
 # Idempotent: known clients are matched by their real clientId (rewritten to a
 # placeholder, so a re-run won't re-match); IdPs are matched by alias (not
 # rewritten, but re-applying the same placeholder is a no-op); del() on an absent
-# key is a no-op.
-#
-# NOTE: user exports (*-users-*.json) are intentionally NOT processed here — they
-# carry password hashes and are gitignored (see .gitignore), not committed.
-# Create dev users out of band (admin console / a seed), not via the baseline.
+# key is a no-op; the credential rewrite is a fixed value, so re-running is a no-op.
 set -euo pipefail
 
 # The live public host to strip out of the exports (replaced with the
@@ -71,14 +84,24 @@ trap cleanup EXIT INT TERM
 # webAuthnPolicyPasswordless*, resetCredentialsFlow, authenticatorConfig,
 # client.secret.creation.time, ...) are NOT false-flagged. Covers: client/idp
 # secrets, smtp password, LDAP bindCredential, SAML/key-provider private keys.
+#
+# The second clause covers the USER files. A KC export writes password hashes as
+# credentials[].secretData (caught by the first clause), but the sanitized form we
+# write instead is a plaintext credentials[].value — a key name generic enough that
+# the first clause would never flag it. Without this, pasting a real password into
+# a user credential would sail straight through the scan into the repo.
 LEAK_SCAN='
   [ paths(scalars) as $p
     | getpath($p)
     | select(type == "string" and . != "" and (startswith("${IMPORT_KC_") | not))
-    | select( ($p | map(strings)) | any(.[];
-          . == "secret" or . == "clientSecret" or . == "password"
-          or . == "bindCredential" or . == "secretData"
-          or test("private[._]?key$"; "i")) )
+    | select(
+        (($p | map(strings)) | any(.[];
+            . == "secret" or . == "clientSecret" or . == "password"
+            or . == "bindCredential" or . == "secretData"
+            or test("private[._]?key$"; "i")))
+        or
+        ((($p | map(strings)) | any(.[]; . == "credentials")) and (($p | last) == "value"))
+      )
     | ($p | map(tostring) | join(".")) ]
 '
 
@@ -171,5 +194,40 @@ sanitize acme-realm.json '
   | (if (.smtpServer | type == "object" and has("password")) and ((.smtpServer.password // "") | startswith("${IMPORT_KC_") | not) then del(.smtpServer.password) else . end)
   | walk(if type == "string" then gsub("https://" + (env.PIVOX_HOSTNAME | gsub("[.]"; "\\.")); "${IMPORT_KC_APP_URL}") else . end)
 '
+
+# --- user exports -------------------------------------------------------------
+# Collapse every password credential to the shared ${IMPORT_KC_DEV_PASSWORD}
+# placeholder. See item 7 in the header for why (no hashes in git, no diff churn).
+# Federated-only users (empty credentials) are left untouched.
+#
+# Globbed rather than named: the set of *-users-N.json files depends on what the
+# export produced (KC shards users across -0, -1, ... above a threshold), so
+# hardcoding names would silently skip a shard — and a skipped shard is a shard
+# full of password hashes going into the repo.
+# Only PASSWORD credentials are placeholdered. Any other credential type (otp,
+# webauthn, ...) is DROPPED rather than rewritten: replacing the whole array
+# wholesale would silently turn a user's OTP secret into a password, and keeping
+# it would commit real credential material. Dev realms have passwords only today —
+# this is here so that stays true if someone enrolls 2FA and re-exports.
+USERS_TRANSFORM='
+  (if has("users") then .users |= map(
+      .credentials = ((.credentials // [])
+        | map(select(.type == "password"))
+        | if length > 0
+            then [{"type": "password", "value": "${IMPORT_KC_DEV_PASSWORD}"}]
+            else [] end)) else . end)
+  | walk(if type == "string" then gsub("https://" + (env.PIVOX_HOSTNAME | gsub("[.]"; "\\.")); "${IMPORT_KC_APP_URL}") else . end)
+'
+
+shopt -s nullglob
+users_files=(*-users-*.json)
+shopt -u nullglob
+if [ ${#users_files[@]} -eq 0 ]; then
+  echo "warning: no *-users-*.json found — dev users will not be part of the baseline" >&2
+else
+  for f in "${users_files[@]}"; do
+    sanitize "$f" "$USERS_TRANSFORM"
+  done
+fi
 
 echo "done — review the diff before committing."

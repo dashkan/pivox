@@ -1,0 +1,186 @@
+{
+  "realm": "acme",
+  "users": [
+    {
+      "createdTimestamp": 1782764284450,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${IMPORT_KC_DEV_PASSWORD}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "email": "ardy@acme.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Ardy",
+      "groups": [],
+      "id": "04cc1df2-4cc9-4e2a-a261-fd6b59333ed8",
+      "lastName": "Daie",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-acme"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "ardy@acme.com"
+    },
+    {
+      "createdTimestamp": 1777521086239,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${IMPORT_KC_DEV_PASSWORD}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "email": "ashkan@acme.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Ashkan",
+      "groups": [],
+      "id": "3e6bcf8c-5042-4f05-8f66-2da8dd7d2dfd",
+      "lastName": "Daie",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-acme"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "ashkan@acme.com"
+    },
+    {
+      "createdTimestamp": 1782711505160,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${IMPORT_KC_DEV_PASSWORD}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "email": "emma@acme.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Emma",
+      "groups": [],
+      "id": "6214af82-ba7d-4236-b3c8-b7d260fb2b69",
+      "lastName": "Daie",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-acme"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "emma@acme.com"
+    },
+    {
+      "clientConsents": [
+        {
+          "clientId": "test",
+          "createdDate": 1783756268030,
+          "grantedClientScopes": [
+            "email",
+            "profile",
+            "roles",
+            "test"
+          ],
+          "lastUpdatedDate": 1783756268045
+        }
+      ],
+      "createdTimestamp": 1782792495119,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${IMPORT_KC_DEV_PASSWORD}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "email": "jane.doe@dateline.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Jane",
+      "groups": [],
+      "id": "4e629619-7e2c-4e1a-9fc1-2092ab11f649",
+      "lastName": "Doe",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-acme"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "jane.doe@dateline.com"
+    },
+    {
+      "createdTimestamp": 1782795656108,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${IMPORT_KC_DEV_PASSWORD}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "email": "john.doe@dateline.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "John",
+      "groups": [],
+      "id": "9f593491-7b3d-4899-9dce-1fddd850ed35",
+      "lastName": "Doe",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-acme"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "john.doe@dateline.com"
+    },
+    {
+      "createdTimestamp": 1782792442205,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${IMPORT_KC_DEV_PASSWORD}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "email": "john.doe@nbcuni.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "John",
+      "groups": [],
+      "id": "15575303-0fb5-4eee-976f-9c23fd726b17",
+      "lastName": "Doe",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-acme"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "john.doe@nbcuni.com"
+    },
+    {
+      "createdTimestamp": 1782780978709,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${IMPORT_KC_DEV_PASSWORD}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "email": "john@acme.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "John",
+      "groups": [],
+      "id": "50e47f26-f5b4-4adb-814c-1512cf682419",
+      "lastName": "Doe",
+      "notBefore": 0,
+      "realmRoles": [
+        "default-roles-acme"
+      ],
+      "requiredActions": [],
+      "totp": false,
+      "username": "john@acme.com"
+    }
+  ]
+}
