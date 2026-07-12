@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // stubHandler lets a test inject Handle failures by record value, and
@@ -32,8 +33,34 @@ func (s *stubHandler) Handle(_ context.Context, raw []byte) error {
 	return nil
 }
 
+// ctxCapturingHandler records the context its Handle was called with, so a test
+// can assert what actually reaches the handler (cancellation, span).
+type ctxCapturingHandler struct {
+	gotCtx context.Context
+}
+
+func (h *ctxCapturingHandler) Handle(ctx context.Context, _ []byte) error {
+	h.gotCtx = ctx
+	return nil
+}
+
 func newConsumerForTest(h eventHandler) *Consumer {
 	return &Consumer{handler: h, logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+}
+
+// newTracingConsumerForTest builds a Consumer on the REAL (non-nil tracer) path —
+// the one production takes. The offset-logic tests run with a nil tracer, which
+// short-circuits handle() before it touches the context, so they cannot catch
+// context-propagation bugs on this path.
+func newTracingConsumerForTest(h eventHandler, sr *tracetest.SpanRecorder) *Consumer {
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
+	return &Consumer{
+		handler:    h,
+		logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		tracer:     kotel.NewTracer(kotel.TracerProvider(tp)),
+		brokerHost: "localhost",
+		brokerPort: 9092,
+	}
 }
 
 func makeRecords(startOffset int64, values ...string) []*kgo.Record {
@@ -158,6 +185,62 @@ func TestProcessPartitionRecordsProcessSpanCarriesBrokerAddress(t *testing.T) {
 	}
 	assert.Equal(t, "localhost", attrs["server.address"].AsString())
 	assert.Equal(t, int64(9092), attrs["server.port"].AsInt64())
+}
+
+// The handler must run under the CALLER's context, not kotel's.
+//
+// kotel's WithProcessSpan takes only the record and starts its span from
+// rec.Context — a context.Background() that kotel's fetch hook populated with the
+// trace linkage. Adopting the context it returns would silently drop Run's
+// cancellation, leaving every Handle (and its DB writes) uncancellable: on
+// shutdown the worker would block until the write finished on its own, blow the
+// shutdown deadline, and get killed mid-write.
+//
+// So handle() keeps the caller's context and grafts the span onto it. Both
+// properties are asserted here: the handler sees the cancellation AND still runs
+// under the process span, so its own spans nest beneath it.
+func TestHandleRunsHandlerUnderCallerContext(t *testing.T) {
+	t.Parallel()
+
+	sr := tracetest.NewSpanRecorder()
+	h := &ctxCapturingHandler{}
+	c := newTracingConsumerForTest(h, sr)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // caller is already shutting down
+
+	require.NoError(t, c.handle(ctx, makeRecords(10, "A")[0]))
+	require.NotNil(t, h.gotCtx)
+
+	// Cancellation reaches the handler.
+	assert.ErrorIs(t, h.gotCtx.Err(), context.Canceled)
+
+	// ...and the process span is still the handler's parent span.
+	spans := sr.Ended()
+	require.Len(t, spans, 1)
+	assert.Equal(t, spans[0].SpanContext().SpanID(), trace.SpanContextFromContext(h.gotCtx).SpanID())
+}
+
+// A cancelled context stops the batch cleanly: the handled prefix stays
+// committable, and the remaining records are neither handled nor treated as
+// failures. Without this, shutdown would run every in-flight record through
+// Handle with a cancelled context and log each resulting error as a partition
+// rewind — turning a clean stop into an error storm.
+func TestProcessPartitionRecordsStopsOnCancelledContext(t *testing.T) {
+	t.Parallel()
+
+	sr := tracetest.NewSpanRecorder()
+	h := &stubHandler{}
+	c := newTracingConsumerForTest(h, sr)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	committable, _, failed := c.processPartitionRecords(ctx, makeRecords(10, "A", "B"))
+
+	assert.False(t, failed, "cancellation is not a handler failure — must not rewind")
+	assert.Empty(t, committable)
+	assert.Empty(t, h.handled, "no record should be handled after cancellation")
 }
 
 // Each attempted record gets a kotel "process" span; a failed Handle records the

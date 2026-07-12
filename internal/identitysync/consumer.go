@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -230,6 +231,14 @@ func (c *Consumer) Run(ctx context.Context) error {
 // after the failed one are left unprocessed; they replay after the rewind.
 func (c *Consumer) processPartitionRecords(ctx context.Context, recs []*kgo.Record) (committable []*kgo.Record, rewindTo int64, failed bool) {
 	for _, rec := range recs {
+		// Stop cleanly on shutdown. Cancellation is not a handler failure: rewinding
+		// would be pointless (we're closing the client) and every remaining record
+		// would otherwise be run through Handle with a dead context and logged as a
+		// partition rewind, turning a clean stop into an error storm. The prefix
+		// handled so far stays committable; the rest simply redeliver next start.
+		if ctx.Err() != nil {
+			return committable, 0, false
+		}
 		if err := c.handle(ctx, rec); err != nil {
 			c.logger.ErrorContext(ctx, "identitysync: handle failed; rewinding partition to retry",
 				"topic", rec.Topic, "partition", rec.Partition, "offset", rec.Offset, "error", err)
@@ -251,8 +260,19 @@ func (c *Consumer) handle(ctx context.Context, rec *kgo.Record) error {
 	if c.tracer == nil {
 		return c.handler.Handle(ctx, rec.Value)
 	}
-	ctx, span := c.tracer.WithProcessSpan(rec)
+	// Deliberately discard the context kotel hands back. WithProcessSpan takes only
+	// the record and starts the span from rec.Context — a context.Background() that
+	// kotel's fetch hook filled with the trace linkage. Adopting it would drop the
+	// caller's cancellation, so Handle (and every DB write under it) would become
+	// uncancellable: on shutdown Run couldn't return until the write finished on its
+	// own, blowing the shutdown deadline and getting killed mid-write.
+	//
+	// The span's parent is already fixed at Start time from rec.Context, so grafting
+	// it onto our ctx keeps the trace intact (handler spans still nest beneath it)
+	// while restoring cancellation.
+	_, span := c.tracer.WithProcessSpan(rec)
 	defer span.End()
+	ctx = trace.ContextWithSpan(ctx, span)
 	// Name the peer. kotel sets only messaging.* attributes, so the trace UI has
 	// no address to resolve the broker by; stamping it makes Kafka render as its
 	// own node rather than the spans hanging off this process.
