@@ -686,6 +686,23 @@
   },
   "clientScopes": [
     {
+      "attributes": {},
+      "description": "AuthnContextClassRef Level of Authentiation",
+      "id": "25a5331d-0a97-405f-9cdd-039e6a22f544",
+      "name": "AuthnContextClassRef",
+      "protocol": "saml",
+      "protocolMappers": [
+        {
+          "config": {},
+          "consentRequired": false,
+          "id": "b30a9e38-94db-4bba-b2c1-64eabed18829",
+          "name": "AuthnContextClassRef",
+          "protocol": "saml",
+          "protocolMapper": "saml-authn-context-class-ref-mapper"
+        }
+      ]
+    },
+    {
       "attributes": {
         "display.on.consent.screen": "false",
         "include.in.token.scope": "false"
@@ -1389,7 +1406,7 @@
         "oauth2.jwt.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "+##${IMPORT_KC_APP_URL}/realms/pivox/broker/oidc.acme/endpoint/logout_response",
+        "post.logout.redirect.uris": "+##/realms/pivox/broker/oidc.acme/endpoint/logout_response",
         "realm_client": "false",
         "standard.token.exchange.enabled": "false"
       },
@@ -1427,9 +1444,9 @@
       "protocol": "openid-connect",
       "publicClient": false,
       "redirectUris": [
-        "${IMPORT_KC_APP_URL}/realms/pivox/broker/oidc.acme/endpoint"
+        "/realms/pivox/broker/oidc.acme/endpoint"
       ],
-      "rootUrl": "",
+      "rootUrl": "${authBaseUrl}",
       "secret": "${IMPORT_KC_IDP_OIDC_ACME_CLIENT_SECRET}",
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
@@ -1590,6 +1607,7 @@
     {
       "alwaysDisplayInConsole": false,
       "attributes": {
+        "client.secret.creation.time": "1783756267",
         "post.logout.redirect.uris": "+",
         "realm_client": "true"
       },
@@ -1633,6 +1651,7 @@
     {
       "alwaysDisplayInConsole": false,
       "attributes": {
+        "client.secret.creation.time": "1783756267",
         "post.logout.redirect.uris": "+",
         "realm_client": "true"
       },
@@ -1801,9 +1820,7 @@
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
       "surrogateAuthRequired": false,
-      "webOrigins": [
-        ""
-      ]
+      "webOrigins": []
     }
   ],
   "components": {
@@ -1916,6 +1933,7 @@
     ]
   },
   "defaultDefaultClientScopes": [
+    "AuthnContextClassRef",
     "acr",
     "basic",
     "email",
@@ -1961,7 +1979,7 @@
   "identityProviderMappers": [],
   "identityProviders": [],
   "internationalizationEnabled": false,
-  "keycloakVersion": "26.6.4",
+  "keycloakVersion": "26.7.0",
   "localizationTexts": {},
   "loginTheme": "",
   "loginWithEmailAllowed": true,
@@ -1999,15 +2017,6 @@
   "rememberMe": true,
   "requiredActions": [
     {
-      "alias": "CONFIGURE_TOTP",
-      "config": {},
-      "defaultAction": false,
-      "enabled": true,
-      "name": "Configure OTP",
-      "priority": 10,
-      "providerId": "CONFIGURE_TOTP"
-    },
-    {
       "alias": "TERMS_AND_CONDITIONS",
       "config": {},
       "defaultAction": false,
@@ -2015,15 +2024,6 @@
       "name": "Terms and Conditions",
       "priority": 20,
       "providerId": "TERMS_AND_CONDITIONS"
-    },
-    {
-      "alias": "UPDATE_PASSWORD",
-      "config": {},
-      "defaultAction": false,
-      "enabled": true,
-      "name": "Update Password",
-      "priority": 30,
-      "providerId": "UPDATE_PASSWORD"
     },
     {
       "alias": "UPDATE_PROFILE",
@@ -2042,6 +2042,24 @@
       "name": "Verify Email",
       "priority": 50,
       "providerId": "VERIFY_EMAIL"
+    },
+    {
+      "alias": "CONFIGURE_TOTP",
+      "config": {},
+      "defaultAction": false,
+      "enabled": true,
+      "name": "Configure OTP",
+      "priority": 54,
+      "providerId": "CONFIGURE_TOTP"
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "config": {},
+      "defaultAction": false,
+      "enabled": true,
+      "name": "Update Password",
+      "priority": 57,
+      "providerId": "UPDATE_PASSWORD"
     },
     {
       "alias": "delete_account",
@@ -2277,6 +2295,15 @@
           "clientRole": true,
           "composite": false,
           "containerId": "2c1e1363-37af-4113-95dd-61b022643ea9",
+          "description": "${role_manage-organizations}",
+          "id": "d2ff625e-390b-48e7-acd1-0d3c83e2870a",
+          "name": "manage-organizations"
+        },
+        {
+          "attributes": {},
+          "clientRole": true,
+          "composite": false,
+          "containerId": "2c1e1363-37af-4113-95dd-61b022643ea9",
           "description": "${role_manage-realm}",
           "id": "f18697bd-8566-49de-884b-6a1523a09fb8",
           "name": "manage-realm"
@@ -2313,6 +2340,15 @@
           "clientRole": true,
           "composite": false,
           "containerId": "2c1e1363-37af-4113-95dd-61b022643ea9",
+          "description": "${role_query-organizations}",
+          "id": "82fb3fe5-b5e0-4a8f-b5ac-6726ae8612af",
+          "name": "query-organizations"
+        },
+        {
+          "attributes": {},
+          "clientRole": true,
+          "composite": false,
+          "containerId": "2c1e1363-37af-4113-95dd-61b022643ea9",
           "description": "${role_query-realms}",
           "id": "8be2aa41-0c6f-4a08-8507-0f8e00e8e0de",
           "name": "query-realms"
@@ -2339,16 +2375,19 @@
                 "manage-clients",
                 "manage-events",
                 "manage-identity-providers",
+                "manage-organizations",
                 "manage-realm",
                 "manage-users",
                 "query-clients",
                 "query-groups",
+                "query-organizations",
                 "query-realms",
                 "query-users",
                 "view-authorization",
                 "view-clients",
                 "view-events",
                 "view-identity-providers",
+                "view-organizations",
                 "view-realm",
                 "view-users"
               ]
@@ -2401,6 +2440,22 @@
           "description": "${role_view-identity-providers}",
           "id": "5ab654f7-b753-4a25-b887-6df522ac8337",
           "name": "view-identity-providers"
+        },
+        {
+          "attributes": {},
+          "clientRole": true,
+          "composite": true,
+          "composites": {
+            "client": {
+              "realm-management": [
+                "query-organizations"
+              ]
+            }
+          },
+          "containerId": "2c1e1363-37af-4113-95dd-61b022643ea9",
+          "description": "${role_view-organizations}",
+          "id": "a7290138-2380-4351-8230-2e4578ed4a7e",
+          "name": "view-organizations"
         },
         {
           "attributes": {},
@@ -2506,6 +2561,7 @@
   "webAuthnPolicyPasswordlessCreateTimeout": 0,
   "webAuthnPolicyPasswordlessExtraOrigins": [],
   "webAuthnPolicyPasswordlessRequireResidentKey": "not specified",
+  "webAuthnPolicyPasswordlessResidentKey": "required",
   "webAuthnPolicyPasswordlessRpEntityName": "keycloak",
   "webAuthnPolicyPasswordlessRpId": "",
   "webAuthnPolicyPasswordlessSignatureAlgorithms": [
@@ -2514,6 +2570,7 @@
   ],
   "webAuthnPolicyPasswordlessUserVerificationRequirement": "not specified",
   "webAuthnPolicyRequireResidentKey": "not specified",
+  "webAuthnPolicyResidentKey": "not specified",
   "webAuthnPolicyRpEntityName": "keycloak",
   "webAuthnPolicyRpId": "",
   "webAuthnPolicySignatureAlgorithms": [
