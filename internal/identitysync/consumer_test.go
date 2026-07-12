@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kotel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -89,6 +90,74 @@ func TestProcessPartitionRecords(t *testing.T) {
 		assert.Empty(t, committable)
 		assert.Equal(t, []string{"A"}, h.handled)
 	})
+}
+
+// splitBroker feeds the server.address/server.port span attributes, and the trace
+// UI resolves the Kafka peer by matching those against the broker's real address.
+// So the parse must agree with what franz-go actually DIALS — including its
+// default-to-9092 for a portless seed. Reporting port 0 there would silently break
+// peer resolution (Kafka stops rendering as its own node), which is the one thing
+// this attribute exists to do.
+func TestSplitBroker(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		broker   string
+		wantHost string
+		wantPort int
+	}{
+		{name: "host and port", broker: "localhost:9092", wantHost: "localhost", wantPort: 9092},
+		{name: "non-default port", broker: "kafka:9093", wantHost: "kafka", wantPort: 9093},
+		// franz-go defaults a portless seed to 9092; report what it dials, not 0.
+		{name: "no port", broker: "kafka", wantHost: "kafka", wantPort: defaultBrokerPort},
+		{name: "ipv6 with port", broker: "[::1]:9092", wantHost: "::1", wantPort: 9092},
+		{name: "ipv6 bare", broker: "::1", wantHost: "::1", wantPort: defaultBrokerPort},
+		{name: "ipv6 bracketed, no port", broker: "[2001:db8::1]", wantHost: "2001:db8::1", wantPort: defaultBrokerPort},
+		// Unreachable in practice — kgo.NewClient rejects it before the consumer is
+		// built — but the parse must not invent a bogus port if it ever gets here.
+		{name: "non-numeric port", broker: "localhost:kafka", wantHost: "localhost", wantPort: defaultBrokerPort},
+		{name: "empty", broker: "", wantHost: "", wantPort: defaultBrokerPort},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			host, port := splitBroker(tt.broker)
+			assert.Equal(t, tt.wantHost, host)
+			assert.Equal(t, tt.wantPort, port)
+		})
+	}
+}
+
+// The process span carries the broker as server.address/server.port. kotel emits
+// only messaging.* attributes — no peer address — so without this the trace UI
+// can't resolve the broker to its own node and the spans just hang off the
+// worker.
+func TestProcessPartitionRecordsProcessSpanCarriesBrokerAddress(t *testing.T) {
+	t.Parallel()
+
+	sr := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
+	c := &Consumer{
+		handler:    &stubHandler{},
+		logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		tracer:     kotel.NewTracer(kotel.TracerProvider(tp)),
+		brokerHost: "localhost",
+		brokerPort: 9092,
+	}
+
+	_, _, failed := c.processPartitionRecords(context.Background(), makeRecords(10, "A"))
+	require.False(t, failed)
+
+	spans := sr.Ended()
+	require.Len(t, spans, 1)
+
+	attrs := make(map[attribute.Key]attribute.Value, len(spans[0].Attributes()))
+	for _, a := range spans[0].Attributes() {
+		attrs[a.Key] = a.Value
+	}
+	assert.Equal(t, "localhost", attrs["server.address"].AsString())
+	assert.Equal(t, int64(9092), attrs["server.port"].AsInt64())
 }
 
 // Each attempted record gets a kotel "process" span; a failed Handle records the

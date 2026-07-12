@@ -260,16 +260,25 @@ var keycloak = builder
     "REGISTER,UPDATE_PROFILE,UPDATE_EMAIL,DELETE_ACCOUNT,LOGIN,LOGOUT"
   )
   // Trace the KC->Kafka producer. The SPI maps KAFKA_INTERCEPTOR_CLASS to the
-  // producer's interceptor.classes; the OTel TracingProducerInterceptor (bundled
-  // in the SPI jar v1.0.2+) opens a produce span + injects W3C traceparent into
-  // the record headers, so the worker's identity-sync consume span links to the
-  // originating KC event as one distributed trace. It binds KC's Quarkus-OTel
-  // GlobalOpenTelemetry (the api ships on lib/main; the SPI bundles only the
-  // kafka-clients instrumentation, not a duplicate api).
+  // producer's interceptor.classes. PivoxTracingProducerInterceptor opens the
+  // PRODUCER span + injects W3C traceparent into the record headers, so the
+  // worker's identity-sync consume span links back to the originating KC request
+  // as one distributed trace. It binds KC's Quarkus-OTel GlobalOpenTelemetry (the
+  // api ships on lib/main; the SPI bundles no duplicate copy).
   .WithEnvironment(
     "KAFKA_INTERCEPTOR_CLASS",
-    "io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor"
+    "com.github.snuk87.keycloak.kafka.PivoxTracingProducerInterceptor"
   )
+  // The span's reported peer. KC dials the broker over the container network
+  // (kafka:9093), but Aspire only knows kafka's HOST endpoint (localhost:9092) —
+  // and the dashboard resolves a span's peer by matching server.address:port
+  // against a resource's registered endpoints. Reporting the host address is what
+  // makes Kafka render as its own node instead of the spans hanging off Keycloak.
+  // This is span METADATA only — the producer still connects to kafka:9093. In prod
+  // both ends share one broker address and the override is unnecessary (the SPI
+  // then falls back to parsing bootstrap.servers).
+  .WithEnvironment("KAFKA_SPAN_SERVER_ADDRESS", "localhost")
+  .WithEnvironment("KAFKA_SPAN_SERVER_PORT", "9092")
   // Secrets/IDs referenced by the realm-import JSON via ${...} placeholders (the
   // committed realm files carry no plaintext secrets). Forwarded 1:1 from .envrc
   // into the container so KC can resolve them on --import-realm. The IMPORT_

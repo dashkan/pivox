@@ -4,11 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kotel"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 )
 
@@ -43,6 +47,13 @@ type Consumer struct {
 	// tracer opens a per-record "process" span around each Handle. Nil in the
 	// offset-logic tests that build Consumer directly (handle() falls through).
 	tracer *kotel.Tracer
+	// brokerHost/brokerPort label each process span with the peer this consumer
+	// reads from (server.address/server.port). kotel emits only messaging.*
+	// attributes — no peer address — so without these the trace UI has nothing to
+	// resolve the broker against, and the consume spans just hang off the worker
+	// instead of showing Kafka as its own node. Derived from the seed broker.
+	brokerHost string
+	brokerPort int
 }
 
 // ConsumerConfig configures Consumer. All fields are required.
@@ -96,12 +107,49 @@ func NewConsumer(cfg ConsumerConfig) (*Consumer, error) {
 		return nil, fmt.Errorf("identitysync: new kafka client: %w", err)
 	}
 
+	brokerHost, brokerPort := splitBroker(cfg.Brokers[0])
+
 	return &Consumer{
-		client:  client,
-		handler: cfg.Handler,
-		logger:  cfg.Logger,
-		tracer:  tracer,
+		client:     client,
+		handler:    cfg.Handler,
+		logger:     cfg.Logger,
+		tracer:     tracer,
+		brokerHost: brokerHost,
+		brokerPort: brokerPort,
 	}, nil
+}
+
+// defaultBrokerPort mirrors franz-go's own default for a seed broker given
+// without a port (kgo's parseBrokerAddr). splitBroker must report the address the
+// client actually DIALS, not the string it was handed — see below.
+const defaultBrokerPort = 9092
+
+// splitBroker splits a seed broker into the host/port reported as the
+// server.address/server.port span attributes.
+//
+// This must agree with what franz-go dials, because the trace UI resolves the
+// Kafka peer by matching these attributes against the broker's real address. A
+// disagreement doesn't error — it silently fails to resolve, and Kafka stops
+// rendering as its own node, defeating the only reason these attributes exist.
+// So: a portless seed reports :9092 (franz-go's default), not port 0, and IPv6
+// literals are unwrapped from their brackets to the bare address form the
+// attribute wants.
+//
+// Instrumentation must never break consumption, so anything unparsable degrades
+// to (raw address, default port) rather than erroring. Such input can't reach
+// here anyway — kgo.NewClient rejects it before the consumer is constructed.
+func splitBroker(broker string) (host string, port int) {
+	h, p, err := net.SplitHostPort(broker)
+	if err != nil {
+		// No port at all, or a bare IPv6 literal ("::1" — SplitHostPort reads the
+		// colons as a malformed port). Either way franz-go supplies :9092.
+		return strings.Trim(broker, "[]"), defaultBrokerPort
+	}
+	n, err := strconv.Atoi(p)
+	if err != nil {
+		return h, defaultBrokerPort
+	}
+	return h, n
 }
 
 // Run polls Kafka until ctx is cancelled, dispatching each record to the
@@ -205,6 +253,13 @@ func (c *Consumer) handle(ctx context.Context, rec *kgo.Record) error {
 	}
 	ctx, span := c.tracer.WithProcessSpan(rec)
 	defer span.End()
+	// Name the peer. kotel sets only messaging.* attributes, so the trace UI has
+	// no address to resolve the broker by; stamping it makes Kafka render as its
+	// own node rather than the spans hanging off this process.
+	span.SetAttributes(
+		attribute.String("server.address", c.brokerHost),
+		attribute.Int("server.port", c.brokerPort),
+	)
 	err := c.handler.Handle(ctx, rec.Value)
 	if err != nil {
 		span.RecordError(err)
