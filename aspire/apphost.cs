@@ -7,7 +7,6 @@
 #:sdk Aspire.AppHost.Sdk@13.4.6
 
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using Aspire.Hosting.ApplicationModel;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -89,7 +88,7 @@ var sessionsDatabaseUrl = sessionsDb.Resource.UriExpression;
 // Receives OTLP and forwards to the Aspire dashboard — crucially it handles the
 // dashboard's dynamic endpoint + rotating API key for us (the part the TS
 // AppHost can't reach directly). forceNonSecureReceiver: plaintext receiver so
-// the rustfs + envoy CONTAINERS can push spans without TLS/keys. A fixed
+// the rustfs + agentgateway CONTAINERS can push spans without TLS/keys. A fixed
 // container-network alias lets them target it at otel-collector:4317 (gRPC) /
 // :4318 (HTTP). Declared early so resources that export to it can waitFor it.
 var otelCollector = builder
@@ -101,7 +100,7 @@ var otelCollector = builder
       // tag (pull is denied). Point at the Docker Hub contrib image instead,
       // pinned to a concrete version for reproducibility (a re-pulled `latest`
       // can ship a config-schema change that fails collector startup — and
-      // envoy waitFor()s the collector, so that would wedge the ingress).
+      // the ingress waitFor()s the collector, so that would wedge it).
       settings.Registry = "docker.io";
       settings.Image = "otel/opentelemetry-collector-contrib";
       settings.CollectorTag = "0.154.0";
@@ -166,9 +165,11 @@ var kafka = builder
   // Persist broker data across restarts (KRaft log + topics/messages) — without
   // this a restart wipes all events.
   .WithDataVolume()
-  // Kafka UI for validation, ingressed by envoy at /kafka. SERVER_SERVLET_CONTEXT_PATH
+  // Kafka UI for dev validation, ingressed at /kafka. SERVER_SERVLET_CONTEXT_PATH
   // makes the (Spring Boot) UI serve under /kafka so its asset URLs resolve through
-  // the proxy without a rewrite; envoy reaches it via the container alias.
+  // the proxy without a rewrite; the gateway reaches it via the container alias.
+  // DEV ONLY — it is unauthenticated and browses the keycloak identity-event topics.
+  // The ingress route carries a matching "never in prod" warning; see /kafka there.
   .WithKafkaUI((ui) =>
   {
     ui.WithContainerNetworkAlias("kafka-ui")
@@ -365,7 +366,7 @@ var keycloak = builder
 
 // --- api (pivox-cloud) — host process, binds its own ports ---
 // Override the service gRPC listener to all-interfaces. The default
-// 127.0.0.1:50052 is loopback-only and unreachable from the envoy CONTAINER
+// 127.0.0.1:50052 is loopback-only and unreachable from the ingress CONTAINER
 // via host.docker.internal (which routes to the host gateway, not loopback).
 var api = builder
   .AddGoApp("api", "../cmd/pivox-cloud")
@@ -382,7 +383,7 @@ var api = builder
   .WaitFor(keycloak);
 
 // --- worker (pivox-worker) — host process, River-backed periodic jobs ---
-// Mirrors the `make air-worker` leg of the dev target. No envoy-facing port;
+// Mirrors the `make air-worker` leg of the dev target. No ingress-facing port;
 // it only needs the DB. River runs its own (idempotent) migrations on start.
 builder
   .AddGoApp("worker", "../cmd/pivox-worker")
@@ -405,7 +406,7 @@ builder
 // config is pinned here (moving config into the AppHost over direnv):
 //   - PIVOX_TOKEN: the seeded `local` gateway's registration token
 //     (scripts/seeds/11_local_corp.sql).
-//   - PIVOX_PORT: envoy's storage_agent cluster targets :8083 (agent
+//   - PIVOX_PORT: the gateway's storage_agent backend targets :8083 (agent
 //     default is 443).
 // PIVOX_CLOUD_HOST / PIVOX_PLAINTEXT still come from direnv (the agent
 // connects to the cloud AgentService over that). Serves /files/.
@@ -418,18 +419,29 @@ builder
 // scripts/seeds/11_local_corp.sql), but api already waits for pivox-db, so waiting
 // on api covers the seed transitively AND expresses the real edge: the agent's
 // first action is to open a control stream to the API.
-// PIVOX_AGENT_STATE_DIR / PIVOX_AGENT_CACHE_DIR come from direnv, not from here.
-// The agent's defaults (/var/lib/pivox/*) are correct for a real Linux install and
-// wrong for a host process running as your own user — it cannot create them and
-// degrades to in-memory-only ("no crash resilience"), losing sessions, denied
-// patterns and endpoints on every restart. Point them somewhere writable in .envrc.
-// Keep them SIBLINGS, not nested: cache cleanup must never be able to delete state
-// (see the --state-dir flag doc in cmd/pivox-agent/storage.go).
+// PIVOX_AGENT_STATE_DIR / PIVOX_AGENT_CACHE_DIR: pinned here, under aspire/.data/,
+// rather than left to direnv. The agent's defaults (/var/lib/pivox/*) are correct
+// for a real Linux install and wrong for a host process running as your own user —
+// it cannot create them and degrades to in-memory-only ("no crash resilience"),
+// losing sessions, denied patterns and endpoints on every restart.
+//
+// ABSOLUTE paths, deliberately. The agent runs as a HOST PROCESS with its working
+// directory at its own project dir (cmd/pivox-agent), so a relative value would
+// land the SQLite DB THERE, in the source tree — which is exactly what happened
+// when this came from a relative direnv path. aspire/.data/ is already gitignored
+// (aspire/.gitignore), so nothing can be committed by accident.
+//
+// SIBLINGS (data vs cache), never nested: cache cleanup walks its own dir and would
+// delete a state DB living under it (see the --state-dir flag doc in
+// cmd/pivox-agent/storage.go; storage_test.go pins this invariant).
+var agentDataRoot = Path.Combine(AppHostDir(), ".data", "agent");
 builder
   .AddGoApp("agent", "../cmd/pivox-agent")
   .WithArgs(["storage"])
   .WithEnvironment("PIVOX_TOKEN", "dev-token-local")
   .WithEnvironment("PIVOX_PORT", "8083")
+  .WithEnvironment("PIVOX_AGENT_STATE_DIR", Path.Combine(agentDataRoot, "data"))
+  .WithEnvironment("PIVOX_AGENT_CACHE_DIR", Path.Combine(agentDataRoot, "cache"))
   .WaitFor(api);
 
 // --- web libraries build (mirrors the `web-build` prereq of `make dev`) ---
@@ -452,8 +464,8 @@ builder
 
 
 // --- start (TanStack Start / Vite dev server) — the `start` leg of dev ---
-// Pinned to :3000 to match envoy's web_app cluster. The dev server binds
-// 127.0.0.1:3000 (its default) and the envoy container reaches it via
+// Pinned to :3000 to match the gateway's web_app backend. The dev server binds
+// 127.0.0.1:3000 (its default) and the gateway container reaches it via
 // host.docker.internal, which resolves to the host loopback on Docker Desktop.
 // pnpm is the workspace package manager; install is off (web-build needs deps).
 builder
@@ -461,7 +473,7 @@ builder
   .WithPnpm(false)
   // isProxied:false → the dev server binds :3000 directly (no DCP proxy). A
   // non-container resource can't be proxied when port === targetPort, and we
-  // want vite on the real :3000 so envoy's web_app cluster reaches it.
+  // want vite on the real :3000 so the gateway's web_app backend reaches it.
   .WithHttpEndpoint(3000, 3000, "http", isProxied: false)
   // The BFF stores OIDC sessions server-side in Postgres (web_sessions),
   // reading one per request. That table lives in the BFF-owned `sessions` DB —
@@ -471,15 +483,15 @@ builder
   // explicitly.
   .WithEnvironment("PIVOX_SESSIONS_DATABASE_URL", sessionsDatabaseUrl)
   // Browser OpenTelemetry: the app exports spans to this same-origin path,
-  // which envoy routes to the otel-collector (-> dashboard). Relative so it
+  // which the gateway routes to the otel-collector (-> dashboard). Relative so it
   // resolves against whatever origin serves the app (the tunnel host).
   .WithEnvironment("VITE_OTEL_TRACES_URL", "/v1/traces")
   // Server-side (SSR) OpenTelemetry. --import loads the Node OTel SDK before the
   // Nitro/TanStack server (no server-entry hook in 1.168). It exports to the
-  // envoy /v1/traces route on the host (plaintext) instead of the Aspire-injected
+  // gateway /v1/traces route on the host (plaintext) instead of the Aspire-injected
   // dashboard OTLP endpoint, because that endpoint is TLS with a dev cert Node
   // won't trust (Go trusts it via the system store; Node's TLS/grpc-js doesn't).
-  // envoy forwards to the collector, which handles the dashboard key + TLS.
+  // the gateway forwards to the collector, which handles the dashboard key + TLS.
   .WithEnvironment("NODE_OPTIONS", "--import ./instrumentation.node.mjs")
   .WithEnvironment(
     "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
@@ -490,61 +502,88 @@ builder
   .WaitForCompletion(webBuild);
 
 
-// --- envoy (L7 ingress) ---
-// Uses the Aspire-specific config (clusters -> host.docker.internal). Mounts
-// the gitignored proto descriptor for grpc_json_transcoder. Its OTel tracer
-// exports to the collector above (otel-collector:4317).
-// apphost-generated config: tracing block stripped unless ASPIRE_OTEL_ENVOY_ENABLED.
+// --- api-docs (static: Scalar API reference + OpenAPI v3 spec) --------------
+// Consumed by the agentgateway ingress, which cannot serve files inline
+// via direct_response (body: {filename: ...}); agentgateway's directResponse is
+// inline-body-only, so under agentgateway they need a real static server. See
+// aspire/api-docs/nginx.conf for why inlining was not an option (660KB spec, and
+// an index.html whose ${window.location.origin} would be eaten by agentgateway's
+// whole-file shell expansion).
 //
-// TWO listeners, same routes (see configs/envoy.aspire.yaml):
+// A CONTAINER, so agentgateway (also a container) reaches it by network alias —
+// not host.docker.internal, which is only for the host-process backends.
+var apiDocs = builder
+  .AddContainer("api-docs", "nginx", "1.27-alpine")
+  .WithBindMount("api-docs/nginx.conf", "/etc/nginx/conf.d/default.conf", true)
+  // Mounted UNDER /api-docs: index.html fetches the spec at the absolute path
+  // /api-docs/pivox.yaml, so the ingress must not rewrite the prefix away.
+  .WithBindMount("../api/openapi/v3", "/usr/share/nginx/html/api-docs", true)
+  .WithContainerNetworkAlias("api-docs");
+
+// --- agentgateway (L7 ingress) ----------------------------------------------
+// TWO listeners, ONE route table (see configs/agentgateway.yaml):
 //   :8081 http  — the Cloudflare Tunnel's origin. Machine-facing.
 //   :8443 https — the LOCAL origin, TLS-terminated with the Aspire dev cert.
 // The :8443 listener is what lets the whole stack run with no public host, no DNS
 // and no tunnel, while every "we're behind an https ingress" assumption baked into
-// the app stays true.
-var envoyConfigMount = WriteEffectiveEnvoyConfig();
-
+// the app stays true. 8443 must equal Keycloak's INTERNAL https port — the acme SSO
+// backchannel loops back to it from inside the KC container, so renumbering it
+// breaks SSO with an issuer mismatch that looks nothing like a port problem.
+//
+// Config: configs/agentgateway.yaml is mounted STATIC and used AS-IS — no codegen
+// in this apphost. Two reasons that's possible:
+//   - TLS cert paths: agentgateway shell-expands its whole config before parsing
+//     (shellexpand::full, types/local.rs), so the cert/key env placeholders set
+//     below resolve natively. No symlink, no envsubst, no custom image.
+//   - OTel tracing: the noisy per-request ingress spans are dropped by a CEL
+//     `filter` on frontendPolicies.tracing IN the config, so there is no tracing
+//     block to strip and nothing to toggle from here.
+// The same file ships to k8s, where the certs mount from a Secret at a fixed path.
+//
+// CAVEAT of that shell expansion: it covers the ENTIRE file text, COMMENTS INCLUDED.
+// A stray shell variable in a comment aborts startup with "environment variable not
+// found". Called out in the config header too — it has already bitten twice.
+//
+// Pinned to v1.4.0-alpha.1, NOT :latest. Alpha under protest: `frontendPolicies.
+// tracing.filter` does not exist in the last stable (v1.3.1), which hard-rejects this
+// config — and that filter is what keeps the trace UI usable. Revisit on next stable.
 #pragma warning disable ASPIRECERTIFICATES001 // HTTPS certificate APIs are experimental
-var envoy = builder
-  .AddContainer("envoy", "envoyproxy/envoy:v1.31-latest")
-  // Mount the Aspire developer certificate into the container. Aspire names the
-  // files after the cert thumbprint and hands us their paths as ReferenceExpressions
-  // (resolved at container start, NOT strings we can bake into a file), and envoy's
-  // static config cannot read env vars — so the paths arrive as env and the start
-  // command below symlinks them to the fixed paths the config names.
+var agentgateway = builder
+  .AddContainer("agentgateway", "cr.agentgateway.dev/agentgateway", "v1.4.0-alpha.1")
   .WithHttpsCertificateConfiguration(ctx =>
   {
     ctx.EnvironmentVariables["PIVOX_TLS_CERT"] = ctx.CertificatePath;
     ctx.EnvironmentVariables["PIVOX_TLS_KEY"] = ctx.KeyPath;
     return Task.CompletedTask;
   })
-  .WithBindMount(envoyConfigMount, "/etc/envoy/envoy.yaml", true)
-  .WithBindMount("../configs/pivox.pb", "/etc/envoy/pivox.pb", true)
-  // Scalar API reference: envoy serves the OpenAPI v3 spec + the Scalar HTML
-  // page inline (direct_response) at /api-docs. In the container those file
-  // bodies are read from absolute /etc/envoy/openapi/* paths — see the
-  // /api-docs routes in configs/envoy.aspire.yaml.
-  .WithBindMount("../api/openapi/v3", "/etc/envoy/openapi", true)
-  // Symlink the thumbprint-named cert/key to the stable paths the envoy config
-  // names, then exec envoy. `set -e` so a missing cert fails the container loudly
-  // instead of starting an ingress whose TLS listener silently never binds.
-  // (The image's entrypoint execs its args verbatim when they don't start with `-`.)
-  .WithArgs([
-    "sh", "-c",
-    "set -e; ln -sf \"$PIVOX_TLS_CERT\" /tmp/tls.crt; ln -sf \"$PIVOX_TLS_KEY\" /tmp/tls.key; "
-      + "exec envoy -c /etc/envoy/envoy.yaml",
-  ])
+  .WithBindMount("../configs/agentgateway.yaml", "/etc/agw/config.yaml", true)
+  // Admin UI + its runtime/config/logs API. Default is localhost:15000, which binds
+  // the CONTAINER's loopback and is therefore unreachable from the host — bind the
+  // wildcard instead so Aspire can publish it.
+  //
+  // NOT ingressed. The UI serves absolute paths (/, /ui, /api/runtime, /api/config,
+  // /api/cel, /api/logs, /api/costs), and `/` collides head-on with the web-app
+  // catch-all in the route table — proxying it under a /gw prefix would need a
+  // rewrite that its own absolute asset+API references then defeat. Same call as the
+  // Keycloak admin console, which is likewise reached directly on its own port.
+  // DEV ONLY: this is an unauthenticated control-plane view. Never expose it publicly.
+  .WithEnvironment("ADMIN_ADDR", "0.0.0.0:15000")
+  .WithArgs(["--file", "/etc/agw/config.yaml"])
   .WithHttpEndpoint(port: 8081, targetPort: 8081, name: "http")
-  // The local origin. 8443 must match Keycloak's INTERNAL https port — see the
-  // ingress_8443 comment in configs/envoy.aspire.yaml; renumbering it silently
-  // breaks the SSO issuer match.
   .WithHttpsEndpoint(port: 8443, targetPort: 8443, name: "https")
-  .WaitFor(otelCollector);
+  .WithHttpEndpoint(port: 15000, targetPort: 15000, name: "admin")
+  .WithUrlForEndpoint("admin", url =>
+  {
+    url.DisplayText = "Gateway UI";
+    url.Url = "/ui";
+  })
+  .WaitFor(otelCollector)
+  .WaitFor(apiDocs);
 #pragma warning restore ASPIRECERTIFICATES001
 
 // --- public tunnel ---
 // The public HTTPS origin (PIVOX_PUBLIC_HOST) is fronted by a
-// Cloudflare Tunnel that forwards to envoy on localhost:8081. cloudflared runs
+// Cloudflare Tunnel that forwards to the gateway on localhost:8081. cloudflared runs
 // as a host service (`brew services start cloudflared`, config in
 // ~/.cloudflared/config.yml) — NOT an Aspire resource — so it's independent of
 // the stack lifecycle and shared across dev machines via each dev's own zone.
@@ -570,7 +609,7 @@ var diag = builder
 // resource implements picks the ref kind AND disambiguates the WithReference
 // overload: connection-string resources (postgres + its DBs, kafka) inject
 // ConnectionStrings__<name>; endpoint-bearing resources (keycloak, rustfs,
-// envoy, otel-collector, kafka-ui, the host apps, ...) inject
+// agentgateway, otel-collector, kafka-ui, the host apps, ...) inject
 // services__<name>__<endpoint>__N. Resources that implement neither (e.g. a
 // pure one-shot executable with no endpoints) contribute nothing and are the
 // only ones left unreferenced.
@@ -593,7 +632,7 @@ foreach (var resource in builder.Resources.ToList())
   }
   else if (resource is IResourceWithEndpoints ep)
   {
-    // Plain containers (rustfs, envoy, otel-collector, kafka-ui) + the vite app
+    // Plain containers (rustfs, agentgateway, otel-collector, kafka-ui) + the vite app
     // (start) expose endpoints but aren't service-discovery resources, so
     // reference each endpoint individually → services__<name>__<endpoint>__N.
     foreach (var endpoint in ep.GetEndpoints())
@@ -605,34 +644,9 @@ foreach (var resource in builder.Resources.ToList())
 
 builder.Build().Run();
 
-// Generate the effective envoy config and return its mount-relative path. The
-// OTel tracing block in configs/envoy.aspire.yaml (between the BEGIN/END
-// envoy-otel-tracing markers) is STRIPPED unless ASPIRE_OTEL_ENVOY_ENABLED is
-// set. envoy's static YAML can't read env, so the apphost does it — letting you
-// toggle envoy's (noisy) per-request ingress spans via direnv. Output goes to
-// the gitignored .data dir and is regenerated on every `aspire run`.
-static string WriteEffectiveEnvoyConfig()
-{
-  var here = AppHostDir();
-  var yaml = File.ReadAllText(Path.Combine(here, "../configs/envoy.aspire.yaml"));
-  if (!IsTruthy(Environment.GetEnvironmentVariable("ASPIRE_OTEL_ENVOY_ENABLED")))
-  {
-    yaml = Regex.Replace(
-        yaml,
-        @"^[ \t]*# BEGIN envoy-otel-tracing\n[\s\S]*?# END envoy-otel-tracing[ \t]*\r?\n",
-        "",
-        RegexOptions.Multiline);
-  }
-  Directory.CreateDirectory(Path.Combine(here, ".data"));
-  File.WriteAllText(Path.Combine(here, ".data/envoy.effective.yaml"), yaml);
-  return "./.data/envoy.effective.yaml";
-}
-
-static bool IsTruthy(string? value) =>
-    value != null && (value.ToLowerInvariant() == "true" || value == "1");
-
-// import.meta.dirname equivalent: the directory of THIS source file, captured at
-// compile time via [CallerFilePath] so path resolution is independent of the
-// current working directory (matches the TS AppHost's behavior).
+// The directory of THIS source file, captured at compile time via [CallerFilePath]
+// — i.e. the aspire/ dir — so path resolution is independent of the current working
+// directory. Used to build absolute paths for host-process env vars that must NOT
+// resolve against the process's own cwd.
 static string AppHostDir([CallerFilePath] string path = "") =>
     Path.GetDirectoryName(path)!;

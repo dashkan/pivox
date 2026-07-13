@@ -86,20 +86,6 @@
           "endsPattern": "built in \\d+\\s*m?s"
         }
       }
-    },
-    {
-      "label": "Start Envoy",
-      "type": "shell",
-      "command": "envoy",
-      "isBackground": true,
-      "args": ["-c", "${workspaceFolder}/configs/envoy.yaml", "-l", "info"],
-      "presentation": {
-        "echo": true,
-        "reveal": "always",
-        "focus": true,
-        "panel": "shared"
-      },
-      "problemMatcher": []
     }
   ]
 }

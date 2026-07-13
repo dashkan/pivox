@@ -35,7 +35,7 @@ let installed = false;
  * Install browser OpenTelemetry tracing: a WebTracerProvider exporting spans
  * over OTLP/HTTP, with fetch/XHR/document-load auto-instrumentation that
  * propagates W3C trace context to the backend — so a browser request continues
- * into the cloud's distributed trace (browser -> envoy -> api -> db).
+ * into the cloud's distributed trace (browser -> ingress -> api -> db).
  *
  * Shared by the start (TanStack) and electron (renderer) apps; call once,
  * client-side, at startup (next to installErrorReporters).

@@ -1,14 +1,12 @@
 .PHONY: build test test-up test-down tidy lint lint-fix fmt generate \
 	run-server run-worker run-agent \
-	air air-worker mocks dev dev-preview \
+	air air-worker mocks \
 	ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go \
 	proto-generate-openapi-v3 proto-generate-typescript api-lint \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down \
-	proxy-nginx proxy-nginx-stop proxy-nginx-reload \
-	proxy-envoy proxy-envoy-validate envoy-descriptor \
 	web-build web-build-watch web-build-start \
 	web-clean web-start web-start-preview electron-start
 
@@ -185,65 +183,19 @@ docker-up:
 docker-down:
 	docker compose down
 
-# Proxy
-
-proxy-nginx:
-	nginx -c $(PWD)/configs/nginx.conf -e stderr
-
-proxy-nginx-stop:
-	nginx -c $(PWD)/configs/nginx.conf -s stop
-
-# Re-read configs/nginx.conf without dropping in-flight connections.
-# Use after editing locations/upstreams; the running master forks
-# new workers with the fresh config and gracefully drains the old.
-proxy-nginx-reload:
-	nginx -c $(PWD)/configs/nginx.conf -s reload
-
-# Envoy is the active ingress proxy (configs/envoy.yaml) — a 1:1 port
-# of nginx.conf that `make dev` / `dev-preview` now run instead of
-# nginx. The proxy-nginx* targets above are kept for fallback but are
-# no longer wired into the dev loop. Native Homebrew Envoy
-# (`brew install envoy`); no signal-based reload like nginx — Envoy
-# hot-restarts, so on a config edit just restart the process (Ctrl-C
-# the dev loop and re-run, or run proxy-envoy standalone).
-# Generate the proto FileDescriptorSet that the grpc_json_transcoder
-# filter loads (configs/pivox.pb). buf's descriptor set includes all
-# transitively-imported protos, which the transcoder requires. It's a
-# generated artifact (gitignored) and a prerequisite of the proxy-envoy*
-# targets so it's always current with the protos.
-ENVOY_DESCRIPTOR = configs/pivox.pb
-envoy-descriptor:
-	$(TOOL) buf build --as-file-descriptor-set -o $(ENVOY_DESCRIPTOR)
-
-# Per-request access logging is always on (configs/envoy.yaml) — that's
-# what surfaces proxied requests in `make dev`. ENVOY_LOG_LEVEL only
-# affects Envoy's internal component logs; bump it to debug/trace when
-# diagnosing the proxy itself, e.g. `make proxy-envoy ENVOY_LOG_LEVEL=debug`.
-ENVOY_LOG_LEVEL ?= info
-proxy-envoy: envoy-descriptor
-	envoy -c $(PWD)/configs/envoy.yaml -l $(ENVOY_LOG_LEVEL)
-
-# Parse + semantically validate the config without binding ports — also
-# loads the descriptor and checks every transcoded service name resolves.
-# Run after editing configs/envoy.yaml; CI-friendly (exits non-zero
-# on error).
-proxy-envoy-validate: envoy-descriptor
-	envoy --mode validate -c $(PWD)/configs/envoy.yaml
-
 # Dev loop
 
 # ollama-serve runs the Ollama daemon in the foreground. Pivox's
 # AiChat handler dials it at http://localhost:11434 (overridable via
 # --ollama-url / PIVOX_OLLAMA_URL); without it, StreamGenerateContent
 # fails with `connection refused`. Foreground form pairs cleanly
-# with `make dev` — Ctrl-C / sibling-failure tears it down with the
-# rest of the loop.
+# with the Aspire loop — Ctrl-C tears it down with the rest.
 ollama-serve:
 	ollama serve
 
 # Web watchers + dev server. Each is a thin wrapper around the
 # corresponding pnpm script in web/package.json so callers can run
-# them standalone (e.g. `make web-primitives`) or composed via `make dev`.
+# them standalone (e.g. `make web-primitives`); Aspire runs the loop.
 web-build:
 	pnpm run --dir web web:build
 
@@ -259,14 +211,14 @@ web-build-watch:
 	pnpm run --dir web web:build:watch
 
 # Wipes the start app's build/runtime caches that go stale when
-# workspace deps get rebuilt out of order. Symptom is `make dev`
+# workspace deps get rebuilt out of order. Symptom is the dev loop
 # reporting `Cannot find module '@pivox/...'` errors from the
 # web-ui watcher even though the symlinks + dist/ files are
 # present — Nitro's cache (.nitro/, .output/) and Vite's optimized-
 # deps cache (node_modules/.vite/) hold dependency-graph snapshots
 # that don't always invalidate when a workspace package
-# republishes. Run this when `make dev` starts complaining about
-# missing modules; retry `make dev` after. Electron isn't wiped
+# republishes. Run this when the dev loop starts complaining about
+# missing modules; retry after. Electron isn't wiped
 # here because we haven't seen the same pattern there yet — add
 # its paths if/when it surfaces.
 web-clean:
@@ -280,10 +232,10 @@ web-clean:
 # `electron.vite.config.ts` imports `buildBootScript` from
 # `@pivox/storage`). Vite resolves those imports via each package's
 # `exports` map → `dist/esm/index.js`, which doesn't exist on a fresh
-# checkout. Without this prerequisite, the first `make dev` or
+# checkout. Without this prerequisite, the first `aspire start` or
 # `make electron-start` after a clone races the watchers and fails
 # with "Cannot find module '@pivox/storage'" before any of the
-# `--watch` jobs in `dev` have produced their initial output.
+# `--watch` jobs have produced their initial output.
 # `pnpm run build` filters to `./packages/**` (see web/package.json),
 # so this builds libraries only — apps stay fresh for the watchers.
 web-start: web-build
@@ -294,44 +246,13 @@ web-start-preview: web-build
 
 # Build the start app (apps/start) on top of the libraries. `web-build`
 # (libraries-only) is a prerequisite so the app build always sees a
-# current dist/. Encoding the dependency here — rather than listing
-# `dev-preview: web-build web-build-start` — guarantees the order even
-# under `make -j`: parallel make can run sibling prerequisites
-# concurrently, but a prereq chain is always serialized. `vite preview`
-# (web:start:preview) serves this built output, so dev-preview needs it.
+# current dist/. Encoding the dependency here — rather than on each
+# caller — guarantees the order even under `make -j`: parallel make can
+# run sibling prerequisites concurrently, but a prereq chain is always
+# serialized. `vite preview` (web:start:preview) serves this output.
 web-build-start: web-build
 	pnpm run --dir web web:build:start
 
 electron-start: web-build
 	pnpm run --dir web electron:start
 
-# dev runs every component of the local loop in one terminal: the
-# pivox-cloud + pivox-worker air watchers, the envoy ingress proxy
-# (the public cloudflared tunnel runs as its own service), and the web watchers + dev
-# server. `concurrently` color-codes each prefix and `--kill-others`
-# tears the rest down the moment any one process exits — so a crashed
-# binary or Ctrl-C cleans up cleanly instead of leaving zombies.
-#
-# `web-build` prerequisite — see the comment on `web-start` above for
-# why this is non-optional. Watchers handle incremental rebuilds, but
-# the FIRST emit needs to land before the dev server boots.
-dev: web-build
-	pnpx concurrently \
-		--kill-others \
-		--names "cloud,worker,envoy,packages,start" \
-		--prefix-colors "yellow,green,cyan,blue,gray" \
-		"$(MAKE) air" \
-		"$(MAKE) air-worker" \
-		"$(MAKE) proxy-envoy" \
-		"$(MAKE) web-build-watch" \
-		"$(MAKE) web-start"
-
-dev-preview: web-build-start
-	pnpx concurrently \
-		--kill-others \
-		--names "cloud,worker,envoy,start" \
-		--prefix-colors "yellow,green,cyan,white" \
-		"$(MAKE) air" \
-		"$(MAKE) air-worker" \
-		"$(MAKE) proxy-envoy" \
-		"$(MAKE) web-start-preview"

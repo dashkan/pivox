@@ -116,7 +116,7 @@ func NewHandler(cfg Config) http.Handler {
 		func(*http.Request) *mcpsdk.Server { return mcpServer },
 		&mcpsdk.StreamableHTTPOptions{
 			// This is a REMOTE MCP server: the process listens on loopback and sits
-			// behind envoy/the tunnel, so every request legitimately arrives with
+			// behind the gateway/the tunnel, so every request legitimately arrives with
 			// Host=pivox.example (non-loopback). The SDK's default DNS-rebinding
 			// guard rejects exactly that shape — loopback listener + non-loopback
 			// Host — with 403. That guard protects *local* MCP servers from a browser

@@ -107,7 +107,8 @@ proto/ buf.yaml ...   buf config + dependencies
 
 aspire/               Aspire AppHost — preferred local dev orchestration
   apphost.cs          Resource graph (source of truth)
-configs/envoy.aspire.yaml  envoy ingress config for the Aspire flow
+configs/agentgateway.yaml  L7 ingress config (agentgateway)
+aspire/api-docs/      nginx container serving the Scalar API reference
 configs/keycloak/     Keycloak realm import (acme) for the dev IDP
 scripts/seeds/        Dev DB seed data (psql -f)
 docs/                 Architecture + feature docs (read before designing)
@@ -204,11 +205,17 @@ Go binaries always go to `bin/`. **Never** bare `go build`
 The preferred local dev loop is the **Aspire AppHost** in `aspire/`,
 which orchestrates the entire stack in one process tree: Postgres
 (pgvector), one-shot migrate + first-use seed, rustfs, Keycloak, the
-cloud API + Worker Process, an envoy ingress container, and the
-TanStack Start dev server (the public Cloudflare tunnel runs as a host
-service, not an Aspire resource). It supersedes the
-multi-process `make dev` (which still works — both converge on the same
-config; see the Keycloak note below).
+cloud API + Worker Process, the agentgateway ingress, an nginx
+api-docs container, and the TanStack Start dev server (the public
+Cloudflare tunnel runs as a host service, not an Aspire resource).
+
+**Aspire is the ONLY local dev loop.** The old multi-process `make dev`
+(a host envoy + the Go/web watchers, run under `concurrently`) was
+removed along with envoy itself — there is no `make dev`, no `proxy-*`
+target, and no second ingress config to keep in sync. `docker-compose.yaml`
+still exists and `make docker-up` still works, but it brings up bare
+postgres/rustfs/keycloak with **no ingress** — it is not a dev loop on its
+own. (`make test` uses the separate `docker-compose.test.yml`; unaffected.)
 
 Read the **`aspire` skill** first (`.claude/skills/aspire`) — it's the
 router for all AppHost operations. Prereqs: .NET 10 SDK + the Aspire
@@ -218,7 +225,7 @@ CLI (`curl -sSL https://aspire.dev/install.sh | bash`).
 cd aspire
 aspire start                  # bring up the whole stack (run in the direnv shell)
 aspire stop
-aspire logs <resource>        # api | worker | envoy | keycloak | start | ...
+aspire logs <resource>        # api | worker | agentgateway | keycloak | start | ...
 aspire describe               # resource table: state, health, endpoint URLs
 dotnet build apphost.cs       # typecheck the single-file C# apphost
 ```
@@ -236,10 +243,12 @@ Conventions and gotchas (each was paid for once; don't relearn them):
   packages are added the same way — everything is a C# package ref now).
 - **Go apps (`AddGoApp`) and the Vite app run as host processes**, not
   containers — they bind their own ports on the host. Postgres, rustfs,
-  Keycloak and envoy are containers.
+  Keycloak, agentgateway and api-docs are containers.
 - **Containers reach host processes via `host.docker.internal`** (the
-  envoy container fronts the host-bound cloud/worker/agent/web). On
-  Docker Desktop this resolves to the host incl. loopback.
+  agentgateway container fronts the host-bound cloud/worker/agent/web).
+  On Docker Desktop this resolves to the host incl. loopback. Sibling
+  CONTAINERS are reached by network alias instead (`api-docs:80`,
+  `otel-collector:4318`, `api-docs:80`).
 - **`PIVOX_DATABASE_URL` must be a libpq URL** (`postgres://…`), not
   Aspire's default Npgsql keyword string — pgx can't parse the latter.
   Built in `apphost.cs` from the Postgres endpoint + parameters.
@@ -252,16 +261,26 @@ Conventions and gotchas (each was paid for once; don't relearn them):
 - **Container env is NOT inherited from direnv `.envrc`** (host
   processes are). Forward what containers need explicitly via
   `WithEnvironment` (e.g. `PIVOX_HOSTNAME` from `Environment.GetEnvironmentVariable`).
-- **`configs/envoy.aspire.yaml` is generated from `configs/envoy.yaml`**
-  — the regen `sed` recipe is in its header. It diverges from the host
-  config by: clusters → `host.docker.internal` (STRICT_DNS + V4_ONLY),
-  absolute proto-descriptor path, a hand-added TLS block for the HTTPS
-  Keycloak upstream, and the root-Keycloak routing. Re-apply the manual
-  bits after regenerating.
-- **Keycloak serves at the root path** (not `/keycloak`) in both the
-  Aspire and compose flows — envoy proxies `/realms/` + `/resources/`
-  for the browser SSO login; the admin console is reached directly on
-  `:8082`, not through envoy. The acme SSO issuer is
+- **`configs/agentgateway.yaml` is STATIC** — mounted as-is, no apphost
+  codegen. It shell-expands its own `${...}` cert placeholders, and
+  filters its own noisy ingress spans via a CEL `filter`, so there is
+  nothing to generate. **Read its header before editing** — four
+  non-obvious behaviours are documented there, each of which cost a
+  debugging session: route precedence is not list order; `pathPrefix` is
+  segment-aware; backend refs need a LEADING SLASH (`backend: /web_app`
+  — a bare name validates, starts, then 500s every request); and the
+  upstream `Host` + `x-forwarded-proto` are NOT what you'd expect
+  (`Host` is rewritten to the backend unless you say otherwise, and
+  X-Forwarded-* is never injected).
+- **`--validate-only` is necessary but NOT sufficient.** It parses the
+  config and compiles every CEL expression, but it does not resolve
+  backend references — a config can validate cleanly and then fail every
+  request at runtime. Boot it and curl a route.
+- **Keycloak serves at the root path** (not `/keycloak`) — the ingress
+  proxies `/realms/` + `/resources/` for the browser SSO login; the
+  admin console is reached directly on `:8082`, not through the ingress
+  (same as agentgateway's own admin UI, on `:15000/ui`). The acme SSO
+  issuer is
   `$PIVOX_PUBLIC_HOST/realms/acme`. This issuer lives in **two**
   places that must agree: `scripts/seeds/02_acme_sso.sql` and the live
   `sso_configs.oidc_config` row (re-seed an empty DB, or `UPDATE` in
@@ -269,8 +288,8 @@ Conventions and gotchas (each was paid for once; don't relearn them):
 - **Public tunnel**: a Cloudflare Tunnel (`cloudflared`, run as a host
   service — `brew services start cloudflared`, config in
   `~/.cloudflared/config.yml`) fronts the public host (`PIVOX_PUBLIC_HOST`)
-  → envoy on `localhost:8081`. It's independent of the Aspire lifecycle;
-  nothing to start/stop in the AppHost.
+  → the ingress on `localhost:8081`. It's independent of the Aspire
+  lifecycle; nothing to start/stop in the AppHost.
 
 ## Skills (`.agents/skills/golang-*`)
 

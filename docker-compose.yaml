@@ -26,9 +26,9 @@ services:
   # Local Keycloak — used as a development IDP to validate Pivox SSO
   # configuration against a real OIDC/SAML provider. Keycloak is the
   # auth IDP for the stack. Serves at ROOT (no /keycloak base
-  # path): envoy proxies /realms/ + /resources/ for the browser SSO
+  # path): the gateway proxies /realms/ + /resources/ for the browser SSO
   # login flow. Admin UI is reached directly at http://localhost:8082/
-  # (not via envoy). Matches the Aspire keycloak so the issuer
+  # (not via the gateway). Matches the Aspire keycloak so the issuer
   # ($PIVOX_PUBLIC_HOST/realms/acme) is identical across both.
   #
   # Bootstrap admin: admin / admin (DEV ONLY — change before exposing

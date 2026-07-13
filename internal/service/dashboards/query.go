@@ -267,7 +267,7 @@ func assetRowToStruct(v assetView, orgSlug, spaceSlug string) (*structpb.Struct,
 //
 //	https://{GatewayHostname}/files/{EndpointSlug}/{org}/{space}/assets/{AssetID}/v{n}/thumb_md.webp
 //
-// The /files/ prefix is permanent: in dev nginx routes /files/ to
+// The /files/ prefix is permanent: in dev the ingress routes /files/ to
 // the storage agent on its loopback port; in prod the gateway's edge
 // proxy (or the agent itself bound to 443) serves /files/ at its
 // public hostname. Same prefix in both, different host. The agent

@@ -2,7 +2,7 @@
 -- Uses rustfs defaults: rustfsadmin/rustfsadmin on localhost:9000
 --
 -- hostname values are dev-only, all pointing at the shared public host so the
--- dashboards composer emits /files/ URLs reachable through the tunnel → envoy
+-- dashboards composer emits /files/ URLs reachable through the tunnel → the gateway
 -- pipeline. The host comes from :public_host (psql -v), set by the apphost init
 -- from PIVOX_HOSTNAME; a default is set just below so standalone runs (e.g.
 -- `make db-seed`) still work. Production gateway provisioning sets real

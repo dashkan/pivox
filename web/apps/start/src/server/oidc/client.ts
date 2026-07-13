@@ -70,10 +70,10 @@ function firstHeaderValue(request: Request, name: string): string | undefined {
 }
 
 /**
- * The public origin the browser actually used. envoy/the tunnel terminate TLS and
+ * The public origin the browser actually used. The ingress/the tunnel terminate TLS and
  * forward to `start` over http, so the request's own protocol is wrong — the real
  * scheme comes from x-forwarded-proto, and the public host from x-forwarded-host
- * (or the preserved Host, since envoy doesn't rewrite it). Falls back to the
+ * (or the preserved Host — the ingress is configured not to rewrite it). Falls back to the
  * request URL for direct access. Validated against PIVOX_ALLOWED_ORIGINS so we
  * never build a redirect to an unexpected origin.
  *

@@ -84,7 +84,7 @@ func (s *HTTPServer) SetCORSOrigin(origin string) {
 // configured storage endpoint via ServeHTTP. Anything outside
 // /files/ returns 404 from the mux directly. The /files/ prefix is
 // the public URL contract emitted by the dashboards composer
-// (Phase 6c.2) — same prefix in dev (nginx → loopback agent) and
+// (Phase 6c.2) — same prefix in dev (gateway → loopback agent) and
 // prod (gateway edge proxy → agent on its public hostname). The
 // agent strips /files/ before its existing /{endpoint}/{key} parser
 // sees the request, so ServeHTTP's path-handling logic is unchanged.
@@ -94,7 +94,7 @@ func (s *HTTPServer) ListenAndServe(addr string) error {
 		return fmt.Errorf("listen %s: %w", addr, err)
 	}
 	// otelhttp opens a server span per /files/ request (extracting any
-	// incoming traceparent from envoy/the browser) — the agent's primary
+	// incoming traceparent from the gateway/the browser) — the agent's primary
 	// trace source. No-op when OTel export is disabled.
 	srv := &http.Server{Handler: otelhttp.NewHandler(s.muxedHandler(), "storage-agent")}
 	return srv.Serve(ln)

@@ -6,9 +6,11 @@ import { deleteSession, getSession } from '@/server/oidc/session-store'
 /** Backend origin the BFF forwards to (e.g. https://pivox.example). */
 const BACKEND = process.env.PIVOX_API_URL
 
-// Client-spoofable / hop-by-hop request headers we never forward upstream. Envoy
-// stays the sole authority on x-forwarded-*; the cookie/host/length are wrong for
-// the rewritten request; the rest are hop-by-hop.
+// Client-spoofable / hop-by-hop request headers we never forward upstream.
+// The ingress owns x-forwarded-proto (it `set`s it on every route) and strips
+// x-forwarded-host, but it does NOT manage x-forwarded-for — so treat all of them
+// as untrusted here and drop the lot. The cookie/host/length are wrong for the
+// rewritten request; the rest are hop-by-hop.
 const STRIP_REQUEST_HEADERS = [
   'cookie',
   'host',

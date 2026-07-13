@@ -17,7 +17,7 @@ installErrorReporters();
 // Browser OpenTelemetry tracing. Unlike the `start` app, no Aspire resource
 // injects VITE_OTEL_TRACES_URL here, and the renderer origin (localhost:5173 in
 // dev) is cross-origin to the backend — relative URLs can't resolve. So in DEV
-// default the OTLP endpoint to the backend ingress's /v1/traces (envoy routes it
+// default the OTLP endpoint to the backend ingress's /v1/traces (the gateway routes it
 // to the collector). VITE_OTEL_TRACES_URL always wins; a PRODUCTION build with
 // no override stays a no-op, so packaged apps never auto-ship spans to a dev
 // tunnel.

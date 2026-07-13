@@ -1,0 +1,756 @@
+# yaml-language-server: $schema=https://agentgateway.dev/schema/config
+#
+# Pivox L7 ingress.
+#
+# ONE route table, served on TWO sockets:
+#   :8081 plaintext — the Cloudflare tunnel's origin. Machine-facing.
+#   :8443 HTTPS     — the local origin, TLS-terminated with the Aspire dev cert.
+# Upstreams are the host processes (reached from this container via
+# host.docker.internal) plus the sibling containers (reached by network alias).
+#
+# REQUIRES agentgateway >= 1.4.0-alpha.1. v1.3.1 has no
+# `frontendPolicies.tracing.filter` and rejects this file. That filter is not a
+# nice-to-have: without it every Vite HMR poll and every static asset gets its
+# own span and the Aspire trace UI is unusable.
+#
+# Validate any version bump before taking it — from the repo root:
+#   docker run --rm -e PIVOX_TLS_CERT=/cfg/tls.crt -e PIVOX_TLS_KEY=/cfg/tls.key \
+#     -v "<repo>/configs:/cfg" cr.agentgateway.dev/agentgateway:<tag> \
+#     --file /cfg/agentgateway.yaml --validate-only
+# The cert env vars must point at real files — validate-only READS them. It also
+# COMPILES every CEL expression here, so it catches a typo'd filter, not just
+# bad YAML.
+#
+# (That command is written without a dollar sign on purpose. See note 3 below —
+# a shell variable in a COMMENT in this file will abort startup.)
+#
+# ---------------------------------------------------------------------------
+# READ THIS BEFORE EDITING — four things that will bite you.
+# ---------------------------------------------------------------------------
+#
+# 1. ROUTE PRECEDENCE IS NOT LIST ORDER.
+#    The whole table is sorted before matching (Gateway API rules;
+#    types/agent.rs, RouteSet::compare_route):
+#        exact > pathPrefix > regex,  then LONGER path first,
+#        then method match, then MORE header matches, then more query matches,
+#        and only then declaration order.
+#    `/v1/traces` (exact) beats `/v1` (prefix) no matter where either sits in
+#    this file. Do NOT reorder routes hoping to change routing — express the
+#    match precisely and let precedence do the work.
+#
+#    The one place order matters is YAML anchors (note 4).
+#
+# 2. pathPrefix IS SEGMENT-AWARE, NOT A STRING PREFIX.
+#    `pathPrefix: /foo` matches `/foo` and `/foo/...` — it does NOT match
+#    `/foobar`. So there is no way to write "every path starting with the
+#    characters /pivox." — `/pivox.` only ever matches a literal `/pivox.`, and
+#    real gRPC calls (`/pivox.api.v1.Spaces/ListSpaces`) would fall through to
+#    the `/` catch-all and get HTML back from the web app. (Upstream knows:
+#    http/route.rs carries a `// TODO this is not right!!` on that branch.)
+#    A regex path match does not rescue it either — regex ranks BELOW pathPrefix,
+#    so the `/` catch-all would outrank it.
+#    The `grpc-main` route therefore matches on the gRPC CONTENT-TYPE instead of
+#    the path, winning against the catch-all on header count (note 1). See it.
+#
+# 2b. THE UPSTREAM `Host` IS REWRITTEN TO THE BACKEND BY DEFAULT.
+#    "AutoHostname" is on unless a route sets `urlRewrite.authority` to something
+#    other than `auto` (filters.rs). Left alone, EVERY backend sees
+#    `Host: host.docker.internal` instead of the client's host — which breaks the
+#    Vite dev server outright (it answers 403 "This host is not allowed"), and
+#    would silently corrupt anything that builds an absolute URL from Host: SSR
+#    links, the Kafka UI, the River UI.
+#    So every route carries `urlRewrite: {authority: none}` ("leave the authority
+#    unchanged") via the `&preserve_host` anchor on the first route. A NEW ROUTE
+#    MUST ALIAS IT TOO — `policies: {urlRewrite: *preserve_host}` — or that
+#    backend starts seeing host.docker.internal.
+#    (Keycloak would survive without it only because it reads x-forwarded-host
+#    and ignores Host entirely. Nothing else is so lucky.)
+#
+# 2c. `x-forwarded-proto` IS NOT INJECTED AUTOMATICALLY.
+#    Nothing sets X-Forwarded-* for you. A backend that infers its scheme from
+#    the request therefore sees the GATEWAY-TO-BACKEND hop, which is plain HTTP —
+#    not the client's HTTPS. The `start` BFF does exactly this
+#    (server/oidc/client.ts, publicOrigin: x-forwarded-proto ?? url.protocol), so
+#    without the header it builds `http://localhost:8443`, fails its
+#    PIVOX_ALLOWED_ORIGINS check, and every login 500s.
+#    So every route sets `x-forwarded-proto: https` — via the `&xfwd_proto`
+#    anchor, or, on the Keycloak routes, via their CEL `transformations` block
+#    (which must also carry x-forwarded-host). A NEW ROUTE MUST DO ONE OR THE
+#    OTHER.
+#    `https` is correct on BOTH binds: :8443 is TLS to the client, and :8081 sits
+#    behind the tunnel's TLS. The client's scheme is HTTPS either way; the
+#    plaintext hop is an implementation detail of the last mile.
+#
+# 3. THIS FILE IS SHELL-EXPANDED IN FULL BEFORE IT IS PARSED.
+#    The entire text — COMMENTS INCLUDED — goes through `shellexpand::full`
+#    (types/local.rs). Two consequences:
+#      * The cert/key env placeholders below resolve natively. Nothing needs to
+#        pre-process this file.
+#      * NEVER write a dollar-brace token in a COMMENT here. An undefined name
+#        anywhere in the file aborts startup with
+#        "error looking key 'FOO' up: environment variable not found".
+#        (This is not hypothetical — it has already broken a startup once.)
+#
+# 4. THE TWO BINDS SHARE ONE ROUTE TABLE VIA A YAML ANCHOR.
+#    The :8081 listener owns `routes: &routes [...]`; the :8443 listener says
+#    `routes: *routes`. One table, two sockets, cannot drift.
+#
+#    Tip-of-main has a nicer form for this — top-level `gateways:` + `routes:`
+#    with a `gateways: [plain, secure]` ref per route — but that surface does NOT
+#    exist in any released image (v1.3.1 and 1.4.0-alpha.1 both reject a
+#    top-level `gateways` key). `binds` is marked deprecated in the schema yet is
+#    the only shape that parses on released builds. Revisit when a release ships
+#    `gateways`.
+#
+# ---------------------------------------------------------------------------
+# KNOWN GAPS — capabilities this ingress does NOT have. Each is restated at the
+# site it affects.
+#   * gRPC-Web            — no de-framing filter. A browser gRPC-Web client will
+#                           not work through this ingress. Native gRPC is fine.
+#                           No consumers in this repo; browsers use /v1.
+#   * idle timeouts       — TimeoutPolicy is requestTimeout + backendRequestTimeout
+#                           and BOTH are TOTAL. There is no "reset on each data
+#                           event" timer, so streaming routes run with NO timeout
+#                           at all rather than a stall guard.
+#   * response compression— there is NO compression policy in agentgateway: the
+#                           route-policy surface has 29 entries and none of them
+#                           compress. (http/compression.rs exists but is only used
+#                           to decompress LLM bodies for inspection.) Verified on
+#                           the wire: 20000 uncompressed bytes in, 20000 out.
+#                           In prod the edge (Cloudflare) compresses — the same
+#                           division of labour as rate limiting, see CLAUDE.md.
+#                           The gap is pure-local dev and any edge-less deploy.
+#                           The one thing that really wants it — the 660KB OpenAPI
+#                           spec — is gzipped by its own nginx (aspire/api-docs).
+#   * static file serving — directResponse takes an INLINE body, not a filename.
+#                           Hence the api-docs nginx container.
+#   * regex path rewrite  — only prefix rewrite (ReplacePrefixMatch). See the
+#                           .well-known routes for how that is worked around.
+# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# Backends
+#
+# ⚠ REFERENCES NEED A LEADING SLASH. A backend declared here as `name: web_app`
+# is registered under the key `/web_app` (local_name() puts it in the empty
+# namespace, and the store key is "<namespace>/<name>"), but a route's
+# `backend:` field is looked up VERBATIM. So the route must say
+# `backend: /web_app` — a bare `backend: web_app` compiles, validates, starts,
+# and then fails EVERY REQUEST at runtime with a 500 and `service not found`.
+#
+# --validate-only does NOT catch this. It is a runtime lookup, not a schema
+# check, so the config passes validation and then 500s on the first request.
+# ===========================================================================
+backends:
+  # gRPC upstreams — h2c (HTTP/2 cleartext, no TLS). `http.version: HTTP/2.0`
+  # forces prior-knowledge HTTP/2 rather than leaving the version to
+  # negotiation. There is no ALPN to negotiate with — the upstream connection is
+  # not TLS — so this must be STATED, not inferred.
+  - name: grpc_main
+    host: host.docker.internal:50051
+    policies:
+      http:
+        version: HTTP/2.0
+
+  - name: grpc_agent
+    host: host.docker.internal:50052
+    policies:
+      http:
+        version: HTTP/2.0
+
+  # HTTP/1.1 upstreams — the default protocol, nothing to declare.
+  - name: rest_gateway
+    host: host.docker.internal:8080
+
+  - name: storage_agent
+    host: host.docker.internal:8083
+
+  - name: debug
+    host: host.docker.internal:9090
+
+  - name: web_app
+    host: host.docker.internal:3000
+
+  # Keycloak — an HTTPS upstream. Aspire's keycloak serves HTTPS on :8082 with the
+  # Aspire dev cert.
+  #
+  # These two flags are NOT additive, and the order matters (backendtls.rs):
+  # `insecureHost` WINS and makes `insecure` dead code. It does not disable
+  # verification — it still does a full chain check against the container's system
+  # root store and only swallows a hostname mismatch. That works here because
+  # Aspire injects its dev cert into container trust stores; it is NOT the blanket
+  # bypass the flag names suggest. Leave both: `insecure` documents the intent and
+  # is the fallback if `insecureHost` is ever removed upstream.
+  # DEV ONLY: a real deployment terminates KC's TLS with a trusted cert.
+  - name: keycloak
+    host: host.docker.internal:8082
+    policies:
+      backendTLS:
+        insecure: true
+        insecureHost: true
+
+  # Sibling CONTAINERS on the Aspire network — reached by alias, NOT through
+  # host.docker.internal (that name is only for the HOST-PROCESS backends above).
+  #
+
+  # Kafka UI (dev tooling). It serves under /kafka via SERVER_SERVLET_CONTEXT_PATH
+  # (apphost.cs), so the ingress prefix passes through unchanged.
+  - name: kafka_ui
+    host: kafka-ui:8080
+
+  # The otel-collector's OTLP/HTTP receiver. Two jobs, one backend: the sink for
+  # BROWSER/SSR OTLP export from the start + electron apps (the /v1/traces route
+  # below), AND where this gateway ships its OWN ingress spans
+  # (frontendPolicies.tracing). Both speak OTLP/HTTP, so :4318 serves both and
+  # the collector's gRPC receiver on :4317 goes unused by us.
+  - name: otel_collector_http
+    host: otel-collector:4318
+
+  # Static API reference: the Scalar page + the OpenAPI v3 spec, served by nginx
+  # (aspire/api-docs/). A real static server rather than an inline body — see the
+  # api-docs route for why that is not optional.
+  - name: api_docs
+    host: api-docs:80
+
+# ===========================================================================
+# Frontend policies — apply to all inbound traffic on both binds.
+# ===========================================================================
+frontendPolicies:
+  tls:
+    # ALPN IS REQUIRED, NOT COSMETIC. gRPC-over-TLS selects HTTP/2 via ALPN, and
+    # grpc-go >= 1.67 refuses a connection where the server picked NO ALPN
+    # protocol ("missing selected ALPN property"). The storage agent dials the
+    # :8443 listener over TLS, so without h2 advertised here its control stream
+    # never comes up. h2 first so gRPC wins the negotiation; http/1.1 keeps the
+    # browser and REST traffic on that same socket working.
+    #
+    # The field is typed as a list of BYTE STRINGS (Vec<Vec<u8>> in
+    # types/frontend.rs), so the protocol IDs are spelled as their ASCII bytes:
+    #   [104, 50]                     = "h2"
+    #   [104,116,116,112,47,49,46,49] = "http/1.1"
+    #
+    # This happens to equal the current default. State it anyway: a silent
+    # default change here breaks the storage agent in a way that reads as a gRPC
+    # bug, not a proxy bug.
+    alpn:
+      - [104, 50]
+      - [104, 116, 116, 112, 47, 49, 46, 49]
+
+  # --- Tracing -------------------------------------------------------------
+  # NOT the top-level `config.tracing` block — that one is DEPRECATED (types/
+  # local.rs refuses to accept both) and has no span filter.
+  #
+  # THE PROBLEM `filter` SOLVES: an ingress span per request means every Vite HMR
+  # poll and every hashed static asset gets a span, which drowns the Aspire trace
+  # UI. `filter` has KEEP semantics — a span is exported only when the CEL
+  # expression is true — so the web-app/HMR/asset noise is dropped at the source
+  # and the API/auth/gRPC calls survive. (Fail-closed: a CEL eval error drops the
+  # span.) This is why the version floor at the top of this file exists.
+  #
+  # TARGET is an explicit backend reference, NOT an env var. TracingConfig's
+  # target is a required, flattened backend ref (`service` | `host` | `backend`)
+  # with no env fallback — OTEL_EXPORTER_OTLP_ENDPOINT is only consulted for the
+  # deprecated block (config.rs). So name it: `otel_collector_http`, the same
+  # collector Aspire points everything else at. `protocol: http` keeps the export
+  # on plain OTLP/HTTP over HTTP/1.1, with no h2c negotiation in the path.
+  #
+  # randomSampling: true — THE DEFAULT IS FALSE, which means the gateway would
+  # only ever continue a trace that already arrived with a traceparent and would
+  # never start one. Ingress spans are the point; opt in explicitly.
+  tracing:
+    backend: /otel_collector_http
+    protocol: http
+    path: /v1/traces
+    randomSampling: true
+    resources:
+      service.name: '"agentgateway"'
+    filter: |
+      request.path != "/v1/traces" && (
+        request.path.startsWith("/pivox.") ||
+        request.path.startsWith("/google.") ||
+        request.path.startsWith("/grpc.reflection.") ||
+        request.path.startsWith("/v1/") ||
+        request.path.startsWith("/realms/") ||
+        request.path.startsWith("/.well-known/") ||
+        request.path.startsWith("/mcp") ||
+        request.path.startsWith("/river") ||
+        request.path.startsWith("/files/")
+      )
+
+  # Per-request access log. Same noise argument as the tracing filter: the web app
+  # and its assets are most of the request volume and none of the signal, so they
+  # are filtered out. KEEP semantics here too.
+  accessLog:
+    filter: |
+      !(
+        request.path.startsWith("/assets/") ||
+        request.path.startsWith("/__tsd/") ||
+        request.path.startsWith("/@vite") ||
+        request.path.startsWith("/@fs/") ||
+        request.path.startsWith("/node_modules/")
+      )
+
+# ===========================================================================
+# Binds — the two sockets. ONE route table, anchored on :8081, aliased on :8443.
+# ===========================================================================
+binds:
+  # --- :8081 plaintext — the CLOUDFLARE TUNNEL's origin --------------------
+  # cloudflared terminates TLS at the public host and forwards plain HTTP here,
+  # so this listener stays HTTP. It is machine-facing: hitting it from a browser
+  # gives you an origin whose x-forwarded-proto says https while the connection
+  # is http, which breaks the OIDC redirect_uri. Use :8443 locally.
+  - port: 8081
+    listeners:
+      - name: plain
+        protocol: HTTP
+
+        # =================================================================
+        # THE ROUTE TABLE. Anchored here; the :8443 listener aliases it.
+        # Remember: this is a SET, not an ordered chain (header note 1).
+        # The only order that matters is anchor-before-alias.
+        # =================================================================
+        routes: &routes
+
+          # --- Service-to-service gRPC: AgentService (50052) -------------
+          # Internal (registration-token auth); no CORS. No requestTimeout: the
+          # agent control stream is a long-lived bidi stream and any TOTAL
+          # timeout would kill it mid-stream.
+          #
+          # This is a legal pathPrefix — unlike `/pivox.` (header note 2) — because
+          # it ends on a real segment boundary: `/pivox.agent.v1.AgentService` +
+          # `/Connect`. It also outranks grpc-main below on path length, so the
+          # agent stream reaches :50052 and not the public API.
+          - name: grpc-agent
+            matches:
+              - path: { pathPrefix: /pivox.agent.v1.AgentService }
+            policies:
+              requestHeaderModifier: &xfwd_proto
+                set:
+                  x-forwarded-proto: https
+                # STRIP the client's x-forwarded-host. Nothing upstream of these
+                # routes legitimately produces one, but the `start` BFF TRUSTS it
+                # (server/oidc/client.ts, publicOrigin: x-forwarded-host ?? url.host)
+                # to build its OIDC redirect_uri. Left un-stripped, a request with a
+                # forged `X-Forwarded-Host: evil.com` makes the BFF mint
+                # `https://evil.com/auth/callback` as the redirect_uri. Keycloak
+                # currently rejects that (it isn't a registered redirect URI), and
+                # PIVOX_ALLOWED_ORIGINS is a second guard — but both are elsewhere,
+                # and neither is this gateway's to rely on. The ingress is the only
+                # thing that can make x-forwarded-host trustworthy, so it does.
+                # (The Keycloak routes SET it explicitly via `transformations` and
+                # are unaffected by this.)
+                remove:
+                  - x-forwarded-host
+              urlRewrite: &preserve_host
+                authority: none
+            backends:
+              - backend: /grpc_agent
+          # --- Public gRPC -> 50051 --------------------------------------
+          # MATCHED BY CONTENT-TYPE, NOT BY PATH. This is the one route worth
+          # understanding before you edit it.
+          #
+          # There is no way to path-match "every gRPC service" here: pathPrefix is
+          # segment-aware (header note 2), so `/pivox.` matches nothing real, and a
+          # regex ranks below the `/` catch-all. Enumerating one pathPrefix per
+          # service does work — but it ROTS: every new gRPC service needs a line
+          # here, and forgetting one doesn't fail loudly, it silently serves the
+          # web app's HTML to a gRPC client.
+          #
+          # So: match `pathPrefix: /` + the gRPC content-type. Precedence (header
+          # note 1) goes path type -> path LENGTH -> method -> NUMBER OF HEADER
+          # MATCHES. This route ties the web-app catch-all on type and length, then
+          # WINS on header count. Every gRPC call — every service, present and
+          # future, including google.longrunning and grpc.reflection — lands here
+          # with nothing to keep in sync, while ordinary browser traffic on `/`
+          # still reaches the web app.
+          #
+          # gRPC-WEB IS NOT DE-FRAMED (see KNOWN GAPS). The content-type regex
+          # deliberately does NOT match `application/grpc-web*`, so such a request
+          # falls to the web app rather than arriving at pivox-cloud as frames
+          # grpc-go will reject — a 404 from the web app is a far better error than
+          # a protocol fault deep in the server.
+          - name: grpc-main
+            matches:
+              - path: { pathPrefix: / }
+                headers:
+                  - name: content-type
+                    value: { regex: "application/grpc(\\+[-a-z0-9.]+)?" }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+              # ===================================================================
+              # THE CORS POLICY. Defined once here, aliased by every other CORS
+              # route below. Fully permissive, and NOT credentialed.
+              # ===================================================================
+              #
+              # WHY WILDCARD RATHER THAN A LIST. An enumerated list cannot express
+              # what is needed. Every allowed origin is parsed as
+              # scheme://host[:port] and SCHEME and PORT are compared exactly (only
+              # the HOST takes a `*`), so:
+              #   - "localhost on any port" is not expressible; a new dev port
+              #     would silently start failing preflight.
+              #   - the literal `null` origin that a PACKAGED ELECTRON build sends
+              #     from its file:// document (main/index.ts uses win.loadFile in
+              #     prod) CANNOT be listed at all. Putting the string "null" in the
+              #     list does NOT work — verified on the wire: the request's
+              #     `Origin: null` also fails to parse, so the list branch is false
+              #     before it ever compares, and the preflight returns 200 with zero
+              #     CORS headers. Only the wildcard reaches it, because
+              #     WildcardOrList::Wildcard short-circuits BEFORE origin parsing.
+              # The response ECHOES the request's real Origin (not a literal `*`),
+              # so a file:// document correctly receives
+              # `access-control-allow-origin: null`.
+              #
+              # WHY THIS IS SAFE, not merely convenient. allowCredentials is FALSE,
+              # and nothing needs it: `start` reaches the API through a SAME-ORIGIN
+              # BFF (CORS never runs for it), and the Electron renderer sends a
+              # bearer token in the Authorization header, not a cookie
+              # (renderer/lib/api-client.ts). With no credentials a hostile page
+              # gets no cookies and still needs a bearer token it has no way to
+              # obtain, so a cross-origin read is inert. This is the posture most
+              # public bearer-authed REST APIs ship with.
+              # `*` + allowCredentials:true is the ONE combination that is a real
+              # hole — it would let any site make credentialed calls. Do not turn
+              # credentials back on without replacing the wildcard with a list.
+              #
+              # FOLLOW-UP that would let us drop the wildcard entirely: have packaged
+              # Electron load its renderer from a registered privileged scheme
+              # (pivox://, already registered for the OIDC redirect capture) instead
+              # of file://. Its origin becomes `pivox://app` — enumerable — and this
+              # collapses to [pivox://app, http://localhost:5173].
+              cors: &cors_all
+                allowOrigins: ["*"]
+                allowMethods: ["*"]
+                allowHeaders: ["*"]
+                exposeHeaders: ["*"]
+                maxAge: 86400s
+                allowCredentials: false
+            backends:
+              - backend: /grpc_main
+          # --- Debug endpoints -> 9090 -----------------------------------
+          - name: healthz
+            matches:
+              - path: { pathPrefix: /healthz }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+            backends:
+              - backend: /debug
+          - name: readyz
+            matches:
+              - path: { pathPrefix: /readyz }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+            backends:
+              - backend: /debug
+          # --- API reference (Scalar + OpenAPI spec) -> nginx -------------
+          # Served by a real static server, not inlined here, for two independent
+          # reasons: directResponse takes an INLINE body only (no filename), the
+          # spec is ~660KB, and index.html contains a `window.location.origin` JS
+          # template literal — written with the dollar-brace syntax — which this
+          # file's whole-file shell expansion (header note 3) would try to resolve
+          # as an env var and abort startup on. Merely writing the literal form in
+          # THIS COMMENT already broke one startup.
+          #
+          # NO urlRewrite: the page fetches the spec at the absolute path
+          # /api-docs/pivox.yaml, so nginx holds the files under /api-docs too and
+          # the prefix passes through untouched.
+          - name: api-docs
+            matches:
+              - path: { pathPrefix: /api-docs }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+            backends:
+              - backend: /api_docs
+          # --- Keycloak (dev IDP) -> 8082 --------------------------------
+          # This Keycloak serves at ROOT, not under /keycloak. The OIDC flow and
+          # browser SSO login use /realms (auth, token, jwks, logout, broker,
+          # account, .well-known) and /resources (login theme css/js). No
+          # requestTimeout on any of them.
+          - name: keycloak-realms
+            matches:
+              - path: { pathPrefix: /realms }
+            policies:
+              urlRewrite: *preserve_host
+              # LOAD-BEARING — do not drop, do not hardcode a host.
+              #
+              # Keycloak runs with KC_PROXY_HEADERS=xforwarded, so it builds its
+              # issuer and every redirect_uri from X-Forwarded-* and IGNORES the
+              # Host header. With only x-forwarded-proto it assumes the scheme's
+              # default port, so the local origin's `:8443` vanishes from the issuer
+              # (`https://localhost/realms/pivox`) and token validation fails
+              # against PIVOX_OIDC_ISSUER.
+              #
+              # `request.host` is the full inbound authority INCLUDING the port —
+              # exact, not approximate: the proxy normalizes an HTTP/1 request's
+              # Host header INTO the URI authority before any policy runs
+              # (`normalize_uri`, proxy/httpproxy.rs). So this yields
+              # "localhost:8443" locally and "pivox.app" through the tunnel —
+              # correct in both profiles, with no per-profile value.
+              #
+              # This MUST be `transformations`, not `requestHeaderModifier`: the
+              # latter's values are literal strings; only `transformations`
+              # evaluates CEL. Hence the quoted-literal '"https"' — it is an
+              # expression too, not a bare string.
+              transformations: &keycloak_xfwd
+                request:
+                  set:
+                    x-forwarded-proto: '"https"'
+                    x-forwarded-host: request.host
+            backends:
+              - backend: /keycloak
+          - name: keycloak-resources
+            matches:
+              - path: { pathPrefix: /resources }
+            policies:
+              urlRewrite: *preserve_host
+              transformations: *keycloak_xfwd
+            backends:
+              - backend: /keycloak
+          # SECURITY — DEV ONLY. NEVER carry /admin to prod. `pathPrefix: /admin`
+          # exposes not just the Keycloak admin CONSOLE but `/admin/realms/*` — the
+          # full Admin REST API — through the public ingress. Prod reaches the
+          # console directly on :8082, never through the gateway. The backend trusts
+          # the KC `sub` as identities.id, so realm control equals impersonation of
+          # any user; with no edge rate-limit in the tunneled dev flow, an
+          # internet-reachable admin login widens the blast radius. Keep the dev
+          # admin password non-guessable.
+          - name: keycloak-admin
+            matches:
+              - path: { pathPrefix: /admin }
+            policies:
+              urlRewrite: *preserve_host
+              transformations: *keycloak_xfwd
+            backends:
+              - backend: /keycloak
+          - name: keycloak-js
+            matches:
+              - path: { pathPrefix: /js }
+            policies:
+              urlRewrite: *preserve_host
+              transformations: *keycloak_xfwd
+            backends:
+              - backend: /keycloak
+          # --- OAuth/OIDC AS metadata discovery -> Keycloak --------------
+          # MCP clients fetch authorization-server metadata at the host-root
+          # well-known path, but Keycloak only serves it under /realms/{realm}/.
+          #
+          # There is no regex path rewrite (see KNOWN GAPS), but none is needed:
+          # only two literal well-known documents are ever requested, so each gets
+          # its own prefix rewrite. ReplacePrefixMatch semantics replace exactly the
+          # matched prefix and preserve whatever follows, which is what the trailing
+          # path segments need. Realm pinned to `pivox`.
+          #
+          # Both carry the X-Forwarded pair for the same reason /realms does:
+          # Keycloak builds the ISSUER inside this discovery document from
+          # X-Forwarded-*. This is the RFC 8414 metadata endpoint MCP clients
+          # discover through, so a wrong issuer here breaks their auth against any
+          # non-443 origin.
+          - name: wellknown-oauth-as
+            matches:
+              - path: { pathPrefix: /.well-known/oauth-authorization-server }
+            policies:
+              urlRewrite:
+                authority: none
+                path:
+                  prefix: /realms/pivox/.well-known/oauth-authorization-server
+              transformations: *keycloak_xfwd
+            backends:
+              - backend: /keycloak
+          - name: wellknown-openid-configuration
+            matches:
+              - path: { pathPrefix: /.well-known/openid-configuration }
+            policies:
+              urlRewrite:
+                authority: none
+                path:
+                  prefix: /realms/pivox/.well-known/openid-configuration
+              transformations: *keycloak_xfwd
+            backends:
+              - backend: /keycloak
+          # --- Kafka UI (dev tooling) -> /kafka --------------------------
+          # SECURITY — THE MOST EXPOSED ROUTE IN THIS FILE. Read before touching.
+          # kafka-ui runs with NO authentication and NO read-only mode, and the
+          # topics it browses are `keycloak-events` / `keycloak-admin-events` —
+          # admin events WITH representation, i.e. user emails, Keycloak `sub` IDs
+          # and profile payloads. Anyone who learns the public host can GET /kafka
+          # and read every identity event ever produced, with zero credentials;
+          # kafka-ui also permits producing messages and topic operations.
+          # That is strictly worse than /admin above, which at least demands a
+          # password. While the Cloudflare tunnel is up, this IS internet-exposed.
+          # Kept in the ingress for dev convenience — NEVER route this in prod, and
+          # be aware of it when the tunnel is running.
+          - name: kafka-ui
+            matches:
+              - path: { pathPrefix: /kafka }
+            policies:
+              urlRewrite: *preserve_host
+              requestHeaderModifier: *xfwd_proto
+            backends:
+              - backend: /kafka_ui
+
+          # --- Browser OTLP traces -> otel-collector (4318) --------------
+          # The start + electron apps export browser spans here. An EXACT match, so
+          # it outranks the /v1 prefix below structurally, with no dependence on
+          # list order (header note 1).
+          #
+          # DEV ONLY — an UNAUTHENTICATED OTLP ingest. Fine behind the local dev
+          # tunnel; NEVER put this route on a prod/public ingress: it would be an
+          # open span sink (dashboard pollution / DoS).
+          - name: otlp-traces
+            matches:
+              - path: { exact: /v1/traces }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+              cors: *cors_all
+            backends:
+              - backend: /otel_collector_http
+          # --- REST surface -> the Go grpc-gateway (8080) ----------------
+          # NO requestTimeout: the AiChat verbs stream SSE on this prefix, and
+          # requestTimeout is TOTAL — it bounds the whole response including a
+          # streaming body — so any cap here truncates a long chat mid-token.
+          #
+          # There is no idle timeout to fall back on (see KNOWN GAPS), so this route
+          # runs with no timeout at all: a hung upstream holds the connection until
+          # the client gives up. Correctness for the stream beats the stall guard.
+          - name: rest-v1
+            matches:
+              - path: { pathPrefix: /v1 }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+              # THIS is the route packaged Electron actually calls: its renderer
+              # points @pivox/client at this REST surface and attaches a bearer over
+              # IPC. From a file:// document that is a cross-origin request with
+              # `Origin: null` — which is precisely why the shared policy is a
+              # wildcard. See its definition on grpc-main above. (`start` is
+              # unaffected either way: it reaches /v1 through its same-origin BFF,
+              # so CORS never runs for it.)
+              cors: *cors_all
+              responseHeaderModifier:
+                add:
+                  vary: origin
+            backends:
+              - backend: /rest_gateway
+          # --- River UI -> 8080 ------------------------------------------
+          # SECURITY — DEV ONLY, and NOT merely a dashboard. River's UI is mounted
+          # with NO AUTH (cmd/pivox-cloud/main.go says so explicitly), it leaks job
+          # names, arguments and error details, and it can CANCEL and RETRY jobs.
+          # On a public origin that is an unauthenticated write surface over the job
+          # queue. Kept in the ingress for dev convenience — never route it in prod.
+          #
+          # A segment-aware pathPrefix of `/river` matches the bare path AND
+          # everything under it, so no bare-path redirect hop is needed. No
+          # timeouts (long-poll).
+          - name: river-ui
+            matches:
+              - path: { pathPrefix: /river }
+            policies:
+              urlRewrite: *preserve_host
+              requestHeaderModifier: *xfwd_proto
+            backends:
+              - backend: /rest_gateway
+
+          # --- Remote MCP server -> api REST (rest_gateway) --------------
+          # /mcp (Streamable transport) + /mcp/.well-known/... (public PRM
+          # discovery). No timeouts — the SSE stream is long-lived.
+          - name: mcp
+            matches:
+              - path: { pathPrefix: /mcp }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+            backends:
+              - backend: /rest_gateway
+          # --- Storage agent -> 8083 -------------------------------------
+          - name: storage-agent-files
+            matches:
+              - path: { pathPrefix: /files }
+            policies:
+              urlRewrite: *preserve_host
+              timeout:
+                requestTimeout: 60s
+              requestHeaderModifier:
+                set:
+                  x-forwarded-proto: https
+            backends:
+              - backend: /storage_agent
+          # --- TanStack DevTools SSE -> web app (3000) -------------------
+          # No timeouts (SSE).
+          - name: tanstack-devtools
+            matches:
+              - path: { pathPrefix: /__tsd }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+            backends:
+              - backend: /web_app
+          # --- Hashed static assets -> web app (immutable) ---------------
+          - name: web-assets
+            matches:
+              - path: { pathPrefix: /assets }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+              responseHeaderModifier:
+                set:
+                  cache-control: public, max-age=31536000, immutable
+            backends:
+              - backend: /web_app
+          # --- Web app (catch-all) -> 3000 -------------------------------
+          # Vite's HMR WebSocket runs through here. HTTP upgrades (WebSocket
+          # included) are proxied natively — there is no `upgrade_configs`
+          # equivalent to declare, the upgrade path is wired unconditionally in
+          # proxy/httpproxy.rs. No timeouts: HMR holds the socket open
+          # indefinitely.
+          #
+          # This is the LOWEST-precedence route by construction: pathPrefix `/`
+          # (length 1, no method or header matches) sorts last under Gateway API
+          # rules, so every route above wins for its own paths regardless of where
+          # it sits in this file.
+          - name: web-app
+            matches:
+              - path: { pathPrefix: / }
+            policies:
+              requestHeaderModifier: *xfwd_proto
+              urlRewrite: *preserve_host
+            backends:
+              - backend: /web_app
+  # --- :8443 TLS — the LOCAL origin (no tunnel, no DNS, no Cloudflare) ------
+  # Serves the EXACT SAME routes as :8081 — `*routes` is an alias of the very same
+  # table, so the two sockets cannot drift — but terminates TLS with the Aspire
+  # developer certificate. That cert is already trusted by the OS
+  # (`aspire certs trust`), so browser, Node and Go all accept
+  # https://localhost:8443 with no warnings and no per-language trust plumbing.
+  #
+  # This is what makes a purely local dev flow work: every hardcode that exists
+  # because production has an ingress — the `https://` in the asset-URL builder,
+  # the `x-forwarded-proto: https` on the routes above, Electron's single-origin
+  # BASE_URL — stays TRUE here instead of needing a local-only exception.
+  #
+  # PORT 8443 IS LOAD-BEARING. It must equal Keycloak's INTERNAL https port. The
+  # browser reaches KC through this listener (Host: localhost:8443), and KC's SSO
+  # backchannel reaches the acme realm by calling https://localhost:8443 from
+  # INSIDE its own container — which lands on KC itself, on that same port. Both
+  # paths therefore mint the same issuer (https://localhost:8443/realms/acme) and
+  # token validation succeeds. Renumber this and SSO breaks with an issuer
+  # mismatch that looks nothing like a port problem.
+  #
+  # cert/key are env placeholders, expanded natively (header note 3). Aspire names
+  # the real files after the cert thumbprint — which changes whenever the cert is
+  # regenerated — and exposes their paths only as env vars, so they cannot be
+  # baked in.
+  #
+  # ALPN for this listener is set globally in frontendPolicies.tls above — see
+  # that block for why h2 must be advertised.
+  - port: 8443
+    listeners:
+      - name: secure
+        protocol: HTTPS
+        tls:
+          cert: ${PIVOX_TLS_CERT}
+          key: ${PIVOX_TLS_KEY}
+        routes: *routes

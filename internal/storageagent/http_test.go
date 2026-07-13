@@ -61,7 +61,7 @@ func makeJWT(claims map[string]any, key []byte) string {
 // ---------------------------------------------------------------------------
 
 // The agent's public URL contract is /files/{endpoint}/{key} —
-// permanent prefix shared between dev (nginx → loopback agent) and
+// permanent prefix shared between dev (ingress → loopback agent) and
 // prod (gateway edge proxy → public agent). The mux returned by
 // muxedHandler() strips /files/ before the existing ServeHTTP sees
 // the request, and 404s anything outside /files/. Tests drive the

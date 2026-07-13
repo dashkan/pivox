@@ -3,7 +3,7 @@
 # pipeline (you get "no receiver/pipeline" without this) and appends its own
 # health_check extension via --config merge.
 #
-# Receives OTLP from the envoy container (plaintext, :4317) and forwards to the
+# Receives OTLP from the agentgateway container (plaintext, :4318) and forwards to the
 # Aspire dashboard. Endpoint = OTEL_EXPORTER_OTLP_ENDPOINT (from
 # withOtlpExporter — the CONTAINER-reachable dashboard address; the toolkit's
 # own ASPIRE_ENDPOINT is loopback-only). Header key = ASPIRE_API_KEY (toolkit).

@@ -12,7 +12,7 @@ installErrorReporters();
 
 // Browser OpenTelemetry tracing. SSR-guarded + no-op unless VITE_OTEL_TRACES_URL
 // is set. The API client is same-origin (window.location.origin, fronted by
-// envoy), so fetch instrumentation auto-propagates traceparent to the backend —
+// the ingress), so fetch instrumentation auto-propagates traceparent to the backend —
 // no propagateTraceHeaderCorsUrls needed.
 installWebTracing({
   // Matches the Aspire resource name ("start") so the dashboard shows one

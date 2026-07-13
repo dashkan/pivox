@@ -70,7 +70,7 @@ export function installNodeTracing(config: NodeTracingConfig = {}): void {
           ? resourceFromAttributes({ [ATTR_SERVICE_NAME]: config.serviceName })
           : undefined,
       // OTLP/HTTP + protobuf. A traces-specific URL is used verbatim — we point
-      // it at the envoy /v1/traces route (plaintext) so Node never has to trust
+      // it at the ingress /v1/traces route (plaintext) so Node never has to trust
       // the dashboard's dev TLS cert (which Go trusts via the system store but
       // Node's TLS/grpc-js does not). Without a URL it reads
       // OTEL_EXPORTER_OTLP_ENDPOINT (the exporter appends /v1/traces).

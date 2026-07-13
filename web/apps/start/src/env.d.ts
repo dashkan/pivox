@@ -5,6 +5,6 @@
 // the app actually reads.
 interface ImportMetaEnv {
   // OTLP/HTTP traces endpoint for browser tracing (e.g. "/v1/traces", routed
-  // through envoy to the collector). Unset => tracing disabled. See router.tsx.
+  // through the ingress to the collector). Unset => tracing disabled. See router.tsx.
   readonly VITE_OTEL_TRACES_URL?: string;
 }

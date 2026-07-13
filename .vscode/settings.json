@@ -89,7 +89,7 @@
   // On macOS the C# Dev Kit can't restore the Windows-targeting .NET
   // projects (native/tests/windows-ui, dotnet/Pivox.WinUI) and parks
   // permanent NETSDK1100 errors in the Problems panel. With the default
-  // "prompt", every launch (start, cloud, worker, envoy) hits
+  // "prompt", every launch (start, cloud, worker) hits
   // "Error exists after running preLaunchTask ...". Those errors are
   // cross-stack noise, never produced by our task problem matchers, so
   // launch anyway.

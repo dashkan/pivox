@@ -85,7 +85,7 @@ func main() {
 	f.String("database-url", envOrDefault("PIVOX_DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"), "PostgreSQL connection URL")
 	f.String("grpc-port", envOrDefault("PIVOX_GRPC_PORT", ":50051"), "Public gRPC listen address (OIDC/Keycloak-authenticated)")
 	// Service-to-service surface defaults to loopback. Production binds via
-	// nginx (configs/nginx.conf maps /pivox.agent.v1.AgentService/ to this
+	// the ingress (configs/agentgateway.yaml routes /pivox.agent.v1.AgentService/ to this
 	// port), so external reach is opt-in by either changing this flag or
 	// terminating at a reverse proxy. Token validation in
 	// AgentAuthStreamInterceptor still gates direct connections — defense

@@ -33,22 +33,6 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/pivox-worker"
-    },
-    {
-      "name": "envoy",
-      "type": "node",
-      "env": {
-        "ENVOY_LOG_LEVEL": "info"
-      },
-      "request": "launch",
-      "runtimeExecutable": "envoy", // Just the name, no path needed!
-      "runtimeArgs": [
-        "-c",
-        "${workspaceFolder}/configs/envoy.yaml",
-        "-l",
-        "${ENVOY_LOG_LEVEL}"
-      ],
-      "console": "integratedTerminal"
     }
   ]
 }

@@ -14,21 +14,13 @@
   <body>
     <div id="app"></div>
 
-    <!-- Scalar API Reference, loaded from the jsDelivr CDN (needs internet at
-         page load). Served verbatim by envoy via direct_response — see the
-         /api-docs routes in configs/envoy.yaml. -->
+    <!-- Scalar API Reference, from the jsDelivr CDN (needs internet at page load). -->
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 
-    <!-- Spec is served same-origin by the same envoy listener, so no proxyUrl
-         is needed. The generated OpenAPI v3 doc lives next to this file at
-         api/openapi/v3/pivox.yaml and is exposed at /api-docs/pivox.yaml. -->
     <script>
-      // OAuth endpoints are derived from the origin serving these docs, so the
-      // "Authorize" flow always targets the same Keycloak that fronts this page
-      // (envoy proxies /realms/ same-origin). No hardcoded host and no build-time
-      // env substitution — it adapts to whatever host serves /api-docs
-      // (pivox.app in dev, prod origin in prod). Overrides the spec's placeholder
-      // authorizationUrl/tokenUrl (Scalar honors these — see its config docs).
+      // Derive the OAuth endpoints from this page's own origin, so "Authorize"
+      // always targets the Keycloak fronting whatever host is serving the docs.
+      // Overrides the spec's placeholder authorizationUrl/tokenUrl.
       const kcOidc = `${window.location.origin}/realms/pivox/protocol/openid-connect`;
       Scalar.createApiReference('#app', {
         url: '/api-docs/pivox.yaml',

@@ -492,7 +492,7 @@ func promoteToIngestedAsset(
 // endpointID). Hostname matches the dev seed flip
 // (10_storage_gateways.sql) so the e2e assertion shape parallels what
 // the dev Library would produce against rustfs through the tunnel →
-// nginx /files/ → agent. Inline rather than via a fixture because
+// ingress /files/ → agent. Inline rather than via a fixture because
 // the thumbnail-URL test is the only consumer; promote to
 // internal/testutil/fixtures when a second consumer arrives.
 func seedThumbnailGateway(
@@ -551,7 +551,7 @@ func lastSegment(name string) string {
 //   - VIDEO asset → empty thumbnail_url (renderer's
 //     IconConfigResolver chain falls through to iconField).
 //
-// The /files/ prefix is permanent — in dev nginx routes it to the
+// The /files/ prefix is permanent — in dev the ingress routes it to the
 // storage agent, in prod the gateway's edge proxy serves it at the
 // public hostname. Same prefix in both, different host (DECISION 1).
 func TestE2E_QueryDashboardData_ThumbnailURL_Synthesis(t *testing.T) {

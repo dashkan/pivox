@@ -52,11 +52,6 @@ __debug_bin*
 build-errors.log
 .envrc.*
 
-# Generated Envoy proto descriptor set — the FileDescriptorSet the
-# grpc_json_transcoder filter loads. Rebuilt from protos by
-# `make envoy-descriptor` (a prerequisite of the proxy-envoy* targets).
-configs/pivox.pb
-
 # ──────────────────────────────────────────────────────────────────
 
 # Created by https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,swift,direnv,nextjs,windows,certificates,jetbrains+all,visualstudiocode

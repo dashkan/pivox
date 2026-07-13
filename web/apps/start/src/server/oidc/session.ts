@@ -50,7 +50,7 @@ export interface LoginTx {
 
 /**
  * True when the request reached us over HTTPS — directly, or via a
- * TLS-terminating proxy (envoy/the tunnel set x-forwarded-proto). Drives the cookie
+ * TLS-terminating proxy (the ingress/the tunnel set x-forwarded-proto). Drives the cookie
  * Secure attribute so it's on for every real (https) deployment and off only for
  * plaintext local dev (http://localhost), where Secure cookies wouldn't be sent.
  */
