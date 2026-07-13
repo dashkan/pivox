@@ -166,7 +166,8 @@ Every parameter is available as both a CLI argument and an environment variable.
 | Parameter | CLI Arg | Env Var | Default |
 |---|---|---|---|
 | Registration token | `--token` | `PIVOX_TOKEN` | (required) |
-| Cache directory | `--cache-dir` | `PIVOX_CACHE_DIR` | `/var/lib/pivox/cache` |
+| Cache directory | `--cache-dir` | `PIVOX_AGENT_CACHE_DIR` | `/var/lib/pivox/cache` |
+| State directory | `--state-dir` | `PIVOX_AGENT_STATE_DIR` | `/var/lib/pivox/state` |
 | Cache size (GB) | `--cache-size` | `PIVOX_CACHE_SIZE` | auto (80% avail) |
 | HTTPS port | `--port` | `PIVOX_PORT` | `443` |
 | Bind address | `--bind` | `PIVOX_BIND` | `0.0.0.0` |

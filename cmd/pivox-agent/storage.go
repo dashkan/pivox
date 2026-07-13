@@ -31,8 +31,12 @@ the cloud.`,
 
 	f := cmd.Flags()
 	f.String("token", envOrDefault("PIVOX_TOKEN", ""), "Registration token from the storage gateway")
-	f.String("cache-dir", envOrDefault("PIVOX_CACHE_DIR", "/var/lib/pivox/cache"), "Cache directory path")
-	f.String("state-dir", envOrDefault("PIVOX_STATE_DIR", "/var/lib/pivox/state"), "Agent state directory (sessions, denied patterns, endpoints). Persisted across restarts; do NOT colocate with --cache-dir or include in cache cleanup.")
+	// PIVOX_AGENT_* rather than PIVOX_*: the agent is deployed alongside the cloud
+	// binaries and, in dev, runs as a host process under the same environment — so
+	// unprefixed names share a namespace with the cloud's own config. The defaults
+	// stay /var/lib/pivox/* for a real (root-owned, systemd) Linux install.
+	f.String("cache-dir", envOrDefault("PIVOX_AGENT_CACHE_DIR", "/var/lib/pivox/cache"), "Cache directory path")
+	f.String("state-dir", envOrDefault("PIVOX_AGENT_STATE_DIR", "/var/lib/pivox/state"), "Agent state directory (sessions, denied patterns, endpoints). Persisted across restarts; do NOT colocate with --cache-dir or include in cache cleanup.")
 	f.Int("cache-size", envOrDefaultInt("PIVOX_CACHE_SIZE", 0), "Disk cache size in GB (0 = auto-detect, 80% of available disk)")
 	f.Int("memcache-max-items", envOrDefaultInt("PIVOX_MEMCACHE_MAX_ITEMS", 0), "In-memory cache: max items (0=default 100, hard max 100000)")
 	f.Int("memcache-max-item-mb", envOrDefaultInt("PIVOX_MEMCACHE_MAX_ITEM_MB", 0), "In-memory cache: max size of a single item in MB (0=default 8, hard max 64)")
