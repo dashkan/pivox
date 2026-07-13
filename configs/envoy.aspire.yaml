@@ -65,9 +65,13 @@ admin:
 
 static_resources:
   listeners:
+    # Bound on :: with ipv4_compat rather than 0.0.0.0: Node resolves `localhost`
+    # to ::1 FIRST, so an IPv4-only bind makes any server-side call from the BFF to
+    # this ingress ECONNREFUSED. Same class of bug as the one already documented in
+    # web/apps/start/vite.config.ts.
     - name: ingress_8081
       address:
-        socket_address: { address: 0.0.0.0, port_value: 8081 }
+        socket_address: { address: "::", port_value: 8081, ipv4_compat: true }
       filter_chains:
         - filters:
             - name: envoy.filters.network.http_connection_manager
@@ -279,20 +283,64 @@ static_resources:
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                            # KC_PROXY_HEADERS=xforwarded makes Keycloak build its
+                            # issuer + redirect URLs from X-Forwarded-* and IGNORE Host.
+                            # With only x-forwarded-proto it assumed the default port for
+                            # the scheme, so the local origin's :8443 vanished from the
+                            # issuer (https://localhost/realms/pivox) and token validation
+                            # failed against PIVOX_OIDC_ISSUER. :authority is whatever the
+                            # client actually asked for — "localhost:8443" locally,
+                            # "pivox.app" through the tunnel — so this is correct in both
+                            # profiles with no per-profile value.
+                            - header: { key: x-forwarded-host, value: "%REQ(:AUTHORITY)%" }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
                         - match: { prefix: "/resources/" }
                           route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                            # KC_PROXY_HEADERS=xforwarded makes Keycloak build its
+                            # issuer + redirect URLs from X-Forwarded-* and IGNORE Host.
+                            # With only x-forwarded-proto it assumed the default port for
+                            # the scheme, so the local origin's :8443 vanished from the
+                            # issuer (https://localhost/realms/pivox) and token validation
+                            # failed against PIVOX_OIDC_ISSUER. :authority is whatever the
+                            # client actually asked for — "localhost:8443" locally,
+                            # "pivox.app" through the tunnel — so this is correct in both
+                            # profiles with no per-profile value.
+                            - header: { key: x-forwarded-host, value: "%REQ(:AUTHORITY)%" }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
                         - match: { prefix: "/admin/" }
                           route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                            # KC_PROXY_HEADERS=xforwarded makes Keycloak build its
+                            # issuer + redirect URLs from X-Forwarded-* and IGNORE Host.
+                            # With only x-forwarded-proto it assumed the default port for
+                            # the scheme, so the local origin's :8443 vanished from the
+                            # issuer (https://localhost/realms/pivox) and token validation
+                            # failed against PIVOX_OIDC_ISSUER. :authority is whatever the
+                            # client actually asked for — "localhost:8443" locally,
+                            # "pivox.app" through the tunnel — so this is correct in both
+                            # profiles with no per-profile value.
+                            - header: { key: x-forwarded-host, value: "%REQ(:AUTHORITY)%" }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
                         - match: { prefix: "/js/" }
                           route: { cluster: keycloak, timeout: 0s, idle_timeout: 0s }
                           request_headers_to_add:
                             - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                            # KC_PROXY_HEADERS=xforwarded makes Keycloak build its
+                            # issuer + redirect URLs from X-Forwarded-* and IGNORE Host.
+                            # With only x-forwarded-proto it assumed the default port for
+                            # the scheme, so the local origin's :8443 vanished from the
+                            # issuer (https://localhost/realms/pivox) and token validation
+                            # failed against PIVOX_OIDC_ISSUER. :authority is whatever the
+                            # client actually asked for — "localhost:8443" locally,
+                            # "pivox.app" through the tunnel — so this is correct in both
+                            # profiles with no per-profile value.
+                            - header: { key: x-forwarded-host, value: "%REQ(:AUTHORITY)%" }
                               append_action: OVERWRITE_IF_EXISTS_OR_ADD
 
                         # --- Kafka UI (dev tooling) -> /kafka ----------------
@@ -409,6 +457,17 @@ static_resources:
                               pattern:
                                 regex: '^/\.well-known/([^/]+)(/.*)?$'
                               substitution: /realms/pivox/.well-known/\1
+                          request_headers_to_add:
+                            # Same reason as the /realms/ route: Keycloak builds the issuer
+                            # in this discovery document from X-Forwarded-*, so without them
+                            # the document advertises the wrong origin (the port is dropped:
+                            # "https://localhost/realms/pivox"). This is the RFC 8414 metadata
+                            # endpoint MCP clients discover through, so a wrong issuer here
+                            # breaks their auth against any non-443 origin.
+                            - header: { key: x-forwarded-proto, value: https }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                            - header: { key: x-forwarded-host, value: "%REQ(:AUTHORITY)%" }
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
 
                         # --- TanStack DevTools SSE -> web app (3000) --------
                         - match: { prefix: "/__tsd/" }
