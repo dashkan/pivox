@@ -1760,67 +1760,6 @@
       "webOrigins": [
         "+"
       ]
-    },
-    {
-      "adminUrl": "",
-      "alwaysDisplayInConsole": false,
-      "attributes": {
-        "backchannel.logout.revoke.offline.tokens": "false",
-        "backchannel.logout.session.required": "true",
-        "client.secret.creation.time": "1782790386",
-        "display.on.consent.screen": "true",
-        "dpop.bound.access.tokens": "false",
-        "frontchannel.logout.session.required": "true",
-        "logout.confirmation.enabled": "false",
-        "oauth2.device.authorization.grant.enabled": "false",
-        "oauth2.jwt.authorization.grant.enabled": "false",
-        "oidc.ciba.grant.enabled": "false",
-        "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "${IMPORT_KC_APP_URL}/realms/test/broker/oidc.acme/endpoint/logout_response",
-        "realm_client": "false",
-        "standard.token.exchange.enabled": "false"
-      },
-      "authenticationFlowBindingOverrides": {},
-      "baseUrl": "",
-      "bearerOnly": false,
-      "clientAuthenticatorType": "client-secret",
-      "clientId": "test",
-      "consentRequired": true,
-      "defaultClientScopes": [
-        "acr",
-        "basic",
-        "email",
-        "profile",
-        "roles",
-        "web-origins"
-      ],
-      "description": "",
-      "directAccessGrantsEnabled": false,
-      "enabled": true,
-      "frontchannelLogout": true,
-      "fullScopeAllowed": true,
-      "id": "5b854b4a-9f57-49b4-84c2-17e587dae6ac",
-      "implicitFlowEnabled": false,
-      "name": "",
-      "nodeReRegistrationTimeout": -1,
-      "notBefore": 0,
-      "optionalClientScopes": [
-        "address",
-        "microprofile-jwt",
-        "offline_access",
-        "organization",
-        "phone"
-      ],
-      "protocol": "openid-connect",
-      "publicClient": false,
-      "redirectUris": [
-        "${IMPORT_KC_APP_URL}/realms/test/broker/oidc.acme/endpoint"
-      ],
-      "rootUrl": "",
-      "serviceAccountsEnabled": false,
-      "standardFlowEnabled": true,
-      "surrogateAuthRequired": false,
-      "webOrigins": []
     }
   ],
   "components": {
@@ -2484,8 +2423,7 @@
           "name": "view-users"
         }
       ],
-      "security-admin-console": [],
-      "test": []
+      "security-admin-console": []
     },
     "realm": [
       {

@@ -74,19 +74,6 @@
       "username": "emma@acme.com"
     },
     {
-      "clientConsents": [
-        {
-          "clientId": "test",
-          "createdDate": 1783756268030,
-          "grantedClientScopes": [
-            "email",
-            "profile",
-            "roles",
-            "test"
-          ],
-          "lastUpdatedDate": 1783756268045
-        }
-      ],
       "createdTimestamp": 1782792495119,
       "credentials": [
         {
