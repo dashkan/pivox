@@ -28,6 +28,16 @@
 #      they must be ABSOLUTE under the /etc/envoy/openapi bind-mount (added in
 #      apphost.mts from ../api/openapi/v3). Re-apply the absolute paths by hand
 #      after regenerating.
+#   7. The `ingress_8443` TLS listener + the `&hcm` anchor on the 8081 listener's
+#      HttpConnectionManager (NOT in envoy.yaml, NOT produced by the sed below).
+#      This is the LOCAL origin — envoy terminates TLS with the Aspire developer
+#      certificate, so the whole stack runs with no public host, no DNS and no
+#      tunnel. It is Aspire-only because the cert only exists there: the plain
+#      `make dev` flow has no dev cert, and a TLS listener naming a cert that
+#      isn't on disk fails to bind.
+#      The two listeners share ONE HttpConnectionManager via the YAML anchor
+#      (`typed_config: &hcm` on 8081, `typed_config: *hcm` on 8443) — same routes,
+#      two sockets, so they cannot drift. Re-add both by hand after regenerating.
 # Regenerate after editing envoy.yaml:
 #   sed -E -e '/port_value: 9901/!s/address: 127\.0\.0\.1/address: host.docker.internal/g' \
 #          -e 's/      type: STATIC/      type: STRICT_DNS\n      dns_lookup_family: V4_ONLY/' \
@@ -65,17 +75,23 @@ admin:
 
 static_resources:
   listeners:
+    # --- :8081 plaintext — the CLOUDFLARE TUNNEL's origin ---------------------
+    # cloudflared terminates TLS at the public host and forwards plain HTTP here,
+    # so this listener stays http. It is machine-facing: hitting it from a browser
+    # gives you an origin whose x-forwarded-proto says https (below) while the
+    # connection is http, which breaks the OIDC redirect_uri. Use :8443 locally.
+    #
     # Bound on :: with ipv4_compat rather than 0.0.0.0: Node resolves `localhost`
-    # to ::1 FIRST, so an IPv4-only bind makes any server-side call from the BFF to
-    # this ingress ECONNREFUSED. Same class of bug as the one already documented in
-    # web/apps/start/vite.config.ts.
+    # to ::1 FIRST, and an IPv4-only bind means the BFF's server-side token
+    # exchange to the issuer would ECONNREFUSED. Same class of bug as the one
+    # already documented in web/apps/start/vite.config.ts.
     - name: ingress_8081
       address:
         socket_address: { address: "::", port_value: 8081, ipv4_compat: true }
       filter_chains:
         - filters:
             - name: envoy.filters.network.http_connection_manager
-              typed_config:
+              typed_config: &hcm
                 "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
                 stat_prefix: ingress_http
                 # Per-request access log to stdout — shows up in `make dev`
@@ -491,6 +507,55 @@ static_resources:
                         # --- Web app (catch-all) -> 3000, WebSocket HMR ------
                         - match: { prefix: "/" }
                           route: { cluster: web_app, timeout: 0s, idle_timeout: 0s }
+
+    # --- :8443 TLS — the LOCAL origin (no tunnel, no DNS, no Cloudflare) -------
+    # Serves the exact same routes as :8081 (the `*hcm` alias below is the very
+    # same HttpConnectionManager — one config, two sockets, so the two listeners
+    # cannot drift), but terminates TLS with the Aspire developer certificate.
+    # That cert is already trusted by the OS (`aspire certs trust`), so the
+    # browser, Node and Go all accept https://localhost:8443 with no warnings and
+    # no per-language trust plumbing.
+    #
+    # This is what makes a purely local dev flow work: every hardcode that exists
+    # because production has an ingress — the `https://` in the asset-URL builder,
+    # `x-forwarded-proto: https` on the routes, Electron's single-origin BASE_URL —
+    # stays TRUE here instead of needing a local-only exception.
+    #
+    # PORT 8443 IS LOAD-BEARING. It must equal Keycloak's INTERNAL https port.
+    # The browser reaches KC through this listener (Host: localhost:8443), and KC's
+    # SSO backchannel reaches the acme realm by calling https://localhost:8443 from
+    # INSIDE its own container — which lands on KC itself, on that same port. Both
+    # paths therefore mint the same issuer (https://localhost:8443/realms/acme) and
+    # token validation succeeds. Renumber this and SSO breaks with an issuer
+    # mismatch that looks nothing like a port problem.
+    #
+    # The cert/key are symlinks created by the container's start command: Aspire
+    # names the real files after the cert thumbprint (which changes when the cert is
+    # regenerated) and exposes their paths only as env vars, and envoy's static
+    # config cannot read env. The symlinks give the config a stable path to name.
+    # See the envoy resource in aspire/apphost.cs.
+    - name: ingress_8443
+      address:
+        socket_address: { address: "::", port_value: 8443, ipv4_compat: true }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config: *hcm
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+              common_tls_context:
+                # ALPN is REQUIRED, not cosmetic. gRPC-over-TLS selects HTTP/2 via ALPN,
+                # and grpc-go >= 1.67 refuses a connection where the server picked no ALPN
+                # protocol ("missing selected ALPN property"). The storage agent dials this
+                # listener over TLS, so without h2 advertised here its control stream never
+                # comes up. h2 first so gRPC wins the negotiation; http/1.1 keeps the
+                # browser and REST traffic on this same listener working.
+                alpn_protocols: ["h2", "http/1.1"]
+                tls_certificates:
+                  - certificate_chain: { filename: /tmp/tls.crt }
+                    private_key: { filename: /tmp/tls.key }
 
   clusters:
     # gRPC backends speak HTTP/2 (h2c).

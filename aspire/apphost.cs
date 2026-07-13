@@ -183,6 +183,31 @@ var keycloak = builder
   // + select-organization authenticator), baked in via `kc build`. Versions
   // pinned in aspire/keycloak/Dockerfile (KC_VERSION / PIVOX_KC_SPI_VERSION).
   .WithDockerfile("keycloak")
+  // Teach Keycloak's JVM to trust the Aspire developer certificate.
+  //
+  // Load-bearing for SSO: the acme identity provider's backchannel (token, jwks) is
+  // an https call Keycloak makes to ITSELF over the dev cert. Without trust it dies
+  // with "PKIX path building failed: unable to find valid certification path" — an
+  // error that names nothing resembling a truststore.
+  //
+  // Aspire mounts the cert here and points SSL_CERT_DIR at it, but that is OpenSSL's
+  // mechanism and Keycloak is Java: JSSE ignores SSL_CERT_DIR, so Aspire's default
+  // container trust is a silent no-op. Keycloak's own KC_TRUSTSTORE_PATHS does not
+  // work either — its FileTruststoreProvider (the truststore the identity broker's
+  // HTTP client uses) initializes from the JVM cacerts BEFORE TruststoreBuilder reads
+  // those paths, and it only ingests certs it classifies as CAs, which the dev cert —
+  // a self-signed LEAF — is not. So the cert must be in the JVM truststore itself.
+  //
+  // cacerts is root-owned and read-only while Keycloak runs as uid 1000, so the image's
+  // entrypoint wrapper (aspire/keycloak/entrypoint.sh) copies it, appends every PEM in
+  // PIVOX_EXTRA_CA_DIR, and points the JVM at the copy. Copying rather than replacing
+  // keeps the ~146 public roots, which is what keeps Google/GitHub brokering working.
+  //
+  // The literal path (rather than the trust-config callback's CertificateDirectoriesPath)
+  // is deliberate: that property resolves to an OpenSSL-style COLON-SEPARATED list of
+  // candidate trust dirs, not a single directory.
+  .WithContainerCertificatePaths(customCertificatesDestination: "/usr/lib/ssl/aspire")
+  .WithEnvironment("PIVOX_EXTRA_CA_DIR", "/usr/lib/ssl/aspire/certs")
   // Build-time PAT (read-only) to clone the private dashkan/pivox-keycloak-spi
   // repo during the image build. Sourced live from .envrc via a dedicated var
   // (PIVOX_KEYCLOAK_SPI_GITHUB_PAT, distinct from the shared GITHUB_PAT); empty
@@ -342,7 +367,7 @@ var keycloak = builder
 // Override the service gRPC listener to all-interfaces. The default
 // 127.0.0.1:50052 is loopback-only and unreachable from the envoy CONTAINER
 // via host.docker.internal (which routes to the host gateway, not loopback).
-builder
+var api = builder
   .AddGoApp("api", "../cmd/pivox-cloud")
   .WithEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
   .WithEnvironment("PIVOX_SERVICE_GRPC_PORT", ":50052")
@@ -384,14 +409,28 @@ builder
 //     default is 443).
 // PIVOX_CLOUD_HOST / PIVOX_PLAINTEXT still come from direnv (the agent
 // connects to the cloud AgentService over that). Serves /files/.
-// waitFor(postgres) so the seeded gateway/token row exists first (seed runs in
-// the pg init script, which completes before postgres is healthy).
+//
+// waitFor(api), NOT the database: the agent is an ON-PREM component that talks to
+// the Cloud Controller and has no knowledge of Postgres — modelling it as a
+// dependent of the DB puts a component's private storage in another component's
+// dependency graph. It waited on pivox-db as a stand-in for "the seed has run"
+// (PIVOX_TOKEN is the `local` gateway's registration token from
+// scripts/seeds/11_local_corp.sql), but api already waits for pivox-db, so waiting
+// on api covers the seed transitively AND expresses the real edge: the agent's
+// first action is to open a control stream to the API.
+// PIVOX_AGENT_STATE_DIR / PIVOX_AGENT_CACHE_DIR come from direnv, not from here.
+// The agent's defaults (/var/lib/pivox/*) are correct for a real Linux install and
+// wrong for a host process running as your own user — it cannot create them and
+// degrades to in-memory-only ("no crash resilience"), losing sessions, denied
+// patterns and endpoints on every restart. Point them somewhere writable in .envrc.
+// Keep them SIBLINGS, not nested: cache cleanup must never be able to delete state
+// (see the --state-dir flag doc in cmd/pivox-agent/storage.go).
 builder
   .AddGoApp("agent", "../cmd/pivox-agent")
   .WithArgs(["storage"])
   .WithEnvironment("PIVOX_TOKEN", "dev-token-local")
   .WithEnvironment("PIVOX_PORT", "8083")
-  .WaitFor(pivoxDb);
+  .WaitFor(api);
 
 // --- web libraries build (mirrors the `web-build` prereq of `make dev`) ---
 // The start app imports from @pivox/* workspace packages at vite config-LOAD
@@ -453,14 +492,32 @@ builder
 
 // --- envoy (L7 ingress) ---
 // Uses the Aspire-specific config (clusters -> host.docker.internal). Mounts
-// the gitignored proto descriptor for grpc_json_transcoder. Pinned to host
-// :8081 so the tunnel (cloudflared) can reach it. Its OTel tracer exports to the collector above
-// (otel-collector:4317). TODO: verify/bump the envoy image tag.
+// the gitignored proto descriptor for grpc_json_transcoder. Its OTel tracer
+// exports to the collector above (otel-collector:4317).
 // apphost-generated config: tracing block stripped unless ASPIRE_OTEL_ENVOY_ENABLED.
+//
+// TWO listeners, same routes (see configs/envoy.aspire.yaml):
+//   :8081 http  — the Cloudflare Tunnel's origin. Machine-facing.
+//   :8443 https — the LOCAL origin, TLS-terminated with the Aspire dev cert.
+// The :8443 listener is what lets the whole stack run with no public host, no DNS
+// and no tunnel, while every "we're behind an https ingress" assumption baked into
+// the app stays true.
 var envoyConfigMount = WriteEffectiveEnvoyConfig();
 
+#pragma warning disable ASPIRECERTIFICATES001 // HTTPS certificate APIs are experimental
 var envoy = builder
   .AddContainer("envoy", "envoyproxy/envoy:v1.31-latest")
+  // Mount the Aspire developer certificate into the container. Aspire names the
+  // files after the cert thumbprint and hands us their paths as ReferenceExpressions
+  // (resolved at container start, NOT strings we can bake into a file), and envoy's
+  // static config cannot read env vars — so the paths arrive as env and the start
+  // command below symlinks them to the fixed paths the config names.
+  .WithHttpsCertificateConfiguration(ctx =>
+  {
+    ctx.EnvironmentVariables["PIVOX_TLS_CERT"] = ctx.CertificatePath;
+    ctx.EnvironmentVariables["PIVOX_TLS_KEY"] = ctx.KeyPath;
+    return Task.CompletedTask;
+  })
   .WithBindMount(envoyConfigMount, "/etc/envoy/envoy.yaml", true)
   .WithBindMount("../configs/pivox.pb", "/etc/envoy/pivox.pb", true)
   // Scalar API reference: envoy serves the OpenAPI v3 spec + the Scalar HTML
@@ -468,9 +525,22 @@ var envoy = builder
   // bodies are read from absolute /etc/envoy/openapi/* paths — see the
   // /api-docs routes in configs/envoy.aspire.yaml.
   .WithBindMount("../api/openapi/v3", "/etc/envoy/openapi", true)
-  .WithArgs(["-c", "/etc/envoy/envoy.yaml"])
+  // Symlink the thumbprint-named cert/key to the stable paths the envoy config
+  // names, then exec envoy. `set -e` so a missing cert fails the container loudly
+  // instead of starting an ingress whose TLS listener silently never binds.
+  // (The image's entrypoint execs its args verbatim when they don't start with `-`.)
+  .WithArgs([
+    "sh", "-c",
+    "set -e; ln -sf \"$PIVOX_TLS_CERT\" /tmp/tls.crt; ln -sf \"$PIVOX_TLS_KEY\" /tmp/tls.key; "
+      + "exec envoy -c /etc/envoy/envoy.yaml",
+  ])
   .WithHttpEndpoint(port: 8081, targetPort: 8081, name: "http")
+  // The local origin. 8443 must match Keycloak's INTERNAL https port — see the
+  // ingress_8443 comment in configs/envoy.aspire.yaml; renumbering it silently
+  // breaks the SSO issuer match.
+  .WithHttpsEndpoint(port: 8443, targetPort: 8443, name: "https")
   .WaitFor(otelCollector);
+#pragma warning restore ASPIRECERTIFICATES001
 
 // --- public tunnel ---
 // The public HTTPS origin (PIVOX_PUBLIC_HOST) is fronted by a

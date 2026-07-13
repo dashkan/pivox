@@ -47,3 +47,11 @@ COPY --from=spi /src/target/pivox-keycloak-spi-*-jar-with-dependencies.jar /opt/
 # image-build time rather than at container start. --db=postgres matches the
 # runtime KC_DB (set in apphost.cs) so the baked build doesn't warn / mismatch.
 RUN /opt/keycloak/bin/kc.sh build --db=postgres
+
+# Entrypoint wrapper: merges PIVOX_EXTRA_CA_DIR's PEMs into a writable copy of the
+# JVM truststore before starting Keycloak. Needed because KC_TRUSTSTORE_PATHS does
+# not reach the identity-broker's HTTP client, and cacerts is read-only at runtime —
+# see the header of entrypoint.sh. Aspire's CMD (start-dev --import-realm) is passed
+# through untouched.
+COPY --chmod=0755 entrypoint.sh /opt/keycloak/bin/pivox-entrypoint.sh
+ENTRYPOINT ["/opt/keycloak/bin/pivox-entrypoint.sh"]
