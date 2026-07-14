@@ -9,6 +9,11 @@ allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: true
+  # Native deps of `appdmg`, pulled in by @electron-forge/maker-dmg.
+  # Required to build the macOS .dmg (parity with the electron-builder
+  # `dmg` target this app shipped before the Forge migration).
+  fs-xattr: true
+  macos-alias: true
   msw: true
   protobufjs: true
   sharp: true
@@ -41,6 +46,30 @@ allowBuilds:
 catalog:
   "@assistant-ui/react": "0.14.26"
   "@assistant-ui/react-ai-sdk": "1.3.40"
+  # Electron Forge 8 is PRERELEASE (no stable v8 exists; `latest` is still
+  # 7.11.2). We're on it deliberately, for two reasons that v7 can't meet:
+  #   1. @electron-forge/plugin-vite@8 is built + tested against `vite ^8`.
+  #      v7's plugin-vite is tested against `vite ^5` (pre-Rolldown), so
+  #      v7 + our catalog Vite 8 is an untested integration.
+  #   2. v7 pulls @electron/rebuild@3.7.2, which resolves `@electron/node-gyp`
+  #      from a GIT url — pnpm 11 rejects that under its default
+  #      `blockExoticSubdeps` supply-chain policy (ERR_PNPM_EXOTIC_SUBDEP).
+  #      v8 uses @electron/rebuild@^4, which resolves node-gyp from the
+  #      registry, so the install is clean with the policy left ON.
+  # Pinned exactly (no `^`): prerelease ranges drift and would let a new
+  # alpha land silently. Bump all nine in lockstep — Forge cross-pins its
+  # own packages to the exact same version.
+  "@electron-forge/cli": "8.0.0-alpha.10"
+  "@electron-forge/maker-deb": "8.0.0-alpha.10"
+  "@electron-forge/maker-dmg": "8.0.0-alpha.10"
+  "@electron-forge/maker-rpm": "8.0.0-alpha.10"
+  "@electron-forge/maker-squirrel": "8.0.0-alpha.10"
+  "@electron-forge/maker-zip": "8.0.0-alpha.10"
+  "@electron-forge/plugin-auto-unpack-natives": "8.0.0-alpha.10"
+  "@electron-forge/plugin-fuses": "8.0.0-alpha.10"
+  "@electron-forge/plugin-vite": "8.0.0-alpha.10"
+  "@electron-forge/shared-types": "8.0.0-alpha.10"
+  "@electron/fuses": "2.1.3"
   "@fontsource-variable/roboto": "5.2.10"
   "@tailwindcss/cli": "4.3.2"
   "@tailwindcss/vite": "4.3.2"
@@ -60,8 +89,6 @@ catalog:
   "@vitejs/plugin-react": "6.0.3"
   "ai": "6.0.219"
   "electron": "43.1.0"
-  "electron-builder": "26.15.3"
-  "electron-vite": "6.0.0-beta.1"
   "keycloak-js": "26.2.4"
   "lucide-react": "1.24.0"
   "prettier": "3.9.5"
@@ -77,3 +104,21 @@ ignoredOptionalDependencies:
 cleanupUnusedCatalogs: true
 linkWorkspacePackages: true
 preferWorkspacePackages: true
+
+# Satisfies Electron Forge's pnpm gate (apps/electron), which refuses to run unless
+# node-linker=hoisted OR a hoist-pattern is defined. `*` is pnpm's own default,
+# so this is a behavioral no-op — it hoists into the virtual store, not into a
+# flat node_modules.
+#
+# node-linker=hoisted was rejected deliberately: it would flatten node_modules
+# for every workspace project, losing strict isolation and risking the duplicate
+# @types/react problem the ignoredOptionalDependencies guard above prevents.
+#
+# Safe because plugin-vite sets `packagerConfig.ignore = !file.startsWith('/.vite')`,
+# so node_modules is never copied into the app — the asar ships zero of it.
+#
+# INVARIANT: apps/electron must ship no production dep Vite can't bundle, i.e. no
+# native modules — those must exist in node_modules at package time and would
+# silently produce a broken app. Adding one means revisiting this.
+hoistPattern:
+  - "*"

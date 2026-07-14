@@ -2,8 +2,7 @@ import { join, resolve } from 'node:path';
 
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
-
-import icon from '../../resources/icon.png?asset';
+import squirrelStartup from 'electron-squirrel-startup';
 
 import {
   cancelCurrentLogin,
@@ -14,9 +13,22 @@ import {
   logout,
   onAuthChanged,
   restoreSession,
-} from './keycloak-auth';
+} from './main/keycloak-auth';
+
+// Squirrel (MakerSquirrel) re-launches this binary with --squirrel-* args on
+// install/update/uninstall to create and remove shortcuts. Must run before the
+// single-instance lock: these are legitimate extra invocations, not a double
+// launch. Without it they'd each open a real window instead.
+if (squirrelStartup) {
+  app.quit();
+}
 
 let mainWindow: BrowserWindow | null = null;
+
+/** Window icon (Linux only; macOS/Windows use packagerConfig.icon). */
+const iconPath = app.isPackaged
+  ? join(process.resourcesPath, 'icon.png')
+  : join(__dirname, '../../resources/icon.png');
 
 // --- Single instance lock + protocol registration ---
 
@@ -103,9 +115,10 @@ function createWindow(): void {
     height: 670,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    ...(process.platform === 'linux' ? { icon: iconPath } : {}),
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      // plugin-vite emits main + preload into the same .vite/build/.
+      preload: join(__dirname, 'preload.js'),
       sandbox: true, // AUTHN-03: Enable sandbox for renderer process isolation.
     },
   });
@@ -147,12 +160,14 @@ function createWindow(): void {
     return { action: 'deny' };
   });
 
-  // HMR for renderer based on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    void win.loadURL(process.env['ELECTRON_RENDERER_URL']);
+  // Injected by plugin-vite (forge.env.d.ts). The dev-server URL is only defined
+  // under `forge start`, so it doubles as the dev/packaged discriminator.
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    void win.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'));
+    void win.loadFile(
+      join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+    );
   }
 }
 
@@ -162,8 +177,10 @@ function createWindow(): void {
 app
   .whenReady()
   .then(() => {
-    // Set app user model id for windows
-    electronApp.setAppUserModelId('com.electron');
+    // Must match packagerConfig.appBundleId — a mismatch makes Windows treat the
+    // running app and its installed shortcut as different apps, silently dropping
+    // toast notifications.
+    electronApp.setAppUserModelId('app.pivox.desktop');
 
     // Default open or close DevTools by F12 in development
     // and ignore CommandOrControl + R in production.

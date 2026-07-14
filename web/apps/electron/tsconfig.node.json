@@ -1,9 +1,20 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
-  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*"],
+  "include": [
+    "forge.config.ts",
+    "forge.env.d.ts",
+    "vite.main.config.ts",
+    "vite.preload.config.ts",
+    "vite.renderer.config.mts",
+    "vitest.config.ts",
+    "src/main.ts",
+    "src/main/**/*",
+    "src/preload.ts",
+    "src/preload/**/*"
+  ],
   "compilerOptions": {
     "composite": true,
     "strict": true,
-    "types": ["electron-vite/node"]
+    "types": ["vite/client", "node"]
   }
 }

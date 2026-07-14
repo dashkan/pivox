@@ -1,7 +1,7 @@
-/// <reference types="electron-vite/node" />
+/// <reference types="vite/client" />
 
-// Augments electron-vite's `ImportMetaEnv` for the main process. Keep
-// in sync with the VITE_* vars main actually reads (see oidc-config.ts).
+// Augments Vite's `ImportMetaEnv` for the main process. Keep in sync with
+// the VITE_* vars main actually reads (see oidc-config.ts).
 interface ImportMetaEnv {
   /** Pivox app origin — REST gateway + SPA. */
   readonly VITE_BASE_URL?: string;

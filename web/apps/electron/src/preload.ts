@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { PivoxAPI } from './auth-api';
+import type { PivoxAPI } from './preload/auth-api';
 
 /**
  * Auth bridge. Every method is a thin pass-through to a main-process IPC handler

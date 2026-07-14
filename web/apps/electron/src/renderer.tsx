@@ -1,4 +1,4 @@
-import './assets/main.css';
+import './renderer/assets/main.css';
 
 import { installErrorReporters, installWebTracing } from '@pivox/observability';
 import { QueryClient } from '@tanstack/react-query';
@@ -10,7 +10,7 @@ import {
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { routeTree } from './routeTree.gen';
+import { routeTree } from './renderer/routeTree.gen';
 
 installErrorReporters();
 
