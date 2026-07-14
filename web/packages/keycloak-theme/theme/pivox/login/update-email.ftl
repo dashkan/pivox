@@ -11,7 +11,7 @@
 
             <@passwordCommons.logoutOtherSessions/>
 
-            <div class="kc-actions">
+            <div class="kc-actions<#if isAppInitiatedAction??> kc-actions-row</#if>">
                 <#if isAppInitiatedAction??>
                     <input class="kc-btn kc-btn-primary" type="submit" value="${msg("doSubmit")}" />
                     <button class="kc-btn kc-btn-outline" type="submit" name="cancel-aia" value="true">${msg("doCancel")}</button>

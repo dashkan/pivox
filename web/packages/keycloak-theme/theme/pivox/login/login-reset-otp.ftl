@@ -4,7 +4,7 @@
         ${msg("doLogIn")}
     <#elseif section="form">
         <form id="kc-otp-reset-form" class="flex flex-col gap-4" action="${url.loginAction}" method="post">
-            <p id="kc-otp-reset-form-description" class="kc-subtitle">${msg("otp-reset-description")}</p>
+            <p id="kc-otp-reset-form-description" class="kc-prose">${msg("otp-reset-description")}</p>
 
             <div class="kc-actions">
                 <#list configuredOtpCredentials.userOtpCredentials as otpCredential>

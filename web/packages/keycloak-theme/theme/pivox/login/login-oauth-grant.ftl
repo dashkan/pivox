@@ -11,20 +11,22 @@
         </#if>
     <#elseif section = "form">
         <div id="kc-oauth" class="kc-stack">
-            <p class="kc-subtitle">${msg("oauthGrantRequest")}</p>
-            <ul class="kc-prose text-left">
+            <div class="kc-prose flex flex-col gap-2 text-start">
+                <p>${msg("oauthGrantRequest")}</p>
                 <#if oauth.clientScopesRequested??>
-                    <#list oauth.clientScopesRequested as clientScope>
-                        <li>
-                            <#if !clientScope.dynamicScopeParameter??>
-                                ${advancedMsg(clientScope.consentScreenText)}
-                            <#else>
-                                ${advancedMsg(clientScope.consentScreenText)}: <b>${clientScope.dynamicScopeParameter}</b>
-                            </#if>
-                        </li>
-                    </#list>
+                    <ul class="mx-0 w-auto">
+                        <#list oauth.clientScopesRequested as clientScope>
+                            <li>
+                                <#if !clientScope.dynamicScopeParameter??>
+                                    ${advancedMsg(clientScope.consentScreenText)}
+                                <#else>
+                                    ${advancedMsg(clientScope.consentScreenText)}: <b>${clientScope.dynamicScopeParameter}</b>
+                                </#if>
+                            </li>
+                        </#list>
+                    </ul>
                 </#if>
-            </ul>
+            </div>
 
             <#if client.attributes.policyUri?? || client.attributes.tosUri??>
                 <p class="kc-hint">
@@ -44,7 +46,7 @@
                 </p>
             </#if>
 
-            <form action="${url.oauthAction}" method="POST" class="kc-actions">
+            <form action="${url.oauthAction}" method="POST" class="kc-actions kc-actions-row">
                 <input type="hidden" name="code" value="${oauth.code}">
                 <button class="kc-btn kc-btn-primary" name="accept" id="kc-login" type="submit">${msg("doYes")}</button>
                 <button class="kc-btn kc-btn-outline" name="cancel" id="kc-cancel" type="submit">${msg("doNo")}</button>

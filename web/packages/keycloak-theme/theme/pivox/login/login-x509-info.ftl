@@ -21,7 +21,7 @@
                 </div>
             </#if>
 
-            <div class="kc-actions">
+            <div class="kc-actions<#if x509.formData.isUserEnabled??> kc-actions-row</#if>">
                 <input class="kc-btn kc-btn-primary" name="login" id="kc-login" type="submit" value="${msg("doContinue")}"/>
                 <#if x509.formData.isUserEnabled??>
                     <input class="kc-btn kc-btn-outline" name="cancel" id="kc-cancel" type="submit" value="${msg("doIgnore")}"/>

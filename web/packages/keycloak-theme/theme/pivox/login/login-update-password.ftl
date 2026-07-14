@@ -27,7 +27,7 @@
                 </div>
             </#if>
 
-            <div class="kc-actions">
+            <div class="kc-actions<#if isAppInitiatedAction??> kc-actions-row</#if>">
                 <button name="login" class="kc-btn kc-btn-primary" type="submit">${msg("doSubmit")}</button>
                 <#if isAppInitiatedAction??>
                     <button class="kc-btn kc-btn-outline" type="submit" name="cancel-aia" value="true">${msg("doCancel")}</button>

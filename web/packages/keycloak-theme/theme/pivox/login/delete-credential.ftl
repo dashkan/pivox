@@ -6,7 +6,7 @@
     <div id="kc-delete-text" class="kc-prose">
         ${msg("deleteCredentialMessage", credentialLabel)}
     </div>
-    <form class="kc-actions" action="${url.loginAction}" method="POST">
+    <form class="kc-actions kc-actions-row" action="${url.loginAction}" method="POST">
         <input class="kc-btn kc-btn-destructive" name="accept" id="kc-accept" type="submit" value="${msg("doConfirmDelete")}"/>
         <input class="kc-btn kc-btn-outline" name="cancel-aia" value="${msg("doCancel")}" id="kc-decline" type="submit" />
     </form>

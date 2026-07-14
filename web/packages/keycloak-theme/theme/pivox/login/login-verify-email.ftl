@@ -7,7 +7,7 @@
             <#if verifyEmail??>${msg("emailVerifyInstruction1",verifyEmail)}<#else>${msg("emailVerifyInstruction4",user.email)}</#if>
         </p>
         <#if isAppInitiatedAction??>
-            <form id="kc-verify-email-form" class="kc-actions" action="${url.loginAction}" method="post">
+            <form id="kc-verify-email-form" class="kc-actions kc-actions-row" action="${url.loginAction}" method="post">
                 <#if verifyEmail??>
                     <button class="kc-btn kc-btn-outline" type="submit">${msg("emailVerifyResend")}</button>
                 <#else>

@@ -11,14 +11,14 @@
         <p>${msg("recovery-code-config-warning-message")}</p>
     </@commons.alert>
 
-    <ol id="kc-recovery-codes-list" class="kc-prose">
+    <ol id="kc-recovery-codes-list">
         <#list recoveryAuthnCodesConfigBean.generatedRecoveryAuthnCodesList as code>
             <li><span>${code?counter}:</span> ${code[0..3]}-${code[4..7]}-${code[8..]}</li>
         </#list>
     </ol>
 
     <!-- actions -->
-    <div class="flex flex-wrap gap-2">
+    <div class="kc-actions kc-actions-row">
         <button id="printRecoveryCodes" class="kc-btn kc-btn-outline" type="button">
             ${msg("recovery-codes-print")}
         </button>
@@ -46,7 +46,7 @@
         <input type="hidden" id="userLabel" name="userLabel" value="${msg("recovery-codes-label-default")}" />
         <@passwordCommons.logoutOtherSessions/>
 
-        <div class="kc-actions">
+        <div class="kc-actions<#if isAppInitiatedAction??> kc-actions-row</#if>">
             <#if isAppInitiatedAction??>
                 <input type="submit"
                 class="kc-btn kc-btn-primary"

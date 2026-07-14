@@ -28,6 +28,17 @@
     <title>${msg("loginTitle",(realm.displayName!''))}</title>
     <link rel="icon" href="${url.resourcesPath}/img/favicon.ico" />
 
+    <#-- Preload the one font face every page needs (Roboto Variable, latin,
+         upright). Without this the browser only discovers it after parsing
+         theme.css, so the page paints in the fallback font and reflows when
+         Roboto lands. The latin-ext + italic faces stay lazy — they're only
+         needed for glyphs/styles most pages never render. `crossorigin` is
+         required even same-origin: font fetches are CORS-mode, and a preload
+         without it is a separate cache entry, i.e. the file gets fetched
+         twice and the preload does nothing. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href="${url.resourcesPath}/fonts/roboto-latin-wght-normal.woff2" />
+
     <#-- Dark mode gated by the realm's native "Dark mode" toggle. Only emitted
          when `darkMode` is true; toggles `.dark` from the OS scheme with no
          flash (blocking="render"). -->

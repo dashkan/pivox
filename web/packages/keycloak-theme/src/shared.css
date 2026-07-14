@@ -289,6 +289,14 @@
   .kc-actions {
     @apply flex flex-col gap-4 px-4;
   }
+  /* Binary choice (approve/deny, confirm/cancel): one row, equal halves.
+     Overrides .kc-btn's w-full, which only makes sense stacked. */
+  .kc-actions-row {
+    @apply flex-row gap-2;
+  }
+  .kc-actions-row .kc-btn {
+    @apply w-auto flex-1 shrink;
+  }
   .kc-btn {
     @apply inline-flex h-8 w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-transparent bg-clip-padding px-2.5 text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50;
   }
@@ -358,12 +366,19 @@
   .kc-prose {
     @apply px-4 text-center text-sm text-muted-foreground;
   }
-  /* Lists inside prose (oauth-grant scopes, TOTP setup steps). Left-aligned
-     and centered as a block so they read naturally inside the centered card. */
-  .kc-prose :is(ol, ul) {
+  /* Lists in prose (oauth-grant scopes, TOTP setup steps, frontchannel-logout
+     clients). Left-aligned and centered as a block so they read naturally
+     inside the centered card. Matches both a list nested in a .kc-prose block
+     and a list that IS the .kc-prose block — templates do both, and Tailwind
+     preflight strips markers, so missing either selector renders the items as
+     bare unindented lines. */
+  .kc-prose :is(ol, ul),
+  ol.kc-prose,
+  ul.kc-prose {
     @apply mx-auto w-fit list-decimal space-y-1 ps-5 text-start;
   }
-  .kc-prose ul {
+  .kc-prose ul,
+  ul.kc-prose {
     @apply list-disc;
   }
   /* Recovery codes grid — monospace, two columns. The base template already

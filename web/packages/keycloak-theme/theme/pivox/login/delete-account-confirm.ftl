@@ -20,7 +20,7 @@
            <p>${msg("finalDeletionConfirmation")}</p>
        </div>
 
-      <div class="kc-actions">
+      <div class="kc-actions<#if triggered_from_aia> kc-actions-row</#if>">
             <input class="kc-btn kc-btn-destructive" type="submit" value="${msg("doConfirmDelete")}" />
             <#if triggered_from_aia>
             <button class="kc-btn kc-btn-outline" type="submit" name="cancel-aia" value="true">${msg("doCancel")}</button>

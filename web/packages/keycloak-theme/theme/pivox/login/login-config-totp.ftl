@@ -82,7 +82,7 @@
 
             <@passwordCommons.logoutOtherSessions/>
 
-            <div id="kc-form-buttons" class="kc-actions">
+            <div id="kc-form-buttons" class="kc-actions<#if isAppInitiatedAction??> kc-actions-row</#if>">
                 <#if isAppInitiatedAction??>
                     <input type="submit"
                            class="kc-btn kc-btn-primary"
