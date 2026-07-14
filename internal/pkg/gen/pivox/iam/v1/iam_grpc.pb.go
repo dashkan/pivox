@@ -84,6 +84,12 @@ const (
 //	catalog consumed via ListPermissions only; per-permission Get
 //	carries no additional information beyond what the catalog
 //	already exposes. --)
+//
+// (-- api-linter: core::0121::resource-must-support-list=disabled
+//
+//	aip.dev/not-precedent: Account is a singleton ("accounts/me");
+//	GetAccount is the whoami, but listing isn't meaningful — there
+//	is only one account from the caller's perspective. --)
 type IamClient interface {
 	// Gets a user by resource name. Users are synced from Keycloak
 	// and are read-only through this API.
@@ -424,6 +430,12 @@ func (c *iamClient) ListGroupMembers(ctx context.Context, in *ListGroupMembersRe
 //	catalog consumed via ListPermissions only; per-permission Get
 //	carries no additional information beyond what the catalog
 //	already exposes. --)
+//
+// (-- api-linter: core::0121::resource-must-support-list=disabled
+//
+//	aip.dev/not-precedent: Account is a singleton ("accounts/me");
+//	GetAccount is the whoami, but listing isn't meaningful — there
+//	is only one account from the caller's perspective. --)
 type IamServer interface {
 	// Gets a user by resource name. Users are synced from Keycloak
 	// and are read-only through this API.

@@ -1,0 +1,198 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// The MCP service is Pivox's curated surface for the Model Context
+// Protocol server (internal/mcp). It is deliberately NOT AIP: no
+// `google.api.http` annotations (never exposed through the REST
+// gateway), lite flat messages instead of the AIP api.v1 resources,
+// and fat single-call tools instead of standard methods.
+//
+// It is registered on the shared gRPC server, so it is reachable on the
+// public TCP listener as well as the in-process bufconn the MCP HTTP
+// handler prefers — it is NOT transport-isolated. The security boundary
+// is the MCP-audience token: auth routing pins these methods to the MCP
+// verifier (audience = the MCP resource URL), the anti-confusion
+// boundary vs the main API audience, so a main-API token is rejected
+// here and vice versa. The MCP handler forwards the caller's bearer so
+// the full interceptor chain (auth → membership → permission) re-runs
+// identically on whichever transport the call arrives over.
+//
+// PERMISSION MODEL. Every method here is `exempt` from the generated
+// permission interceptor, and each data method enforces its read
+// permission IN THE HANDLER instead. This is deliberate, not an
+// oversight:
+//
+//   - The messages carry raw slugs (`org`, `space`), not AIP resource
+//     paths, so the generated `ScopeFromPath` extractor — which the
+//     interceptor's registry entries are built from — cannot parse
+//     them.
+//   - More importantly, this curated agent surface must FAIL CLOSED
+//     with NotFound for an org/space the caller can't see, never
+//     leaking existence via the interceptor's PermissionDenied. The
+//     handler resolves the row, checks the permission named below, and
+//     returns NotFound on any miss.
+syntax = "proto3";
+
+package pivox.mcp.v1;
+
+import "pivox/permission/v1/options.proto";
+
+option go_package = "pivox/mcp/v1;mcpv1";
+
+// McpService is the internal RPC surface backing the MCP tools,
+// resources, and completions.
+service McpService {
+  // GetAccount returns the authenticated caller's own account
+  // (whoami). No permission — it only ever surfaces the caller's own
+  // identity, so it is exempt like the Iam.GetAccount RPC.
+  rpc GetAccount(GetAccountRequest) returns (Account) {
+    option (pivox.permission.v1.exempt) = true;
+  }
+
+  // ListOrgs lists the organizations the caller is a member of. No
+  // permission — the query is hard-scoped to the caller's own
+  // memberships, so there is no over-disclosure vector.
+  rpc ListOrgs(ListOrgsRequest) returns (ListOrgsResponse) {
+    option (pivox.permission.v1.exempt) = true;
+  }
+
+  // GetOrg returns a single organization by slug. Interceptor-exempt;
+  // the handler enforces `organizations.read` on the org and returns
+  // NotFound when the caller is not a member (fail-closed — never leak
+  // an org the caller has no binding on).
+  rpc GetOrg(GetOrgRequest) returns (Organization) {
+    option (pivox.permission.v1.exempt) = true;
+  }
+
+  // ListSpaces lists spaces across the caller's organizations (or a
+  // single org when `org` is set). Interceptor-exempt; the handler
+  // scopes the result to the caller's member orgs, so every returned
+  // space is one the caller has `spaces.read` on by inheritance.
+  rpc ListSpaces(ListSpacesRequest) returns (ListSpacesResponse) {
+    option (pivox.permission.v1.exempt) = true;
+  }
+
+  // GetSpace returns a single space by (org, slug). Interceptor-exempt;
+  // the handler enforces `spaces.read` on the space and returns
+  // NotFound when the caller cannot see it (fail-closed).
+  rpc GetSpace(GetSpaceRequest) returns (Space) {
+    option (pivox.permission.v1.exempt) = true;
+  }
+}
+
+// Account is the lite whoami shape: just the caller's identity. It
+// intentionally omits the active-organization projection the AIP
+// Iam.Account carries — the MCP agent gets that from ListOrgs.
+message Account {
+  // The caller's subject (Keycloak `sub` == Pivox identities.id).
+  string subject = 1;
+
+  // The caller's email, sourced from the verified token.
+  string email = 2;
+
+  // The caller's human-readable display name, sourced from the token.
+  string display_name = 3;
+}
+
+// Organization is the lite org shape: slug + display name only.
+message Organization {
+  // The organization's stable URL slug.
+  string slug = 1;
+
+  // The organization's human-readable display name.
+  string display_name = 2;
+}
+
+// Space is the lite space shape: parent org slug, own slug, display
+// name.
+message Space {
+  // The parent organization's stable URL slug.
+  string org = 1;
+
+  // The space's stable URL slug (unique within its org).
+  string slug = 2;
+
+  // The space's human-readable display name.
+  string display_name = 3;
+}
+
+// GetAccountRequest is the argument-free whoami request.
+message GetAccountRequest {}
+
+// ListOrgsRequest pages the caller's organizations.
+message ListOrgsRequest {
+  // Maximum orgs to return. Defaults to 25, clamped to 100.
+  int32 page_size = 1;
+
+  // Opaque cursor from a previous ListOrgs response. Empty starts at
+  // the first page.
+  string page_token = 2;
+
+  // Case-insensitive prefix filter on the org slug. Empty matches all.
+  string name_prefix = 3;
+}
+
+// GetOrgRequest names a single organization by slug.
+message GetOrgRequest {
+  // The organization's slug. Required.
+  string org = 1;
+}
+
+// ListSpacesRequest pages spaces, optionally restricted to one org.
+message ListSpacesRequest {
+  // Optional org slug filter. Empty lists across every org the caller
+  // is a member of.
+  string org = 1;
+
+  // Maximum spaces to return. Defaults to 25, clamped to 100.
+  int32 page_size = 2;
+
+  // Opaque cursor from a previous ListSpaces response. Empty starts at
+  // the first page. For the cross-org listing it encodes both the org
+  // cursor and the within-org offset.
+  string page_token = 3;
+
+  // Case-insensitive prefix filter on the space slug. Empty matches
+  // all.
+  string name_prefix = 4;
+}
+
+// GetSpaceRequest names a single space by (org, slug).
+message GetSpaceRequest {
+  // The parent organization's slug. Required.
+  string org = 1;
+
+  // The space's slug. Required.
+  string space = 2;
+}
+
+// ListOrgsResponse is a page of the caller's organizations.
+message ListOrgsResponse {
+  // The page of organizations.
+  repeated Organization orgs = 1;
+
+  // Opaque cursor for the next page, or empty when this is the last
+  // page.
+  string next_page_token = 2;
+}
+
+// ListSpacesResponse is a page of spaces.
+message ListSpacesResponse {
+  // The page of spaces.
+  repeated Space spaces = 1;
+
+  // Opaque cursor for the next page, or empty when this is the last
+  // page.
+  string next_page_token = 2;
+}

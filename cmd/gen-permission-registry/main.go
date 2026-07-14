@@ -42,6 +42,7 @@ import (
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/mcp/v1"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"
@@ -61,14 +62,21 @@ const outputPath = "permission_registry_gen.go"
 // this set are skipped (e.g. third-party services like
 // google.longrunning.Operations).
 var gatedServices = map[string]bool{
-	"pivox.api.v1.Organizations":          true,
-	"pivox.api.v1.Spaces":                 true,
-	"pivox.api.v1.TagKeys":                true,
-	"pivox.api.v1.TagValues":              true,
-	"pivox.api.v1.TagBindings":            true,
-	"pivox.api.v1.ApiKeys":                true,
-	"pivox.api.v1.Dashboards":             true,
-	"pivox.iam.v1.Iam":                    true,
+	"pivox.api.v1.Organizations": true,
+	"pivox.api.v1.Spaces":        true,
+	"pivox.api.v1.TagKeys":       true,
+	"pivox.api.v1.TagValues":     true,
+	"pivox.api.v1.TagBindings":   true,
+	"pivox.api.v1.ApiKeys":       true,
+	"pivox.api.v1.Dashboards":    true,
+	"pivox.iam.v1.Iam":           true,
+	// The MCP service is walked so its five methods land in
+	// GeneratedExempt. Every method is `exempt` in the proto: this
+	// curated, non-AIP surface enforces read permissions IN THE
+	// HANDLER (raw-slug fields don't fit ScopeFromPath, and it must
+	// fail closed with NotFound, not the interceptor's
+	// PermissionDenied). See the mcp_service.proto header.
+	"pivox.mcp.v1.McpService":             true,
 	"pivox.assets.v1.Assets":              true,
 	"pivox.assets.v1.Requests":            true,
 	"pivox.storage.v1.StorageGateways":    true,
@@ -94,6 +102,7 @@ var goPkgInfo = map[string]struct {
 }{
 	"pivox.api.v1":       {"apiv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"},
 	"pivox.iam.v1":       {"iamv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"},
+	"pivox.mcp.v1":       {"mcpv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/mcp/v1"},
 	"pivox.assets.v1":    {"assetsv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"},
 	"pivox.storage.v1":   {"storagev1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"},
 	"pivox.ai.v1":        {"aiv1", "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"},

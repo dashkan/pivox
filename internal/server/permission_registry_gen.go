@@ -1011,5 +1011,10 @@ var GeneratedExempt = map[string]bool{
 	"/pivox.iam.v1.Iam/GetAccount":                           true,
 	"/pivox.iam.v1.Iam/ListAccountOrganizations":             true,
 	"/pivox.iam.v1.Iam/ListPermissions":                      true,
+	"/pivox.mcp.v1.McpService/GetAccount":                    true,
+	"/pivox.mcp.v1.McpService/GetOrg":                        true,
+	"/pivox.mcp.v1.McpService/GetSpace":                      true,
+	"/pivox.mcp.v1.McpService/ListOrgs":                      true,
+	"/pivox.mcp.v1.McpService/ListSpaces":                    true,
 	"/pivox.storage.v1.StorageGateways/CreateStorageSession": true,
 }
