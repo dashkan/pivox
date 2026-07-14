@@ -10,33 +10,29 @@
       "clientConsents": [
         {
           "clientId": "https://claude.ai/oauth/claude-code-client-metadata",
-          "createdDate": 1783989270787,
+          "createdDate": 1784011611309,
           "grantedClientScopes": [
             "email",
             "https://claude.ai/oauth/claude-code-client-metadata",
-            "mcp:resources",
-            "mcp:tools",
+            "mcp",
             "offline_access",
-            "organization",
             "profile",
             "roles"
           ],
-          "lastUpdatedDate": 1783989270807
+          "lastUpdatedDate": 1784011611314
         },
         {
           "clientId": "https://vscode.dev/oauth/client-metadata.json",
-          "createdDate": 1783987441391,
+          "createdDate": 1784011693499,
           "grantedClientScopes": [
             "email",
             "https://vscode.dev/oauth/client-metadata.json",
-            "mcp:resources",
-            "mcp:tools",
+            "mcp",
             "offline_access",
-            "organization",
             "profile",
             "roles"
           ],
-          "lastUpdatedDate": 1783987441398
+          "lastUpdatedDate": 1784011693506
         }
       ],
       "credentials": [

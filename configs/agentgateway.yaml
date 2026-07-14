@@ -718,12 +718,9 @@ binds:
                 resourceMetadata:
                   resource: https://pivox.app/mcp
                   scopesSupported:
-                    - organization
-                    - mcp:tools
-                    - mcp:resources
+                    - mcp
                     - offline_access
                     - openid
-                    - service_account
                   bearerMethodsSupported: [header]
             backends:
               - mcp:

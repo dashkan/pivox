@@ -922,7 +922,7 @@
           "config": {
             "access.token.claim": "true",
             "id.token.claim": "false",
-            "included.custom.audience": "pivox-cloud",
+            "included.custom.audience": "${IMPORT_KC_APP_URL}",
             "introspection.token.claim": "true",
             "lightweight.claim": "false",
             "userinfo.token.claim": "true"
@@ -1027,9 +1027,9 @@
         "include.in.openid.provider.metadata": "true",
         "include.in.token.scope": "false"
       },
-      "description": "Model Context Protocol Resources",
-      "id": "cb2258c7-44e3-44e8-9d6f-64a9da9ddcda",
-      "name": "mcp:resources",
+      "description": "Model Context Protocol",
+      "id": "9a1166f5-3675-442a-8941-d4b7196e505b",
+      "name": "mcp",
       "protocol": "openid-connect",
       "protocolMappers": [
         {
@@ -1042,37 +1042,7 @@
             "userinfo.token.claim": "false"
           },
           "consentRequired": false,
-          "id": "8732a69a-ba9c-4f86-88ed-b92b3b90abc6",
-          "name": "mcp audience",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-audience-mapper"
-        }
-      ]
-    },
-    {
-      "attributes": {
-        "consent.screen.text": "",
-        "display.on.consent.screen": "true",
-        "gui.order": "",
-        "include.in.openid.provider.metadata": "true",
-        "include.in.token.scope": "false"
-      },
-      "description": "Model Context Protocol Tools",
-      "id": "0304ce13-8135-4d19-8e98-43595eaff192",
-      "name": "mcp:tools",
-      "protocol": "openid-connect",
-      "protocolMappers": [
-        {
-          "config": {
-            "access.token.claim": "true",
-            "id.token.claim": "false",
-            "included.custom.audience": "${IMPORT_KC_APP_URL}/mcp",
-            "introspection.token.claim": "true",
-            "lightweight.claim": "false",
-            "userinfo.token.claim": "false"
-          },
-          "consentRequired": false,
-          "id": "acf165c7-4c35-459a-ac2f-92d5c6f244c9",
+          "id": "4f8d11c7-d466-4fcb-bad2-9fd86ddf5afb",
           "name": "mcp audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper"
@@ -1844,7 +1814,7 @@
     {
       "alwaysDisplayInConsole": false,
       "attributes": {
-        "client.secret.creation.time": "1783987440",
+        "client.secret.creation.time": "1784011187",
         "realm_client": "false"
       },
       "authenticationFlowBindingOverrides": {},
@@ -2288,7 +2258,7 @@
       "attributes": {
         "backchannel.logout.revoke.offline.tokens": "false",
         "backchannel.logout.session.required": "true",
-        "cimd.cache.expiry.time.in.sec": "1783991419",
+        "cimd.cache.expiry.time.in.sec": "1784015791",
         "consent.screen.text": "The client's hostname is claude.ai",
         "display.on.consent.screen": "true",
         "frontchannel.logout.session.required": "false",
@@ -2318,15 +2288,14 @@
       "enabled": true,
       "frontchannelLogout": false,
       "fullScopeAllowed": false,
-      "id": "20a2ade2-6f26-4a46-b66c-aaed7cc6bdb4",
+      "id": "60be12bd-d030-4cf8-acd8-8adf2ac81c9a",
       "implicitFlowEnabled": false,
       "name": "Claude Code",
       "nodeReRegistrationTimeout": -1,
       "notBefore": 0,
       "optionalClientScopes": [
         "address",
-        "mcp:resources",
-        "mcp:tools",
+        "mcp",
         "microprofile-jwt",
         "offline_access",
         "organization",
@@ -2351,7 +2320,7 @@
       "attributes": {
         "backchannel.logout.revoke.offline.tokens": "false",
         "backchannel.logout.session.required": "true",
-        "cimd.cache.expiry.time.in.sec": "1783992588",
+        "cimd.cache.expiry.time.in.sec": "1784015766",
         "consent.screen.text": "The client's hostname is vscode.dev",
         "display.on.consent.screen": "true",
         "frontchannel.logout.session.required": "false",
@@ -2359,7 +2328,6 @@
         "oauth2.device.authorization.grant.enabled": "true",
         "oauth2.jwt.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
-        "post.logout.redirect.uris": "+",
         "realm_client": "false",
         "standard.token.exchange.enabled": "false",
         "use.refresh.tokens": "true"
@@ -2383,15 +2351,14 @@
       "enabled": true,
       "frontchannelLogout": false,
       "fullScopeAllowed": false,
-      "id": "f50af81c-0cba-41d5-a0fd-99b2717eed11",
+      "id": "b6b6020f-4684-464a-951f-916d4df769ad",
       "implicitFlowEnabled": false,
       "name": "Visual Studio Code",
       "nodeReRegistrationTimeout": -1,
       "notBefore": 0,
       "optionalClientScopes": [
         "address",
-        "mcp:resources",
-        "mcp:tools",
+        "mcp",
         "microprofile-jwt",
         "offline_access",
         "organization",
@@ -2589,14 +2556,6 @@
         "config": {
           "allow-default-scopes": [
             "true"
-          ],
-          "allowed-client-scopes": [
-            "mcp:resources",
-            "mcp:tools",
-            "offline_access",
-            "openid",
-            "organization",
-            "service_account"
           ]
         },
         "id": "bff7b93b-4f95-4457-8997-349df7f44517",
@@ -2698,6 +2657,21 @@
         "providerId": "max-clients",
         "subComponents": {},
         "subType": "anonymous"
+      },
+      {
+        "config": {
+          "client-uris-must-match": [
+            "true"
+          ],
+          "host-sending-registration-request-must-match": [
+            "true"
+          ]
+        },
+        "id": "69b403d0-e381-41cc-b539-acf539f50dcc",
+        "name": "Trusted Hosts",
+        "providerId": "trusted-hosts",
+        "subComponents": {},
+        "subType": "anonymous"
       }
     ],
     "org.keycloak.userprofile.UserProfileProvider": [
@@ -2727,8 +2701,7 @@
   ],
   "defaultOptionalClientScopes": [
     "address",
-    "mcp:resources",
-    "mcp:tools",
+    "mcp",
     "microprofile-jwt",
     "offline_access",
     "organization",
@@ -2937,7 +2910,6 @@
       "hideOnLogin": false,
       "internalId": "16077a56-b0e5-4868-9631-d5d3897b5ead",
       "linkOnly": false,
-      "postBrokerLoginFlowAlias": "post broker org select",
       "providerId": "github",
       "storeToken": false,
       "trustEmail": true,
@@ -2963,7 +2935,6 @@
       "hideOnLogin": false,
       "internalId": "21a2ff36-09d2-488e-b5c1-f5c803fe4ddd",
       "linkOnly": false,
-      "postBrokerLoginFlowAlias": "post broker org select",
       "providerId": "google",
       "storeToken": false,
       "trustEmail": true,
