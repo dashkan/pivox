@@ -30,6 +30,53 @@ schemes:
   - https
 paths:
   /v1/accounts/me:
+    get:
+      summary: |-
+        Gets the authenticated caller's account (whoami). Returns the
+        caller's identity as carried on the verified access token
+        (subject, email, display_name) plus the single organization the
+        token is scoped to (`active_organization`), derived from the
+        token's `organization` claim and resolved against the caller's
+        own memberships so its `role` matches what
+        `ListAccountOrganizations` reports for that org.
+      description: |-
+        `active_organization` is unset when the token carries no
+        `organization` claim (the non-MCP web/electron tokens, where the
+        claim is gated behind the `organization` scope) or when the
+        claimed org is not one the caller is an active member of.
+
+        On the membership-exempt list, like `ListAccountOrganizations`
+        and `DeleteAccount`: whoami targets `accounts/me`, the caller's
+        own account, with no org scope. A memberless caller (mid-bootstrap)
+        must be able to learn who they are; gating this on membership
+        would be chicken-and-egg. Authn still runs; the result only ever
+        surfaces the caller's own identity, so there is no over-disclosure
+        vector beyond what authentication already grants.
+      operationId: Iam_GetAccount
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/v1Account"
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/rpcStatus"
+      parameters:
+        - schema:
+            type: string
+          name: name
+          description: |-
+            Required. Must be `accounts/me`. The caller is implicit from the
+            authentication context.
+          in: path
+          required: true
+      tags:
+        - Iam
     delete:
       summary: |-
         Deletes the authenticated caller's Pivox account (LRO). Cascades
@@ -14397,6 +14444,70 @@ components:
           $ref: "#/components/schemas/v1Invitation"
           description: The accepted invitation.
       description: Response message for `AcceptInvitation`.
+    v1Account:
+      type: object
+      properties:
+        name:
+          type: string
+          description: |-
+            The resource name. Always `accounts/me`. The caller is implicit
+            from the authentication context — there's no other account a
+            caller can address.
+        subject:
+          type: string
+          description: |-
+            Output only. The caller's Pivox identity id — the Keycloak access
+            token's `sub`, which IS the Pivox `identities.id` (a UUID). Same
+            value the API keys every membership and audit reference off.
+          readOnly: true
+        email:
+          type: string
+          description: |-
+            Output only. The caller's email, as carried on the verified access
+            token (`email` claim). Empty when the token omits it.
+          readOnly: true
+        displayName:
+          type: string
+          description: |-
+            Output only. The caller's human-readable display name, from the
+            token's `name` claim. Empty when the token omits it.
+          readOnly: true
+        activeOrganization:
+          $ref: "#/components/schemas/v1AccountOrganization"
+          description: |-
+            Output only. The single organization the caller's token is scoped
+            to, derived from the token's `organization` claim and resolved to
+            the caller's own membership (so `role` matches exactly what
+            `ListAccountOrganizations` reports for that org).
+
+            Unset when the token carries no `organization` claim — the case
+            for the non-MCP web/electron tokens, where the claim is gated
+            behind the `organization` scope. Also unset if the claimed org is
+            not one the caller is an active member of.
+          readOnly: true
+      description: |
+        Account is the singleton representing the authenticated caller's
+        global Pivox account, mirrored from the Keycloak identity. It is
+        the addressing target for the `accounts/me` whoami (`GetAccount`)
+        and for custom verbs Pivox legitimately owns (today: DeleteAccount;
+        future: data export, account disable, etc.).
+
+        `GetAccount` is the whoami: it echoes back the caller's identity as
+        carried on the verified access token, plus the single organization
+        the token is scoped to. It does NOT read the mutable Keycloak
+        profile from Pivox's replica — every field is sourced from the
+        token itself, so there's no stale-replica or write-through concern.
+
+        Update, Create, and List remain intentionally NOT exposed:
+
+          - Profile fields (email, display_name, photo_url, email_verified)
+            are owned by Keycloak and synced into Pivox via the
+            KC→Kafka→Pivox identity-sync pipeline. Surfacing Update here
+            would force Pivox to write through to the IdP from the server,
+            violating the "Keycloak owns the account profile" rule.
+
+          - Create is implicit via Keycloak registration + the identity-
+            sync pipeline; not a public RPC.
     v1AccountOrganization:
       type: object
       properties:

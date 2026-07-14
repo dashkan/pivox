@@ -57,6 +57,13 @@ var membershipExemptMethods = map[string]bool{
 	"/pivox.api.v1.Organizations/AcceptInvitation":   true,
 	"/pivox.api.v1.Organizations/GetInvitation":      true,
 	"/pivox.iam.v1.Iam/ListAccountOrganizations":     true,
+	// GetAccount is the accounts/me whoami — the caller's own account,
+	// no org scope. A mid-bootstrap caller (identity exists, no org
+	// memberships yet) must be able to learn who they are; gating this
+	// on membership would be chicken-and-egg, same as
+	// ListAccountOrganizations. The response only ever surfaces the
+	// caller's own identity, so there is no over-disclosure vector.
+	"/pivox.iam.v1.Iam/GetAccount": true,
 	// DeleteAccount targets accounts/me, the caller's own account —
 	// no org scope. A user stuck in a half-bootstrapped state (identity
 	// exists, no org memberships) must still be able to

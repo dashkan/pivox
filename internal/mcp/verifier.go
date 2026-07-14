@@ -24,11 +24,12 @@ import (
 	"github.com/dashkan/pivox/internal/authn"
 )
 
-// OIDC claim keys read off a Keycloak access token.
+// OIDC claim keys read off a Keycloak access token. The `organization`
+// claim key lives in internal/authn (authn.ClaimOrganization) — the
+// single source of truth shared with the accounts/me whoami.
 const (
-	claimScope        = "scope"
-	claimOrganization = "organization"
-	claimExpiration   = "exp"
+	claimScope      = "scope"
+	claimExpiration = "exp"
 )
 
 // ExtraOrganization is the auth.TokenInfo.Extra key under which the caller's
@@ -68,7 +69,7 @@ func NewTokenVerifier(verifySvc authn.Service) auth.TokenVerifier {
 			Expiration: expirationFromClaims(identity.Claims),
 			Extra:      map[string]any{},
 		}
-		if orgs := organizationsFromClaims(identity.Claims); len(orgs) > 0 {
+		if orgs := authn.OrganizationsFromClaims(identity.Claims); len(orgs) > 0 {
 			info.Extra[ExtraOrganization] = orgs
 		}
 		return info, nil
@@ -83,34 +84,6 @@ func scopesFromClaims(claims map[string]any) []string {
 		return nil
 	}
 	return strings.Fields(raw)
-}
-
-// organizationsFromClaims normalizes the `organization` claim to a slice of
-// aliases. Keycloak's bare-`organization` (ANY) scope yields a single-element
-// array, but a bare string is accepted defensively. Returns nil when absent.
-func organizationsFromClaims(claims map[string]any) []string {
-	switch v := claims[claimOrganization].(type) {
-	case string:
-		if v == "" {
-			return nil
-		}
-		return []string{v}
-	case []any:
-		orgs := make([]string, 0, len(v))
-		for _, item := range v {
-			if s, ok := item.(string); ok && s != "" {
-				orgs = append(orgs, s)
-			}
-		}
-		if len(orgs) == 0 {
-			return nil
-		}
-		return orgs
-	case []string:
-		return v
-	default:
-		return nil
-	}
 }
 
 // expirationFromClaims reads the `exp` claim (unix seconds) into a time.Time so

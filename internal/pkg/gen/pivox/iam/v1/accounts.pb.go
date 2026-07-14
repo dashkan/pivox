@@ -96,32 +96,31 @@ func (x DeleteAccountMetadata_Phase) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DeleteAccountMetadata_Phase.Descriptor instead.
 func (DeleteAccountMetadata_Phase) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{2, 0}
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{3, 0}
 }
 
 // Account is the singleton representing the authenticated caller's
-// global Pivox account, mirrored from the Keycloak identity. The
-// resource exists as an addressing target for custom verbs Pivox
-// legitimately owns (today: DeleteAccount; future: data export,
-// account disable, etc.). Standard methods (Get, List, Update,
-// Create) are intentionally NOT exposed:
+// global Pivox account, mirrored from the Keycloak identity. It is
+// the addressing target for the `accounts/me` whoami (`GetAccount`)
+// and for custom verbs Pivox legitimately owns (today: DeleteAccount;
+// future: data export, account disable, etc.).
+//
+// `GetAccount` is the whoami: it echoes back the caller's identity as
+// carried on the verified access token, plus the single organization
+// the token is scoped to. It does NOT read the mutable Keycloak
+// profile from Pivox's replica — every field is sourced from the
+// token itself, so there's no stale-replica or write-through concern.
+//
+// Update, Create, and List remain intentionally NOT exposed:
 //
 //   - Profile fields (email, display_name, photo_url, email_verified)
 //     are owned by Keycloak and synced into Pivox via the
-//     KC→Kafka→Pivox identity-sync pipeline. Surfacing Get/Update
-//     here would either expose stale replicas or force Pivox to
-//     write through to the IdP from the server, both of which
-//     violate the "Keycloak owns the account profile" rule.
+//     KC→Kafka→Pivox identity-sync pipeline. Surfacing Update here
+//     would force Pivox to write through to the IdP from the server,
+//     violating the "Keycloak owns the account profile" rule.
 //
 //   - Create is implicit via Keycloak registration + the identity-
 //     sync pipeline; not a public RPC.
-//
-// (-- api-linter: core::0121::resource-must-support-get=disabled
-//
-//	aip.dev/not-precedent: Account is a singleton mirroring the
-//	Keycloak identity; profile reads come from the identity-sync
-//	pipeline. Pivox only owns delete-class verbs against this
-//	resource. --)
 //
 // (-- api-linter: core::0121::resource-must-support-list=disabled
 //
@@ -133,9 +132,29 @@ type Account struct {
 	// The resource name. Always `accounts/me`. The caller is implicit
 	// from the authentication context — there's no other account a
 	// caller can address.
-	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Output only. The caller's Pivox identity id — the Keycloak access
+	// token's `sub`, which IS the Pivox `identities.id` (a UUID). Same
+	// value the API keys every membership and audit reference off.
+	Subject string `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	// Output only. The caller's email, as carried on the verified access
+	// token (`email` claim). Empty when the token omits it.
+	Email string `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	// Output only. The caller's human-readable display name, from the
+	// token's `name` claim. Empty when the token omits it.
+	DisplayName string `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	// Output only. The single organization the caller's token is scoped
+	// to, derived from the token's `organization` claim and resolved to
+	// the caller's own membership (so `role` matches exactly what
+	// `ListAccountOrganizations` reports for that org).
+	//
+	// Unset when the token carries no `organization` claim — the case
+	// for the non-MCP web/electron tokens, where the claim is gated
+	// behind the `organization` scope. Also unset if the claimed org is
+	// not one the caller is an active member of.
+	ActiveOrganization *AccountOrganization `protobuf:"bytes,5,opt,name=active_organization,json=activeOrganization,proto3" json:"active_organization,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Account) Reset() {
@@ -175,6 +194,85 @@ func (x *Account) GetName() string {
 	return ""
 }
 
+func (x *Account) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *Account) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *Account) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *Account) GetActiveOrganization() *AccountOrganization {
+	if x != nil {
+		return x.ActiveOrganization
+	}
+	return nil
+}
+
+// Request message for `Iam.GetAccount` (the whoami). The account
+// fetched is always the authenticated caller's; the only valid value
+// for `name` is `accounts/me`. The handler validates this literal to
+// defend against a misconfigured client constructing a path pointing
+// at someone else.
+type GetAccountRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. Must be `accounts/me`. The caller is implicit from the
+	// authentication context.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAccountRequest) Reset() {
+	*x = GetAccountRequest{}
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAccountRequest) ProtoMessage() {}
+
+func (x *GetAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAccountRequest.ProtoReflect.Descriptor instead.
+func (*GetAccountRequest) Descriptor() ([]byte, []int) {
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetAccountRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 // Request message for `Iam.DeleteAccount`. The account being deleted
 // is always the authenticated caller's account; the only valid value
 // for `name` is `accounts/me`. The handler validates this literal
@@ -191,7 +289,7 @@ type DeleteAccountRequest struct {
 
 func (x *DeleteAccountRequest) Reset() {
 	*x = DeleteAccountRequest{}
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[1]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -203,7 +301,7 @@ func (x *DeleteAccountRequest) String() string {
 func (*DeleteAccountRequest) ProtoMessage() {}
 
 func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[1]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -216,7 +314,7 @@ func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAccountRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAccountRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{1}
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DeleteAccountRequest) GetName() string {
@@ -260,7 +358,7 @@ type DeleteAccountMetadata struct {
 
 func (x *DeleteAccountMetadata) Reset() {
 	*x = DeleteAccountMetadata{}
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[2]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -272,7 +370,7 @@ func (x *DeleteAccountMetadata) String() string {
 func (*DeleteAccountMetadata) ProtoMessage() {}
 
 func (x *DeleteAccountMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[2]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -285,7 +383,7 @@ func (x *DeleteAccountMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAccountMetadata.ProtoReflect.Descriptor instead.
 func (*DeleteAccountMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{2}
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DeleteAccountMetadata) GetPhase() DeleteAccountMetadata_Phase {
@@ -336,7 +434,7 @@ type AccountOrganization struct {
 
 func (x *AccountOrganization) Reset() {
 	*x = AccountOrganization{}
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[3]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -348,7 +446,7 @@ func (x *AccountOrganization) String() string {
 func (*AccountOrganization) ProtoMessage() {}
 
 func (x *AccountOrganization) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[3]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -361,7 +459,7 @@ func (x *AccountOrganization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccountOrganization.ProtoReflect.Descriptor instead.
 func (*AccountOrganization) Descriptor() ([]byte, []int) {
-	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{3}
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AccountOrganization) GetOrganization() string {
@@ -413,7 +511,7 @@ type ListAccountOrganizationsRequest struct {
 
 func (x *ListAccountOrganizationsRequest) Reset() {
 	*x = ListAccountOrganizationsRequest{}
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[4]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -425,7 +523,7 @@ func (x *ListAccountOrganizationsRequest) String() string {
 func (*ListAccountOrganizationsRequest) ProtoMessage() {}
 
 func (x *ListAccountOrganizationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[4]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -438,7 +536,7 @@ func (x *ListAccountOrganizationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAccountOrganizationsRequest.ProtoReflect.Descriptor instead.
 func (*ListAccountOrganizationsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{4}
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListAccountOrganizationsRequest) GetParent() string {
@@ -470,7 +568,7 @@ type ListAccountOrganizationsResponse struct {
 
 func (x *ListAccountOrganizationsResponse) Reset() {
 	*x = ListAccountOrganizationsResponse{}
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[5]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -482,7 +580,7 @@ func (x *ListAccountOrganizationsResponse) String() string {
 func (*ListAccountOrganizationsResponse) ProtoMessage() {}
 
 func (x *ListAccountOrganizationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[5]
+	mi := &file_pivox_iam_v1_accounts_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -495,7 +593,7 @@ func (x *ListAccountOrganizationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAccountOrganizationsResponse.ProtoReflect.Descriptor instead.
 func (*ListAccountOrganizationsResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{5}
+	return file_pivox_iam_v1_accounts_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListAccountOrganizationsResponse) GetAccountOrganizations() []*AccountOrganization {
@@ -509,10 +607,17 @@ var File_pivox_iam_v1_accounts_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_accounts_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/iam/v1/accounts.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\"a\n" +
+	"\x1bpivox/iam/v1/accounts.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\"\x9c\x02\n" +
 	"\aAccount\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name:=\xeaA:\n" +
-	"\x11pivox.iam/Account\x12\x12accounts/{account}*\baccounts2\aaccount\"K\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\x1d\n" +
+	"\asubject\x18\x02 \x01(\tB\x03\xe0A\x03R\asubject\x12\x19\n" +
+	"\x05email\x18\x03 \x01(\tB\x03\xe0A\x03R\x05email\x12&\n" +
+	"\fdisplay_name\x18\x04 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12W\n" +
+	"\x13active_organization\x18\x05 \x01(\v2!.pivox.iam.v1.AccountOrganizationB\x03\xe0A\x03R\x12activeOrganization:=\xeaA:\n" +
+	"\x11pivox.iam/Account\x12\x12accounts/{account}*\baccounts2\aaccount\"H\n" +
+	"\x11GetAccountRequest\x123\n" +
+	"\x04name\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
+	"\x11pivox.iam/Account\xbaH\x03\xc8\x01\x01R\x04name\"K\n" +
 	"\x14DeleteAccountRequest\x123\n" +
 	"\x04name\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
 	"\x11pivox.iam/Account\xbaH\x03\xc8\x01\x01R\x04name\"\xf1\x01\n" +
@@ -551,24 +656,26 @@ func file_pivox_iam_v1_accounts_proto_rawDescGZIP() []byte {
 }
 
 var file_pivox_iam_v1_accounts_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pivox_iam_v1_accounts_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_pivox_iam_v1_accounts_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_pivox_iam_v1_accounts_proto_goTypes = []any{
 	(DeleteAccountMetadata_Phase)(0),         // 0: pivox.iam.v1.DeleteAccountMetadata.Phase
 	(*Account)(nil),                          // 1: pivox.iam.v1.Account
-	(*DeleteAccountRequest)(nil),             // 2: pivox.iam.v1.DeleteAccountRequest
-	(*DeleteAccountMetadata)(nil),            // 3: pivox.iam.v1.DeleteAccountMetadata
-	(*AccountOrganization)(nil),              // 4: pivox.iam.v1.AccountOrganization
-	(*ListAccountOrganizationsRequest)(nil),  // 5: pivox.iam.v1.ListAccountOrganizationsRequest
-	(*ListAccountOrganizationsResponse)(nil), // 6: pivox.iam.v1.ListAccountOrganizationsResponse
+	(*GetAccountRequest)(nil),                // 2: pivox.iam.v1.GetAccountRequest
+	(*DeleteAccountRequest)(nil),             // 3: pivox.iam.v1.DeleteAccountRequest
+	(*DeleteAccountMetadata)(nil),            // 4: pivox.iam.v1.DeleteAccountMetadata
+	(*AccountOrganization)(nil),              // 5: pivox.iam.v1.AccountOrganization
+	(*ListAccountOrganizationsRequest)(nil),  // 6: pivox.iam.v1.ListAccountOrganizationsRequest
+	(*ListAccountOrganizationsResponse)(nil), // 7: pivox.iam.v1.ListAccountOrganizationsResponse
 }
 var file_pivox_iam_v1_accounts_proto_depIdxs = []int32{
-	0, // 0: pivox.iam.v1.DeleteAccountMetadata.phase:type_name -> pivox.iam.v1.DeleteAccountMetadata.Phase
-	4, // 1: pivox.iam.v1.ListAccountOrganizationsResponse.account_organizations:type_name -> pivox.iam.v1.AccountOrganization
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	5, // 0: pivox.iam.v1.Account.active_organization:type_name -> pivox.iam.v1.AccountOrganization
+	0, // 1: pivox.iam.v1.DeleteAccountMetadata.phase:type_name -> pivox.iam.v1.DeleteAccountMetadata.Phase
+	5, // 2: pivox.iam.v1.ListAccountOrganizationsResponse.account_organizations:type_name -> pivox.iam.v1.AccountOrganization
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_pivox_iam_v1_accounts_proto_init() }
@@ -582,7 +689,7 @@ func file_pivox_iam_v1_accounts_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_iam_v1_accounts_proto_rawDesc), len(file_pivox_iam_v1_accounts_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

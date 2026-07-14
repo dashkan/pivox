@@ -263,8 +263,8 @@ func TestE2E_DeleteUser_RejectsMeTarget(t *testing.T) {
 // helpers
 // ===========================================================================
 
-func newIamHarness(t *testing.T) *grpcharness.Harness {
-	h := grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+func newIamHarness(t *testing.T, opts ...grpcharness.Option) *grpcharness.Harness {
+	svcOpt := grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
 		require.NoError(t, err)
 		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
@@ -278,7 +278,8 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 			Queries:    h.Queries,
 			LROManager: h.LROManager,
 		}))
-	}))
+	})
+	h := grpcharness.New(t, append([]grpcharness.Option{svcOpt}, opts...)...)
 	startIamLifecycleWorkers(t, h)
 	return h
 }

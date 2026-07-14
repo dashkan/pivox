@@ -22,6 +22,15 @@ import (
 // this UUID — it's the universal user identifier across the API.
 type userIDKey struct{}
 
+// identityKey is the context key for the caller's full verified
+// authn.Identity (UID + email + raw token claims), populated by the
+// auth interceptor alongside userIDKey. Handlers that need more than
+// the identity UUID — the `accounts/me` whoami reads email, the `name`
+// claim, and the `organization` claim off it — read this via
+// IdentityFromContext. The identity is already verified by the
+// authn.Service, so nothing untrusted rides on this context value.
+type identityKey struct{}
+
 // Canonical Unauthenticated messages. Centralized so both the unary
 // and stream interceptors return identical errors and so any future
 // reword happens in one place.
@@ -47,6 +56,21 @@ func WithUserID(ctx context.Context, id uuid.UUID) context.Context {
 	return context.WithValue(ctx, userIDKey{}, id)
 }
 
+// Identity returns the caller's full verified authn.Identity from the
+// context. Present whenever the auth interceptor authenticated the
+// request; the boolean is false otherwise (e.g. an exempt method that
+// bypassed auth, or a unit test that only set the UUID).
+func Identity(ctx context.Context) (*authn.Identity, bool) {
+	id, ok := ctx.Value(identityKey{}).(*authn.Identity)
+	return id, ok
+}
+
+// WithIdentity returns a new context carrying the given verified
+// identity, as if the auth interceptor had set it. Intended for tests.
+func WithIdentity(ctx context.Context, identity *authn.Identity) context.Context {
+	return context.WithValue(ctx, identityKey{}, identity)
+}
+
 // MustUserID extracts the verified caller's `identities.id` UUID from the
 // context. Panics if the context does not contain one — only call from
 // handlers behind the auth interceptor, which rejects any token it can't
@@ -56,6 +80,19 @@ func MustUserID(ctx context.Context) uuid.UUID {
 	id, ok := UserID(ctx)
 	if !ok {
 		panic("server: MustUserID called without an identity on context")
+	}
+	return id
+}
+
+// MustIdentity extracts the caller's full verified authn.Identity from
+// the context. Panics if absent — only call from handlers behind the
+// auth interceptor, which sets the identity for every request it
+// authenticates, so by the time such a handler runs it is guaranteed
+// present. Mirrors MustUserID.
+func MustIdentity(ctx context.Context) *authn.Identity {
+	id, ok := Identity(ctx)
+	if !ok {
+		panic("server: MustIdentity called without an identity on context")
 	}
 	return id
 }
@@ -109,6 +146,7 @@ func authenticateBearer(ctx context.Context, auth authn.Service, bearerHeader st
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}
 	ctx = context.WithValue(ctx, userIDKey{}, uid)
+	ctx = context.WithValue(ctx, identityKey{}, identity)
 	return ctx, nil
 }
 

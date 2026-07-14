@@ -39,6 +39,7 @@ const (
 	Iam_ListUsers_FullMethodName                = "/pivox.iam.v1.Iam/ListUsers"
 	Iam_DeleteUser_FullMethodName               = "/pivox.iam.v1.Iam/DeleteUser"
 	Iam_ListAccountOrganizations_FullMethodName = "/pivox.iam.v1.Iam/ListAccountOrganizations"
+	Iam_GetAccount_FullMethodName               = "/pivox.iam.v1.Iam/GetAccount"
 	Iam_DeleteAccount_FullMethodName            = "/pivox.iam.v1.Iam/DeleteAccount"
 	Iam_GetRole_FullMethodName                  = "/pivox.iam.v1.Iam/GetRole"
 	Iam_ListRoles_FullMethodName                = "/pivox.iam.v1.Iam/ListRoles"
@@ -135,6 +136,33 @@ type IamClient interface {
 	//	parent since there is no other account a caller can
 	//	address. Parallels the same disable on DeleteAccount. --)
 	ListAccountOrganizations(ctx context.Context, in *ListAccountOrganizationsRequest, opts ...grpc.CallOption) (*ListAccountOrganizationsResponse, error)
+	// Gets the authenticated caller's account (whoami). Returns the
+	// caller's identity as carried on the verified access token
+	// (subject, email, display_name) plus the single organization the
+	// token is scoped to (`active_organization`), derived from the
+	// token's `organization` claim and resolved against the caller's
+	// own memberships so its `role` matches what
+	// `ListAccountOrganizations` reports for that org.
+	//
+	// `active_organization` is unset when the token carries no
+	// `organization` claim (the non-MCP web/electron tokens, where the
+	// claim is gated behind the `organization` scope) or when the
+	// claimed org is not one the caller is an active member of.
+	//
+	// On the membership-exempt list, like `ListAccountOrganizations`
+	// and `DeleteAccount`: whoami targets `accounts/me`, the caller's
+	// own account, with no org scope. A memberless caller (mid-bootstrap)
+	// must be able to learn who they are; gating this on membership
+	// would be chicken-and-egg. Authn still runs; the result only ever
+	// surfaces the caller's own identity, so there is no over-disclosure
+	// vector beyond what authentication already grants.
+	// (-- api-linter: core::0127::http-template-pattern=disabled
+	//
+	//	aip.dev/not-precedent: Only support getting the caller's own
+	//	account; `accounts/me` is the only valid name since there is
+	//	no other account a caller can address. Parallels the same
+	//	disable on DeleteAccount. --)
+	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*Account, error)
 	// Deletes the authenticated caller's Pivox account (LRO). Cascades
 	// through Pivox-side state across every org the caller is in and
 	// soft-deletes their identity row. Cross-org by design — this is
@@ -230,6 +258,16 @@ func (c *iamClient) ListAccountOrganizations(ctx context.Context, in *ListAccoun
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListAccountOrganizationsResponse)
 	err := c.cc.Invoke(ctx, Iam_ListAccountOrganizations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*Account, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Account)
+	err := c.cc.Invoke(ctx, Iam_GetAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -438,6 +476,33 @@ type IamServer interface {
 	//	parent since there is no other account a caller can
 	//	address. Parallels the same disable on DeleteAccount. --)
 	ListAccountOrganizations(context.Context, *ListAccountOrganizationsRequest) (*ListAccountOrganizationsResponse, error)
+	// Gets the authenticated caller's account (whoami). Returns the
+	// caller's identity as carried on the verified access token
+	// (subject, email, display_name) plus the single organization the
+	// token is scoped to (`active_organization`), derived from the
+	// token's `organization` claim and resolved against the caller's
+	// own memberships so its `role` matches what
+	// `ListAccountOrganizations` reports for that org.
+	//
+	// `active_organization` is unset when the token carries no
+	// `organization` claim (the non-MCP web/electron tokens, where the
+	// claim is gated behind the `organization` scope) or when the
+	// claimed org is not one the caller is an active member of.
+	//
+	// On the membership-exempt list, like `ListAccountOrganizations`
+	// and `DeleteAccount`: whoami targets `accounts/me`, the caller's
+	// own account, with no org scope. A memberless caller (mid-bootstrap)
+	// must be able to learn who they are; gating this on membership
+	// would be chicken-and-egg. Authn still runs; the result only ever
+	// surfaces the caller's own identity, so there is no over-disclosure
+	// vector beyond what authentication already grants.
+	// (-- api-linter: core::0127::http-template-pattern=disabled
+	//
+	//	aip.dev/not-precedent: Only support getting the caller's own
+	//	account; `accounts/me` is the only valid name since there is
+	//	no other account a caller can address. Parallels the same
+	//	disable on DeleteAccount. --)
+	GetAccount(context.Context, *GetAccountRequest) (*Account, error)
 	// Deletes the authenticated caller's Pivox account (LRO). Cascades
 	// through Pivox-side state across every org the caller is in and
 	// soft-deletes their identity row. Cross-org by design — this is
@@ -510,6 +575,9 @@ func (UnimplementedIamServer) DeleteUser(context.Context, *DeleteUserRequest) (*
 }
 func (UnimplementedIamServer) ListAccountOrganizations(context.Context, *ListAccountOrganizationsRequest) (*ListAccountOrganizationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAccountOrganizations not implemented")
+}
+func (UnimplementedIamServer) GetAccount(context.Context, *GetAccountRequest) (*Account, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAccount not implemented")
 }
 func (UnimplementedIamServer) DeleteAccount(context.Context, *DeleteAccountRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAccount not implemented")
@@ -636,6 +704,24 @@ func _Iam_ListAccountOrganizations_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IamServer).ListAccountOrganizations(ctx, req.(*ListAccountOrganizationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_GetAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).GetAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_GetAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).GetAccount(ctx, req.(*GetAccountRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -878,6 +964,10 @@ var Iam_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAccountOrganizations",
 			Handler:    _Iam_ListAccountOrganizations_Handler,
+		},
+		{
+			MethodName: "GetAccount",
+			Handler:    _Iam_GetAccount_Handler,
 		},
 		{
 			MethodName: "DeleteAccount",

@@ -81,9 +81,12 @@ func TestAuthInterceptor_ValidToken(t *testing.T) {
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
 	var captured uuid.UUID
+	var capturedIdentity *authn.Identity
 	handler := func(ctx context.Context, req any) (any, error) {
 		var ok bool
 		captured, ok = UserID(ctx)
+		require.True(t, ok)
+		capturedIdentity, ok = Identity(ctx)
 		require.True(t, ok)
 		return "ok", nil
 	}
@@ -95,6 +98,12 @@ func TestAuthInterceptor_ValidToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ok", resp)
 	assert.Equal(t, sub, captured)
+	// The full verified identity — not just the UUID — is plumbed onto
+	// the context for handlers like the accounts/me whoami that read
+	// the email and raw token claims.
+	require.NotNil(t, capturedIdentity)
+	assert.Equal(t, "kc@example.com", capturedIdentity.Email)
+	assert.Equal(t, "https://kc/realms/pivox", capturedIdentity.Claims["iss"])
 }
 
 func TestAuthInterceptor_MissingMetadata(t *testing.T) {
@@ -204,6 +213,32 @@ func TestMustUserID_Present(t *testing.T) {
 func TestMustUserID_Panics(t *testing.T) {
 	assert.Panics(t, func() {
 		MustUserID(context.Background())
+	})
+}
+
+func TestIdentity_Present(t *testing.T) {
+	want := &authn.Identity{UID: uuid.NewString(), Email: "id@example.com"}
+	ctx := WithIdentity(context.Background(), want)
+	got, ok := Identity(ctx)
+
+	assert.True(t, ok)
+	assert.Same(t, want, got)
+}
+
+func TestIdentity_Missing(t *testing.T) {
+	_, ok := Identity(context.Background())
+	assert.False(t, ok)
+}
+
+func TestMustIdentity_Present(t *testing.T) {
+	want := &authn.Identity{UID: uuid.NewString()}
+	ctx := WithIdentity(context.Background(), want)
+	assert.Same(t, want, MustIdentity(ctx))
+}
+
+func TestMustIdentity_Panics(t *testing.T) {
+	assert.Panics(t, func() {
+		MustIdentity(context.Background())
 	})
 }
 

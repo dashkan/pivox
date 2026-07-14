@@ -23,27 +23,28 @@ import "google/api/resource.proto";
 option go_package = "pivox/iam/v1;iampb";
 
 // Account is the singleton representing the authenticated caller's
-// global Pivox account, mirrored from the Keycloak identity. The
-// resource exists as an addressing target for custom verbs Pivox
-// legitimately owns (today: DeleteAccount; future: data export,
-// account disable, etc.). Standard methods (Get, List, Update,
-// Create) are intentionally NOT exposed:
+// global Pivox account, mirrored from the Keycloak identity. It is
+// the addressing target for the `accounts/me` whoami (`GetAccount`)
+// and for custom verbs Pivox legitimately owns (today: DeleteAccount;
+// future: data export, account disable, etc.).
+//
+// `GetAccount` is the whoami: it echoes back the caller's identity as
+// carried on the verified access token, plus the single organization
+// the token is scoped to. It does NOT read the mutable Keycloak
+// profile from Pivox's replica — every field is sourced from the
+// token itself, so there's no stale-replica or write-through concern.
+//
+// Update, Create, and List remain intentionally NOT exposed:
 //
 //   - Profile fields (email, display_name, photo_url, email_verified)
 //     are owned by Keycloak and synced into Pivox via the
-//     KC→Kafka→Pivox identity-sync pipeline. Surfacing Get/Update
-//     here would either expose stale replicas or force Pivox to
-//     write through to the IdP from the server, both of which
-//     violate the "Keycloak owns the account profile" rule.
+//     KC→Kafka→Pivox identity-sync pipeline. Surfacing Update here
+//     would force Pivox to write through to the IdP from the server,
+//     violating the "Keycloak owns the account profile" rule.
 //
 //   - Create is implicit via Keycloak registration + the identity-
 //     sync pipeline; not a public RPC.
 //
-// (-- api-linter: core::0121::resource-must-support-get=disabled
-//     aip.dev/not-precedent: Account is a singleton mirroring the
-//     Keycloak identity; profile reads come from the identity-sync
-//     pipeline. Pivox only owns delete-class verbs against this
-//     resource. --)
 // (-- api-linter: core::0121::resource-must-support-list=disabled
 //     aip.dev/not-precedent: Account is a singleton ("accounts/me");
 //     listing isn't meaningful — there's only one account from the
@@ -60,6 +61,45 @@ message Account {
   // from the authentication context — there's no other account a
   // caller can address.
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Output only. The caller's Pivox identity id — the Keycloak access
+  // token's `sub`, which IS the Pivox `identities.id` (a UUID). Same
+  // value the API keys every membership and audit reference off.
+  string subject = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The caller's email, as carried on the verified access
+  // token (`email` claim). Empty when the token omits it.
+  string email = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The caller's human-readable display name, from the
+  // token's `name` claim. Empty when the token omits it.
+  string display_name = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The single organization the caller's token is scoped
+  // to, derived from the token's `organization` claim and resolved to
+  // the caller's own membership (so `role` matches exactly what
+  // `ListAccountOrganizations` reports for that org).
+  //
+  // Unset when the token carries no `organization` claim — the case
+  // for the non-MCP web/electron tokens, where the claim is gated
+  // behind the `organization` scope. Also unset if the claimed org is
+  // not one the caller is an active member of.
+  AccountOrganization active_organization = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `Iam.GetAccount` (the whoami). The account
+// fetched is always the authenticated caller's; the only valid value
+// for `name` is `accounts/me`. The handler validates this literal to
+// defend against a misconfigured client constructing a path pointing
+// at someone else.
+message GetAccountRequest {
+  // Required. Must be `accounts/me`. The caller is implicit from the
+  // authentication context.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Account"},
+    (buf.validate.field).required = true
+  ];
 }
 
 // Request message for `Iam.DeleteAccount`. The account being deleted
