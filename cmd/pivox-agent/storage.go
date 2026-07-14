@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dashkan/pivox/internal/health"
 	agent "github.com/dashkan/pivox/internal/storageagent"
 	"github.com/dashkan/pivox/internal/telemetry"
 )
@@ -42,6 +43,7 @@ the cloud.`,
 	f.Int("memcache-max-item-mb", envOrDefaultInt("PIVOX_MEMCACHE_MAX_ITEM_MB", 0), "In-memory cache: max size of a single item in MB (0=default 8, hard max 64)")
 	f.Int("port", envOrDefaultInt("PIVOX_PORT", defaultPort), "HTTPS listen port")
 	f.String("bind", envOrDefault("PIVOX_BIND", "0.0.0.0"), "Bind address")
+	health.RegisterFlag(f)
 	addControlPlaneFlag(f)
 	f.String("role", envOrDefault("PIVOX_ROLE", "both"), "Agent role: both, serve, worker")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
@@ -65,6 +67,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	}
 	cacheDir, _ := f.GetString("cache-dir")
 	stateDir, _ := f.GetString("state-dir")
+	debugPort := health.Addr(f)
 	cacheSize, _ := f.GetInt("cache-size")
 	port, _ := f.GetInt("port")
 	bind, _ := f.GetString("bind")
@@ -149,6 +152,47 @@ func runStorage(cmd *cobra.Command, args []string) error {
 
 	go state.Sessions.StartCleanup(ctx, 1*time.Minute)
 
+	// Health/readiness. Bound before the file server and the cloud stream so a
+	// wedged startup answers "not ready, and here is why" rather than refusing
+	// connections.
+	healthState := health.NewState()
+	healthServer := health.NewServer(health.Config{
+		Addr:   debugPort,
+		State:  healthState,
+		Logger: logger,
+	})
+	if err := healthServer.Start(); err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = healthServer.Shutdown(shutdownCtx)
+	}()
+
+	// Readiness for THIS process. The agent has NO Postgres. Its two real
+	// dependencies are:
+	//
+	//   state-dir    — holds sessions, endpoints and denied patterns; must be
+	//                  writable or the agent cannot function. A read-only mount
+	//                  is an ordinary on-prem failure that otherwise boots clean.
+	//   cloud-stream — the bidi control-plane link. NOT ready until the handshake
+	//                  lands, because the handshake is what delivers the SESSION
+	//                  SIGNING KEY (see storageagent/connect.go). Without it the
+	//                  agent cannot validate a single session, so it can serve
+	//                  nothing. "Process started" is not "able to serve".
+	//
+	// Note the cloud link gates READINESS only, never liveness. If it fed liveness,
+	// a cloud outage would fail liveness on every agent simultaneously and the
+	// supervisor would restart the whole fleet — amplifying someone else's outage
+	// into ours. Readiness takes a disconnected agent out of rotation and leaves it
+	// running to reconnect (the loop below).
+	cloudStream := health.NewFlag("cloud-stream", "handshake not completed")
+	healthState.SetChecks(
+		health.DirWritable("state-dir", stateDir),
+		cloudStream.Check(),
+	)
+
 	// Start the HTTP file server alongside the bidi connection.
 	httpServer := agent.NewHTTPServer(agent.Config{
 		Sessions:   state.Sessions,
@@ -171,6 +215,10 @@ func runStorage(cmd *cobra.Command, args []string) error {
 		Endpoints: state.Endpoints,
 		Denied:    state.Denied,
 		HTTP:      httpServer,
+		// Readiness follows the control-plane link: ready once the handshake has
+		// applied the signing key, not-ready the moment the stream drops.
+		OnConnected:    func() { cloudStream.Set(true) },
+		OnDisconnected: func() { cloudStream.Set(false) },
 	}
 
 	// Connect to control plane with reconnect loop.

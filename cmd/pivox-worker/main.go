@@ -33,6 +33,7 @@ import (
 	"github.com/dashkan/pivox/internal/crypto"
 	"github.com/dashkan/pivox/internal/engine"
 	"github.com/dashkan/pivox/internal/engine/connector"
+	"github.com/dashkan/pivox/internal/health"
 	"github.com/dashkan/pivox/internal/identitysync"
 	"github.com/dashkan/pivox/internal/telemetry"
 	"github.com/dashkan/pivox/internal/telemetry/rivertrace"
@@ -96,6 +97,7 @@ func main() {
 	f.String("encryption-provider", envOrDefault("PIVOX_ENCRYPTION_PROVIDER", "local"), "At-rest encryption backend: local (cleartext Tink keyset) or gcp (Cloud KMS)")
 	f.String("encryption-local-keyset", envOrDefault("PIVOX_ENCRYPTION_LOCAL_KEYSET", ""), "base64 cleartext Tink keyset; required when encryption-provider=local")
 	f.String("encryption-gcp-kms-key-name", envOrDefault("PIVOX_ENCRYPTION_GCP_KMS_KEY_NAME", ""), "Cloud KMS key resource name; required when encryption-provider=gcp")
+	health.RegisterFlag(f)
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
 	f.Bool("workflow-allow-internal-networks", envOrBool("PIVOX_WORKFLOW_ALLOW_INTERNAL_NETWORKS", false), "Allow workflow HTTP activities to reach internal/private network addresses (loopback, link-local, private, metadata). Default false — REQUIRED for shared multi-tenant cloud. Set true only for single-tenant on-prem where the worker legitimately reaches internal systems.")
 	f.Int64("workflow-http-max-response-size", envOrInt64("PIVOX_WORKFLOW_HTTP_MAX_RESPONSE_SIZE", 1<<20), "Max bytes a workflow HTTP activity reads from a response body. Default 1048576 (1 MiB); clamped to [524288 (512 KiB), 10485760 (10 MiB)].")
@@ -160,6 +162,7 @@ func serve(cmd *cobra.Command, _ []string) error {
 	f := cmd.Flags()
 	databaseURL := mustString(f.GetString("database-url"))
 	sessionsURL := mustString(f.GetString("sessions-database-url"))
+	debugPort := health.Addr(f)
 	kafkaBrokers := mustString(f.GetString("kafka-brokers"))
 	kcRealm := mustString(f.GetString("kc-realm"))
 	encryptionProvider := mustString(f.GetString("encryption-provider"))
@@ -191,6 +194,28 @@ func serve(cmd *cobra.Command, _ []string) error {
 		}
 	}()
 
+	// Health/readiness. The Worker previously exposed NOTHING — no port, no
+	// endpoint — so a worker that could not reach Postgres or Kafka was
+	// indistinguishable from a healthy one: the supervisor saw a live process and
+	// reported green while no job ran. Same failure class the API hit.
+	//
+	// Bound FIRST, before any dependency, so a startup that wedges answers "not
+	// ready, and here is why" instead of refusing connections.
+	healthState := health.NewState()
+	healthServer := health.NewServer(health.Config{
+		Addr:   debugPort,
+		State:  healthState,
+		Logger: logger,
+	})
+	if err := healthServer.Start(); err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = healthServer.Shutdown(shutdownCtx)
+	}()
+
 	// db.NewPool wires the otelpgx query tracer + pgvector per-connection type
 	// registration (required to decode `vector` columns like assets.embedding,
 	// which worker jobs touch) — shared with cloud + the test harness.
@@ -212,6 +237,21 @@ func serve(cmd *cobra.Command, _ []string) error {
 	}
 	defer sessionsPool.Close()
 	logger.Info("connected to sessions database")
+
+	// Readiness for THIS process: both databases. The worker's jobs run against
+	// the app DB (River queue lives there) and the BFF-owned sessions DB
+	// (purge_web_sessions). Losing either means it cannot do its job, so it should
+	// leave the ready set — but it must NOT be restarted for it (liveness stays
+	// dependency-free; see internal/health).
+	//
+	// Kafka is deliberately NOT a readiness dependency: the identity-sync consumer
+	// reconnects on its own, and the worker's other periodic jobs keep running
+	// without it. Gating readiness on Kafka would take the whole worker out of
+	// service for a partial degradation.
+	healthState.SetChecks(
+		health.Check{Name: "pivox-db", Func: pool.Ping},
+		health.Check{Name: "sessions-db", Func: sessionsPool.Ping},
+	)
 
 	driver := riverpropgxv5.New(pool)
 

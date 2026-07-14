@@ -36,6 +36,7 @@ import (
 	"github.com/dashkan/pivox/internal/config"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/health"
 	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/mcp"
 	"github.com/dashkan/pivox/internal/oidc"
@@ -96,7 +97,7 @@ func main() {
 	// remember to firewall it.
 	f.String("service-grpc-port", envOrDefault("PIVOX_SERVICE_GRPC_PORT", "127.0.0.1:50052"), "Service-to-service gRPC listen address (AgentService et al., registration-token authenticated)")
 	f.String("rest-port", envOrDefault("PIVOX_REST_PORT", ":8080"), "REST gateway listen address")
-	f.String("debug-port", envOrDefault("PIVOX_DEBUG_PORT", ":9090"), "Debug/health listen address")
+	health.RegisterFlag(f)
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
 	telemetry.RegisterOtelFlags(f)
 	f.Bool("enable-reflection", envOrBool("PIVOX_ENABLE_REFLECTION", false), "Register gRPC server reflection for dev tooling (grpcurl, buf curl). OFF by default — never enable in production; it exposes the full API surface to unauthenticated callers.")
@@ -163,7 +164,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		GRPCPort:         must(f.GetString("grpc-port")),
 		ServiceGRPCPort:  must(f.GetString("service-grpc-port")),
 		RESTPort:         must(f.GetString("rest-port")),
-		DebugPort:        must(f.GetString("debug-port")),
+		DebugPort:        health.Addr(f),
 		LogLevel:         must(f.GetString("log-level")),
 		EnableReflection: enableReflection,
 		OIDC: config.OIDCConfig{
@@ -202,6 +203,26 @@ func serve(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	// Health/readiness. Bound FIRST, before every dependency, and deliberately so:
+	// this process binds none of its real listeners until startup completes, so a
+	// startup that wedges (an unreachable IdP, a DB that never answers) used to
+	// leave NO open port at all. A closed port is a black hole — indistinguishable
+	// from a crash, a firewall, or a wrong port — which is how a non-serving API
+	// once sat "Running / Healthy" in the dashboard for 25 minutes.
+	//
+	// Binding here means a wedged startup answers "not ready, and here is why"
+	// instead of refusing connections. The State starts NOT ready; the checks are
+	// installed below once the dependencies actually exist.
+	healthState := health.NewState()
+	healthServer := health.NewServer(health.Config{
+		Addr:   cfg.DebugPort,
+		State:  healthState,
+		Logger: logger,
+	})
+	if err := healthServer.Start(); err != nil {
+		return err
+	}
+
 	// Database. db.NewPool wires the otelpgx query tracer + pgvector
 	// per-connection type registration (required to decode `vector` columns
 	// like assets.embedding) in one place shared with the worker + test harness.
@@ -211,6 +232,14 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 	defer pool.Close()
 	logger.Info("connected to database")
+
+	// Readiness for THIS process: it cannot serve a single RPC without Postgres.
+	// Liveness deliberately does not check the DB — see internal/health's package
+	// doc: a DB blip must not restart the fleet.
+	healthState.SetChecks(health.Check{
+		Name: "pivox-db",
+		Func: pool.Ping,
+	})
 
 	queries := db.New(pool)
 
@@ -571,6 +600,22 @@ func serve(cmd *cobra.Command, args []string) error {
 	})
 	aiv1.RegisterAiChatServer(grpcServer, aiChatServer)
 
+	// Standard gRPC health protocol (grpc.health.v1) on the public server, backed
+	// by the SAME health.State as /readyz — so an HTTP prober and a gRPC prober
+	// can never disagree about whether this instance can serve.
+	//
+	// Registered here and nowhere else: the Worker runs no gRPC server, and the
+	// Storage Agent is a gRPC *client* (it dials the cloud). Standing up a gRPC
+	// listener in either purely to answer health would add surface for no
+	// consumer — they expose HTTP /healthz + /readyz, which every prober speaks.
+	//
+	// Like reflection, health bypasses the auth interceptor (GatedUnaryInterceptor
+	// gates it to pivox.* + LRO). Unlike reflection, that is fine to leave on in
+	// production: a health protocol exists to answer probers that hold no
+	// credentials, and it discloses only SERVING/NOT_SERVING — not the API surface.
+	grpcHealth := health.NewGRPCService(healthState)
+	grpcHealth.Register(grpcServer)
+
 	// Server reflection is registered only when explicitly enabled
 	// (PIVOX_ENABLE_REFLECTION / --enable-reflection, off by default).
 	// It exposes the full API surface to unauthenticated callers — the
@@ -863,33 +908,9 @@ func serve(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	// Debug server (health/readiness)
-	debugMux := http.NewServeMux()
-	debugMux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		// Best-effort write; the client hanging up before we finish
-		// is not actionable for a health endpoint.
-		_, _ = fmt.Fprintln(w, "ok")
-	})
-	debugMux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
-		if err := pool.Ping(r.Context()); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = fmt.Fprintln(w, "not ready")
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = fmt.Fprintln(w, "ready")
-	})
-	debugServer := &http.Server{
-		Addr:    cfg.DebugPort,
-		Handler: debugMux,
-	}
-	go func() {
-		logger.Info("debug server listening", "addr", cfg.DebugPort)
-		if err := debugServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("debug server stopped", "error", err)
-		}
-	}()
+	// The health server itself was bound at the very top of serve(), before any
+	// dependency existed. Keep the gRPC health status in step with it.
+	go grpcHealth.Run(ctx, 0)
 
 	// Wait for shutdown signal
 	<-ctx.Done()
@@ -899,9 +920,14 @@ func serve(cmd *cobra.Command, args []string) error {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer shutdownCancel()
 
+	// Announce NOT_SERVING *before* GracefulStop, so load balancers and Watch
+	// subscribers stop routing to us while we can still finish in-flight RPCs.
+	// Stopping first would leave the LB pushing traffic into a closing server.
+	grpcHealth.Shutdown()
+
 	grpcServer.GracefulStop()
 	_ = restServer.Shutdown(shutdownCtx)
-	_ = debugServer.Shutdown(shutdownCtx)
+	_ = healthServer.Shutdown(shutdownCtx)
 
 	// Shut down the LRO manager — stop the LISTEN goroutine and let it
 	// release its pool conn — before pool.Close runs in the outer

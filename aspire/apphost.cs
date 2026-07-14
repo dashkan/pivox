@@ -372,9 +372,16 @@ var api = builder
   .AddGoApp("api", "../cmd/pivox-cloud")
   .WithEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
   .WithEnvironment("PIVOX_SERVICE_GRPC_PORT", ":50052")
-  // The app's own debug listener (PIVOX_DEBUG_PORT, default :9090), serving
-  // /healthz + /readyz. isProxied:false because port == targetPort on a host
-  // process (Aspire can't proxy those).
+  // Health/debug listener (/healthz + /readyz).
+  //
+  // All three Go binaries DEFAULT to :9090 — in production each is its own
+  // container, so a uniform port means one probe config, one scrape config, one
+  // dashboard. In dev they share a host, so they would collide; Aspire assigns
+  // each a distinct port here (api 9090, worker 9091, agent 9095 — NOT 9092,
+  // which is Kafka's; see the agent's block).
+  //
+  // isProxied:false because port == targetPort on a host process.
+  .WithEnvironment("PIVOX_DEBUG_PORT", ":9090")
   .WithHttpEndpoint(port: 9090, targetPort: 9090, name: "debug", isProxied: false)
   // WITHOUT THIS, A NON-SERVING API REPORTS AS HEALTHY. Aspire's health for a
   // host process is otherwise just "the process hasn't exited", and pivox-cloud
@@ -411,6 +418,14 @@ var api = builder
 builder
   .AddGoApp("worker", "../cmd/pivox-worker")
   .WithEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
+  // Health/debug listener. The worker previously exposed NOTHING — no port, no
+  // endpoint — so a worker that could not reach Postgres was indistinguishable
+  // from a healthy one: a live process, a green dashboard, and no jobs running.
+  // :9091 in dev to avoid colliding with the api's :9090 (both default to :9090
+  // in production, where each has its own container).
+  .WithEnvironment("PIVOX_DEBUG_PORT", ":9091")
+  .WithHttpEndpoint(port: 9091, targetPort: 9091, name: "debug", isProxied: false)
+  .WithHttpHealthCheck("/readyz", endpointName: "debug")
   // The purge_web_sessions periodic job GCs expired rows from the BFF-owned
   // `web_sessions` table, which lives in the separate `sessions` DB — so the
   // worker needs that connection in addition to the app DB.
@@ -463,6 +478,20 @@ builder
   .WithArgs(["storage"])
   .WithEnvironment("PIVOX_TOKEN", "dev-token-local")
   .WithEnvironment("PIVOX_PORT", "8083")
+  // Health/debug listener. :9095, NOT :9092 — 9092 is KAFKA's port (AddKafka's
+  // default, and it is not spelled out anywhere in this file, so it does not show
+  // up in a grep for `port:`). Binding the agent there produced a genuinely
+  // confusing failure: the agent bound the IPv6 wildcard alongside Kafka's proxy,
+  // probes landed on the proxy, and the health check reported
+  // "response ended prematurely" while the agent itself looked fine.
+  //
+  // (See the api's note on the shared :9090 production default.) The agent's
+  // readiness includes the bidi control-plane stream: it is NOT ready until the
+  // handshake delivers the session signing key, without which it cannot validate a
+  // session and so can serve nothing.
+  .WithEnvironment("PIVOX_DEBUG_PORT", ":9095")
+  .WithHttpEndpoint(port: 9095, targetPort: 9095, name: "debug", isProxied: false)
+  .WithHttpHealthCheck("/readyz", endpointName: "debug")
   .WithEnvironment("PIVOX_AGENT_STATE_DIR", Path.Combine(agentDataRoot, "data"))
   .WithEnvironment("PIVOX_AGENT_CACHE_DIR", Path.Combine(agentDataRoot, "cache"))
   .WaitFor(api);

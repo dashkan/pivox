@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -17,12 +18,36 @@ import (
 
 // HTTPServer serves files from storage endpoints with session-based auth.
 type HTTPServer struct {
-	sessions   *SessionStore
-	endpoints  *EndpointStore
-	denied     *DeniedPatterns
+	sessions  *SessionStore
+	endpoints *EndpointStore
+	denied    *DeniedPatterns
+	logger    *slog.Logger
+
+	// mu guards the fields the control-plane stream mutates at runtime.
+	//
+	// signingKey and corsOrigin are written by the Connect goroutine on EVERY
+	// successful (re-)handshake and read by every HTTP handler goroutine, so
+	// without this they are a real data race — not a theoretical one, because
+	// reconnects happen. The consequence is worse than a detector warning: a torn
+	// read of the key slice means the session HMAC is computed over garbage and
+	// every request is rejected, while the agent still reports itself ready.
+	mu         sync.RWMutex
 	signingKey []byte // HMAC key for JWT validation
 	corsOrigin string // allowed CORS origin
-	logger     *slog.Logger
+}
+
+// SigningKey returns the current HMAC key.
+func (s *HTTPServer) SigningKey() []byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.signingKey
+}
+
+// CORSOrigin returns the current allowed CORS origin.
+func (s *HTTPServer) CORSOrigin() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.corsOrigin
 }
 
 // Config is the constructor input for HTTPServer.
@@ -68,13 +93,19 @@ func NewHTTPServer(cfg Config) *HTTPServer {
 	}
 }
 
-// SetSigningKey updates the HMAC signing key for JWT validation.
+// SetSigningKey updates the HMAC signing key for JWT validation. Called from the
+// Connect goroutine on every successful handshake.
 func (s *HTTPServer) SetSigningKey(key []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.signingKey = key
 }
 
-// SetCORSOrigin updates the allowed CORS origin.
+// SetCORSOrigin updates the allowed CORS origin. Called from the Connect
+// goroutine on every successful handshake.
 func (s *HTTPServer) SetCORSOrigin(origin string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.corsOrigin = origin
 }
 
@@ -215,7 +246,7 @@ func extractJWT(r *http.Request) (string, error) {
 }
 
 func (s *HTTPServer) setCORSHeaders(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", s.corsOrigin)
+	w.Header().Set("Access-Control-Allow-Origin", s.CORSOrigin())
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
@@ -237,7 +268,7 @@ func (s *HTTPServer) validateJWT(tokenStr string) (map[string]interface{}, error
 		return nil, fmt.Errorf("decode signature: %w", err)
 	}
 
-	mac := hmac.New(sha256.New, s.signingKey)
+	mac := hmac.New(sha256.New, s.SigningKey())
 	mac.Write([]byte(headerPayload))
 	expectedSig := mac.Sum(nil)
 

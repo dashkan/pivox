@@ -39,6 +39,20 @@ type ConnectConfig struct {
 	Endpoints *EndpointStore
 	Denied    *DeniedPatterns
 	HTTP      *HTTPServer
+
+	// OnConnected fires once the handshake has completed AND its payload has been
+	// applied — endpoints, denied patterns, and above all the session signing key.
+	// That is the first instant the agent can serve anything: without the signing
+	// key it cannot validate a single session, so "connected" is the honest
+	// readiness boundary, not "process started".
+	//
+	// OnDisconnected fires when the stream ends, for any reason. A disconnected
+	// agent receives no new sessions, so it belongs out of the ready set until it
+	// reconnects (Connect is driven by a reconnect loop in cmd/pivox-agent).
+	//
+	// Both are optional and must be safe to call from this goroutine.
+	OnConnected    func()
+	OnDisconnected func()
 }
 
 func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *ConnectConfig, logger *slog.Logger) error {
@@ -126,12 +140,39 @@ func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *C
 		}
 	}
 
-	// Update HTTP server with signing key and CORS from handshake.
-	if key := ack.GetSessionSigningKey(); len(key) > 0 {
-		cfg.HTTP.SetSigningKey(key)
+	// The session signing key is REQUIRED, not optional. It is the HMAC key every
+	// /files/ session JWT is validated against (see http.go), so without it the
+	// agent validates nothing: hmac.New(sha256.New, nil) rejects every session.
+	//
+	// Treat its absence as a failed handshake rather than carrying on. An agent
+	// that "connects", reports ready, gets traffic, and then rejects 100% of it is
+	// the exact looks-healthy-isn't failure the readiness work exists to kill —
+	// and it would be reproduced here. The reconnect loop retries, so a transient
+	// cloud-side gap self-heals.
+	key := ack.GetSessionSigningKey()
+	if len(key) == 0 {
+		return fmt.Errorf("handshake: no session signing key — cannot validate sessions")
 	}
+	cfg.HTTP.SetSigningKey(key)
+
 	if origin := ack.GetCorsOrigin(); origin != "" {
 		cfg.HTTP.SetCORSOrigin(origin)
+	}
+
+	// Whatever ends this stream — error, cloud restart, context cancel — the agent
+	// stops receiving new sessions, so it must leave the ready set. Registered
+	// BEFORE OnConnected and independently of it: the two callbacks are documented
+	// as separately optional, and nesting this inside `if OnConnected != nil` would
+	// silently drop OnDisconnected for a caller that set only that one.
+	if cfg.OnDisconnected != nil {
+		defer cfg.OnDisconnected()
+	}
+	// Ready: the handshake landed AND its config — signing key above all — is
+	// applied. Announced here rather than at stream-open, because a stream without
+	// the key cannot validate a session: the agent would be "connected" and still
+	// unable to serve.
+	if cfg.OnConnected != nil {
+		cfg.OnConnected()
 	}
 
 	// Heartbeat loop.
