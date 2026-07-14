@@ -578,8 +578,26 @@ var agentgateway = builder
     url.Url = "/ui";
   })
   .WaitFor(otelCollector)
-  .WaitFor(apiDocs);
+  .WaitFor(apiDocs)
+  // waitFor(keycloak): the mcpAuthentication policy loads the realm JWKS at boot
+  // (jwks.url → host.docker.internal:8082) and HARD-EXITS if that fetch fails, so
+  // KC must be serving before agentgateway starts. First leg of the kc → ag → api
+  // chain.
+  .WaitFor(keycloak);
 #pragma warning restore ASPIRECERTIFICATES001
+
+// api WaitFor(agentgateway): the SECOND leg of kc → ag → api. The api's OIDC
+// verifier fetches its JWKS from the PUBLIC issuer (https://pivox.app/realms/
+// pivox/.../certs), which resolves out through the Cloudflare tunnel and back
+// into THIS gateway's ingress — so the api cannot load JWKS until agentgateway is
+// up and proxying. On a cold start the api otherwise races ahead of the gateway,
+// its blocking startup fetch hangs, and the process never binds its listeners
+// (looks like "api healthy but serving nothing"). Declared here, after
+// agentgateway exists, because `api` is defined earlier in the file.
+// NOTE: this is a dev-ordering band-aid. The real fix is to stop the api fetching
+// its own auth JWKS through the public ingress (fetch KC directly, like the
+// gateway does) and/or make the startup load non-blocking.
+api.WaitFor(agentgateway);
 
 // --- public tunnel ---
 // The public HTTPS origin (PIVOX_PUBLIC_HOST) is fronted by a
