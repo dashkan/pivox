@@ -654,17 +654,95 @@ binds:
             backends:
               - backend: /rest_gateway
 
-          # --- Remote MCP server -> api REST (rest_gateway) --------------
-          # /mcp (Streamable transport) + /mcp/.well-known/... (public PRM
-          # discovery). No timeouts — the SSE stream is long-lived.
+          # --- Remote MCP server: AG owns the OAuth handshake ------------
+          # AG fronts our Streamable-HTTP MCP server (the Go handler mounted at
+          # rest_gateway :8080 /mcp) as an `mcp` multiplexer AND serves the OAuth
+          # Protected-Resource / Authorization-Server metadata + the DCR proxy
+          # itself, via `mcpAuthentication`. Modeled on AG's own
+          # examples/mcp-authentication/config.yaml Scenario C (Keycloak).
+          #
+          # WHY AG and not the Go server's own bearer+PRM: Keycloak is not a
+          # spec-compliant MCP Authorization Server — it lacks RFC 8414 AS
+          # metadata at the resource path, RFC 8707 resource-indicator handling,
+          # and CORS on its registration endpoint. `provider: keycloak` turns on
+          # AG's adapter, which synthesizes the metadata MCP clients expect and
+          # proxies Dynamic Client Registration to KC's
+          # clients-registrations/openid-connect endpoint. The Go server keeps
+          # its own bearer check (defense in depth); AG forwards Authorization.
+          #
+          # THE FOUR MATCHES ARE ONE ROUTE ON PURPOSE. The `.well-known/*` paths
+          # are `exact` so they outrank the host-root pathPrefix
+          # `/.well-known/oauth-authorization-server` route above (exact beats
+          # prefix under Gateway API precedence) — the mcpAuthentication policy
+          # intercepts them and returns MCP-scoped metadata instead of proxying
+          # to the mcp backend. Everything else on the route (i.e. /mcp) speaks
+          # MCP to the backend.
+          #
+          # `clientId` is DELIBERATELY UNSET: with it unset AG proxies real DCR
+          # to Keycloak so we can observe actual registration + refresh-scope
+          # behavior. Setting it would short-circuit DCR to one static shared
+          # client (the escape hatch for the refresh-drops-optional-scope bug) —
+          # that's the production fallback, not the spike.
           - name: mcp
             matches:
-              - path: { pathPrefix: /mcp }
+              - path: { exact: /mcp }
+              - path: { exact: /.well-known/oauth-protected-resource/mcp }
+              - path: { exact: /.well-known/oauth-authorization-server/mcp }
+              - path: { exact: /.well-known/oauth-authorization-server/mcp/client-registration }
             policies:
-              requestHeaderModifier: *xfwd_proto
-              urlRewrite: *preserve_host
+              # allowOrigins '*' + no allowCredentials: MCP clients send a Bearer
+              # in the Authorization header, not a cookie, so wildcard-origin is
+              # valid here (credentialed wildcard would be rejected by browsers).
+              cors:
+                allowOrigins: ['*']
+                allowHeaders: [mcp-protocol-version, content-type, authorization]
+                exposeHeaders: ["Mcp-Session-Id"]
+              mcpAuthentication:
+                mode: strict
+                # issuer is the PUBLIC value tokens carry as `iss` — validated
+                # against the JWT, independent of where keys are fetched.
+                issuer: https://pivox.app/realms/pivox
+                audiences:
+                  - https://pivox.app/mcp
+                # jwks.url points DIRECTLY at Keycloak, NOT the public host. If it
+                # pointed at https://pivox.app/... the fetch would route back
+                # through THIS gateway's own ingress (pivox.app → Cloudflare tunnel
+                # → :8081 → KC) — a boot-time loopback: AG can't proxy KC until it's
+                # up, and it can't come up until it fetches JWKS. host.docker.internal
+                # is in the Aspire dev cert's SANs, so TLS verifies without the
+                # insecure knob the JWKS fetcher doesn't have. KC on :8082 is HTTPS.
+                jwks:
+                  url: https://host.docker.internal:8082/realms/pivox/protocol/openid-connect/certs
+                provider:
+                  keycloak: {}
+                resourceMetadata:
+                  resource: https://pivox.app/mcp
+                  scopesSupported:
+                    - organization
+                    - mcp:tools
+                    - mcp:resources
+                    - offline_access
+                    - openid
+                    - service_account
+                  bearerMethodsSupported: [header]
             backends:
-              - backend: /rest_gateway
+              - mcp:
+                  targets:
+                    - name: pivox
+                      mcp:
+                        host: http://host.docker.internal:8080/mcp
+                      # mcpAuthentication VALIDATES the client's bearer and then
+                      # STRIPS it (the gateway terminates auth). Without this, the
+                      # upstream Go /mcp server sees no Authorization header and
+                      # returns 401 "no bearer token". `backendAuth: passthrough`
+                      # re-attaches the validated JWT as a Bearer on the upstream
+                      # request (auth/mod.rs: "That will strip the token. Here we
+                      # add it back"), so the Go server can run its own audience
+                      # check + extract the org claim. Defense in depth: both AG
+                      # and the Go server validate the same token.
+                      policies:
+                        backendAuth:
+                          passthrough: {}
           # --- Storage agent -> 8083 -------------------------------------
           - name: storage-agent-files
             matches:
