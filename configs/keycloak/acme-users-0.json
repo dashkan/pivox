@@ -2,7 +2,6 @@
   "realm": "acme",
   "users": [
     {
-      "createdTimestamp": 1782764284450,
       "credentials": [
         {
           "type": "password",
@@ -26,7 +25,6 @@
       "username": "ardy@acme.com"
     },
     {
-      "createdTimestamp": 1777521086239,
       "credentials": [
         {
           "type": "password",
@@ -50,7 +48,6 @@
       "username": "ashkan@acme.com"
     },
     {
-      "createdTimestamp": 1782711505160,
       "credentials": [
         {
           "type": "password",
@@ -74,7 +71,6 @@
       "username": "emma@acme.com"
     },
     {
-      "createdTimestamp": 1782792495119,
       "credentials": [
         {
           "type": "password",
@@ -98,7 +94,6 @@
       "username": "jane.doe@dateline.com"
     },
     {
-      "createdTimestamp": 1782795656108,
       "credentials": [
         {
           "type": "password",
@@ -122,7 +117,6 @@
       "username": "john.doe@dateline.com"
     },
     {
-      "createdTimestamp": 1782792442205,
       "credentials": [
         {
           "type": "password",
@@ -146,7 +140,6 @@
       "username": "john.doe@nbcuni.com"
     },
     {
-      "createdTimestamp": 1782780978709,
       "credentials": [
         {
           "type": "password",

@@ -770,7 +770,9 @@
             "condition": "client-id-uri",
             "configuration": {
               "client-id-uri-allow-permitted-domains": [
+                "*.claude.ai",
                 "*.vscode.dev",
+                "claude.ai",
                 "vscode.dev"
               ],
               "client-id-uri-scheme": [
@@ -798,9 +800,12 @@
             "configuration": {
               "cimd-allow-http-scheme": "true",
               "cimd-allow-permitted-domains": [
+                "*.claude.ai",
                 "*.vscode.dev",
                 "127.0.0.1",
+                "claude.ai",
                 "code.visualstudio.com",
+                "localhost",
                 "vscode.dev"
               ],
               "cimd-required-properties": [],
@@ -1839,7 +1844,7 @@
     {
       "alwaysDisplayInConsole": false,
       "attributes": {
-        "client.secret.creation.time": "1783756268",
+        "client.secret.creation.time": "1783987440",
         "realm_client": "false"
       },
       "authenticationFlowBindingOverrides": {},
@@ -2283,7 +2288,70 @@
       "attributes": {
         "backchannel.logout.revoke.offline.tokens": "false",
         "backchannel.logout.session.required": "true",
-        "cimd.cache.expiry.time.in.sec": "1783492393",
+        "cimd.cache.expiry.time.in.sec": "1783991419",
+        "consent.screen.text": "The client's hostname is claude.ai",
+        "display.on.consent.screen": "true",
+        "frontchannel.logout.session.required": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oauth2.jwt.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "realm_client": "false",
+        "standard.token.exchange.enabled": "false",
+        "use.refresh.tokens": "true"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "baseUrl": "https://claude.ai",
+      "bearerOnly": false,
+      "clientAuthenticatorType": "none",
+      "clientId": "https://claude.ai/oauth/claude-code-client-metadata",
+      "consentRequired": true,
+      "defaultClientScopes": [
+        "acr",
+        "aud",
+        "basic",
+        "email",
+        "profile",
+        "roles",
+        "web-origins"
+      ],
+      "directAccessGrantsEnabled": false,
+      "enabled": true,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "id": "20a2ade2-6f26-4a46-b66c-aaed7cc6bdb4",
+      "implicitFlowEnabled": false,
+      "name": "Claude Code",
+      "nodeReRegistrationTimeout": -1,
+      "notBefore": 0,
+      "optionalClientScopes": [
+        "address",
+        "mcp:resources",
+        "mcp:tools",
+        "microprofile-jwt",
+        "offline_access",
+        "organization",
+        "phone"
+      ],
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "redirectUris": [
+        "http://127.0.0.1/callback",
+        "http://localhost/callback"
+      ],
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": true,
+      "surrogateAuthRequired": false,
+      "webOrigins": [
+        "http://127.0.0.1",
+        "http://localhost"
+      ]
+    },
+    {
+      "alwaysDisplayInConsole": false,
+      "attributes": {
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "backchannel.logout.session.required": "true",
+        "cimd.cache.expiry.time.in.sec": "1783992588",
         "consent.screen.text": "The client's hostname is vscode.dev",
         "display.on.consent.screen": "true",
         "frontchannel.logout.session.required": "false",
@@ -2628,31 +2696,6 @@
         "id": "e69c1852-7db6-4fbc-b985-14c9f1e64872",
         "name": "Max Clients Limit",
         "providerId": "max-clients",
-        "subComponents": {},
-        "subType": "anonymous"
-      },
-      {
-        "config": {
-          "client-uris-must-match": [
-            "true"
-          ],
-          "host-sending-registration-request-must-match": [
-            "false"
-          ],
-          "trusted-hosts": [
-            "*.chatgpt.com",
-            "*.claude.ai",
-            "*.vscode.dev",
-            "127.0.0.1",
-            "chatgpt.com",
-            "claude.ai",
-            "localhost",
-            "vscode.dev"
-          ]
-        },
-        "id": "f5ea60d5-132e-4b3f-9bd5-90234cc5eae3",
-        "name": "Trusted Hosts",
-        "providerId": "trusted-hosts",
         "subComponents": {},
         "subType": "anonymous"
       }
@@ -3410,6 +3453,7 @@
         }
       ],
       "electron": [],
+      "https://claude.ai/oauth/claude-code-client-metadata": [],
       "https://vscode.dev/oauth/client-metadata.json": [],
       "postman": [],
       "realm-management": [

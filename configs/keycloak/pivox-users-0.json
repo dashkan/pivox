@@ -9,8 +9,23 @@
       },
       "clientConsents": [
         {
+          "clientId": "https://claude.ai/oauth/claude-code-client-metadata",
+          "createdDate": 1783989270787,
+          "grantedClientScopes": [
+            "email",
+            "https://claude.ai/oauth/claude-code-client-metadata",
+            "mcp:resources",
+            "mcp:tools",
+            "offline_access",
+            "organization",
+            "profile",
+            "roles"
+          ],
+          "lastUpdatedDate": 1783989270807
+        },
+        {
           "clientId": "https://vscode.dev/oauth/client-metadata.json",
-          "createdDate": 1783756268915,
+          "createdDate": 1783987441391,
           "grantedClientScopes": [
             "email",
             "https://vscode.dev/oauth/client-metadata.json",
@@ -21,10 +36,9 @@
             "profile",
             "roles"
           ],
-          "lastUpdatedDate": 1783756268918
+          "lastUpdatedDate": 1783987441398
         }
       ],
-      "createdTimestamp": 1782631146358,
       "credentials": [
         {
           "type": "password",
@@ -60,7 +74,6 @@
       "username": "ashkan.daie@gmail.com"
     },
     {
-      "createdTimestamp": 1783452280677,
       "credentials": [],
       "disableableCredentialTypes": [],
       "email": "ashkan@acme.com",
@@ -94,7 +107,6 @@
           "12"
         ]
       },
-      "createdTimestamp": 1782868444296,
       "credentials": [],
       "disableableCredentialTypes": [],
       "email": "ashkan@eqdsoft.com",
@@ -125,7 +137,6 @@
           "uma_protection"
         ]
       },
-      "createdTimestamp": 1782686199129,
       "credentials": [],
       "disableableCredentialTypes": [],
       "emailVerified": false,

@@ -209,8 +209,15 @@ sanitize acme-realm.json '
 # wholesale would silently turn a user's OTP secret into a password, and keeping
 # it would commit real credential material. Dev realms have passwords only today —
 # this is here so that stays true if someone enrolls 2FA and re-exports.
+#
+# createdTimestamp is also dropped: KC stamps it per-user at export time, so it
+# churns the diff on every re-export while being purely cosmetic for seeded dev
+# users (KC reassigns it on import when absent). Precise per-user del, not a
+# recursive walk — createdTimestamp is a top-level user field and appears nowhere
+# else in these exports.
 USERS_TRANSFORM='
-  (if has("users") then .users |= map(
+  del(.users[]?.createdTimestamp)
+  | (if has("users") then .users |= map(
       .credentials = ((.credentials // [])
         | map(select(.type == "password"))
         | if length > 0
