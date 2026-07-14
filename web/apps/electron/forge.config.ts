@@ -1,9 +1,7 @@
 import { MakerDeb } from '@electron-forge/maker-deb';
-import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
-import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeConfig } from '@electron-forge/shared-types';
@@ -44,9 +42,8 @@ const config: ForgeConfig = {
     // src/main.ts is this maker's companion.
     new MakerSquirrel({ name: 'pivox', setupIcon: 'build/icon.ico' }),
     new MakerZIP({}, ['darwin']),
-    new MakerDMG({ icon: 'build/icon.icns' }, ['darwin']),
-    // electron-builder also shipped AppImage + snap; Forge has no maker for
-    // either, so Linux coverage is deb + rpm.
+    // Forge's default maker set. electron-builder also shipped AppImage + snap;
+    // Forge has no maker for either, so Linux coverage is deb + rpm.
     new MakerDeb({
       options: {
         // Debian names must be lowercase; productName is "Pivox".
@@ -67,9 +64,6 @@ const config: ForgeConfig = {
     }),
   ],
   plugins: [
-    // No native deps today; a guard if one is ever added. See the native-dep
-    // invariant in pnpm-workspace.yaml first.
-    new AutoUnpackNativesPlugin({}),
     new VitePlugin({
       build: [
         { entry: 'src/main.ts', config: 'vite.main.config.ts', target: 'main' },

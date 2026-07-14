@@ -14,6 +14,7 @@ import {
   onAuthChanged,
   restoreSession,
 } from './main/keycloak-auth';
+import { decideNavigation } from './main/navigation-guard';
 
 // Squirrel (MakerSquirrel) re-launches this binary with --squirrel-* args on
 // install/update/uninstall to create and remove shortcuts. Must run before the
@@ -29,6 +30,16 @@ let mainWindow: BrowserWindow | null = null;
 const iconPath = app.isPackaged
   ? join(process.resourcesPath, 'icon.png')
   : join(__dirname, '../../resources/icon.png');
+
+/**
+ * The renderer's own origin, for the will-navigate guard: the Vite dev server
+ * under `forge start`, or null in a packaged build (loaded from file://, which
+ * has an opaque origin). plugin-vite defines the global as undefined when
+ * packaged.
+ */
+const rendererOrigin: string | null = MAIN_WINDOW_VITE_DEV_SERVER_URL
+  ? new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin
+  : null;
 
 // --- Single instance lock + protocol registration ---
 
@@ -158,6 +169,25 @@ function createWindow(): void {
       // Unparseable URL — deny silently.
     }
     return { action: 'deny' };
+  });
+
+  // setWindowOpenHandler above only covers window.open. This covers the renderer
+  // navigating its OWN top-level frame (location.href, a link, meta-refresh),
+  // which would otherwise carry the preload bridge — and therefore
+  // auth:get-access-token — onto an attacker's page. Policy lives in
+  // navigation-guard.ts (pure + unit-tested); this is just the adapter.
+  win.webContents.on('will-navigate', (event, targetUrl) => {
+    switch (decideNavigation(targetUrl, rendererOrigin)) {
+      case 'allow':
+        return;
+      case 'open-external':
+        event.preventDefault();
+        void shell.openExternal(targetUrl);
+        return;
+      case 'deny':
+        event.preventDefault();
+        return;
+    }
   });
 
   // Injected by plugin-vite (forge.env.d.ts). The dev-server URL is only defined

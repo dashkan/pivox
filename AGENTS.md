@@ -285,11 +285,21 @@ Conventions and gotchas (each was paid for once; don't relearn them):
   places that must agree: `scripts/seeds/02_acme_sso.sql` and the live
   `sso_configs.oidc_config` row (re-seed an empty DB, or `UPDATE` in
   place — the seed only runs on first use).
-- **Public tunnel**: a Cloudflare Tunnel (`cloudflared`, run as a host
-  service — `brew services start cloudflared`, config in
+- **Public tunnel**: a Cloudflare Tunnel (`cloudflared`, config in
   `~/.cloudflared/config.yml`) fronts the public host (`PIVOX_PUBLIC_HOST`)
-  → the ingress on `localhost:8081`. It's independent of the Aspire
-  lifecycle; nothing to start/stop in the AppHost.
+  → the ingress on `localhost:8081`. Start it with `cloudflared tunnel run`
+  (only one tunnel is configured, so it needs no name). It's independent of
+  the Aspire lifecycle; nothing to start/stop in the AppHost.
+
+  Do NOT use `brew services start cloudflared`. The Homebrew plist invokes
+  `cloudflared` with no arguments, so it prints "use `cloudflared tunnel
+  run`" and exits immediately, leaving the service in `error` state — the
+  tunnel silently never comes up. Everything behind `PIVOX_PUBLIC_HOST` then
+  returns Cloudflare **530 (origin unreachable)**, which does NOT look like a
+  tunnel problem at the call site: an error page carries no
+  `Access-Control-Allow-Origin`, so the browser reports it as a **CORS**
+  failure, and the desktop app's OIDC login reports `discovery_failed`. If
+  you see 530, check the tunnel before you touch `configs/agentgateway.yaml`.
 
 ## Skills (`.agents/skills/golang-*`)
 

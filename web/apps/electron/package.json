@@ -42,11 +42,9 @@
   "devDependencies": {
     "@electron-forge/cli": "catalog:",
     "@electron-forge/maker-deb": "catalog:",
-    "@electron-forge/maker-dmg": "catalog:",
     "@electron-forge/maker-rpm": "catalog:",
     "@electron-forge/maker-squirrel": "catalog:",
     "@electron-forge/maker-zip": "catalog:",
-    "@electron-forge/plugin-auto-unpack-natives": "catalog:",
     "@electron-forge/plugin-fuses": "catalog:",
     "@electron-forge/plugin-vite": "catalog:",
     "@electron-forge/shared-types": "catalog:",

@@ -9,11 +9,6 @@ allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: true
-  # Native deps of `appdmg`, pulled in by @electron-forge/maker-dmg.
-  # Required to build the macOS .dmg (parity with the electron-builder
-  # `dmg` target this app shipped before the Forge migration).
-  fs-xattr: true
-  macos-alias: true
   msw: true
   protobufjs: true
   sharp: true
@@ -61,11 +56,9 @@ catalog:
   # own packages to the exact same version.
   "@electron-forge/cli": "8.0.0-alpha.10"
   "@electron-forge/maker-deb": "8.0.0-alpha.10"
-  "@electron-forge/maker-dmg": "8.0.0-alpha.10"
   "@electron-forge/maker-rpm": "8.0.0-alpha.10"
   "@electron-forge/maker-squirrel": "8.0.0-alpha.10"
   "@electron-forge/maker-zip": "8.0.0-alpha.10"
-  "@electron-forge/plugin-auto-unpack-natives": "8.0.0-alpha.10"
   "@electron-forge/plugin-fuses": "8.0.0-alpha.10"
   "@electron-forge/plugin-vite": "8.0.0-alpha.10"
   "@electron-forge/shared-types": "8.0.0-alpha.10"
