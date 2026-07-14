@@ -61,6 +61,112 @@ type Config struct {
 	// caller constructing Config directly (e.g. a test) and relying on refresh
 	// must set this explicitly.
 	JWKSRefreshInterval time.Duration
+
+	// JWKSFetchAttempts bounds the STARTUP JWKS fetch: NewVerifier tries this
+	// many times (with JWKSFetchBackoff between tries) before giving up and
+	// returning an error.
+	//
+	// Retry exists because the IdP legitimately may not be up yet when the API
+	// boots — a cold `aspire start`, a rolling deploy, or a proxy in front of
+	// Keycloak that is still coming up. A single attempt turns that ordinary
+	// race into a hard boot failure.
+	//
+	// The budget is BOUNDED on purpose. Retrying forever would trade a loud
+	// crash for a silent outage: the process would sit "up" and never serve,
+	// which is strictly harder to diagnose (and is exactly what an unbounded
+	// wait looked like in practice). We fail closed and loudly instead — the
+	// supervisor restarts us, and the IdP being down is visible as a crashloop
+	// rather than a healthy-looking process that answers nothing.
+	//
+	// <= 0 applies defaultJWKSFetchAttempts. 1 means "no retry".
+	JWKSFetchAttempts int
+
+	// JWKSFetchBackoff is the wait before the second startup fetch attempt; it
+	// doubles each subsequent attempt (capped at maxJWKSFetchBackoff). <= 0
+	// applies defaultJWKSFetchBackoff.
+	JWKSFetchBackoff time.Duration
+}
+
+const (
+	// Tuned for "the IdP is still coming up", not "the IdP is down": 5 attempts
+	// at 2s doubling (2+4+8+16) is ~30s of tolerance before we fail. Long enough
+	// to ride out a container start, short enough that a genuinely dead IdP is
+	// reported quickly rather than hidden behind a long silent wait.
+	defaultJWKSFetchAttempts = 5
+	defaultJWKSFetchBackoff  = 2 * time.Second
+	maxJWKSFetchBackoff      = 30 * time.Second
+)
+
+// resolveJWKSFetchAttempts applies the default when the caller left the field
+// unset (or set it to something nonsensical). An unset Config must not silently
+// mean "never retry".
+func resolveJWKSFetchAttempts(n int) int {
+	if n <= 0 {
+		return defaultJWKSFetchAttempts
+	}
+	return n
+}
+
+// resolveJWKSFetchBackoff applies the default when the caller left the field
+// unset (or negative). A zero backoff would hot-loop the IdP.
+func resolveJWKSFetchBackoff(d time.Duration) time.Duration {
+	if d <= 0 {
+		return defaultJWKSFetchBackoff
+	}
+	return d
+}
+
+// fetchJWKSWithRetry performs the startup JWKS fetch, retrying a transiently
+// unavailable IdP up to Config.JWKSFetchAttempts times with exponential backoff.
+//
+// Returns an error — never a partially-usable storage — once the budget is
+// exhausted, so NewVerifier's caller fails closed. Honours ctx: a cancelled
+// context aborts immediately rather than sleeping out the remaining backoff, so
+// shutdown racing startup doesn't hang the process.
+func fetchJWKSWithRetry(ctx context.Context, cfg Config) (jwkset.Storage, error) {
+	attempts := resolveJWKSFetchAttempts(cfg.JWKSFetchAttempts)
+	backoff := resolveJWKSFetchBackoff(cfg.JWKSFetchBackoff)
+
+	var lastErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		storage, err := jwkset.NewStorageFromHTTP(cfg.JWKSURL, jwkset.HTTPClientStorageOptions{
+			Ctx:             ctx,
+			RefreshInterval: cfg.JWKSRefreshInterval,
+			RefreshErrorHandler: func(ctx context.Context, err error) {
+				slog.ErrorContext(ctx, "oidc: JWKS background refresh failed", "url", cfg.JWKSURL, "error", err)
+			},
+		})
+		if err == nil {
+			if attempt > 1 {
+				slog.InfoContext(ctx, "oidc: JWKS startup fetch succeeded after retry",
+					"url", cfg.JWKSURL, "attempt", attempt)
+			}
+			return storage, nil
+		}
+		lastErr = err
+
+		if attempt == attempts {
+			break
+		}
+		slog.WarnContext(ctx, "oidc: JWKS startup fetch failed; retrying",
+			"url", cfg.JWKSURL,
+			"attempt", attempt,
+			"attempts", attempts,
+			"retry_in", backoff,
+			"error", err,
+		)
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("oidc: load JWKS: %w", ctx.Err())
+		case <-time.After(backoff):
+		}
+		backoff = min(backoff*2, maxJWKSFetchBackoff)
+	}
+
+	// Fail closed. Coming up without a key set would mean every token 401s until
+	// the next background refresh — an API that looks healthy and authenticates
+	// nobody. A boot error is the honest signal.
+	return nil, fmt.Errorf("oidc: load JWKS from %s after %d attempts: %w", cfg.JWKSURL, attempts, lastErr)
 }
 
 // Verifier validates OIDC tokens from one issuer and maps them to a Pivox
@@ -99,17 +205,16 @@ func NewVerifier(ctx context.Context, cfg Config) (*Verifier, error) {
 	// jwkset.NewHTTPClient with a RefreshUnknownKID limiter — that on-demand
 	// path is caller-triggerable via the token's `kid` and would let forged
 	// tokens amplify into JWKS fetches. NoErrorReturnFirstHTTPReq is left false
-	// (the default) so an unreachable IdP at startup is a loud, fail-fast boot
-	// error rather than a process that comes up unable to verify anything.
-	storage, err := jwkset.NewStorageFromHTTP(cfg.JWKSURL, jwkset.HTTPClientStorageOptions{
-		Ctx:             ctx,
-		RefreshInterval: cfg.JWKSRefreshInterval,
-		RefreshErrorHandler: func(ctx context.Context, err error) {
-			slog.ErrorContext(ctx, "oidc: JWKS background refresh failed", "url", cfg.JWKSURL, "error", err)
-		},
-	})
+	// (the default) so a failed startup fetch surfaces as an error here rather
+	// than a verifier that comes up unable to verify anything.
+	//
+	// That first fetch is RETRIED (bounded — see Config.JWKSFetchAttempts): the
+	// IdP may simply not be up yet when we boot. Exhausting the budget is a hard
+	// error, deliberately: we fail closed and loudly so the supervisor
+	// crashloops us, rather than sitting "up" and serving nothing.
+	storage, err := fetchJWKSWithRetry(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("oidc: load JWKS: %w", err)
+		return nil, err
 	}
 	k, err := keyfunc.New(keyfunc.Options{Ctx: ctx, Storage: storage})
 	if err != nil {

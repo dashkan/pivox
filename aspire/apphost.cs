@@ -372,14 +372,37 @@ var api = builder
   .AddGoApp("api", "../cmd/pivox-cloud")
   .WithEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
   .WithEnvironment("PIVOX_SERVICE_GRPC_PORT", ":50052")
+  // The app's own debug listener (PIVOX_DEBUG_PORT, default :9090), serving
+  // /healthz + /readyz. isProxied:false because port == targetPort on a host
+  // process (Aspire can't proxy those).
+  .WithHttpEndpoint(port: 9090, targetPort: 9090, name: "debug", isProxied: false)
+  // WITHOUT THIS, A NON-SERVING API REPORTS AS HEALTHY. Aspire's health for a
+  // host process is otherwise just "the process hasn't exited", and pivox-cloud
+  // binds NOTHING until startup completes — so a verifier that can't reach the
+  // IdP leaves a process that is Running/Healthy in the dashboard while every
+  // request through the ingress 503s. That is exactly what happened once, and it
+  // cost a debugging session precisely because the dashboard said green.
+  //
+  // /readyz (not /healthz) because it also pings the DB pool, and because the
+  // debug server binds only AFTER the OIDC verifier's startup JWKS fetch
+  // succeeds — so this probe fails for the wedged case too.
+  .WithHttpHealthCheck("/readyz", endpointName: "debug")
   // waitFor(pivoxDb): the DB resource is ready only after postgres is healthy,
   // which on first init is after the init script's migrate + seed — so the
   // schema + the `vector` type exist before pgx's RegisterTypes runs.
   .WaitFor(pivoxDb)
-  // waitFor(keycloak): the OIDC verifier fetches the realm JWKS at startup. If
-  // the API boots before Keycloak is serving, that fetch fails and (with no
-  // on-demand refresh) every token 401s until the next background refresh. Wait
-  // for KC to be healthy so the startup JWKS load succeeds.
+  // waitFor(keycloak): the OIDC verifier fetches the realm JWKS at startup, and
+  // an unreachable IdP is now a hard boot failure (bounded retry, then error —
+  // see oidc.Config.JWKSFetchAttempts). Waiting for KC to be healthy avoids the
+  // pointless crashloop of racing it.
+  //
+  // NOTE this is NOT sufficient on its own: PIVOX_OIDC_ISSUER points at the
+  // PUBLIC host (the Cloudflare tunnel), not at the KC container directly, so
+  // the JWKS fetch traverses cloudflared — which Aspire does not manage and
+  // cannot wait on. A healthy KC with a down tunnel still fails the fetch
+  // (Cloudflare answers 530). The verifier's retry absorbs a slow tunnel; a
+  // tunnel that is simply not running is a crashloop, by design, and the fix is
+  // `cloudflared tunnel run`.
   .WaitFor(keycloak);
 
 // --- worker (pivox-worker) — host process, River-backed periodic jobs ---

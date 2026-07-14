@@ -275,9 +275,22 @@ func serve(cmd *cobra.Command, args []string) error {
 	// resource server: it validates Bearer access tokens against the
 	// realm's JWKS. The token's `sub` IS the Pivox identity id, so the
 	// verifier directly satisfies authn.Service — no provider-routing
-	// wrapper. The verifier's JWKS load is lazy/tolerant, so startup is
-	// NOT coupled to Keycloak readiness — keys are fetched on the first
-	// token (when a user logs in through the edge).
+	// wrapper.
+	//
+	// Startup IS coupled to Keycloak reachability, deliberately. NewVerifier
+	// fetches the JWKS now — retrying a transiently-unavailable IdP (bounded;
+	// see oidc.Config.JWKSFetchAttempts) — and returns an error if it never
+	// answers. There is no lazy/on-demand key fetch to fall back on: an
+	// unknown-`kid` refresh is attacker-triggerable, so it is deliberately not
+	// wired. Booting without a key set would therefore mean 401ing every token
+	// until the next background refresh — an API that looks healthy and
+	// authenticates nobody. Failing the boot is the honest signal; the
+	// supervisor restarts us and a down IdP shows up as a crashloop.
+	//
+	// NOTE: this listener (and the /healthz + /readyz debug server further
+	// down) only binds AFTER this point, so a wedged verifier means the ports
+	// never open — which is what the Aspire health check on the debug port is
+	// there to surface.
 	if cfg.OIDC.Issuer == "" {
 		return fmt.Errorf("PIVOX_OIDC_ISSUER is required (Keycloak is the sole auth provider)")
 	}

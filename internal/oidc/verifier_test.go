@@ -277,16 +277,24 @@ func TestVerifier_UnknownKIDDoesNotFetch(t *testing.T) {
 // TestNewVerifier_FailsFastOnUnreachableJWKS pins fail-fast startup: if the IdP's
 // JWKS can't be fetched when the verifier is built, construction must error
 // rather than yield a verifier that silently can't validate any token.
-func TestNewVerifier_FailsFastOnUnreachableJWKS(t *testing.T) {
+func TestNewVerifier_FailsClosedOnUnreachableJWKS(t *testing.T) {
 	t.Parallel()
-	// A server that's already closed → connection refused on the first fetch.
+	// A server that's already closed → connection refused on every fetch.
 	srv := httptest.NewServer(http.NewServeMux())
 	srv.Close()
 
+	// The startup fetch is retried (Config.JWKSFetchAttempts) because the IdP may
+	// simply not be up yet. An IdP that never comes back must still be an ERROR,
+	// not a verifier that boots without a key set — that would 401 every token
+	// while looking healthy. Attempts/backoff are pinned small so this asserts
+	// the fail-closed contract without paying the production backoff (the
+	// defaults sum to ~30s, which has no place in a unit test).
 	_, err := NewVerifier(context.Background(), Config{
-		Issuer:   "https://kc.example/realms/pivox",
-		JWKSURL:  srv.URL + "/realms/pivox/protocol/openid-connect/certs",
-		Audience: "pivox",
+		Issuer:            "https://kc.example/realms/pivox",
+		JWKSURL:           srv.URL + "/realms/pivox/protocol/openid-connect/certs",
+		Audience:          "pivox",
+		JWKSFetchAttempts: 2,
+		JWKSFetchBackoff:  time.Millisecond,
 	})
 	assert.Error(t, err)
 }
