@@ -32,10 +32,16 @@ const (
 	claimExpiration = "exp"
 )
 
-// ExtraOrganization is the auth.TokenInfo.Extra key under which the caller's
-// organization aliases (from the token's `organization` claim) are stashed, for
-// downstream resolution to a Pivox organization.
-const ExtraOrganization = "organization"
+// ExtraIdentity is the auth.TokenInfo.Extra key under which the full verified
+// *authn.Identity (UID + email + raw token claims) is stashed.
+const ExtraIdentity = "identity"
+
+// ExtraRawToken is the auth.TokenInfo.Extra key under which the RAW bearer
+// token string is stashed. The tool/resource/completion handlers forward it as
+// outbound gRPC metadata on the in-process bufconn call to McpService, so that
+// service's own interceptor chain re-verifies the MCP-audience token (cheap,
+// JWKS-cached) and runs membership/permission before touching data.
+const ExtraRawToken = "raw_token"
 
 // NewTokenVerifier adapts an authn.Service into the SDK's auth.TokenVerifier.
 //
@@ -63,16 +69,21 @@ func NewTokenVerifier(verifySvc authn.Service) auth.TokenVerifier {
 			return nil, fmt.Errorf("mcp: token verification failed: %w", auth.ErrInvalidToken)
 		}
 
-		info := &auth.TokenInfo{
+		// Stash the full verified identity so the whoami handler can resolve the
+		// account through iam.BuildAccount (which reads email, the `name` claim,
+		// and the `organization` claim off it). The SDK-facing fields
+		// (UserID/Scopes/Expiration) are still populated for the transport.
+		return &auth.TokenInfo{
 			UserID:     identity.UID,
 			Scopes:     scopesFromClaims(identity.Claims),
 			Expiration: expirationFromClaims(identity.Claims),
-			Extra:      map[string]any{},
-		}
-		if orgs := authn.OrganizationsFromClaims(identity.Claims); len(orgs) > 0 {
-			info.Extra[ExtraOrganization] = orgs
-		}
-		return info, nil
+			Extra: map[string]any{
+				ExtraIdentity: identity,
+				// Carry the raw token so the SDK handlers can forward it to
+				// McpService over bufconn for re-verification + authz.
+				ExtraRawToken: token,
+			},
+		}, nil
 	}
 }
 

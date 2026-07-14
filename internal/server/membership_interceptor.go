@@ -70,6 +70,15 @@ var membershipExemptMethods = map[string]bool{
 	// delete their account; gating this on membership would lock
 	// them out of recovery.
 	"/pivox.iam.v1.Iam/DeleteAccount": true,
+	// The MCP whoami + org-list mirror the Iam.GetAccount /
+	// ListAccountOrganizations bootstrap shape: both are hard-scoped to
+	// the caller's own identity/memberships, so a mid-bootstrap caller
+	// with zero memberships must be able to learn who they are and see
+	// their (empty) org list. The MCP data reads (GetOrg, GetSpace,
+	// ListSpaces) are deliberately NOT here — they require an existing
+	// membership and enforce per-resource read permission in-handler.
+	"/pivox.mcp.v1.McpService/GetAccount": true,
+	"/pivox.mcp.v1.McpService/ListOrgs":   true,
 }
 
 // requireMembership is the shared body for both unary and stream

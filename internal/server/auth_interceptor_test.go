@@ -242,6 +242,82 @@ func TestMustIdentity_Panics(t *testing.T) {
 	})
 }
 
+// TestAuthInterceptorSelecting_RoutesByAudience pins the anti-confusion
+// boundary: MCP methods (/pivox.mcp.v1.*) are verified by the MCP
+// verifier, everything else by the main verifier. A token accepted by
+// one verifier is rejected on the other surface because the selector
+// routes it to the verifier that rejects it. This is what stops a
+// main-API token from being replayed against McpService and vice versa.
+func TestAuthInterceptorSelecting_RoutesByAudience(t *testing.T) {
+	const (
+		mcpMethod  = "/pivox.mcp.v1.McpService/GetOrg"
+		mainMethod = "/pivox.api.v1.Spaces/GetSpace"
+		mcpToken   = "mcp-token"
+		mainToken  = "main-token"
+	)
+
+	cases := []struct {
+		name    string
+		method  string
+		token   string
+		wantOK  bool // handler reached (verification succeeded)
+		wantSub uuid.UUID
+	}{
+		{name: "mcp token on mcp method", method: mcpMethod, token: mcpToken, wantOK: true},
+		{name: "main token on mcp method is rejected", method: mcpMethod, token: mainToken, wantOK: false},
+		{name: "main token on main method", method: mainMethod, token: mainToken, wantOK: true},
+		{name: "mcp token on main method is rejected", method: mainMethod, token: mcpToken, wantOK: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mainAuth := authnmock.NewMockService(t)
+			mcpAuth := authnmock.NewMockService(t)
+			sub := uuid.New()
+
+			// Each verifier accepts only ITS audience's token and rejects
+			// the other's — the single-audience OIDC verifier behaviour.
+			selected := mainAuth
+			if IsMcpMethod(tc.method) {
+				selected = mcpAuth
+			}
+			if tc.wantOK {
+				expectVerifyToken(selected, tc.token, &authn.Identity{UID: sub.String()})
+			} else {
+				expectVerifyTokenError(selected, tc.token, fmt.Errorf("audience mismatch"))
+			}
+
+			sel := func(fullMethod string) authn.Service {
+				if IsMcpMethod(fullMethod) {
+					return mcpAuth
+				}
+				return mainAuth
+			}
+
+			md := metadata.New(map[string]string{"authorization": "Bearer " + tc.token})
+			ctx := metadata.NewIncomingContext(context.Background(), md)
+
+			var captured uuid.UUID
+			handler := func(ctx context.Context, _ any) (any, error) {
+				captured, _ = UserID(ctx)
+				return "ok", nil
+			}
+
+			resp, err := AuthInterceptorSelecting(sel)(ctx, nil, &grpc.UnaryServerInfo{
+				FullMethod: tc.method,
+			}, handler)
+
+			if tc.wantOK {
+				require.NoError(t, err)
+				assert.Equal(t, "ok", resp)
+				assert.Equal(t, sub, captured, "handler must see the verified identity")
+			} else {
+				requireAuthn(t, err, "invalid or expired token")
+			}
+		})
+	}
+}
+
 // TestAuthInterceptor_UnresolvableSub covers the identity-resolution reject
 // branches: the token verifies, but its `sub` (Identity.UID) isn't a usable
 // identity id. Both an empty sub and a non-UUID sub must produce Unauthenticated

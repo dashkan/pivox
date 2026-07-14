@@ -44,6 +44,7 @@ import (
 	"github.com/dashkan/pivox/internal/service/apikeys"
 	"github.com/dashkan/pivox/internal/service/dashboards"
 	"github.com/dashkan/pivox/internal/service/iam"
+	mcpservice "github.com/dashkan/pivox/internal/service/mcp"
 	"github.com/dashkan/pivox/internal/service/operations"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/service/secrets"
@@ -66,6 +67,7 @@ import (
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	iamv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	mcpv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/mcp/v1"
 	secretsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/secrets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 	workflowsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"
@@ -305,9 +307,16 @@ func serve(cmd *cobra.Command, args []string) error {
 	// the anti-confusion boundary vs the main API audience. Audience validation is
 	// always ON here (DisableAudienceValidation is never plumbed through): a
 	// disabled check would let any realm-signed token reach /mcp.
-	var mcpHandler http.Handler
+	// mcpVerifier is captured here (not scoped to the block) so the gRPC
+	// AuthInterceptor can route /pivox.mcp.v1.* methods to it while every
+	// other method uses authChainSvc — the anti-confusion boundary
+	// between the two token audiences. Nil when MCP is disabled, in which
+	// case McpService is not registered on the gRPC server. The MCP HTTP
+	// handler itself is built later, once the in-process bufconn client
+	// it proxies through is available.
+	var mcpVerifier authn.Service
 	if cfg.MCP.ResourceURL != "" {
-		mcpVerifier, verr := oidc.NewVerifier(ctx, oidc.Config{
+		v, verr := oidc.NewVerifier(ctx, oidc.Config{
 			Issuer:              cfg.OIDC.Issuer,
 			JWKSURL:             strings.TrimRight(cfg.OIDC.Issuer, "/") + "/protocol/openid-connect/certs",
 			Audience:            cfg.MCP.ResourceURL,
@@ -316,12 +325,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		if verr != nil {
 			return fmt.Errorf("initialize MCP OIDC verifier: %w", verr)
 		}
-		mcpHandler = mcp.NewHandler(mcp.Config{
-			Queries:     queries,
-			Verifier:    mcpVerifier,
-			ResourceURL: cfg.MCP.ResourceURL,
-			Issuer:      cfg.OIDC.Issuer,
-		})
+		mcpVerifier = v
 		logger.Info("MCP server enabled", "resource_url", cfg.MCP.ResourceURL)
 	}
 
@@ -348,6 +352,20 @@ func serve(cmd *cobra.Command, args []string) error {
 		queries, permResolver,
 	)
 
+	// Verifier routing: MCP methods (pivox.mcp.v1.*) are verified by the
+	// MCP-audience verifier, every other method by the main verifier.
+	// Each verifier is single-audience, so a token minted for one
+	// surface is rejected on the other — the anti-confusion boundary.
+	// When MCP is disabled, mcpVerifier is nil and McpService isn't
+	// registered, so the fallback to authChainSvc is never exercised for
+	// a live MCP method.
+	authVerifierSelector := func(fullMethod string) authn.Service {
+		if mcpVerifier != nil && server.IsMcpMethod(fullMethod) {
+			return mcpVerifier
+		}
+		return authChainSvc
+	}
+
 	grpcServer := grpc.NewServer(
 		// OTel: server span per RPC + trace-context extraction from gRPC
 		// metadata (no-op when export is disabled).
@@ -366,7 +384,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		// the vendored google proto.
 		grpc.ChainUnaryInterceptor(
 			server.LoggingUnaryInterceptor(logger),
-			server.GatedUnaryInterceptor(server.IsPivoxOrLRO, server.AuthInterceptor(authChainSvc)),
+			server.GatedUnaryInterceptor(server.IsPivoxOrLRO, server.AuthInterceptorSelecting(authVerifierSelector)),
 			// Membership check runs after Auth so the caller's UID is
 			// in context, and before Permission/Validate so we don't
 			// leak field shape errors to memberless callers.
@@ -379,7 +397,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		),
 		grpc.ChainStreamInterceptor(
 			server.LoggingStreamInterceptor(logger),
-			server.GatedStreamInterceptor(server.IsPivoxOrLRO, server.AuthStreamInterceptor(authChainSvc)),
+			server.GatedStreamInterceptor(server.IsPivoxOrLRO, server.AuthStreamInterceptorSelecting(authVerifierSelector)),
 			server.GatedStreamInterceptor(server.IsPivox, server.MembershipRequiredStreamInterceptor(queries)),
 			server.GatedStreamInterceptor(server.IsPivox, permissionStreamInterceptor),
 			// Stream validator parallels the unary chain's
@@ -470,6 +488,25 @@ func serve(cmd *cobra.Command, args []string) error {
 		Pool: pool, Queries: queries,
 		LROManager: lroManager, AuditResolver: auditResolver,
 	}))
+
+	// McpService — the curated, non-AIP surface backing the MCP HTTP
+	// server. Registered ONLY when MCP is enabled: without an MCP
+	// verifier its methods would fall back to the main verifier, so
+	// leaving it unregistered keeps main-audience tokens from ever
+	// reaching it. Registered on the SHARED gRPC server, so it is
+	// reachable on the public TCP listener too — NOT bufconn-isolated.
+	// That is fine: the boundary is the MCP-audience token (auth routes
+	// pivox.mcp.v1.* to the MCP verifier by method prefix) + the
+	// membership interceptor + the per-handler read gate — identical on
+	// either transport. internal/mcp merely PREFERS the in-process
+	// bufconn dial; it does not rely on transport isolation for authz.
+	if mcpVerifier != nil {
+		mcpv1.RegisterMcpServiceServer(grpcServer, mcpservice.NewMcpServer(mcpservice.Config{
+			Pool:    pool,
+			Queries: queries,
+			Codec:   appCodec,
+		}))
+	}
 
 	// Storage services
 	connMgr := agentstream.NewConnectionManager()
@@ -673,6 +710,22 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("dial local gRPC for SSE handler: %w", err)
 	}
 	sseHandler := aichat.NewSSEHandler(aichat.SSEHandlerConfig{Client: aiv1.NewAiChatClient(grpcConn), Logger: logger})
+
+	// MCP HTTP handler: built here (not in the early verifier block)
+	// because it proxies to McpService over the in-process bufconn — the
+	// same grpcConn the SSE handler uses — forwarding the caller's MCP
+	// bearer so McpService's gRPC chain re-verifies + authorizes. Only
+	// wired when MCP is enabled (mcpVerifier != nil), matching the
+	// conditional McpService registration above.
+	var mcpHandler http.Handler
+	if mcpVerifier != nil {
+		mcpHandler = mcp.NewHandler(mcp.Config{
+			Client:      mcpv1.NewMcpServiceClient(grpcConn),
+			Verifier:    mcpVerifier,
+			ResourceURL: cfg.MCP.ResourceURL,
+			Issuer:      cfg.OIDC.Issuer,
+		})
+	}
 
 	// HTTP mux: gRPC gateway (fallback) + River UI. Auth flows
 	// (sign-in, federation, identity sync) live in the Keycloak BFF

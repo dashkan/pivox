@@ -165,6 +165,15 @@ func authenticate(ctx context.Context, auth authn.Service) (context.Context, err
 	return authenticateBearer(ctx, auth, authHeaders[0])
 }
 
+// VerifierSelector picks the authn.Service used to verify a given full
+// gRPC method. It lets one gRPC server route different method families
+// to different verifiers — the anti-confusion boundary between the main
+// Pivox API audience and the MCP resource-URL audience: MCP methods are
+// verified by a verifier pinned to the MCP audience, everything else by
+// the main verifier. A main-audience token thus fails on an MCP method
+// and vice versa, because each verifier rejects the other's audience.
+type VerifierSelector func(fullMethod string) authn.Service
+
 // AuthInterceptor returns a gRPC unary server interceptor that
 // verifies bearer tokens via the provided authn.Service. The service
 // is responsible for token verification internally — production
@@ -179,13 +188,21 @@ func authenticate(ctx context.Context, auth authn.Service) (context.Context, err
 // decided one level up by GatedUnaryInterceptor in main.go (pivox.* +
 // LRO). Infrastructure methods (reflection, health) bypass it there.
 func AuthInterceptor(auth authn.Service) grpc.UnaryServerInterceptor {
+	return AuthInterceptorSelecting(func(string) authn.Service { return auth })
+}
+
+// AuthInterceptorSelecting is the per-method-routing variant of
+// AuthInterceptor: it picks the verifier per RPC via sel. Used by
+// production to send /pivox.mcp.v1.* methods to the MCP verifier and
+// everything else to the main verifier.
+func AuthInterceptorSelecting(sel VerifierSelector) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req any,
-		_ *grpc.UnaryServerInfo,
+		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
-		ctx, err := authenticate(ctx, auth)
+		ctx, err := authenticate(ctx, sel(info.FullMethod))
 		if err != nil {
 			return nil, err
 		}
@@ -196,13 +213,19 @@ func AuthInterceptor(auth authn.Service) grpc.UnaryServerInterceptor {
 // AuthStreamInterceptor returns a gRPC stream server interceptor that verifies
 // bearer tokens. Same logic as AuthInterceptor but for streaming RPCs.
 func AuthStreamInterceptor(auth authn.Service) grpc.StreamServerInterceptor {
+	return AuthStreamInterceptorSelecting(func(string) authn.Service { return auth })
+}
+
+// AuthStreamInterceptorSelecting is the per-method-routing variant of
+// AuthStreamInterceptor. Mirrors AuthInterceptorSelecting.
+func AuthStreamInterceptorSelecting(sel VerifierSelector) grpc.StreamServerInterceptor {
 	return func(
 		srv any,
 		ss grpc.ServerStream,
-		_ *grpc.StreamServerInfo,
+		info *grpc.StreamServerInfo,
 		handler grpc.StreamHandler,
 	) error {
-		ctx, err := authenticate(ss.Context(), auth)
+		ctx, err := authenticate(ss.Context(), sel(info.FullMethod))
 		if err != nil {
 			return err
 		}

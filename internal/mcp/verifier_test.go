@@ -18,9 +18,10 @@ import (
 
 // TestNewTokenVerifier covers the adapter from authn.Service (the OIDC verifier,
 // pinned to the MCP resource audience) to the SDK's auth.TokenInfo: it maps the
-// identity + claims through, and on any verification failure returns an error
-// that unwraps to auth.ErrInvalidToken (the SDK's 401 sentinel) without leaking
-// the underlying reason to the caller.
+// SDK-facing fields through, stashes the full verified identity under
+// ExtraIdentity for the whoami handler, and on any verification failure returns
+// an error that unwraps to auth.ErrInvalidToken (the SDK's 401 sentinel) without
+// leaking the underlying reason to the caller.
 func TestNewTokenVerifier(t *testing.T) {
 	t.Parallel()
 
@@ -33,7 +34,6 @@ func TestNewTokenVerifier(t *testing.T) {
 		wantErrIs  error
 		wantUID    string
 		wantScopes []string
-		wantOrgs   []string
 	}{
 		{
 			name: "valid token maps identity and claims to token info",
@@ -48,7 +48,6 @@ func TestNewTokenVerifier(t *testing.T) {
 			},
 			wantUID:    uid,
 			wantScopes: []string{"openid", "mcp:tools", "organization"},
-			wantOrgs:   []string{"pacific-coast-net"},
 		},
 		{
 			name:      "verification failure returns ErrInvalidToken",
@@ -56,23 +55,13 @@ func TestNewTokenVerifier(t *testing.T) {
 			wantErrIs: auth.ErrInvalidToken,
 		},
 		{
-			name: "organization claim as a bare string is normalized to a slice",
-			identity: &authn.Identity{
-				UID:    uid,
-				Claims: map[string]any{"sub": uid, "organization": "acme"},
-			},
-			wantUID:  uid,
-			wantOrgs: []string{"acme"},
-		},
-		{
-			name: "missing organization claim yields no org in extra",
+			name: "identity with no organization claim still stashed",
 			identity: &authn.Identity{
 				UID:    uid,
 				Claims: map[string]any{"sub": uid, "scope": "mcp:tools"},
 			},
 			wantUID:    uid,
 			wantScopes: []string{"mcp:tools"},
-			wantOrgs:   nil,
 		},
 	}
 
@@ -98,11 +87,11 @@ func TestNewTokenVerifier(t *testing.T) {
 			if tt.wantScopes != nil {
 				assert.Equal(t, tt.wantScopes, info.Scopes)
 			}
-			if tt.wantOrgs == nil {
-				assert.NotContains(t, info.Extra, "organization")
-			} else {
-				assert.Equal(t, tt.wantOrgs, info.Extra["organization"])
-			}
+			// The full verified identity is stashed for iam.BuildAccount (the
+			// whoami resolution), keyed by ExtraIdentity.
+			gotIdentity, ok := info.Extra[mcp.ExtraIdentity].(*authn.Identity)
+			require.True(t, ok, "verified identity must be stashed under ExtraIdentity")
+			assert.Same(t, tt.identity, gotIdentity)
 		})
 	}
 }

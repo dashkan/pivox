@@ -17,6 +17,12 @@ import (
 const (
 	pivoxMethodPrefix = "/pivox."
 
+	// mcpMethodPrefix is the internal MCP service surface. Its methods
+	// are verified with the MCP-audience verifier (not the main one) —
+	// see server.VerifierSelector and the AuthInterceptorSelecting
+	// wiring in cmd/pivox-cloud/main.go.
+	mcpMethodPrefix = "/pivox.mcp.v1."
+
 	// lroMethodPrefix is the AIP long-running-operations surface
 	// (google.longrunning.Operations). It's authenticated but NOT
 	// membership- or permission-gated: an operation is caller-scoped, so
@@ -38,6 +44,13 @@ func IsPivox(fullMethod string) bool {
 // authenticated but skips membership/permission (see lroMethodPrefix).
 func IsPivoxOrLRO(fullMethod string) bool {
 	return IsPivox(fullMethod) || strings.HasPrefix(fullMethod, lroMethodPrefix)
+}
+
+// IsMcpMethod reports whether a gRPC FullMethod belongs to the internal
+// MCP service (pivox.mcp.v1.*). The auth chain routes these to the
+// MCP-audience verifier so a main-API token can't be replayed here.
+func IsMcpMethod(fullMethod string) bool {
+	return strings.HasPrefix(fullMethod, mcpMethodPrefix)
 }
 
 // GatedUnaryInterceptor wraps a unary interceptor so it runs only for
