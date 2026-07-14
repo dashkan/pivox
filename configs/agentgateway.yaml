@@ -165,8 +165,6 @@ backends:
   - name: storage_agent
     host: host.docker.internal:8083
 
-  - name: debug
-    host: host.docker.internal:9090
 
   - name: web_app
     host: host.docker.internal:3000
@@ -427,23 +425,25 @@ binds:
                 allowCredentials: false
             backends:
               - backend: /grpc_main
-          # --- Debug endpoints -> 9090 -----------------------------------
-          - name: healthz
-            matches:
-              - path: { pathPrefix: /healthz }
-            policies:
-              requestHeaderModifier: *xfwd_proto
-              urlRewrite: *preserve_host
-            backends:
-              - backend: /debug
-          - name: readyz
-            matches:
-              - path: { pathPrefix: /readyz }
-            policies:
-              requestHeaderModifier: *xfwd_proto
-              urlRewrite: *preserve_host
-            backends:
-              - backend: /debug
+          # --- NO DEBUG ROUTES. The health surface is NOT ingressed. ----------
+          # /healthz + /readyz used to be routed here (to the app's debug port).
+          # Both were removed, for different reasons:
+          #
+          #   /readyz names the internal dependencies that are down (pivox-db,
+          #   sessions-db, cloud-stream) — operational detail the public internet has
+          #   no business reading; it would let anyone watch our database go down.
+          #   Worse, it used to echo the check's raw error, and pgconn's connect
+          #   error embeds the DSN (db user, db name, internal host, port).
+          #
+          #   /healthz disclosed nothing (a bare "ok") but was worth nothing either:
+          #   it is LIVENESS, so it answers 200 while touching no dependency. It
+          #   would have returned 200 for the entire 25 minutes the API was bound to
+          #   no ports and every request 503'd. As an external uptime signal it is
+          #   actively misleading — a public uptime check belongs on a real API route.
+          #
+          # Probes reach both directly on the debug port (PIVOX_DEBUG_PORT, :9090) —
+          # which is how orchestrator probes work anyway; they do not come through an
+          # ingress. Do not re-add either route.
           # --- API reference (Scalar + OpenAPI spec) -> nginx -------------
           # Served by a real static server, not inlined here, for two independent
           # reasons: directResponse takes an INLINE body only (no filename), the

@@ -90,13 +90,16 @@ func (s *State) SetChecks(checks ...Check) {
 
 // NotReadyError reports which dependencies failed.
 //
-// Names and payloads are kept SEPARATE on purpose. /readyz is routed through the
-// public ingress (configs/agentgateway.yaml), so its response body is
-// internet-reachable, and a dependency's raw error is not safe to echo there:
-// pgconn's connect error embeds the DSN — database user, database name, internal
-// host, port. Names() is what the response body may show; the wrapped error (the
-// full text) is for the LOG, where the operator can see it and the internet
-// cannot.
+// Names and payloads are kept SEPARATE on purpose. A dependency's raw error is
+// not safe to put in a response body: pgconn's connect error embeds the DSN —
+// database user, database name, internal host, port. Names() is what a body may
+// show; the wrapped error (the full text) is for the LOG, where the operator can
+// see it and nobody else can.
+//
+// This holds even though /readyz is no longer routed through the public ingress
+// (configs/agentgateway.yaml exposes /healthz only). It WAS routed there, which
+// is how this came to light — so this is the inner layer of a two-layer defense,
+// and it must survive someone re-adding the route.
 type NotReadyError struct {
 	// names of the checks that failed, in declaration order.
 	names []string
@@ -203,16 +206,13 @@ func NewServer(cfg Config) *Server {
 			return
 		}
 
-		// THE BODY IS PUBLIC. /readyz is routed through the ingress
-		// (configs/agentgateway.yaml), so this response is reachable from the
-		// internet. Echo the failing dependency NAMES — enough to make an incident
-		// legible — and nothing else. A dependency's raw error is not safe here:
-		// pgconn's connect error embeds the DSN (db user, db name, internal host,
-		// port), and it would be disclosed to unauthenticated callers at precisely
-		// the moment an operator is too busy to notice.
+		// Echo the failing dependency NAMES — enough to make an incident legible —
+		// and nothing else. A dependency's raw error is not safe in a body: pgconn's
+		// connect error embeds the DSN (db user, db name, internal host, port).
 		//
-		// The full detail goes to the LOG, where the operator can see it and the
-		// internet cannot.
+		// /readyz is no longer routed through the public ingress (it was, which is
+		// how this was caught), but this stays: it is the layer that survives someone
+		// re-adding the route. The full detail goes to the LOG instead.
 		var notReady *NotReadyError
 		switch {
 		case errors.As(err, &notReady):

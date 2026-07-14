@@ -301,6 +301,27 @@ Conventions and gotchas (each was paid for once; don't relearn them):
   failure, and the desktop app's OIDC login reports `discovery_failed`. If
   you see 530, check the tunnel before you touch `configs/agentgateway.yaml`.
 
+- **gRPC through the tunnel needs TWO things.** The Storage Agent's control
+  stream (`/pivox.agent.v1.AgentService/Connect`) is the only gRPC that
+  traverses the public host, and it is blocked by default at both hops:
+
+  1. **`originRequest.http2Origin: true`** in `~/.cloudflared/config.yml`.
+     cloudflared speaks HTTP/1.1 to the origin by default and gRPC is
+     HTTP/2-only, so without it the stream dies at the tunnel.
+  2. **gRPC enabled on the Cloudflare zone** (Dashboard → the zone → Network →
+     gRPC). Otherwise the EDGE answers **403** to anything carrying
+     `content-type: application/grpc` — not just the gRPC path; a plain
+     `POST /v1/...` with that content-type gets 403 too, while the same POST
+     without it reaches the origin and 401s. That asymmetry is the fingerprint.
+
+  Symptom when either is missing: the agent logs
+  `handshake: stream closed while waiting for response` on a 5s retry loop
+  forever, agentgateway logs NOTHING (the request never arrived), and the API
+  never sees a connection. To bisect, point an agent straight at the gateway —
+  `PIVOX_CLOUD_HOST=localhost:8081 PIVOX_PLAINTEXT=true` — which bypasses
+  Cloudflare entirely. If it connects there, the fault is in the two items
+  above, not in the token, the route, or the API.
+
 ## Skills (`.agents/skills/golang-*`)
 
 The repo carries a standardized set of Go skills under
