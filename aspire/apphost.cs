@@ -372,44 +372,22 @@ var api = builder
   .AddGoApp("api", "../cmd/pivox-cloud")
   .WithEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
   .WithEnvironment("PIVOX_SERVICE_GRPC_PORT", ":50052")
-  // Health/debug listener (/healthz + /readyz).
-  //
-  // All three Go binaries DEFAULT to :9090 — in production each is its own
-  // container, so a uniform port means one probe config, one scrape config, one
-  // dashboard. In dev they share a host, so they would collide; Aspire assigns
-  // each a distinct port here (api 9090, worker 9091, agent 9095 — NOT 9092,
-  // which is Kafka's; see the agent's block).
-  //
-  // isProxied:false because port == targetPort on a host process.
+  // Health/debug (/healthz + /readyz). All three binaries default to :9090; in
+  // dev they share a host, so each gets its own (api 9090, worker 9091, agent
+  // 9095 — 9092 is Kafka's). isProxied:false because port == targetPort.
   .WithEnvironment("PIVOX_DEBUG_PORT", ":9090")
   .WithHttpEndpoint(port: 9090, targetPort: 9090, name: "debug", isProxied: false)
-  // WITHOUT THIS, A NON-SERVING API REPORTS AS HEALTHY. Aspire's health for a
-  // host process is otherwise just "the process hasn't exited", and pivox-cloud
-  // binds NOTHING until startup completes — so a verifier that can't reach the
-  // IdP leaves a process that is Running/Healthy in the dashboard while every
-  // request through the ingress 503s. That is exactly what happened once, and it
-  // cost a debugging session precisely because the dashboard said green.
-  //
-  // /readyz (not /healthz) because it also pings the DB pool, and because the
-  // debug server binds only AFTER the OIDC verifier's startup JWKS fetch
-  // succeeds — so this probe fails for the wedged case too.
+  // Without this a non-serving API reports Healthy: Aspire's health for a host
+  // process is otherwise just "the process hasn't exited".
   .WithHttpHealthCheck("/readyz", endpointName: "debug")
   // waitFor(pivoxDb): the DB resource is ready only after postgres is healthy,
   // which on first init is after the init script's migrate + seed — so the
   // schema + the `vector` type exist before pgx's RegisterTypes runs.
   .WaitFor(pivoxDb)
-  // waitFor(keycloak): the OIDC verifier fetches the realm JWKS at startup, and
-  // an unreachable IdP is now a hard boot failure (bounded retry, then error —
-  // see oidc.Config.JWKSFetchAttempts). Waiting for KC to be healthy avoids the
-  // pointless crashloop of racing it.
-  //
-  // NOTE this is NOT sufficient on its own: PIVOX_OIDC_ISSUER points at the
-  // PUBLIC host (the Cloudflare tunnel), not at the KC container directly, so
-  // the JWKS fetch traverses cloudflared — which Aspire does not manage and
-  // cannot wait on. A healthy KC with a down tunnel still fails the fetch
-  // (Cloudflare answers 530). The verifier's retry absorbs a slow tunnel; a
-  // tunnel that is simply not running is a crashloop, by design, and the fix is
-  // `cloudflared tunnel run`.
+  // waitFor(keycloak): the OIDC verifier fetches the realm JWKS at startup and an
+  // unreachable IdP is a hard boot failure. NOT sufficient on its own —
+  // PIVOX_OIDC_ISSUER points at the public host, so the fetch traverses
+  // cloudflared, which Aspire cannot wait on.
   .WaitFor(keycloak);
 
 // --- worker (pivox-worker) — host process, River-backed periodic jobs ---
@@ -418,11 +396,7 @@ var api = builder
 builder
   .AddGoApp("worker", "../cmd/pivox-worker")
   .WithEnvironment("PIVOX_DATABASE_URL", pivoxDatabaseUrl)
-  // Health/debug listener. The worker previously exposed NOTHING — no port, no
-  // endpoint — so a worker that could not reach Postgres was indistinguishable
-  // from a healthy one: a live process, a green dashboard, and no jobs running.
-  // :9091 in dev to avoid colliding with the api's :9090 (both default to :9090
-  // in production, where each has its own container).
+  // Health/debug. The worker previously exposed no port at all.
   .WithEnvironment("PIVOX_DEBUG_PORT", ":9091")
   .WithHttpEndpoint(port: 9091, targetPort: 9091, name: "debug", isProxied: false)
   .WithHttpHealthCheck("/readyz", endpointName: "debug")
@@ -446,8 +420,10 @@ builder
 //     (scripts/seeds/11_local_corp.sql).
 //   - PIVOX_PORT: the gateway's storage_agent backend targets :8083 (agent
 //     default is 443).
-// PIVOX_CLOUD_HOST / PIVOX_PLAINTEXT still come from direnv (the agent
-// connects to the cloud AgentService over that). Serves /files/.
+//   - PIVOX_CLOUD_HOST / PIVOX_PLAINTEXT: dial the local ingress directly rather
+//     than inheriting direnv's public host. Prod goes over the internet; dev has
+//     no reason to.
+// Serves /files/.
 //
 // waitFor(api), NOT the database: the agent is an ON-PREM component that talks to
 // the Cloud Controller and has no knowledge of Postgres — modelling it as a
@@ -478,17 +454,10 @@ builder
   .WithArgs(["storage"])
   .WithEnvironment("PIVOX_TOKEN", "dev-token-local")
   .WithEnvironment("PIVOX_PORT", "8083")
-  // Health/debug listener. :9095, NOT :9092 — 9092 is KAFKA's port (AddKafka's
-  // default, and it is not spelled out anywhere in this file, so it does not show
-  // up in a grep for `port:`). Binding the agent there produced a genuinely
-  // confusing failure: the agent bound the IPv6 wildcard alongside Kafka's proxy,
-  // probes landed on the proxy, and the health check reported
-  // "response ended prematurely" while the agent itself looked fine.
-  //
-  // (See the api's note on the shared :9090 production default.) The agent's
-  // readiness includes the bidi control-plane stream: it is NOT ready until the
-  // handshake delivers the session signing key, without which it cannot validate a
-  // session and so can serve nothing.
+  .WithEnvironment("PIVOX_CLOUD_HOST", "localhost:8081")
+  .WithEnvironment("PIVOX_PLAINTEXT", "true")
+  // Health/debug. :9095, not :9092 — 9092 is Kafka's (AddKafka's default, which
+  // does not appear in a grep for `port:` here).
   .WithEnvironment("PIVOX_DEBUG_PORT", ":9095")
   .WithHttpEndpoint(port: 9095, targetPort: 9095, name: "debug", isProxied: false)
   .WithHttpHealthCheck("/readyz", endpointName: "debug")
