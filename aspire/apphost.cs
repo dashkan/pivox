@@ -420,9 +420,10 @@ builder
 //     (scripts/seeds/11_local_corp.sql).
 //   - PIVOX_PORT: the gateway's storage_agent backend targets :8083 (agent
 //     default is 443).
-//   - PIVOX_CLOUD_HOST / PIVOX_PLAINTEXT: dial the local ingress directly rather
-//     than inheriting direnv's public host. Prod goes over the internet; dev has
-//     no reason to.
+// PIVOX_CLOUD_HOST / PIVOX_PLAINTEXT come from direnv — the agent dials the PUBLIC
+// host, the same path it takes in prod. That needs gRPC enabled on the Cloudflare
+// zone and `originRequest.http2Origin: true` in the tunnel config; without either,
+// the edge 403s the stream and the agent never connects.
 // Serves /files/.
 //
 // waitFor(api), NOT the database: the agent is an ON-PREM component that talks to
@@ -454,8 +455,6 @@ builder
   .WithArgs(["storage"])
   .WithEnvironment("PIVOX_TOKEN", "dev-token-local")
   .WithEnvironment("PIVOX_PORT", "8083")
-  .WithEnvironment("PIVOX_CLOUD_HOST", "localhost:8081")
-  .WithEnvironment("PIVOX_PLAINTEXT", "true")
   // Health/debug. :9095, not :9092 — 9092 is Kafka's (AddKafka's default, which
   // does not appear in a grep for `port:` here).
   .WithEnvironment("PIVOX_DEBUG_PORT", ":9095")
