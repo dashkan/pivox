@@ -46,16 +46,29 @@ function readEnvironment(): Environment {
 
 export const environment = readEnvironment();
 
+/**
+ * Strip trailing slashes so a base URL is always safe to concatenate with a
+ * leading-slash path. Keycloak is NOT consistent here: `authServerUrl` arrives
+ * with a trailing slash while `serverBaseUrl` does not, so `${base}/resources/…`
+ * yields `https://host//resources/…`. The ingress rejects the double slash
+ * outright (connection error, not a 404), which silently broke the i18next
+ * message-bundle load and rendered every label as its raw key.
+ */
+function trimTrailingSlash(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
 /** Base URL of the Keycloak server (for keycloak-js). */
-export const authServerUrl =
+export const authServerUrl = trimTrailingSlash(
   environment.authServerUrl ??
-  environment.authUrl ??
-  environment.serverBaseUrl ??
-  "";
+    environment.authUrl ??
+    environment.serverBaseUrl ??
+    "",
+);
 
 /** Base URL of the Account REST API for this realm. */
-export const accountApiBase = `${
-  environment.serverBaseUrl ?? authServerUrl
-}/realms/${environment.realm}/account`;
+export const accountApiBase = `${trimTrailingSlash(
+  environment.serverBaseUrl ?? authServerUrl,
+)}/realms/${environment.realm}/account`;
 
 export const features: Features = environment.features ?? {};
