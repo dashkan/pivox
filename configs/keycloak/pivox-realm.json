@@ -775,9 +775,7 @@
                 "claude.ai",
                 "vscode.dev"
               ],
-              "client-id-uri-scheme": [
-                "https"
-              ],
+              "client-id-uri-scheme": ["https"],
               "is-negative-logic": false
             }
           }
@@ -785,9 +783,7 @@
         "description": "",
         "enabled": true,
         "name": "cimd-policy",
-        "profiles": [
-          "cimd-profile"
-        ]
+        "profiles": ["cimd-profile"]
       }
     ]
   },
@@ -823,10 +819,7 @@
     "account": [
       {
         "client": "account-console",
-        "roles": [
-          "manage-account",
-          "view-groups"
-        ]
+        "roles": ["manage-account", "view-groups"]
       }
     ]
   },
@@ -1652,9 +1645,7 @@
       ],
       "protocol": "openid-connect",
       "publicClient": false,
-      "redirectUris": [
-        "/auth/callback"
-      ],
+      "redirectUris": ["/auth/callback"],
       "rootUrl": "${authBaseUrl}",
       "secret": "${IMPORT_KC_START_CLIENT_SECRET}",
       "serviceAccountsEnabled": false,
@@ -1700,9 +1691,7 @@
       ],
       "protocol": "openid-connect",
       "publicClient": true,
-      "redirectUris": [
-        "/realms/pivox/account/*"
-      ],
+      "redirectUris": ["/realms/pivox/account/*"],
       "rootUrl": "${authBaseUrl}",
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
@@ -1758,9 +1747,7 @@
         }
       ],
       "publicClient": true,
-      "redirectUris": [
-        "/realms/pivox/account/*"
-      ],
+      "redirectUris": ["/realms/pivox/account/*"],
       "rootUrl": "${authBaseUrl}",
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
@@ -1849,10 +1836,7 @@
             },
             "Organizations": {
               "scopeAliases": {},
-              "scopes": [
-                "manage",
-                "view"
-              ],
+              "scopes": ["manage", "view"],
               "type": "Organizations"
             },
             "Roles": {
@@ -1867,18 +1851,10 @@
             "Users": {
               "groupType": "Groups",
               "scopeAliases": {
-                "impersonate": [
-                  "impersonate-members"
-                ],
-                "manage": [
-                  "manage-members"
-                ],
-                "manage-group-membership": [
-                  "manage-membership-of-members"
-                ],
-                "view": [
-                  "view-members"
-                ]
+                "impersonate": ["impersonate-members"],
+                "manage": ["manage-members"],
+                "manage-group-membership": ["manage-membership-of-members"],
+                "view": ["view-members"]
               },
               "scopes": [
                 "impersonate",
@@ -2136,10 +2112,7 @@
       ],
       "protocol": "openid-connect",
       "publicClient": true,
-      "redirectUris": [
-        "/api-docs",
-        "/api-docs*"
-      ],
+      "redirectUris": ["/api-docs", "/api-docs*"],
       "rootUrl": "${authBaseUrl}",
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
@@ -2310,10 +2283,7 @@
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
       "surrogateAuthRequired": false,
-      "webOrigins": [
-        "http://127.0.0.1",
-        "http://localhost"
-      ]
+      "webOrigins": ["http://127.0.0.1", "http://localhost"]
     },
     {
       "alwaysDisplayInConsole": false,
@@ -2373,10 +2343,7 @@
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
       "surrogateAuthRequired": false,
-      "webOrigins": [
-        "http://127.0.0.1:33418",
-        "https://vscode.dev"
-      ]
+      "webOrigins": ["http://127.0.0.1:33418", "https://vscode.dev"]
     },
     {
       "adminUrl": "",
@@ -2427,9 +2394,7 @@
       ],
       "protocol": "openid-connect",
       "publicClient": false,
-      "redirectUris": [
-        "https://oauth.pstmn.io/v1/callback"
-      ],
+      "redirectUris": ["https://oauth.pstmn.io/v1/callback"],
       "rootUrl": "",
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
@@ -2538,25 +2503,19 @@
         }
       ],
       "publicClient": true,
-      "redirectUris": [
-        "/admin/pivox/console/*"
-      ],
+      "redirectUris": ["/admin/pivox/console/*"],
       "rootUrl": "${authAdminUrl}",
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
       "surrogateAuthRequired": false,
-      "webOrigins": [
-        "+"
-      ]
+      "webOrigins": ["+"]
     }
   ],
   "components": {
     "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
       {
         "config": {
-          "allow-default-scopes": [
-            "true"
-          ]
+          "allow-default-scopes": ["true"]
         },
         "id": "bff7b93b-4f95-4457-8997-349df7f44517",
         "name": "Allowed Client Scopes",
@@ -2566,9 +2525,7 @@
       },
       {
         "config": {
-          "allow-default-scopes": [
-            "true"
-          ]
+          "allow-default-scopes": ["true"]
         },
         "id": "c838e4cb-cc24-409e-9284-f09977d30651",
         "name": "Allowed Client Scopes",
@@ -2648,9 +2605,7 @@
       },
       {
         "config": {
-          "max-clients": [
-            "200"
-          ]
+          "max-clients": ["200"]
         },
         "id": "e69c1852-7db6-4fbc-b985-14c9f1e64872",
         "name": "Max Clients Limit",
@@ -2660,12 +2615,8 @@
       },
       {
         "config": {
-          "client-uris-must-match": [
-            "true"
-          ],
-          "host-sending-registration-request-must-match": [
-            "true"
-          ]
+          "client-uris-must-match": ["true"],
+          "host-sending-registration-request-must-match": ["true"]
         },
         "id": "69b403d0-e381-41cc-b539-acf539f50dcc",
         "name": "Trusted Hosts",
@@ -2859,9 +2810,7 @@
     "VERIFY_PROFILE_ERROR"
   ],
   "eventsEnabled": true,
-  "eventsListeners": [
-    "kafka"
-  ],
+  "eventsListeners": ["kafka"],
   "failureFactor": 30,
   "firstBrokerLoginFlow": "first broker login",
   "groups": [],
@@ -2987,7 +2936,7 @@
       "hideOnLogin": true,
       "internalId": "573a54c8-c17e-4b6a-9b74-03bedcd72244",
       "linkOnly": false,
-      "providerId": "keycloak-oidc",
+      "providerId": "oidc",
       "storeToken": false,
       "trustEmail": true,
       "types": [
@@ -3303,9 +3252,7 @@
       "providerId": "update_user_locale"
     }
   ],
-  "requiredCredentials": [
-    "password"
-  ],
+  "requiredCredentials": ["password"],
   "resetCredentialsFlow": "reset credentials",
   "resetPasswordAllowed": true,
   "revokeRefreshToken": false,
@@ -3327,9 +3274,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "account": [
-                "manage-account-links"
-              ]
+              "account": ["manage-account-links"]
             }
           },
           "containerId": "b0c0cc0d-1278-4609-aa37-28b1a8d27743",
@@ -3352,9 +3297,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "account": [
-                "view-consent"
-              ]
+              "account": ["view-consent"]
             }
           },
           "containerId": "b0c0cc0d-1278-4609-aa37-28b1a8d27743",
@@ -3605,9 +3548,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "realm-management": [
-                "query-clients"
-              ]
+              "realm-management": ["query-clients"]
             }
           },
           "containerId": "35dc9303-657c-42dc-a388-216062fe9be5",
@@ -3639,9 +3580,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "realm-management": [
-                "query-organizations"
-              ]
+              "realm-management": ["query-organizations"]
             }
           },
           "containerId": "35dc9303-657c-42dc-a388-216062fe9be5",
@@ -3664,10 +3603,7 @@
           "composite": true,
           "composites": {
             "client": {
-              "realm-management": [
-                "query-groups",
-                "query-users"
-              ]
+              "realm-management": ["query-groups", "query-users"]
             }
           },
           "containerId": "35dc9303-657c-42dc-a388-216062fe9be5",
@@ -3686,15 +3622,9 @@
         "composite": true,
         "composites": {
           "client": {
-            "account": [
-              "manage-account",
-              "view-profile"
-            ]
+            "account": ["manage-account", "view-profile"]
           },
-          "realm": [
-            "offline_access",
-            "uma_authorization"
-          ]
+          "realm": ["offline_access", "uma_authorization"]
         },
         "containerId": "6cfebb8c-4834-44eb-9009-7792754a3353",
         "description": "${role_default-roles}",
@@ -3725,9 +3655,7 @@
   "scopeMappings": [
     {
       "clientScope": "offline_access",
-      "roles": [
-        "offline_access"
-      ]
+      "roles": ["offline_access"]
     }
   ],
   "smtpServer": {},
@@ -3756,18 +3684,12 @@
   "webAuthnPolicyPasswordlessResidentKey": "required",
   "webAuthnPolicyPasswordlessRpEntityName": "keycloak",
   "webAuthnPolicyPasswordlessRpId": "",
-  "webAuthnPolicyPasswordlessSignatureAlgorithms": [
-    "ES256",
-    "RS256"
-  ],
+  "webAuthnPolicyPasswordlessSignatureAlgorithms": ["ES256", "RS256"],
   "webAuthnPolicyPasswordlessUserVerificationRequirement": "required",
   "webAuthnPolicyRequireResidentKey": "not specified",
   "webAuthnPolicyResidentKey": "not specified",
   "webAuthnPolicyRpEntityName": "keycloak",
   "webAuthnPolicyRpId": "",
-  "webAuthnPolicySignatureAlgorithms": [
-    "ES256",
-    "RS256"
-  ],
+  "webAuthnPolicySignatureAlgorithms": ["ES256", "RS256"],
   "webAuthnPolicyUserVerificationRequirement": "not specified"
 }
