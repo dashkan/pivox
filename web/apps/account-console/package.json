@@ -14,7 +14,7 @@
     "@fontsource-variable/roboto": "catalog:",
     "@pivox/primitives": "workspace:*",
     "i18next": "26.3.6",
-    "i18next-fetch-backend": "7.0.0",
+    "i18next-fetch-backend": "8.0.0",
     "keycloak-js": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
