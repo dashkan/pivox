@@ -25,7 +25,7 @@ func ConnectorToProto(c db.Connector, namePrefix string, actors map[uuid.UUID]*t
 		_ = json.Unmarshal(c.Annotations, &annotations)
 	}
 	out := &workflowsv1.Connector{
-		Name:        namePrefix + "/connectors/" + c.ID.String(),
+		Name:        namePrefix + "/connectors/" + c.Slug,
 		DisplayName: c.DisplayName,
 		Description: c.Description,
 		Agent:       c.Agent,

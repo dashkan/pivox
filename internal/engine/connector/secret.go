@@ -38,12 +38,15 @@ import (
 )
 
 // Store is the narrow read surface this package needs from the database:
-// GetSecret (secret resolution) and GetConnector (connector resolution by the
-// activity). db.Querier satisfies it in production; it is deliberately not the
-// full Querier so the broker's dependency is exactly the two rows it reads.
+// GetSecretByParent (secret resolution) and GetConnectorByParent (connector
+// resolution by the activity). Both resolve by the resource-name leaf slug,
+// SCOPED to the caller's org+space — the scoped lookup is itself the cross-scope
+// guard (a ref naming a resource in another scope simply isn't found).
+// db.Querier satisfies it in production; it is deliberately not the full Querier
+// so the broker's dependency is exactly the two rows it reads.
 type Store interface {
-	GetSecret(ctx context.Context, id uuid.UUID) (db.Secret, error)
-	GetConnector(ctx context.Context, id uuid.UUID) (db.Connector, error)
+	GetSecretByParent(ctx context.Context, arg db.GetSecretByParentParams) (db.Secret, error)
+	GetConnectorByParent(ctx context.Context, arg db.GetConnectorByParentParams) (db.Connector, error)
 }
 
 // db.Querier is the production Store.
@@ -111,12 +114,20 @@ func buildConnectorEnv(resolve func(name string) (string, error)) (*cel.Env, err
 // missing ref, a bad ref name, an out-of-scope secret, and a decrypt failure are
 // all terminal (they never heal on retry).
 func resolveSecret(ctx context.Context, store Store, enc decryptor, name string, connOrg uuid.UUID, connSpace pgtype.UUID) (string, error) {
-	id, err := parseSecretLeaf(name)
+	slug, err := parseSecretLeaf(name)
 	if err != nil {
 		return "", fmt.Errorf("connector: secret reference %q is not a valid resource name: %w", name, err)
 	}
 
-	row, err := store.GetSecret(ctx, id)
+	// Resolve by slug SCOPED to the connector's own org+space — the same scope
+	// rule the Secrets/Connectors services enforce at write time. The scoped
+	// lookup collapses existence + scope: a secret outside the connector's scope
+	// simply isn't found (no cross-scope existence leak).
+	row, err := store.GetSecretByParent(ctx, db.GetSecretByParentParams{
+		OrgID:   connOrg,
+		SpaceID: connSpace,
+		Slug:    slug,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", fmt.Errorf("connector: secret %q does not exist", name)
@@ -125,11 +136,9 @@ func resolveSecret(ctx context.Context, store Store, enc decryptor, name string,
 		return "", engine.Retryable(fmt.Errorf("connector: resolve secret %q: %w", name, err))
 	}
 
-	if row.OrgID != connOrg || row.SpaceID != connSpace {
-		return "", fmt.Errorf("connector: secret %q is not in the connector's scope", name)
-	}
-
-	plaintext, err := enc.Decrypt(row.ValueCiphertext, secretAAD(id))
+	// AAD binds to the secret's immutable id (row.ID), not the slug — matching
+	// the write path's secretAAD(id).
+	plaintext, err := enc.Decrypt(row.ValueCiphertext, secretAAD(row.ID))
 	if err != nil {
 		// A decrypt failure under the correct AAD is corruption or a key
 		// mismatch — it will not heal on retry, so it is terminal rather than a
@@ -139,17 +148,14 @@ func resolveSecret(ctx context.Context, store Store, enc decryptor, name string,
 	return string(plaintext), nil
 }
 
-// parseSecretLeaf extracts the leaf UUID from a Secret resource name
-// ("organizations/{org}[/spaces/{space}]/secrets/{uuid}"). Mirrors the secrets
-// service's own name parsing.
-func parseSecretLeaf(name string) (uuid.UUID, error) {
+// parseSecretLeaf extracts the slug leaf from a Secret resource name
+// ("organizations/{org}[/spaces/{space}]/secrets/{slug}"). Mirrors the secrets
+// service's own name parsing; the slug is resolved to a concrete secret against
+// the connector's scope by the caller.
+func parseSecretLeaf(name string) (string, error) {
 	idx := strings.LastIndex(name, "/")
-	if idx < 0 {
-		return uuid.Nil, errors.New("not a secret resource name")
+	if idx < 0 || idx == len(name)-1 {
+		return "", errors.New("not a secret resource name")
 	}
-	id, err := uuid.Parse(name[idx+1:])
-	if err != nil {
-		return uuid.Nil, errors.New("secret name leaf is not a uuid")
-	}
-	return id, nil
+	return name[idx+1:], nil
 }

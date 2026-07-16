@@ -22,10 +22,12 @@ import (
 
 	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/permission"
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
@@ -42,6 +44,7 @@ type StorageGatewaysServer struct {
 	encryptor         crypto.Encryptor
 	conns             *agentstream.ConnectionManager
 	audit             *audit.Resolver
+	codec             *appkey.Codec
 	sessionSigningKey []byte
 	maxSessionTTL     time.Duration
 	cookieDomain      string
@@ -66,6 +69,9 @@ type StorageGatewaysConfig struct {
 	Pool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
+	// Codec opaque-encodes keyset page tokens for ListStorageGateways.
+	// Required.
+	Codec *appkey.Codec
 	// Encryptor wraps Cloud KMS for column-level encryption.
 	// Optional.
 	Encryptor crypto.Encryptor
@@ -114,6 +120,9 @@ func NewStorageGatewaysServer(cfg StorageGatewaysConfig) *StorageGatewaysServer 
 	if cfg.Queries == nil {
 		panic("storage: StorageGatewaysConfig.Queries is required")
 	}
+	if cfg.Codec == nil {
+		panic("storage: StorageGatewaysConfig.Codec is required")
+	}
 	if cfg.Conns == nil {
 		panic("storage: StorageGatewaysConfig.Conns is required")
 	}
@@ -131,6 +140,7 @@ func NewStorageGatewaysServer(cfg StorageGatewaysConfig) *StorageGatewaysServer 
 	return &StorageGatewaysServer{
 		pool:              cfg.Pool,
 		queries:           cfg.Queries,
+		codec:             cfg.Codec,
 		encryptor:         cfg.Encryptor,
 		conns:             cfg.Conns,
 		audit:             cfg.AuditResolver,
@@ -251,8 +261,65 @@ func (s *StorageGatewaysServer) GetStorageGateway(ctx context.Context, req *stor
 	return convert.StorageGatewayToProto(gw, orgName, actors), nil
 }
 
-func (s *StorageGatewaysServer) ListStorageGateways(_ context.Context, _ *storagev1.ListStorageGatewaysRequest) (*storagev1.ListStorageGatewaysResponse, error) {
-	return nil, apierr.Unimplemented("ListStorageGateways not yet implemented")
+func (s *StorageGatewaysServer) ListStorageGateways(ctx context.Context, req *storagev1.ListStorageGatewaysRequest) (*storagev1.ListStorageGatewaysResponse, error) {
+	// The interceptor already resolved and membership-gated the org named by
+	// `parent`, so the scope is authoritative here — a `parent` naming another
+	// org the caller can't reach never reaches this handler. Listing is scoped
+	// to exactly the resolved org's id; there is no cross-org leak.
+	org := server.MustResolvedOrgFromContext(ctx)
+
+	pageSize := req.GetPageSize()
+	if pageSize <= 0 {
+		pageSize = 100
+	}
+	if pageSize > 1000 {
+		pageSize = 1000
+	}
+
+	var cursor pgtype.UUID
+	if tok := req.GetPageToken(); tok != "" {
+		raw, err := s.codec.Decrypt(tok)
+		if err != nil || len(raw) != 16 {
+			return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+		}
+		var id uuid.UUID
+		copy(id[:], raw)
+		cursor = convert.PgUUID(id)
+	}
+
+	rows, err := s.queries.ListStorageGatewaysByOrg(ctx, db.ListStorageGatewaysByOrgParams{
+		OrgID:     org.ID,
+		Cursor:    cursor,
+		PageLimit: pageSize + 1,
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "list storage gateways")
+	}
+
+	// Keyset cursor = the LAST RETURNED row's id (rows[pageSize-1]) against the
+	// `id > cursor` predicate. Encoding the first un-returned row (rows[pageSize])
+	// would skip it on the next page — the off-by-one CLEANUP-1 tracks.
+	var nextPageToken string
+	if int32(len(rows)) > pageSize {
+		rows = rows[:pageSize]
+		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize-1].ID)
+		if err != nil {
+			return nil, apierr.Internal(err, "encode page token")
+		}
+	}
+
+	actors, err := s.resolveGatewayActors(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*storagev1.StorageGateway, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, convert.StorageGatewayToProto(r, org.Slug, actors))
+	}
+	return &storagev1.ListStorageGatewaysResponse{
+		StorageGateways: out,
+		NextPageToken:   nextPageToken,
+	}, nil
 }
 
 func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *storagev1.UpdateStorageGatewayRequest) (*longrunningpb.Operation, error) {

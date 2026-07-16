@@ -53,6 +53,38 @@ func (h *Harness) SeedMembership(t *testing.T, orgID uuid.UUID, identity *Caller
 	return identity.IdentityID
 }
 
+// SeedSpaceMembership binds an identity to a space with the given system role
+// via a direct `space_members` user binding (no org_members row of its own).
+// Roles are org-scoped and shared by the org's spaces, so `role` resolves
+// against the parent org's system roles. Returns the user UUID.
+//
+// Note: the MembershipRequiredInterceptor gates every non-bootstrap RPC on org
+// membership (`org_members`), which a space binding does NOT satisfy — a caller
+// with ONLY a space binding is treated as memberless. To exercise space-scoped
+// authorization, also give the identity an org binding (e.g. SeedMembership with
+// a low-privilege role like viewer) so it clears the membership gate.
+func (h *Harness) SeedSpaceMembership(t *testing.T, orgID, spaceID uuid.UUID, identity *Caller, role string) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+
+	roleRow, err := h.Queries.GetSystemRole(ctx, db.GetSystemRoleParams{
+		OrgID: orgID,
+		Name:  role,
+	})
+	require.NoError(t, err, "system role %q not found in org %s — was the org created via CreateOrganization?", role, orgID)
+
+	_, err = h.Queries.CreateSpaceUserMember(ctx, db.CreateSpaceUserMemberParams{
+		ID:        uuid.New(),
+		SpaceID:   spaceID,
+		RoleID:    roleRow.ID,
+		UserID:    convert.PgUUID(identity.IdentityID),
+		CreatedBy: convert.PgUUID(identity.IdentityID),
+	})
+	require.NoError(t, err)
+
+	return identity.IdentityID
+}
+
 // SeedGroupMembership binds an identity to `role` at org scope purely
 // through a group: it creates a group in the org, adds the identity as
 // a group member, and binds the group to the role via org_members

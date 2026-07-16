@@ -14,18 +14,18 @@ import (
 )
 
 const connectorsReferencingSecret = `-- name: ConnectorsReferencingSecret :many
-SELECT c.id, c.connector_id, c.org_id, c.space_id
+SELECT c.id, c.slug, c.org_id, c.space_id
 FROM connector_secret_refs r
 JOIN connectors c ON c.id = r.connector_id
 WHERE r.secret_id = $1
-ORDER BY c.connector_id
+ORDER BY c.slug
 `
 
 type ConnectorsReferencingSecretRow struct {
-	ID          uuid.UUID   `json:"id"`
-	ConnectorID string      `json:"connector_id"`
-	OrgID       uuid.UUID   `json:"org_id"`
-	SpaceID     pgtype.UUID `json:"space_id"`
+	ID      uuid.UUID   `json:"id"`
+	Slug    string      `json:"slug"`
+	OrgID   uuid.UUID   `json:"org_id"`
+	SpaceID pgtype.UUID `json:"space_id"`
 }
 
 // The DeleteSecret guard's lookup: connectors that reference a given secret,
@@ -42,7 +42,7 @@ func (q *Queries) ConnectorsReferencingSecret(ctx context.Context, secretID uuid
 		var i ConnectorsReferencingSecretRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.ConnectorID,
+			&i.Slug,
 			&i.OrgID,
 			&i.SpaceID,
 		); err != nil {
@@ -57,15 +57,15 @@ func (q *Queries) ConnectorsReferencingSecret(ctx context.Context, secretID uuid
 }
 
 const createConnector = `-- name: CreateConnector :one
-INSERT INTO connectors (id, org_id, space_id, connector_id, display_name, description, config, agent, annotations, created_by, updated_by)
+INSERT INTO connectors (id, org_id, space_id, slug, display_name, description, config, agent, annotations, created_by, updated_by)
 VALUES ($1, $2, $10, $3, $4, $5, $6, $7, $8, $9, $9)
-RETURNING id, org_id, space_id, connector_id, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, space_id, slug, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time
 `
 
 type CreateConnectorParams struct {
 	ID          uuid.UUID       `json:"id"`
 	OrgID       uuid.UUID       `json:"org_id"`
-	ConnectorID string          `json:"connector_id"`
+	Slug        string          `json:"slug"`
 	DisplayName string          `json:"display_name"`
 	Description string          `json:"description"`
 	Config      json.RawMessage `json:"config"`
@@ -81,7 +81,7 @@ func (q *Queries) CreateConnector(ctx context.Context, arg CreateConnectorParams
 	row := q.db.QueryRow(ctx, createConnector,
 		arg.ID,
 		arg.OrgID,
-		arg.ConnectorID,
+		arg.Slug,
 		arg.DisplayName,
 		arg.Description,
 		arg.Config,
@@ -95,7 +95,7 @@ func (q *Queries) CreateConnector(ctx context.Context, arg CreateConnectorParams
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.ConnectorID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Config,
@@ -132,7 +132,7 @@ func (q *Queries) DeleteConnectorSecretRefs(ctx context.Context, connectorID uui
 }
 
 const getConnector = `-- name: GetConnector :one
-SELECT id, org_id, space_id, connector_id, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time FROM connectors WHERE id = $1
+SELECT id, org_id, space_id, slug, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time FROM connectors WHERE id = $1
 `
 
 func (q *Queries) GetConnector(ctx context.Context, id uuid.UUID) (Connector, error) {
@@ -142,7 +142,7 @@ func (q *Queries) GetConnector(ctx context.Context, id uuid.UUID) (Connector, er
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.ConnectorID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Config,
@@ -158,28 +158,28 @@ func (q *Queries) GetConnector(ctx context.Context, id uuid.UUID) (Connector, er
 }
 
 const getConnectorByParent = `-- name: GetConnectorByParent :one
-SELECT id, org_id, space_id, connector_id, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time FROM connectors
+SELECT id, org_id, space_id, slug, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time FROM connectors
 WHERE org_id = $1
-  AND space_id IS NOT DISTINCT FROM $3
-  AND connector_id = $2
+  AND space_id IS NOT DISTINCT FROM $2
+  AND slug = $3
 `
 
 type GetConnectorByParentParams struct {
-	OrgID       uuid.UUID   `json:"org_id"`
-	ConnectorID string      `json:"connector_id"`
-	SpaceID     pgtype.UUID `json:"space_id"`
+	OrgID   uuid.UUID   `json:"org_id"`
+	SpaceID pgtype.UUID `json:"space_id"`
+	Slug    string      `json:"slug"`
 }
 
-// Resolves a Connector from its parent + slug. space_id IS NOT DISTINCT FROM
-// treats NULL (org-scoped) as a matchable value.
+// Resolves a Connector from its parent + slug (the resource-name leaf).
+// space_id IS NOT DISTINCT FROM treats NULL (org-scoped) as a matchable value.
 func (q *Queries) GetConnectorByParent(ctx context.Context, arg GetConnectorByParentParams) (Connector, error) {
-	row := q.db.QueryRow(ctx, getConnectorByParent, arg.OrgID, arg.ConnectorID, arg.SpaceID)
+	row := q.db.QueryRow(ctx, getConnectorByParent, arg.OrgID, arg.SpaceID, arg.Slug)
 	var i Connector
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.ConnectorID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Config,
@@ -194,20 +194,32 @@ func (q *Queries) GetConnectorByParent(ctx context.Context, arg GetConnectorByPa
 	return i, err
 }
 
-const getConnectorForUpdate = `-- name: GetConnectorForUpdate :one
-SELECT id, org_id, space_id, connector_id, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time FROM connectors WHERE id = $1 FOR UPDATE
+const getConnectorByParentForUpdate = `-- name: GetConnectorByParentForUpdate :one
+SELECT id, org_id, space_id, slug, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time FROM connectors
+WHERE org_id = $1
+  AND space_id IS NOT DISTINCT FROM $2
+  AND slug = $3
+FOR UPDATE
 `
 
-// GetConnectorForUpdate locks the row for the update/delete tx so the etag
-// check and the write serialize against a concurrent update.
-func (q *Queries) GetConnectorForUpdate(ctx context.Context, id uuid.UUID) (Connector, error) {
-	row := q.db.QueryRow(ctx, getConnectorForUpdate, id)
+type GetConnectorByParentForUpdateParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	SpaceID pgtype.UUID `json:"space_id"`
+	Slug    string      `json:"slug"`
+}
+
+// GetConnectorByParentForUpdate resolves a Connector by parent + slug AND locks
+// the row for the update/delete tx, so the etag check and the write serialize
+// against a concurrent mutation. The slug (not the uuid) is the resource-name
+// leaf, so update/delete resolve their target by scope + slug in one statement.
+func (q *Queries) GetConnectorByParentForUpdate(ctx context.Context, arg GetConnectorByParentForUpdateParams) (Connector, error) {
+	row := q.db.QueryRow(ctx, getConnectorByParentForUpdate, arg.OrgID, arg.SpaceID, arg.Slug)
 	var i Connector
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.ConnectorID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Config,
@@ -242,57 +254,68 @@ func (q *Queries) InsertConnectorSecretRefs(ctx context.Context, arg InsertConne
 	return err
 }
 
-const listConnectorsByParent = `-- name: ListConnectorsByParent :many
-SELECT id, org_id, space_id, connector_id, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time FROM connectors
-WHERE org_id = $1
-  AND space_id IS NOT DISTINCT FROM $2
-  AND ($3::uuid IS NULL OR id > $3)
-ORDER BY id
-LIMIT $4
+const listDistinctConnectorAgentsInOrg = `-- name: ListDistinctConnectorAgentsInOrg :many
+
+SELECT DISTINCT agent FROM connectors
+WHERE org_id = $1 AND agent <> ''
+ORDER BY agent
 `
 
-type ListConnectorsByParentParams struct {
-	OrgID     uuid.UUID   `json:"org_id"`
-	SpaceID   pgtype.UUID `json:"space_id"`
-	Cursor    pgtype.UUID `json:"cursor"`
-	PageLimit int32       `json:"page_limit"`
-}
-
-// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
-// (AIP-160 filter / order_by are not yet wired — ordered by id.)
-func (q *Queries) ListConnectorsByParent(ctx context.Context, arg ListConnectorsByParentParams) ([]Connector, error) {
-	rows, err := q.db.Query(ctx, listConnectorsByParent,
-		arg.OrgID,
-		arg.SpaceID,
-		arg.Cursor,
-		arg.PageLimit,
-	)
+// ListConnectors is NOT a static sqlc query: it is a dynamic AIP-160
+// filtered + AIP-132 sorted + compound-cursor keyset list assembled by
+// internal/filter.BuildListQuery (base scope org_id + space_id IS NOT DISTINCT
+// FROM, layered filter/order_by/keyset). See internal/service/connectors and
+// docs/aip-list-transpiler-procedure.md.
+// The org-rollup "agents in use" facet: the distinct non-empty agent values
+// across the whole org — org-direct connectors AND every space — matching the
+// org-level list's base scope. Cloud connectors (agent = ”) are excluded.
+// Connectors hard-delete, so there is no soft-delete predicate.
+func (q *Queries) ListDistinctConnectorAgentsInOrg(ctx context.Context, orgID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listDistinctConnectorAgentsInOrg, orgID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Connector{}
+	items := []string{}
 	for rows.Next() {
-		var i Connector
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.SpaceID,
-			&i.ConnectorID,
-			&i.DisplayName,
-			&i.Description,
-			&i.Config,
-			&i.Agent,
-			&i.Annotations,
-			&i.Etag,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-		); err != nil {
+		var agent string
+		if err := rows.Scan(&agent); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, agent)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDistinctConnectorAgentsInSpace = `-- name: ListDistinctConnectorAgentsInSpace :many
+SELECT DISTINCT agent FROM connectors
+WHERE org_id = $1 AND space_id = $2 AND agent <> ''
+ORDER BY agent
+`
+
+type ListDistinctConnectorAgentsInSpaceParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	SpaceID pgtype.UUID `json:"space_id"`
+}
+
+// The space-scoped "agents in use" facet: the distinct non-empty agent values
+// within one space, matching a space-level list's base scope.
+func (q *Queries) ListDistinctConnectorAgentsInSpace(ctx context.Context, arg ListDistinctConnectorAgentsInSpaceParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listDistinctConnectorAgentsInSpace, arg.OrgID, arg.SpaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var agent string
+		if err := rows.Scan(&agent); err != nil {
+			return nil, err
+		}
+		items = append(items, agent)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -311,7 +334,7 @@ SET display_name = COALESCE($3, display_name),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, space_id, connector_id, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, space_id, slug, display_name, description, config, agent, annotations, etag, created_by, updated_by, create_time, update_time
 `
 
 type UpdateConnectorParams struct {
@@ -340,7 +363,7 @@ func (q *Queries) UpdateConnector(ctx context.Context, arg UpdateConnectorParams
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.ConnectorID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Config,

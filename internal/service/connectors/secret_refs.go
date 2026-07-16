@@ -53,20 +53,25 @@ func extractSecretRefs(in *workflowsv1.Connector) []string {
 	return refs
 }
 
-// parseSecretRefLeaf extracts the leaf UUID from a Secret resource name
-// ("organizations/{org}[/spaces/{space}]/secrets/{uuid}"). Mirrors the secrets
-// package's own name parsing; a malformed name or non-UUID leaf is a ref error
-// (there is no such secret to point at).
-func parseSecretRefLeaf(name string) (uuid.UUID, error) {
-	idx := strings.LastIndex(name, "/")
-	if idx < 0 {
-		return uuid.Nil, errors.New("not a secret resource name")
+// parseSecretRef validates a secret("…") ref name against the connector's scope
+// and returns its slug leaf. The ref MUST be exactly
+// "{connectorPrefix}/secrets/{slug}" where connectorPrefix is the connector's
+// own scope path ("organizations/{org}[/spaces/{space}]"). Validating the parent
+// segments — not just the leaf — is load-bearing: a ref written as
+// "organizations/OTHER/secrets/foo" must be REJECTED, never silently rebound to
+// the connector-local "foo" (the leaf slug alone can't distinguish the two).
+// The remaining errors: a scope mismatch, an empty leaf, or a multi-segment
+// leaf.
+func parseSecretRef(name, connectorPrefix string) (string, error) {
+	want := connectorPrefix + "/secrets/"
+	if !strings.HasPrefix(name, want) {
+		return "", errors.New("is not in the connector's scope")
 	}
-	id, err := uuid.Parse(name[idx+1:])
-	if err != nil {
-		return uuid.Nil, errors.New("secret name leaf is not a uuid")
+	slug := name[len(want):]
+	if slug == "" || strings.Contains(slug, "/") {
+		return "", errors.New("is not a valid Secret resource name")
 	}
-	return id, nil
+	return slug, nil
 }
 
 // trackSecretRefs re-derives and records the vault Secrets a connector's
@@ -79,40 +84,44 @@ func parseSecretRefLeaf(name string) (uuid.UUID, error) {
 // you can't save a connector pointing at a secret that isn't yours. This is
 // the write half of the loop the DeleteSecret guard closes: a secret can't be
 // deleted while a tracked ref points at it.
-func trackSecretRefs(ctx context.Context, qtx db.Querier, connectorID, orgID uuid.UUID, spaceID pgtype.UUID, in *workflowsv1.Connector) error {
+func trackSecretRefs(ctx context.Context, qtx db.Querier, connectorID, orgID uuid.UUID, spaceID pgtype.UUID, connectorPrefix string, in *workflowsv1.Connector) error {
 	refs := extractSecretRefs(in)
 
 	ids := make([]uuid.UUID, 0, len(refs))
 	seen := make(map[uuid.UUID]struct{}, len(refs))
 	for _, name := range refs {
-		secretID, err := parseSecretRefLeaf(name)
+		// Validate the ref's parent segments against the connector's scope
+		// (rejecting a mismatched org/space prefix) before resolving the slug.
+		slug, err := parseSecretRef(name, connectorPrefix)
 		if err != nil {
 			return apierr.InvalidArgument(apierr.FieldViolation("connector.config",
-				fmt.Sprintf("secret reference %q is not a valid Secret resource name", name)))
+				fmt.Sprintf("secret reference %q %s", name, err.Error())))
 		}
+		// Resolve the (scope-validated) slug against the connector's OWN scope
+		// (org + space) — the same scope rule the Secrets service enforces.
+		//
 		// FOR UPDATE locks the referenced secret for this tx, serializing
 		// against a concurrent DeleteSecret (which locks the same row via
-		// GetSecretForUpdate before its ref-guard check). Without the lock a
-		// connector-create can race past an in-flight delete — the delete's
-		// guard sees no ref, this plain read sees the still-live secret, the
-		// ref is inserted, and the delete commits, leaving the config pointing
-		// at a deleted secret. With it, either the delete commits first and
-		// this returns ErrNoRows (ref rejected) or this commits first and the
-		// guard sees the ref (delete blocked). Deadlocks (two connector-writes
-		// locking overlapping secrets) are retried by RunInTx.
-		row, err := qtx.GetSecretForUpdate(ctx, secretID)
+		// GetSecretByParentForUpdate before its ref-guard check). Without the
+		// lock a connector-create can race past an in-flight delete — the
+		// delete's guard sees no ref, this plain read sees the still-live
+		// secret, the ref is inserted, and the delete commits, leaving the
+		// config pointing at a deleted secret. With it, either the delete
+		// commits first and this returns ErrNoRows (ref rejected) or this
+		// commits first and the guard sees the ref (delete blocked). Deadlocks
+		// (two connector-writes locking overlapping secrets) are retried by
+		// RunInTx.
+		row, err := qtx.GetSecretByParentForUpdate(ctx, db.GetSecretByParentForUpdateParams{
+			OrgID:   orgID,
+			SpaceID: spaceID,
+			Slug:    slug,
+		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return apierr.InvalidArgument(apierr.FieldViolation("connector.config",
 					fmt.Sprintf("secret reference %q does not exist", name)))
 			}
 			return apierr.Internal(err, "resolve secret reference")
-		}
-		// Same scope check the Secrets service uses: the referenced secret must
-		// belong to the connector's org (and space, if space-scoped).
-		if row.OrgID != orgID || row.SpaceID != spaceID {
-			return apierr.InvalidArgument(apierr.FieldViolation("connector.config",
-				fmt.Sprintf("secret reference %q is not in this connector's scope", name)))
 		}
 		if _, ok := seen[row.ID]; ok {
 			continue

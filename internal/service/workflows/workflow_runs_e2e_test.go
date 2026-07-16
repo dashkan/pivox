@@ -229,11 +229,11 @@ func TestE2E_WorkflowRun_ScopeIsolation(t *testing.T) {
 	runB, err := runClient.RunWorkflow(ctx, &workflowsv1.RunWorkflowRequest{Name: wfB.GetName()})
 	require.NoError(t, err)
 
-	// Reconstruct B's run name under A's prefix: same workflow + run uuids,
-	// wrong org slug.
-	bWfID := idFromName(t, wfB.GetName())
+	// Reconstruct B's run name under A's prefix: same workflow slug + run uuid,
+	// wrong org slug. A has no "b-flow" workflow, so the scoped parent lookup
+	// finds nothing.
 	runUUID := runIDFromName(t, runB.GetName())
-	crossName := "organizations/" + a.Slug + "/workflows/" + bWfID.String() + "/runs/" + runUUID.String()
+	crossName := "organizations/" + a.Slug + "/workflows/b-flow/runs/" + runUUID.String()
 
 	_, err = runClient.GetWorkflowRun(ctx, &workflowsv1.GetWorkflowRunRequest{Name: crossName})
 	require.Error(t, err)

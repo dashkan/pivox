@@ -24,7 +24,7 @@ func TestIntegration_Storage_GatewayLifecycle(t *testing.T) {
 		grpcharness.WithOrganizationsServer(),
 		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 			storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
-				Pool: h.Pool, Queries: h.Queries, Encryptor: h.Encryptor, Conns: conns,
+				Pool: h.Pool, Queries: h.Queries, Codec: grpcharness.TestAppCodec(), Encryptor: h.Encryptor, Conns: conns,
 			}))
 			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
 				Pool: h.Pool, Queries: h.Queries, Encryptor: h.Encryptor,

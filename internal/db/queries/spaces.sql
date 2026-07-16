@@ -6,6 +6,21 @@ RETURNING *;
 -- name: GetSpace :one
 SELECT * FROM spaces WHERE id = $1 AND delete_time IS NULL;
 
+-- name: SpaceSlugsByIDs :many
+-- Maps a set of space uuids to their slug (the `name` column). Used to build
+-- space-scoped resource names for a page of rows that reference spaces by uuid
+-- (e.g. org-wide workflow-run listing) in one round-trip instead of N+1.
+-- Includes soft-deleted spaces so a name still renders during the grace window.
+SELECT id, name FROM spaces WHERE id = ANY(@ids::uuid[]);
+
+-- name: GetSpaceSlugsByIDs :many
+-- Maps a set of space uuids to their slug (the `name` column), scoped to the
+-- org so a foreign org's space slug can never be resolved. Used to build
+-- space-scoped resource names for an org-level connector rollup page (rows that
+-- reference their space by uuid) in one round-trip instead of N+1. Includes
+-- soft-deleted spaces so a name still renders during the grace window.
+SELECT id, name FROM spaces WHERE id = ANY(@ids::uuid[]) AND org_id = @org_id;
+
 -- name: GetSpaceIncludingDeleted :one
 SELECT * FROM spaces WHERE id = $1;
 

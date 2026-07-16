@@ -180,6 +180,45 @@ func (q *Queries) GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (S
 	return i, err
 }
 
+const getSpaceSlugsByIDs = `-- name: GetSpaceSlugsByIDs :many
+SELECT id, name FROM spaces WHERE id = ANY($1::uuid[]) AND org_id = $2
+`
+
+type GetSpaceSlugsByIDsParams struct {
+	Ids   []uuid.UUID `json:"ids"`
+	OrgID uuid.UUID   `json:"org_id"`
+}
+
+type GetSpaceSlugsByIDsRow struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+// Maps a set of space uuids to their slug (the `name` column), scoped to the
+// org so a foreign org's space slug can never be resolved. Used to build
+// space-scoped resource names for an org-level connector rollup page (rows that
+// reference their space by uuid) in one round-trip instead of N+1. Includes
+// soft-deleted spaces so a name still renders during the grace window.
+func (q *Queries) GetSpaceSlugsByIDs(ctx context.Context, arg GetSpaceSlugsByIDsParams) ([]GetSpaceSlugsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, getSpaceSlugsByIDs, arg.Ids, arg.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetSpaceSlugsByIDsRow{}
+	for rows.Next() {
+		var i GetSpaceSlugsByIDsRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSpacesPastPurgeTime = `-- name: ListSpacesPastPurgeTime :many
 SELECT id, org_id, name, display_name, labels, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM spaces
  WHERE delete_time IS NOT NULL
@@ -311,6 +350,39 @@ func (q *Queries) SoftDeleteSpace(ctx context.Context, arg SoftDeleteSpaceParams
 		&i.PurgeTime,
 	)
 	return i, err
+}
+
+const spaceSlugsByIDs = `-- name: SpaceSlugsByIDs :many
+SELECT id, name FROM spaces WHERE id = ANY($1::uuid[])
+`
+
+type SpaceSlugsByIDsRow struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+// Maps a set of space uuids to their slug (the `name` column). Used to build
+// space-scoped resource names for a page of rows that reference spaces by uuid
+// (e.g. org-wide workflow-run listing) in one round-trip instead of N+1.
+// Includes soft-deleted spaces so a name still renders during the grace window.
+func (q *Queries) SpaceSlugsByIDs(ctx context.Context, ids []uuid.UUID) ([]SpaceSlugsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, spaceSlugsByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SpaceSlugsByIDsRow{}
+	for rows.Next() {
+		var i SpaceSlugsByIDsRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const undeleteSpace = `-- name: UndeleteSpace :one

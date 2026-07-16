@@ -212,6 +212,15 @@ message ListConnectorsResponse {
 
   // A pagination token for the next page, empty if there are no more.
   string next_page_token = 2;
+
+  // The distinct, sorted set of non-empty `agent` values present across the
+  // list's BASE SCOPE — the whole org (org-direct connectors plus every space)
+  // for an org-level list, or the selected space for a space-level list. It is
+  // NOT narrowed by the request `filter`, so a client can populate an
+  // agent-filter facet with every agent actually assigned to a connector in
+  // scope, regardless of the current page's filter. Empty when every connector
+  // in scope runs on the cloud controller (agent = "").
+  repeated string agents_in_use = 3;
 }
 
 // Request for GetConnector.

@@ -48,26 +48,50 @@ type fakeStore struct {
 	connectorErr error
 }
 
-func (s *fakeStore) GetSecret(_ context.Context, id uuid.UUID) (db.Secret, error) {
+// GetSecretByParent resolves a secret by (org, space, slug) — the scoped-by-slug
+// lookup the production engine now uses. It scans registered secrets for an
+// exact org + space + slug match (space compared NULL-aware), so a secret whose
+// slug exists only in another scope is not found.
+func (s *fakeStore) GetSecretByParent(_ context.Context, arg db.GetSecretByParentParams) (db.Secret, error) {
 	if s.secretErr != nil {
 		return db.Secret{}, s.secretErr
 	}
-	row, ok := s.secrets[id]
-	if !ok {
-		return db.Secret{}, pgx.ErrNoRows
+	for _, row := range s.secrets {
+		if row.OrgID == arg.OrgID && sameFakeSpace(row.SpaceID, arg.SpaceID) && row.Slug == arg.Slug {
+			return row, nil
+		}
 	}
-	return row, nil
+	return db.Secret{}, pgx.ErrNoRows
 }
 
-func (s *fakeStore) GetConnector(_ context.Context, id uuid.UUID) (db.Connector, error) {
+// GetConnectorByParent resolves a connector by (org, space, slug), same scoping
+// rule as GetSecretByParent.
+func (s *fakeStore) GetConnectorByParent(_ context.Context, arg db.GetConnectorByParentParams) (db.Connector, error) {
 	if s.connectorErr != nil {
 		return db.Connector{}, s.connectorErr
 	}
-	row, ok := s.connectors[id]
-	if !ok {
-		return db.Connector{}, pgx.ErrNoRows
+	for _, row := range s.connectors {
+		if row.OrgID == arg.OrgID && sameFakeSpace(row.SpaceID, arg.SpaceID) && row.Slug == arg.Slug {
+			return row, nil
+		}
 	}
-	return row, nil
+	return db.Connector{}, pgx.ErrNoRows
+}
+
+// sameFakeSpace compares two nullable spaces NULL-aware, mirroring Postgres
+// `space_id IS NOT DISTINCT FROM`.
+func sameFakeSpace(a, b pgtype.UUID) bool {
+	if a.Valid != b.Valid {
+		return false
+	}
+	return !a.Valid || a.Bytes == b.Bytes
+}
+
+// leafSlug is the deterministic, non-uuid slug the fakes assign a row: a short
+// prefixed string derived from the id. Being non-uuid, it proves the engine
+// resolves by the slug leaf (a uuid.Parse of it would fail).
+func leafSlug(prefix string, id uuid.UUID) string {
+	return prefix + "-" + id.String()[:8]
 }
 
 // makeSecret builds an encrypted Secret row (real crypto, real AAD) and its
@@ -75,10 +99,12 @@ func (s *fakeStore) GetConnector(_ context.Context, id uuid.UUID) (db.Connector,
 func makeSecret(t *testing.T, enc crypto.Encryptor, org uuid.UUID, space pgtype.UUID, plaintext string) (db.Secret, string) {
 	t.Helper()
 	id := uuid.New()
+	slug := leafSlug("sec", id)
+	// AAD binds to the immutable id (not the slug), matching the write path.
 	ct, err := enc.Encrypt([]byte(plaintext), secretAAD(id))
 	require.NoError(t, err)
-	return db.Secret{ID: id, OrgID: org, SpaceID: space, ValueCiphertext: ct},
-		fmt.Sprintf("organizations/acme/secrets/%s", id)
+	return db.Secret{ID: id, OrgID: org, SpaceID: space, Slug: slug, ValueCiphertext: ct},
+		"organizations/acme/secrets/" + slug
 }
 
 // makeConnector builds an http Connector row (config marshaled as protojson,
@@ -93,8 +119,9 @@ func makeConnector(t *testing.T, org uuid.UUID, space pgtype.UUID, baseURL strin
 		}},
 	})
 	require.NoError(t, err)
-	return db.Connector{ID: id, OrgID: org, SpaceID: space, Config: cfg},
-		fmt.Sprintf("organizations/acme/connectors/%s", id)
+	slug := leafSlug("conn", id)
+	return db.Connector{ID: id, OrgID: org, SpaceID: space, Slug: slug, Config: cfg},
+		"organizations/acme/connectors/" + slug
 }
 
 func httpStep(connectorName, method string, opts func(*workflowsv1.HttpActivity)) *workflowsv1.Step {
@@ -536,6 +563,52 @@ func TestHTTPActivity_OutOfScopeSecretTerminal(t *testing.T) {
 
 	require.Error(t, err)
 	assert.False(t, engine.IsRetryable(err), "an out-of-scope secret is terminal")
+}
+
+// TestHTTPActivity_SecretResolvedBySlugWithinScope proves resolution is by SLUG
+// scoped to the connector's org: two secrets share the slug "api-token" in
+// different orgs, and a connector in orgA must inject ITS org's value — never
+// the same-slug secret from orgB. A uuid-keyed resolver couldn't tell them apart
+// by slug; this locks in the slug + scope semantics.
+func TestHTTPActivity_SecretResolvedBySlugWithinScope(t *testing.T) {
+	t.Parallel()
+
+	enc := testEncryptor(t)
+	orgA, orgB := uuid.New(), uuid.New()
+	const slug = "api-token"
+
+	mk := func(org uuid.UUID, plaintext string) db.Secret {
+		id := uuid.New()
+		ct, err := enc.Encrypt([]byte(plaintext), secretAAD(id))
+		require.NoError(t, err)
+		return db.Secret{ID: id, OrgID: org, Slug: slug, ValueCiphertext: ct}
+	}
+	secretA := mk(orgA, "value-A")
+	secretB := mk(orgB, "value-B")
+
+	cap := &headerCapture{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cap.record(r.Header)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	// Connector in orgA references the secret by its slug name.
+	conn, connName := makeConnector(t, orgA, pgtype.UUID{}, srv.URL, map[string]string{
+		"Authorization": `secret("organizations/acme/secrets/` + slug + `")`,
+	})
+	store := &fakeStore{
+		connectors: map[uuid.UUID]db.Connector{conn.ID: conn},
+		secrets:    map[uuid.UUID]db.Secret{secretA.ID: secretA, secretB.ID: secretB},
+	}
+	act := newActivity(t, store, enc, srv.Client(), nil, nil)
+
+	rc := engine.NewRunContext(engine.RunContextConfig{OrgID: orgA})
+	_, err := act.Execute(context.Background(), rc, httpStep(connName, "GET", nil))
+	require.NoError(t, err)
+	assert.Equal(t, "value-A", cap.get("Authorization"),
+		"the connector must resolve the same-slug secret in ITS OWN org, not orgB's")
 }
 
 // --- connector out of the run's scope is terminal -------------------------

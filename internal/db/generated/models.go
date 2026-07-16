@@ -858,7 +858,7 @@ type Connector struct {
 	ID          uuid.UUID       `json:"id"`
 	OrgID       uuid.UUID       `json:"org_id"`
 	SpaceID     pgtype.UUID     `json:"space_id"`
-	ConnectorID string          `json:"connector_id"`
+	Slug        string          `json:"slug"`
 	DisplayName string          `json:"display_name"`
 	Description string          `json:"description"`
 	Config      json.RawMessage `json:"config"`
@@ -1056,7 +1056,7 @@ type Secret struct {
 	ID              uuid.UUID       `json:"id"`
 	OrgID           uuid.UUID       `json:"org_id"`
 	SpaceID         pgtype.UUID     `json:"space_id"`
-	SecretID        string          `json:"secret_id"`
+	Slug            string          `json:"slug"`
 	DisplayName     string          `json:"display_name"`
 	ValueCiphertext []byte          `json:"value_ciphertext"`
 	Annotations     json.RawMessage `json:"annotations"`
@@ -1226,7 +1226,7 @@ type Workflow struct {
 	ID          uuid.UUID       `json:"id"`
 	OrgID       uuid.UUID       `json:"org_id"`
 	SpaceID     pgtype.UUID     `json:"space_id"`
-	WorkflowID  string          `json:"workflow_id"`
+	Slug        string          `json:"slug"`
 	DisplayName string          `json:"display_name"`
 	Description string          `json:"description"`
 	Enabled     bool            `json:"enabled"`
@@ -1244,6 +1244,8 @@ type Workflow struct {
 type WorkflowRun struct {
 	ID          uuid.UUID          `json:"id"`
 	WorkflowID  uuid.UUID          `json:"workflow_id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	SpaceID     pgtype.UUID        `json:"space_id"`
 	VersionID   uuid.UUID          `json:"version_id"`
 	State       string             `json:"state"`
 	Trigger     json.RawMessage    `json:"trigger"`

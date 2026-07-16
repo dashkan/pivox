@@ -3,10 +3,13 @@ package filter
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.einride.tech/aip/filtering"
 
 	"github.com/dashkan/pivox/internal/appkey"
 )
@@ -72,5 +75,72 @@ func TestDecodeCursor_PlainUUIDRejected(t *testing.T) {
 	// wired.
 	c := newTestCodec(t)
 	_, err := decodeCursor(c, uuid.New().String())
+	require.Error(t, err)
+}
+
+func TestEncodeDecodeCursor_IDOnlyRoundTrip(t *testing.T) {
+	c := newTestCodec(t)
+	id := uuid.New()
+	plan := OrderByPlan{} // default id ordering
+
+	tok, err := EncodeCursor(c, plan, "", id)
+	require.NoError(t, err)
+	require.NotEmpty(t, tok)
+
+	got, err := DecodeCursor(c, plan, tok)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, id, got.ID)
+	assert.Nil(t, got.SortValue, "id-only cursor carries no sort value")
+}
+
+func TestEncodeDecodeCursor_CompoundStringRoundTrip(t *testing.T) {
+	c := newTestCodec(t)
+	id := uuid.New()
+	plan := OrderByPlan{Field: "displayName", Column: "display_name", Type: filtering.TypeString}
+
+	tok, err := EncodeCursor(c, plan, "Acme Hub", id)
+	require.NoError(t, err)
+
+	got, err := DecodeCursor(c, plan, tok)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, id, got.ID)
+	assert.Equal(t, "Acme Hub", got.SortValue)
+}
+
+func TestEncodeDecodeCursor_CompoundTimestampRoundTrip(t *testing.T) {
+	c := newTestCodec(t)
+	id := uuid.New()
+	plan := OrderByPlan{Field: "createTime", Column: "create_time", Type: filtering.TypeTimestamp}
+
+	// Microsecond precision — the Postgres timestamptz resolution the boundary
+	// must preserve exactly for a correct keyset.
+	ts := time.Date(2026, 7, 15, 12, 34, 56, 789000000, time.UTC)
+	tok, err := EncodeCursor(c, plan, ts.Format(time.RFC3339Nano), id)
+	require.NoError(t, err)
+
+	got, err := DecodeCursor(c, plan, tok)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	gotTS, ok := got.SortValue.(time.Time)
+	require.True(t, ok, "timestamp cursor decodes to time.Time, got %T", got.SortValue)
+	assert.True(t, ts.Equal(gotTS), "timestamp round-trips exactly: want %s got %s", ts, gotTS)
+}
+
+func TestDecodeCursor_EmptyTokenIsNilCursor(t *testing.T) {
+	c := newTestCodec(t)
+	got, err := DecodeCursor(c, OrderByPlan{Field: "displayName"}, "")
+	require.NoError(t, err)
+	assert.Nil(t, got, "empty token means first page")
+}
+
+func TestDecodeCursor_TamperedCompoundRejected(t *testing.T) {
+	c := newTestCodec(t)
+	plan := OrderByPlan{Field: "displayName", Type: filtering.TypeString}
+	tok, err := EncodeCursor(c, plan, "x", uuid.New())
+	require.NoError(t, err)
+	bad := tok[:len(tok)-1] + string([]byte{tok[len(tok)-1] ^ 0x01})
+	_, err = DecodeCursor(c, plan, bad)
 	require.Error(t, err)
 }

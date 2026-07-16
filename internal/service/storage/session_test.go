@@ -98,6 +98,7 @@ func newSessionTestEnv(t *testing.T, opts ...sessionTestOpts) *sessionTestEnv {
 			storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
 				Pool:          h.Pool,
 				Queries:       h.Queries,
+				Codec:         grpcharness.TestAppCodec(),
 				Encryptor:     h.Encryptor,
 				Conns:         conns,
 				MaxSessionTTL: o.MaxSessionTTL,
@@ -727,6 +728,7 @@ func TestIntegration_SessionSigningKey_RoundTripsControllerToAgent(t *testing.T)
 			storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
 				Pool:              h.Pool,
 				Queries:           h.Queries,
+				Codec:             grpcharness.TestAppCodec(),
 				Encryptor:         h.Encryptor,
 				Conns:             conns,
 				SessionSigningKey: []byte(sharedKey),

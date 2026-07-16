@@ -48,15 +48,15 @@ func (q *Queries) CountActiveWorkflowRuns(ctx context.Context, workflowID uuid.U
 
 const createWorkflow = `-- name: CreateWorkflow :one
 
-INSERT INTO workflows (id, org_id, space_id, workflow_id, display_name, description, enabled, config, origin, annotations, created_by, updated_by)
+INSERT INTO workflows (id, org_id, space_id, slug, display_name, description, enabled, config, origin, annotations, created_by, updated_by)
 VALUES ($1, $2, $11, $3, $4, $5, $6, $7, $8, $9, $10, $10)
-RETURNING id, org_id, space_id, workflow_id, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, space_id, slug, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time
 `
 
 type CreateWorkflowParams struct {
 	ID          uuid.UUID       `json:"id"`
 	OrgID       uuid.UUID       `json:"org_id"`
-	WorkflowID  string          `json:"workflow_id"`
+	Slug        string          `json:"slug"`
 	DisplayName string          `json:"display_name"`
 	Description string          `json:"description"`
 	Enabled     bool            `json:"enabled"`
@@ -77,7 +77,7 @@ func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) 
 	row := q.db.QueryRow(ctx, createWorkflow,
 		arg.ID,
 		arg.OrgID,
-		arg.WorkflowID,
+		arg.Slug,
 		arg.DisplayName,
 		arg.Description,
 		arg.Enabled,
@@ -92,7 +92,7 @@ func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) 
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.WorkflowID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Enabled,
@@ -111,19 +111,21 @@ func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) 
 
 const createWorkflowRun = `-- name: CreateWorkflowRun :one
 
-INSERT INTO workflow_runs (id, workflow_id, version_id, state, trigger, subject, input, steps, triggered_by)
-VALUES ($1, $2, $3, $4, $5, $6, $8, $7, $9)
-RETURNING id, workflow_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time
+INSERT INTO workflow_runs (id, workflow_id, org_id, space_id, version_id, state, trigger, subject, input, steps, triggered_by)
+VALUES ($1, $2, $3, $9, $4, $5, $6, $7, $10, $8, $11)
+RETURNING id, workflow_id, org_id, space_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time
 `
 
 type CreateWorkflowRunParams struct {
 	ID          uuid.UUID       `json:"id"`
 	WorkflowID  uuid.UUID       `json:"workflow_id"`
+	OrgID       uuid.UUID       `json:"org_id"`
 	VersionID   uuid.UUID       `json:"version_id"`
 	State       string          `json:"state"`
 	Trigger     json.RawMessage `json:"trigger"`
 	Subject     string          `json:"subject"`
 	Steps       json.RawMessage `json:"steps"`
+	SpaceID     pgtype.UUID     `json:"space_id"`
 	Input       []byte          `json:"input"`
 	TriggeredBy pgtype.UUID     `json:"triggered_by"`
 }
@@ -132,16 +134,19 @@ type CreateWorkflowRunParams struct {
 // workflow_runs (executions)
 // ============================================================================
 // A run is created PENDING; output/error/end_time are filled in later via
-// UpdateWorkflowRunState. triggered_by is NULL for system triggers.
+// UpdateWorkflowRunState. triggered_by is NULL for system triggers. org_id /
+// space_id are the run's workflow's scope, denormalized for scope-wide listing.
 func (q *Queries) CreateWorkflowRun(ctx context.Context, arg CreateWorkflowRunParams) (WorkflowRun, error) {
 	row := q.db.QueryRow(ctx, createWorkflowRun,
 		arg.ID,
 		arg.WorkflowID,
+		arg.OrgID,
 		arg.VersionID,
 		arg.State,
 		arg.Trigger,
 		arg.Subject,
 		arg.Steps,
+		arg.SpaceID,
 		arg.Input,
 		arg.TriggeredBy,
 	)
@@ -149,6 +154,8 @@ func (q *Queries) CreateWorkflowRun(ctx context.Context, arg CreateWorkflowRunPa
 	err := row.Scan(
 		&i.ID,
 		&i.WorkflowID,
+		&i.OrgID,
+		&i.SpaceID,
 		&i.VersionID,
 		&i.State,
 		&i.Trigger,
@@ -221,9 +228,11 @@ func (q *Queries) DeleteWorkflowVersion(ctx context.Context, id uuid.UUID) error
 }
 
 const getWorkflow = `-- name: GetWorkflow :one
-SELECT id, org_id, space_id, workflow_id, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time FROM workflows WHERE id = $1
+SELECT id, org_id, space_id, slug, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time FROM workflows WHERE id = $1
 `
 
+// Resolves a Workflow by its internal uuid. Used by the Worker Process and the
+// execution engine, which hold a run's workflow_id FK (a uuid, not the slug).
 func (q *Queries) GetWorkflow(ctx context.Context, id uuid.UUID) (Workflow, error) {
 	row := q.db.QueryRow(ctx, getWorkflow, id)
 	var i Workflow
@@ -231,7 +240,7 @@ func (q *Queries) GetWorkflow(ctx context.Context, id uuid.UUID) (Workflow, erro
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.WorkflowID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Enabled,
@@ -249,28 +258,28 @@ func (q *Queries) GetWorkflow(ctx context.Context, id uuid.UUID) (Workflow, erro
 }
 
 const getWorkflowByParent = `-- name: GetWorkflowByParent :one
-SELECT id, org_id, space_id, workflow_id, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time FROM workflows
+SELECT id, org_id, space_id, slug, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time FROM workflows
 WHERE org_id = $1
-  AND space_id IS NOT DISTINCT FROM $3
-  AND workflow_id = $2
+  AND space_id IS NOT DISTINCT FROM $2
+  AND slug = $3
 `
 
 type GetWorkflowByParentParams struct {
-	OrgID      uuid.UUID   `json:"org_id"`
-	WorkflowID string      `json:"workflow_id"`
-	SpaceID    pgtype.UUID `json:"space_id"`
+	OrgID   uuid.UUID   `json:"org_id"`
+	SpaceID pgtype.UUID `json:"space_id"`
+	Slug    string      `json:"slug"`
 }
 
-// Resolves a Workflow from its parent + slug. space_id IS NOT DISTINCT FROM
-// treats NULL (org-scoped) as a matchable value.
+// Resolves a Workflow from its parent + slug (the resource-name leaf).
+// space_id IS NOT DISTINCT FROM treats NULL (org-scoped) as a matchable value.
 func (q *Queries) GetWorkflowByParent(ctx context.Context, arg GetWorkflowByParentParams) (Workflow, error) {
-	row := q.db.QueryRow(ctx, getWorkflowByParent, arg.OrgID, arg.WorkflowID, arg.SpaceID)
+	row := q.db.QueryRow(ctx, getWorkflowByParent, arg.OrgID, arg.SpaceID, arg.Slug)
 	var i Workflow
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.WorkflowID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Enabled,
@@ -287,20 +296,33 @@ func (q *Queries) GetWorkflowByParent(ctx context.Context, arg GetWorkflowByPare
 	return i, err
 }
 
-const getWorkflowForUpdate = `-- name: GetWorkflowForUpdate :one
-SELECT id, org_id, space_id, workflow_id, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time FROM workflows WHERE id = $1 FOR UPDATE
+const getWorkflowByParentForUpdate = `-- name: GetWorkflowByParentForUpdate :one
+SELECT id, org_id, space_id, slug, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time FROM workflows
+WHERE org_id = $1
+  AND space_id IS NOT DISTINCT FROM $2
+  AND slug = $3
+FOR UPDATE
 `
 
-// GetWorkflowForUpdate locks the row for the update/promote/delete tx so the
-// etag check and the write serialize against a concurrent mutation.
-func (q *Queries) GetWorkflowForUpdate(ctx context.Context, id uuid.UUID) (Workflow, error) {
-	row := q.db.QueryRow(ctx, getWorkflowForUpdate, id)
+type GetWorkflowByParentForUpdateParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	SpaceID pgtype.UUID `json:"space_id"`
+	Slug    string      `json:"slug"`
+}
+
+// GetWorkflowByParentForUpdate resolves a Workflow by parent + slug AND locks
+// the row for the update/promote/delete/version-create tx, so the etag check
+// and the write serialize against a concurrent mutation. The slug is the
+// resource-name leaf, so handlers resolve their target by scope + slug in one
+// statement.
+func (q *Queries) GetWorkflowByParentForUpdate(ctx context.Context, arg GetWorkflowByParentForUpdateParams) (Workflow, error) {
+	row := q.db.QueryRow(ctx, getWorkflowByParentForUpdate, arg.OrgID, arg.SpaceID, arg.Slug)
 	var i Workflow
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.WorkflowID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Enabled,
@@ -318,7 +340,7 @@ func (q *Queries) GetWorkflowForUpdate(ctx context.Context, id uuid.UUID) (Workf
 }
 
 const getWorkflowRun = `-- name: GetWorkflowRun :one
-SELECT id, workflow_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time FROM workflow_runs WHERE id = $1
+SELECT id, workflow_id, org_id, space_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time FROM workflow_runs WHERE id = $1
 `
 
 func (q *Queries) GetWorkflowRun(ctx context.Context, id uuid.UUID) (WorkflowRun, error) {
@@ -327,6 +349,8 @@ func (q *Queries) GetWorkflowRun(ctx context.Context, id uuid.UUID) (WorkflowRun
 	err := row.Scan(
 		&i.ID,
 		&i.WorkflowID,
+		&i.OrgID,
+		&i.SpaceID,
 		&i.VersionID,
 		&i.State,
 		&i.Trigger,
@@ -344,7 +368,7 @@ func (q *Queries) GetWorkflowRun(ctx context.Context, id uuid.UUID) (WorkflowRun
 }
 
 const getWorkflowRunForUpdate = `-- name: GetWorkflowRunForUpdate :one
-SELECT id, workflow_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time FROM workflow_runs WHERE id = $1 FOR UPDATE
+SELECT id, workflow_id, org_id, space_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time FROM workflow_runs WHERE id = $1 FOR UPDATE
 `
 
 // Locks the run row for a cancel/transition tx so the terminal-state check and
@@ -357,6 +381,8 @@ func (q *Queries) GetWorkflowRunForUpdate(ctx context.Context, id uuid.UUID) (Wo
 	err := row.Scan(
 		&i.ID,
 		&i.WorkflowID,
+		&i.OrgID,
+		&i.SpaceID,
 		&i.VersionID,
 		&i.State,
 		&i.Trigger,
@@ -420,22 +446,31 @@ func (q *Queries) GetWorkflowVersionByNumber(ctx context.Context, arg GetWorkflo
 }
 
 const listWorkflowRuns = `-- name: ListWorkflowRuns :many
-SELECT id, workflow_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time FROM workflow_runs
+SELECT id, workflow_id, org_id, space_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time FROM workflow_runs
 WHERE workflow_id = $1
-  AND ($2::uuid IS NULL OR id > $2)
+  AND ($2::text IS NULL OR state = $2)
+  AND ($3::uuid IS NULL OR id > $3)
 ORDER BY id
-LIMIT $3
+LIMIT $4
 `
 
 type ListWorkflowRunsParams struct {
 	WorkflowID uuid.UUID   `json:"workflow_id"`
+	State      pgtype.Text `json:"state"`
 	Cursor     pgtype.UUID `json:"cursor"`
 	PageLimit  int32       `json:"page_limit"`
 }
 
-// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+// Runs of one workflow. Keyset pagination on id (fetch page_limit+1 to detect a
+// next page), with an optional state filter (NULL = all states). order_by is not
+// honored — runs are always id (creation) order, the keyset column.
 func (q *Queries) ListWorkflowRuns(ctx context.Context, arg ListWorkflowRunsParams) ([]WorkflowRun, error) {
-	rows, err := q.db.Query(ctx, listWorkflowRuns, arg.WorkflowID, arg.Cursor, arg.PageLimit)
+	rows, err := q.db.Query(ctx, listWorkflowRuns,
+		arg.WorkflowID,
+		arg.State,
+		arg.Cursor,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -446,6 +481,131 @@ func (q *Queries) ListWorkflowRuns(ctx context.Context, arg ListWorkflowRunsPara
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkflowID,
+			&i.OrgID,
+			&i.SpaceID,
+			&i.VersionID,
+			&i.State,
+			&i.Trigger,
+			&i.Subject,
+			&i.Input,
+			&i.Output,
+			&i.Steps,
+			&i.Error,
+			&i.TriggeredBy,
+			&i.CreateTime,
+			&i.StartTime,
+			&i.EndTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkflowRunsByOrg = `-- name: ListWorkflowRunsByOrg :many
+SELECT id, workflow_id, org_id, space_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time FROM workflow_runs
+WHERE org_id = $1
+  AND ($2::text IS NULL OR state = $2)
+  AND ($3::uuid IS NULL OR id > $3)
+ORDER BY id
+LIMIT $4
+`
+
+type ListWorkflowRunsByOrgParams struct {
+	OrgID     uuid.UUID   `json:"org_id"`
+	State     pgtype.Text `json:"state"`
+	Cursor    pgtype.UUID `json:"cursor"`
+	PageLimit int32       `json:"page_limit"`
+}
+
+// Org-scope wildcard listing (organizations/{org}/workflows/-/runs): ALL runs in
+// the org — both org-direct runs (space_id NULL) and runs of the org's
+// space-scoped workflows (the "org + all its spaces" global view). Keyset on id
+// via idx_workflow_runs_org, optional state filter.
+func (q *Queries) ListWorkflowRunsByOrg(ctx context.Context, arg ListWorkflowRunsByOrgParams) ([]WorkflowRun, error) {
+	rows, err := q.db.Query(ctx, listWorkflowRunsByOrg,
+		arg.OrgID,
+		arg.State,
+		arg.Cursor,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WorkflowRun{}
+	for rows.Next() {
+		var i WorkflowRun
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkflowID,
+			&i.OrgID,
+			&i.SpaceID,
+			&i.VersionID,
+			&i.State,
+			&i.Trigger,
+			&i.Subject,
+			&i.Input,
+			&i.Output,
+			&i.Steps,
+			&i.Error,
+			&i.TriggeredBy,
+			&i.CreateTime,
+			&i.StartTime,
+			&i.EndTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkflowRunsBySpace = `-- name: ListWorkflowRunsBySpace :many
+SELECT id, workflow_id, org_id, space_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time FROM workflow_runs
+WHERE space_id = $1
+  AND ($2::text IS NULL OR state = $2)
+  AND ($3::uuid IS NULL OR id > $3)
+ORDER BY id
+LIMIT $4
+`
+
+type ListWorkflowRunsBySpaceParams struct {
+	SpaceID   pgtype.UUID `json:"space_id"`
+	State     pgtype.Text `json:"state"`
+	Cursor    pgtype.UUID `json:"cursor"`
+	PageLimit int32       `json:"page_limit"`
+}
+
+// Space-scope wildcard listing
+// (organizations/{org}/spaces/{space}/workflows/-/runs): runs of that space's
+// workflows. Keyset on id via idx_workflow_runs_space, optional state filter.
+func (q *Queries) ListWorkflowRunsBySpace(ctx context.Context, arg ListWorkflowRunsBySpaceParams) ([]WorkflowRun, error) {
+	rows, err := q.db.Query(ctx, listWorkflowRunsBySpace,
+		arg.SpaceID,
+		arg.State,
+		arg.Cursor,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WorkflowRun{}
+	for rows.Next() {
+		var i WorkflowRun
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkflowID,
+			&i.OrgID,
+			&i.SpaceID,
 			&i.VersionID,
 			&i.State,
 			&i.Trigger,
@@ -514,7 +674,7 @@ func (q *Queries) ListWorkflowVersions(ctx context.Context, arg ListWorkflowVers
 }
 
 const listWorkflowsByParent = `-- name: ListWorkflowsByParent :many
-SELECT id, org_id, space_id, workflow_id, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time FROM workflows
+SELECT id, org_id, space_id, slug, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time FROM workflows
 WHERE org_id = $1
   AND space_id IS NOT DISTINCT FROM $2
   AND ($3::uuid IS NULL OR id > $3)
@@ -548,7 +708,7 @@ func (q *Queries) ListWorkflowsByParent(ctx context.Context, arg ListWorkflowsBy
 			&i.ID,
 			&i.OrgID,
 			&i.SpaceID,
-			&i.WorkflowID,
+			&i.Slug,
 			&i.DisplayName,
 			&i.Description,
 			&i.Enabled,
@@ -601,7 +761,7 @@ FROM workflow_versions v
 WHERE w.id = $1
   AND v.id = $3
   AND v.workflow_id = w.id
-RETURNING w.id, w.org_id, w.space_id, w.workflow_id, w.display_name, w.description, w.enabled, w.version, w.config, w.origin, w.annotations, w.etag, w.created_by, w.updated_by, w.create_time, w.update_time
+RETURNING w.id, w.org_id, w.space_id, w.slug, w.display_name, w.description, w.enabled, w.version, w.config, w.origin, w.annotations, w.etag, w.created_by, w.updated_by, w.create_time, w.update_time
 `
 
 type SetWorkflowVersionParams struct {
@@ -616,7 +776,8 @@ type SetWorkflowVersionParams struct {
 // without the join a cross-workflow promote would corrupt the
 // container→definition link (Workflow A executing B's definition). No row is
 // returned (→ ErrNoRows) when the version isn't this workflow's; the handler
-// maps that to FailedPrecondition. Serialized under GetWorkflowForUpdate's lock.
+// maps that to FailedPrecondition. Serialized under the workflow row lock taken
+// by GetWorkflowByParentForUpdate.
 func (q *Queries) SetWorkflowVersion(ctx context.Context, arg SetWorkflowVersionParams) (Workflow, error) {
 	row := q.db.QueryRow(ctx, setWorkflowVersion, arg.ID, arg.UpdatedBy, arg.Version)
 	var i Workflow
@@ -624,7 +785,7 @@ func (q *Queries) SetWorkflowVersion(ctx context.Context, arg SetWorkflowVersion
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.WorkflowID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Enabled,
@@ -652,7 +813,7 @@ SET display_name = COALESCE($3, display_name),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, space_id, workflow_id, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, space_id, slug, display_name, description, enabled, version, config, origin, annotations, etag, created_by, updated_by, create_time, update_time
 `
 
 type UpdateWorkflowParams struct {
@@ -682,7 +843,7 @@ func (q *Queries) UpdateWorkflow(ctx context.Context, arg UpdateWorkflowParams) 
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.WorkflowID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.Description,
 		&i.Enabled,
@@ -708,7 +869,7 @@ SET state = $2,
     start_time = COALESCE($6, start_time),
     end_time = COALESCE($7, end_time)
 WHERE id = $1
-RETURNING id, workflow_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time
+RETURNING id, workflow_id, org_id, space_id, version_id, state, trigger, subject, input, output, steps, error, triggered_by, create_time, start_time, end_time
 `
 
 type UpdateWorkflowRunStateParams struct {
@@ -738,6 +899,8 @@ func (q *Queries) UpdateWorkflowRunState(ctx context.Context, arg UpdateWorkflow
 	err := row.Scan(
 		&i.ID,
 		&i.WorkflowID,
+		&i.OrgID,
+		&i.SpaceID,
 		&i.VersionID,
 		&i.State,
 		&i.Trigger,
@@ -773,6 +936,39 @@ type UpdateWorkflowRunStepsParams struct {
 func (q *Queries) UpdateWorkflowRunSteps(ctx context.Context, arg UpdateWorkflowRunStepsParams) error {
 	_, err := q.db.Exec(ctx, updateWorkflowRunSteps, arg.ID, arg.Steps)
 	return err
+}
+
+const workflowSlugsByIDs = `-- name: WorkflowSlugsByIDs :many
+SELECT id, slug FROM workflows WHERE id = ANY($1::uuid[])
+`
+
+type WorkflowSlugsByIDsRow struct {
+	ID   uuid.UUID `json:"id"`
+	Slug string    `json:"slug"`
+}
+
+// Maps a set of workflow uuids to their slug. The scope-wide run listings
+// (the workflows/- wildcard) return workflow_runs rows carrying only the
+// workflow_id uuid FK; the run's resource name needs the workflow slug, so the
+// page's distinct workflow ids are resolved in one round-trip (no N+1).
+func (q *Queries) WorkflowSlugsByIDs(ctx context.Context, ids []uuid.UUID) ([]WorkflowSlugsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, workflowSlugsByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WorkflowSlugsByIDsRow{}
+	for rows.Next() {
+		var i WorkflowSlugsByIDsRow
+		if err := rows.Scan(&i.ID, &i.Slug); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const workflowVersionNumbersByIDs = `-- name: WorkflowVersionNumbersByIDs :many

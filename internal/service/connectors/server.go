@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -108,31 +109,18 @@ func (s *ConnectorsServer) resolveActors(ctx context.Context, rows []db.Connecto
 	return actors
 }
 
-// parseConnectorName extracts the leaf UUID from a full Connector resource
-// name ("organizations/{org}[/spaces/{space}]/connectors/{uuid}"). A malformed
-// name or non-UUID leaf is NotFound (the named connector doesn't exist).
-func parseConnectorName(name string) (uuid.UUID, error) {
+// parseConnectorName extracts the slug leaf from a full Connector resource name
+// ("organizations/{org}[/spaces/{space}]/connectors/{slug}"). The slug is the
+// user-assigned id, unique within the connector's parent scope; the handler
+// resolves it to the internal uuid via a scoped (org + space + slug) lookup, so
+// a name that names another org's connector simply finds no row in this scope
+// (NotFound, no cross-scope leak). A name with no leaf is NotFound.
+func parseConnectorName(name string) (string, error) {
 	idx := strings.LastIndex(name, "/")
-	if idx < 0 {
-		return uuid.Nil, apierr.NotFound("Connector", name)
+	if idx < 0 || idx == len(name)-1 {
+		return "", apierr.NotFound("Connector", name)
 	}
-	id, err := uuid.Parse(name[idx+1:])
-	if err != nil {
-		return uuid.Nil, apierr.NotFound("Connector", name)
-	}
-	return id, nil
-}
-
-// checkScope enforces that a connector fetched by its (global) uuid actually
-// belongs to the caller's interceptor-resolved scope. Without this, a caller
-// with access to org A could read/mutate a connector in org B by crafting
-// "organizations/A/connectors/{B-uuid}" — the interceptor gates on A but never
-// verifies the uuid is A's. A mismatch is NotFound (don't leak existence).
-func checkScope(row db.Connector, orgID uuid.UUID, spaceID pgtype.UUID, name string) error {
-	if row.OrgID != orgID || row.SpaceID != spaceID {
-		return apierr.NotFound("Connector", name)
-	}
-	return nil
+	return name[idx+1:], nil
 }
 
 // marshalAnnotations renders the labels map as JSONB. Empty map → "{}" (the
@@ -159,67 +147,232 @@ func marshalConfig(in *workflowsv1.Connector) (json.RawMessage, error) {
 	return b, nil
 }
 
+// ListConnectors is a dynamic AIP-160 filtered + AIP-132 sorted +
+// compound-cursor keyset list. The interceptor-resolved (org, space) is the
+// NON-NEGOTIABLE base scope, ANDed as the base of the query; the request's
+// filter/order_by layer ON TOP of it and can only narrow, never widen. Every
+// value (scope ids, filter operands, cursor values, page size) is bound as a
+// $N parameter by filter.BuildListQuery — nothing is string-interpolated — and
+// column/direction come only from ConnectorFilter's whitelist. See
+// docs/aip-list-transpiler-procedure.md for the general procedure.
 func (s *ConnectorsServer) ListConnectors(ctx context.Context, req *workflowsv1.ListConnectorsRequest) (*workflowsv1.ListConnectorsResponse, error) {
 	orgID, spaceID, prefix := s.scope(ctx)
+	rf := filter.ConnectorFilter()
+	pageSize := clampPageSize(req.GetPageSize())
 
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
-
-	var cursor pgtype.UUID
-	if tok := req.GetPageToken(); tok != "" {
-		raw, err := s.codec.Decrypt(tok)
-		if err != nil || len(raw) != 16 {
-			return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
-		}
-		var id uuid.UUID
-		copy(id[:], raw)
-		cursor = convert.PgUUID(id)
+	// Resolve order_by against the sortable whitelist (default: id). The plan
+	// also tells the cursor codec whether the sort value is a timestamp.
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
 	}
 
-	rows, err := s.queries.ListConnectorsByParent(ctx, db.ListConnectorsByParentParams{
-		OrgID:     orgID,
-		SpaceID:   spaceID,
-		Cursor:    cursor,
-		PageLimit: pageSize + 1,
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	// Base scope: the interceptor-resolved org (always) + a space predicate that
+	// depends on the parent's scope. The AIP filter is layered on top — it can
+	// only narrow within the scope.
+	//
+	//   - Space-scoped parent (spaceID.Valid): narrow to that one space.
+	//   - Org-level parent (!spaceID.Valid): the ROLLUP — org-direct rows
+	//     (space_id NULL) PLUS every space's rows. No space_id predicate, so the
+	//     org scope alone bounds the list. This matches the WorkflowRuns org
+	//     wildcard (BE-1): the permission interceptor already gated
+	//     connectors.read at the org scope, which is defined to cover the whole
+	//     org (org-direct + all spaces).
+	base := []filter.Predicate{{SQL: "org_id = %s", Arg: orgID}}
+	if spaceID.Valid {
+		base = append(base, filter.Predicate{SQL: "space_id = %s", Arg: spaceID})
+	}
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     base,
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter, e.g.
+		// an unknown field) — surface it as InvalidArgument on "filter".
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list connectors")
+	}
+	rows, err := filter.ScanConnectors(pgxRows)
 	if err != nil {
 		return nil, apierr.Internal(err, "list connectors")
 	}
 
 	var nextPageToken string
 	if int32(len(rows)) > pageSize {
-		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize].ID)
+		// The keyset cursor is the LAST returned row (index pageSize-1), never
+		// the first un-returned row — the resume predicate is strict `>`/`<`,
+		// so encoding rows[pageSize] would silently drop it next page.
+		rows = rows[:pageSize]
+		last := rows[pageSize-1]
+		nextPageToken, err = filter.EncodeCursor(s.codec, plan, connectorSortValue(plan, last), last.ID)
 		if err != nil {
 			return nil, apierr.Internal(err, "encode page token")
 		}
-		rows = rows[:pageSize]
 	}
 
 	actors := s.resolveActors(ctx, rows)
+	// Per-row name prefix. A space-scoped list shares the single `prefix` (which
+	// already carries /spaces/{space}) across every row. The org-level rollup
+	// names each row by its actual location: an org-direct row (space_id NULL)
+	// keeps the bare org prefix, while a space-scoped row gets its space segment,
+	// with the page's distinct space slugs resolved in one batched lookup (no
+	// N+1).
+	var spaceSlugs map[uuid.UUID]string
+	if !spaceID.Valid {
+		// FAIL CLOSED: on a slug-resolution failure the space rows are already
+		// fetched, but naming them without their /spaces/{slug} segment would
+		// emit well-formed org-direct names that mis-route a later Get/Update/
+		// Delete into the wrong scope. A wrong-but-valid name is worse than an
+		// error, so surface the failure instead of rendering a mis-addressable
+		// page.
+		spaceSlugs, err = s.resolveSpaceSlugs(ctx, orgID, rows)
+		if err != nil {
+			return nil, apierr.Internal(err, "resolve space slugs")
+		}
+	}
 	out := make([]*workflowsv1.Connector, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, convert.ConnectorToProto(r, prefix, actors))
+		p := prefix
+		if !spaceID.Valid && r.SpaceID.Valid {
+			slug, ok := spaceSlugs[uuid.UUID(r.SpaceID.Bytes)]
+			if !ok {
+				// The slug query succeeded but this row's space is absent from the
+				// result — a cross-org anomaly (no same-org FK enforces that a
+				// connector's space belongs to its org). Unreachable via the API
+				// today. OMIT the row rather than emit a mis-addressable
+				// org-direct name: omission is safe where a wrong name is not.
+				slog.WarnContext(ctx, "connectors: space slug missing for rolled-up connector; omitting from response",
+					"connector_id", r.ID, "space_id", uuid.UUID(r.SpaceID.Bytes))
+				continue
+			}
+			p = prefix + "/spaces/" + slug
+		}
+		out = append(out, convert.ConnectorToProto(r, p, actors))
 	}
-	return &workflowsv1.ListConnectorsResponse{Connectors: out, NextPageToken: nextPageToken}, nil
+
+	// The "agents in use" facet is computed over the BASE SCOPE only (the whole
+	// org for a rollup, or the selected space) — deliberately NOT narrowed by the
+	// request filter, so a client can offer an agent-filter dropdown listing
+	// every agent assigned to a connector in scope regardless of the current
+	// page's filter. One extra distinct read alongside the page; no tx.
+	agents, err := s.agentsInUse(ctx, orgID, spaceID)
+	if err != nil {
+		return nil, apierr.Internal(err, "list agents in use")
+	}
+	return &workflowsv1.ListConnectorsResponse{
+		Connectors:    out,
+		NextPageToken: nextPageToken,
+		AgentsInUse:   agents,
+	}, nil
+}
+
+// agentsInUse returns the distinct, sorted, non-empty agent values in the
+// list's base scope: one space when spaceID is valid, else the whole org
+// (org-direct + all spaces, matching the org-level rollup). The distinct/sort/
+// non-empty filtering is done in SQL; this just dispatches on scope.
+func (s *ConnectorsServer) agentsInUse(ctx context.Context, orgID uuid.UUID, spaceID pgtype.UUID) ([]string, error) {
+	if spaceID.Valid {
+		return s.queries.ListDistinctConnectorAgentsInSpace(ctx, db.ListDistinctConnectorAgentsInSpaceParams{
+			OrgID:   orgID,
+			SpaceID: spaceID,
+		})
+	}
+	return s.queries.ListDistinctConnectorAgentsInOrg(ctx, orgID)
+}
+
+// resolveSpaceSlugs maps the distinct valid space ids across an org-level
+// rollup page to their slug (spaces.name), scoped to orgID so a foreign org's
+// space slug can never be resolved. One batched read (no N+1); a single
+// autocommit statement needs no tx (per internal/CLAUDE.md). Mirrors the
+// resolveActors helper shape. The query error is PROPAGATED (fail closed): the
+// caller must not render a page of space rows without their space segment, as
+// the resulting org-direct names would mis-route later mutations.
+func (s *ConnectorsServer) resolveSpaceSlugs(ctx context.Context, orgID uuid.UUID, rows []db.Connector) (map[uuid.UUID]string, error) {
+	var ids []uuid.UUID
+	seen := make(map[uuid.UUID]struct{})
+	for _, r := range rows {
+		if !r.SpaceID.Valid {
+			continue
+		}
+		id := uuid.UUID(r.SpaceID.Bytes)
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	slugByID := make(map[uuid.UUID]string, len(ids))
+	if len(ids) == 0 {
+		return slugByID, nil
+	}
+	got, err := s.queries.GetSpaceSlugsByIDs(ctx, db.GetSpaceSlugsByIDsParams{
+		Ids:   ids,
+		OrgID: orgID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, sr := range got {
+		slugByID[sr.ID] = sr.Name
+	}
+	return slugByID, nil
+}
+
+// clampPageSize applies the server page-size policy: default 100, cap 1000.
+func clampPageSize(n int32) int32 {
+	if n <= 0 {
+		return 100
+	}
+	if n > 1000 {
+		return 1000
+	}
+	return n
+}
+
+// connectorSortValue renders the primary order_by column's value for the given
+// row as the string the compound page token carries. Timestamps use
+// RFC3339Nano so filter.DecodeCursor can parse them back to an exact
+// time.Time. For the default id ordering (plan.Field == "") the value is
+// unused (EncodeCursor emits the id-only token), so "" is returned.
+func connectorSortValue(plan filter.OrderByPlan, r db.Connector) string {
+	switch plan.Field {
+	case "displayName":
+		return r.DisplayName
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	case "updateTime":
+		return r.UpdateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *ConnectorsServer) GetConnector(ctx context.Context, req *workflowsv1.GetConnectorRequest) (*workflowsv1.Connector, error) {
-	id, err := parseConnectorName(req.GetName())
+	slug, err := parseConnectorName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
 	orgID, spaceID, prefix := s.scope(ctx)
-	row, err := s.queries.GetConnector(ctx, id)
+	row, err := s.queries.GetConnectorByParent(ctx, db.GetConnectorByParentParams{
+		OrgID:   orgID,
+		SpaceID: spaceID,
+		Slug:    slug,
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Connector", req.GetName())
-	}
-	if err := checkScope(row, orgID, spaceID, req.GetName()); err != nil {
-		return nil, err
 	}
 	return convert.ConnectorToProto(row, prefix, s.resolveActors(ctx, []db.Connector{row})), nil
 }
@@ -251,7 +404,7 @@ func (s *ConnectorsServer) CreateConnector(ctx context.Context, req *workflowsv1
 		ID:          id,
 		OrgID:       orgID,
 		SpaceID:     spaceID,
-		ConnectorID: connectorID,
+		Slug:        connectorID,
 		DisplayName: in.GetDisplayName(),
 		Description: in.GetDescription(),
 		Config:      config,
@@ -270,7 +423,7 @@ func (s *ConnectorsServer) CreateConnector(ctx context.Context, req *workflowsv1
 		if err != nil {
 			return db.Connector{}, apierr.HandleResourceError(err, "Connector", connectorID)
 		}
-		if err := trackSecretRefs(ctx, qtx, row.ID, orgID, spaceID, in); err != nil {
+		if err := trackSecretRefs(ctx, qtx, row.ID, orgID, spaceID, prefix, in); err != nil {
 			return db.Connector{}, err
 		}
 		return row, nil
@@ -283,7 +436,7 @@ func (s *ConnectorsServer) CreateConnector(ctx context.Context, req *workflowsv1
 
 func (s *ConnectorsServer) UpdateConnector(ctx context.Context, req *workflowsv1.UpdateConnectorRequest) (*workflowsv1.Connector, error) {
 	in := req.GetConnector()
-	id, err := parseConnectorName(in.GetName())
+	slug, err := parseConnectorName(in.GetName())
 	if err != nil {
 		return nil, err
 	}
@@ -300,8 +453,9 @@ func (s *ConnectorsServer) UpdateConnector(ctx context.Context, req *workflowsv1
 		return slices.Contains(mask.GetPaths(), field)
 	}
 
+	// ID is filled in-tx from the scope-resolved row (the name leaf is the slug,
+	// not the internal uuid).
 	params := db.UpdateConnectorParams{
-		ID:        id,
 		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 	if inScope("display_name") {
@@ -333,16 +487,18 @@ func (s *ConnectorsServer) UpdateConnector(ctx context.Context, req *workflowsv1
 
 	var row db.Connector
 	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
-		existing, err := qtx.GetConnectorForUpdate(ctx, id)
+		existing, err := qtx.GetConnectorByParentForUpdate(ctx, db.GetConnectorByParentForUpdateParams{
+			OrgID:   orgID,
+			SpaceID: spaceID,
+			Slug:    slug,
+		})
 		if err != nil {
 			return apierr.HandleResourceError(err, "Connector", in.GetName())
-		}
-		if err := checkScope(existing, orgID, spaceID, in.GetName()); err != nil {
-			return err
 		}
 		if etag := in.GetEtag(); etag != "" && etag != existing.Etag {
 			return apierr.Aborted("Connector", in.GetName(), "etag mismatch")
 		}
+		params.ID = existing.ID
 		row, err = qtx.UpdateConnector(ctx, params)
 		if err != nil {
 			return apierr.HandleResourceError(err, "Connector", in.GetName())
@@ -350,7 +506,7 @@ func (s *ConnectorsServer) UpdateConnector(ctx context.Context, req *workflowsv1
 		// Re-track secret refs only when config changed. A config-less update
 		// (metadata only) leaves the tracked set — and the config — untouched.
 		if inScope("config") {
-			if err := trackSecretRefs(ctx, qtx, id, orgID, spaceID, in); err != nil {
+			if err := trackSecretRefs(ctx, qtx, existing.ID, orgID, spaceID, prefix, in); err != nil {
 				return err
 			}
 		}
@@ -363,23 +519,24 @@ func (s *ConnectorsServer) UpdateConnector(ctx context.Context, req *workflowsv1
 }
 
 func (s *ConnectorsServer) DeleteConnector(ctx context.Context, req *workflowsv1.DeleteConnectorRequest) (*emptypb.Empty, error) {
-	id, err := parseConnectorName(req.GetName())
+	slug, err := parseConnectorName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
 	orgID, spaceID, _ := s.scope(ctx)
 	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
-		existing, err := qtx.GetConnectorForUpdate(ctx, id)
+		existing, err := qtx.GetConnectorByParentForUpdate(ctx, db.GetConnectorByParentForUpdateParams{
+			OrgID:   orgID,
+			SpaceID: spaceID,
+			Slug:    slug,
+		})
 		if err != nil {
 			return apierr.HandleResourceError(err, "Connector", req.GetName())
-		}
-		if err := checkScope(existing, orgID, spaceID, req.GetName()); err != nil {
-			return err
 		}
 		if etag := req.GetEtag(); etag != "" && etag != existing.Etag {
 			return apierr.Aborted("Connector", req.GetName(), "etag mismatch")
 		}
-		return qtx.DeleteConnector(ctx, id)
+		return qtx.DeleteConnector(ctx, existing.ID)
 	})
 	if err != nil {
 		return nil, err

@@ -1417,7 +1417,7 @@ CREATE TABLE secrets (
     org_id           UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     space_id         UUID REFERENCES spaces(id) ON DELETE CASCADE,
     -- identity
-    secret_id        TEXT NOT NULL, -- AIP slug, unique per (org_id, space_id)
+    slug             TEXT NOT NULL, -- AIP slug + resource-name leaf, unique per (org_id, space_id)
     -- domain
     display_name     TEXT NOT NULL DEFAULT '',
     value_ciphertext BYTEA NOT NULL, -- encrypted value; AAD-bound to id
@@ -1431,8 +1431,8 @@ CREATE TABLE secrets (
     create_time      TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time      TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- Slug unique per parent. NULLS NOT DISTINCT so two org-scoped rows
-    -- (space_id NULL) still collide on a duplicate secret_id.
-    UNIQUE NULLS NOT DISTINCT (org_id, space_id, secret_id)
+    -- (space_id NULL) still collide on a duplicate slug.
+    UNIQUE NULLS NOT DISTINCT (org_id, space_id, slug)
 );
 CREATE INDEX idx_secrets_org ON secrets (org_id);
 CREATE INDEX idx_secrets_space ON secrets (space_id) WHERE space_id IS NOT NULL;
@@ -1457,7 +1457,7 @@ CREATE TABLE workflows (
     org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     space_id      UUID REFERENCES spaces(id) ON DELETE CASCADE,
     -- identity
-    workflow_id   TEXT NOT NULL, -- AIP slug, unique per (org_id, space_id)
+    slug          TEXT NOT NULL, -- AIP slug + resource-name leaf, unique per (org_id, space_id)
     -- domain
     display_name  TEXT NOT NULL DEFAULT '',
     description   TEXT NOT NULL DEFAULT '',
@@ -1480,8 +1480,8 @@ CREATE TABLE workflows (
     create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- Slug unique per parent. NULLS NOT DISTINCT so two org-scoped rows
-    -- (space_id NULL) still collide on a duplicate workflow_id.
-    UNIQUE NULLS NOT DISTINCT (org_id, space_id, workflow_id)
+    -- (space_id NULL) still collide on a duplicate slug.
+    UNIQUE NULLS NOT DISTINCT (org_id, space_id, slug)
 );
 CREATE INDEX idx_workflows_org ON workflows (org_id);
 CREATE INDEX idx_workflows_space ON workflows (space_id) WHERE space_id IS NOT NULL;
@@ -1522,6 +1522,12 @@ ALTER TABLE workflows
 CREATE TABLE workflow_runs (
     id           UUID PRIMARY KEY DEFAULT uuidv7(),
     workflow_id  UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    -- Denormalized scope, mirrored from the run's workflow (org_id NOT NULL;
+    -- space_id NULL for an org-scoped workflow). Lets the org/space-wide run
+    -- listing (the workflows/- wildcard) filter runs by scope without joining
+    -- back to workflows. Set on insert; the workflow's scope is immutable.
+    org_id       UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    space_id     UUID REFERENCES spaces(id) ON DELETE CASCADE,
     -- the version pinned at start; NO ACTION so a version with runs can't be
     -- dropped out from under them (checked at end-of-statement, so a
     -- force-delete of the whole workflow still cascades cleanly).
@@ -1547,6 +1553,13 @@ CREATE INDEX idx_workflow_runs_workflow ON workflow_runs (workflow_id, id);
 -- referential-integrity check on DELETE FROM workflow_versions would seq-scan
 -- workflow_runs. Also serves "list runs of a version".
 CREATE INDEX idx_workflow_runs_version ON workflow_runs (version_id);
+-- Org/space-wide run listing (the workflows/- wildcard), keyset-paginated on id.
+-- The org index serves the org-scope wildcard (all runs in the org, spaces
+-- included: WHERE org_id = X ORDER BY id) and covers the org_id FK cascade
+-- check. The space index (partial, matching idx_workflows_space) serves the
+-- space-scope wildcard (WHERE space_id = Y ORDER BY id).
+CREATE INDEX idx_workflow_runs_org ON workflow_runs (org_id, id);
+CREATE INDEX idx_workflow_runs_space ON workflow_runs (space_id, id) WHERE space_id IS NOT NULL;
 
 -- A reusable, credentialed connection to an external system. Workflow
 -- activities bind to a Connector by name so the definition stays
@@ -1557,7 +1570,7 @@ CREATE TABLE connectors (
     org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     space_id      UUID REFERENCES spaces(id) ON DELETE CASCADE,
     -- identity
-    connector_id  TEXT NOT NULL, -- AIP slug, unique per (org_id, space_id)
+    slug          TEXT NOT NULL, -- AIP slug + resource-name leaf, unique per (org_id, space_id)
     -- domain
     display_name  TEXT NOT NULL DEFAULT '',
     description   TEXT NOT NULL DEFAULT '',
@@ -1575,7 +1588,7 @@ CREATE TABLE connectors (
     -- timestamps
     create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE NULLS NOT DISTINCT (org_id, space_id, connector_id)
+    UNIQUE NULLS NOT DISTINCT (org_id, space_id, slug)
 );
 CREATE INDEX idx_connectors_org ON connectors (org_id);
 CREATE INDEX idx_connectors_space ON connectors (space_id) WHERE space_id IS NOT NULL;

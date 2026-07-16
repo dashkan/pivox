@@ -81,7 +81,11 @@ func workflowStackFrom(ctx context.Context) []uuid.UUID {
 // pointer) and either the promoted version or a pinned version by number.
 // db.Querier satisfies it in production.
 type WorkflowStore interface {
-	GetWorkflow(ctx context.Context, id uuid.UUID) (db.Workflow, error)
+	// GetWorkflowByParent resolves the target container by its resource-name
+	// slug, SCOPED to the run's org+space (the scoped lookup is the cross-scope
+	// guard). GetWorkflowVersion / GetWorkflowVersionByNumber then resolve the
+	// version by the container's internal uuid / monotonic number.
+	GetWorkflowByParent(ctx context.Context, arg db.GetWorkflowByParentParams) (db.Workflow, error)
 	GetWorkflowVersion(ctx context.Context, id uuid.UUID) (db.WorkflowVersion, error)
 	GetWorkflowVersionByNumber(ctx context.Context, arg db.GetWorkflowVersionByNumberParams) (db.WorkflowVersion, error)
 }
@@ -222,13 +226,15 @@ type resolvedTarget struct {
 func (a *RunWorkflowActivity) resolveTarget(ctx context.Context, rc *RunContext, ref string) (resolvedTarget, error) {
 	orgID, spaceID := rc.Scope()
 
-	if wfID, versionNumber, isVersion := parseVersionRef(ref); isVersion {
-		// Pinned version: scope-check the parent workflow, then load that version.
-		if _, err := a.scopedWorkflow(ctx, wfID, orgID, spaceID, ref); err != nil {
+	if wfSlug, versionNumber, isVersion := parseVersionRef(ref); isVersion {
+		// Pinned version: resolve the parent workflow (scoped, by slug), then
+		// load that version by the container's internal uuid + number.
+		wf, err := a.scopedWorkflow(ctx, wfSlug, orgID, spaceID, ref)
+		if err != nil {
 			return resolvedTarget{}, err
 		}
 		ver, err := a.store.GetWorkflowVersionByNumber(ctx, db.GetWorkflowVersionByNumberParams{
-			WorkflowID:    wfID,
+			WorkflowID:    wf.ID,
 			VersionNumber: versionNumber,
 		})
 		if err != nil {
@@ -237,14 +243,14 @@ func (a *RunWorkflowActivity) resolveTarget(ctx context.Context, rc *RunContext,
 			}
 			return resolvedTarget{}, Retryable(fmt.Errorf("engine: load run_workflow version %q: %w", ref, err))
 		}
-		return targetFromVersion(ref, wfID, ver)
+		return targetFromVersion(ref, wf.ID, ver)
 	}
 
-	wfID, err := parseWorkflowRef(ref)
+	wfSlug, err := parseWorkflowRef(ref)
 	if err != nil {
 		return resolvedTarget{}, fmt.Errorf("engine: run_workflow target %q is not a valid workflow resource name: %w", ref, err)
 	}
-	wf, err := a.scopedWorkflow(ctx, wfID, orgID, spaceID, ref)
+	wf, err := a.scopedWorkflow(ctx, wfSlug, orgID, spaceID, ref)
 	if err != nil {
 		return resolvedTarget{}, err
 	}
@@ -258,26 +264,28 @@ func (a *RunWorkflowActivity) resolveTarget(ctx context.Context, rc *RunContext,
 		}
 		return resolvedTarget{}, Retryable(fmt.Errorf("engine: load run_workflow promoted version %q: %w", ref, err))
 	}
-	return targetFromVersion(ref, wfID, ver)
+	return targetFromVersion(ref, wf.ID, ver)
 }
 
-// scopedWorkflow loads the workflow named by wfID and confirms it belongs to the
-// run's scope. A missing or out-of-scope workflow is reported as not-found so a
-// crafted cross-scope reference can't confirm the workflow exists; a transient
-// DB fault is [Retryable].
-func (a *RunWorkflowActivity) scopedWorkflow(ctx context.Context, wfID, orgID, spaceID uuid.UUID, ref string) (db.Workflow, error) {
-	wf, err := a.store.GetWorkflow(ctx, wfID)
+// scopedWorkflow resolves the workflow named by wfSlug within the run's scope
+// (org + space). A missing or out-of-scope workflow is reported as not-found so
+// a crafted cross-scope reference can't confirm the workflow exists (the scoped
+// by-slug lookup is the guard); a transient DB fault is [Retryable].
+//
+// Same-scope only for day one — the sub-run executes under the PARENT run's
+// scope (least-privilege sub-workflow identity is deferred with the
+// KC-run-identity work), so a cross-scope target is refused.
+func (a *RunWorkflowActivity) scopedWorkflow(ctx context.Context, wfSlug string, orgID, spaceID uuid.UUID, ref string) (db.Workflow, error) {
+	wf, err := a.store.GetWorkflowByParent(ctx, db.GetWorkflowByParentParams{
+		OrgID:   orgID,
+		SpaceID: pgtype.UUID{Bytes: spaceID, Valid: spaceID != uuid.Nil},
+		Slug:    wfSlug,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.Workflow{}, fmt.Errorf("engine: run_workflow target %q not found", ref)
 		}
 		return db.Workflow{}, Retryable(fmt.Errorf("engine: load run_workflow target %q: %w", ref, err))
-	}
-	// Same-scope only for day one — the sub-run executes under the PARENT run's
-	// scope (least-privilege sub-workflow identity is deferred with the
-	// KC-run-identity work), so a cross-scope target is refused.
-	if wf.OrgID != orgID || !sameWorkflowSpace(wf.SpaceID, spaceID) {
-		return db.Workflow{}, fmt.Errorf("engine: run_workflow target %q not found", ref)
 	}
 	return wf, nil
 }
@@ -328,47 +336,33 @@ func cycleError(stack []uuid.UUID, target uuid.UUID) error {
 }
 
 // parseVersionRef splits a WorkflowVersion resource name
-// (".../workflows/{wf-uuid}/versions/{n}") into the parent workflow uuid and the
+// (".../workflows/{wf-slug}/versions/{n}") into the parent workflow slug and the
 // monotonic version number. ok is false when ref is not a version name (no
-// "/versions/" segment, a non-numeric or non-positive number, or an unparseable
-// workflow segment) — the caller then treats it as a Workflow name.
-func parseVersionRef(ref string) (workflowID uuid.UUID, versionNumber int64, ok bool) {
+// "/versions/" segment, a non-numeric or non-positive number, or a workflow
+// segment with no slug leaf) — the caller then treats it as a Workflow name.
+func parseVersionRef(ref string) (workflowSlug string, versionNumber int64, ok bool) {
 	const marker = "/versions/"
 	idx := strings.LastIndex(ref, marker)
 	if idx < 0 {
-		return uuid.Nil, 0, false
+		return "", 0, false
 	}
 	num, err := strconv.ParseInt(ref[idx+len(marker):], 10, 64)
 	if err != nil || num <= 0 {
-		return uuid.Nil, 0, false
+		return "", 0, false
 	}
-	wfID, err := parseWorkflowRef(ref[:idx])
+	slug, err := parseWorkflowRef(ref[:idx])
 	if err != nil {
-		return uuid.Nil, 0, false
+		return "", 0, false
 	}
-	return wfID, num, true
+	return slug, num, true
 }
 
-// parseWorkflowRef extracts the leaf uuid from a Workflow resource name
-// ("organizations/{org}[/spaces/{space}]/workflows/{uuid}").
-func parseWorkflowRef(ref string) (uuid.UUID, error) {
+// parseWorkflowRef extracts the slug leaf from a Workflow resource name
+// ("organizations/{org}[/spaces/{space}]/workflows/{slug}").
+func parseWorkflowRef(ref string) (string, error) {
 	idx := strings.LastIndex(ref, "/")
-	if idx < 0 {
-		return uuid.Nil, errors.New("missing workflow id segment")
+	if idx < 0 || idx == len(ref)-1 {
+		return "", errors.New("missing workflow slug segment")
 	}
-	id, err := uuid.Parse(ref[idx+1:])
-	if err != nil {
-		return uuid.Nil, errors.New("workflow id segment is not a uuid")
-	}
-	return id, nil
-}
-
-// sameWorkflowSpace reports whether a workflow's (nullable) space matches the
-// run's space. A uuid.Nil run space means org-scoped, matching only a workflow
-// with no space.
-func sameWorkflowSpace(wfSpace pgtype.UUID, runSpace uuid.UUID) bool {
-	if runSpace == uuid.Nil {
-		return !wfSpace.Valid
-	}
-	return wfSpace.Valid && uuid.UUID(wfSpace.Bytes) == runSpace
+	return ref[idx+1:], nil
 }

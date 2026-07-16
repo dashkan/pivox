@@ -37,12 +37,34 @@ func newFakeWorkflowStore() *fakeWorkflowStore {
 	}
 }
 
-func (s *fakeWorkflowStore) GetWorkflow(_ context.Context, id uuid.UUID) (db.Workflow, error) {
-	wf, ok := s.workflows[id]
-	if !ok {
-		return db.Workflow{}, pgx.ErrNoRows
+// GetWorkflowByParent resolves a workflow by its (org, space, slug) — the
+// scoped-by-slug lookup the production engine now uses. It scans registered
+// workflows for an exact org + space + slug match (space compared NULL-aware,
+// mirroring `space_id IS NOT DISTINCT FROM`), so a slug that exists only in
+// another scope is not found.
+func (s *fakeWorkflowStore) GetWorkflowByParent(_ context.Context, arg db.GetWorkflowByParentParams) (db.Workflow, error) {
+	for _, wf := range s.workflows {
+		if wf.OrgID == arg.OrgID && sameFakeSpace(wf.SpaceID, arg.SpaceID) && wf.Slug == arg.Slug {
+			return wf, nil
+		}
 	}
-	return wf, nil
+	return db.Workflow{}, pgx.ErrNoRows
+}
+
+// sameFakeSpace compares two nullable spaces NULL-aware (both unset match; both
+// set match on value), mirroring Postgres `IS NOT DISTINCT FROM`.
+func sameFakeSpace(a, b pgtype.UUID) bool {
+	if a.Valid != b.Valid {
+		return false
+	}
+	return !a.Valid || a.Bytes == b.Bytes
+}
+
+// wfSlug is the deterministic slug the fake assigns a workflow: a short,
+// non-uuid string derived from the id. Being non-uuid, it proves the engine
+// resolves by the slug leaf (a uuid.Parse of it would fail).
+func wfSlug(id uuid.UUID) string {
+	return "wf-" + id.String()[:8]
 }
 
 func (s *fakeWorkflowStore) GetWorkflowVersion(_ context.Context, id uuid.UUID) (db.WorkflowVersion, error) {
@@ -86,7 +108,7 @@ func (s *fakeWorkflowStore) addVersionedWorkflow(
 	ver := db.WorkflowVersion{ID: verID, WorkflowID: wfID, VersionNumber: number, Definition: def}
 	s.versionsByID[verID] = ver
 	s.versionsByNum[wfID.String()+"/"+strconv.FormatInt(number, 10)] = ver
-	wf := db.Workflow{ID: wfID, OrgID: orgID}
+	wf := db.Workflow{ID: wfID, OrgID: orgID, Slug: wfSlug(wfID)}
 	if promoted {
 		wf.Version = pgtype.UUID{Bytes: verID, Valid: true}
 	}
@@ -94,12 +116,14 @@ func (s *fakeWorkflowStore) addVersionedWorkflow(
 	return wfID
 }
 
+// workflowRef builds the run_workflow target name for a registered workflow —
+// its slug leaf (not the uuid), matching how clients now name workflows.
 func workflowRef(id uuid.UUID) string {
-	return "organizations/o/workflows/" + id.String()
+	return "organizations/o/workflows/" + wfSlug(id)
 }
 
 func versionRef(wfID uuid.UUID, number int64) string {
-	return "organizations/o/workflows/" + wfID.String() + "/versions/" + strconv.FormatInt(number, 10)
+	return "organizations/o/workflows/" + wfSlug(wfID) + "/versions/" + strconv.FormatInt(number, 10)
 }
 
 // newRunWorkflowInterpreter builds an interpreter wired with set + run_workflow.
@@ -176,7 +200,7 @@ func TestRunWorkflow_DirectCycle_SelfCallIsTerminal(t *testing.T) {
 	ver := db.WorkflowVersion{ID: verID, WorkflowID: wfID, VersionNumber: 1, Definition: def}
 	store.versionsByID[verID] = ver
 	store.versionsByNum[wfID.String()+"/1"] = ver
-	store.workflows[wfID] = db.Workflow{ID: wfID, OrgID: org, Version: pgtype.UUID{Bytes: verID, Valid: true}}
+	store.workflows[wfID] = db.Workflow{ID: wfID, OrgID: org, Slug: wfSlug(wfID), Version: pgtype.UUID{Bytes: verID, Valid: true}}
 
 	// Patch the self-reference now that we have the id.
 	root := seq(runWorkflowStep("recur", workflowRef(wfID), nil))
@@ -209,7 +233,7 @@ func TestRunWorkflow_IndirectCycle_ABAIsTerminal(t *testing.T) {
 		ver := db.WorkflowVersion{ID: verID, WorkflowID: id, VersionNumber: 1, Definition: def}
 		store.versionsByID[verID] = ver
 		store.versionsByNum[id.String()+"/1"] = ver
-		store.workflows[id] = db.Workflow{ID: id, OrgID: org, Version: pgtype.UUID{Bytes: verID, Valid: true}}
+		store.workflows[id] = db.Workflow{ID: id, OrgID: org, Slug: wfSlug(id), Version: pgtype.UUID{Bytes: verID, Valid: true}}
 	}
 	register(aID, bID)
 	register(bID, aID)
@@ -253,7 +277,7 @@ func TestRunWorkflow_DepthCapExceeded_IsTerminal(t *testing.T) {
 		ver := db.WorkflowVersion{ID: verIDs[i], WorkflowID: ids[i], VersionNumber: 1, Definition: def}
 		store.versionsByID[verIDs[i]] = ver
 		store.versionsByNum[ids[i].String()+"/1"] = ver
-		store.workflows[ids[i]] = db.Workflow{ID: ids[i], OrgID: org, Version: pgtype.UUID{Bytes: verIDs[i], Valid: true}}
+		store.workflows[ids[i]] = db.Workflow{ID: ids[i], OrgID: org, Slug: wfSlug(ids[i]), Version: pgtype.UUID{Bytes: verIDs[i], Valid: true}}
 	}
 
 	it := newRunWorkflowInterpreter(t, store)
@@ -346,7 +370,7 @@ func TestRunWorkflow_ExplicitVersionPin_RunsThatVersion(t *testing.T) {
 	store.versionsByID[ver2ID] = v2
 	store.versionsByNum[wfID.String()+"/1"] = v1
 	store.versionsByNum[wfID.String()+"/2"] = v2
-	store.workflows[wfID] = db.Workflow{ID: wfID, OrgID: org, Version: pgtype.UUID{Bytes: ver1ID, Valid: true}}
+	store.workflows[wfID] = db.Workflow{ID: wfID, OrgID: org, Slug: wfSlug(wfID), Version: pgtype.UUID{Bytes: ver1ID, Valid: true}}
 
 	it := newRunWorkflowInterpreter(t, store)
 	rc := NewRunContext(RunContextConfig{OrgID: org, WorkflowID: uuid.New()})

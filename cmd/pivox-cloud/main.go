@@ -562,7 +562,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// truth. Production key loading via KMS is tracked in #24.
 	storageSessionSigningKey := []byte("pivox-dev-session-signing-key-do-not-use-in-prod")
 	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
-		Pool: pool, Queries: queries, Encryptor: enc, Conns: connMgr, AuditResolver: auditResolver,
+		Pool: pool, Queries: queries, Codec: appCodec, Encryptor: enc, Conns: connMgr, AuditResolver: auditResolver,
 		MaxSessionTTL:     storageSessionMaxTTL,
 		CookieDomain:      storageSessionCookieDomain,
 		SessionSigningKey: storageSessionSigningKey,

@@ -20,6 +20,18 @@ const (
 	StateCancelled = "CANCELLED"
 )
 
+// IsValidState reports whether s is a known run lifecycle state (one of the
+// State* constants). The zero/unspecified value and any unknown string are
+// invalid — used to validate a client-supplied state filter.
+func IsValidState(s string) bool {
+	switch s {
+	case StatePending, StateRunning, StateWaiting, StateSucceeded, StateFailed, StateCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
 // IsTerminalState reports whether a run can no longer transition. A run in a
 // terminal state neither re-executes (the executor's idempotency guard) nor
 // accepts a cancel (the API's precondition).

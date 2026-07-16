@@ -41,7 +41,7 @@ func WorkflowToProto(w db.Workflow, namePrefix string, actors map[uuid.UUID]*typ
 		_ = json.Unmarshal(w.Annotations, &annotations)
 	}
 	out := &workflowsv1.Workflow{
-		Name:        namePrefix + "/workflows/" + w.ID.String(),
+		Name:        namePrefix + "/workflows/" + w.Slug,
 		DisplayName: w.DisplayName,
 		Description: w.Description,
 		Enabled:     w.Enabled,
@@ -71,13 +71,13 @@ func WorkflowToProto(w db.Workflow, namePrefix string, actors map[uuid.UUID]*typ
 
 // WorkflowVersionToProto maps a workflow_versions row to its proto.
 // workflowName is the parent Workflow's resource name
-// ("organizations/{org}[/spaces/{space}]/workflows/{wf-uuid}"); the version's
+// ("organizations/{org}[/spaces/{space}]/workflows/{wf-slug}"); the version's
 // own name appends the monotonic version_number ({version} segment).
 //
-// The definition JSONB carries the marshaled parameters + trigger + root
-// (written by the CreateWorkflowVersion path via a scratch WorkflowVersion);
-// here it round-trips back by unmarshaling onto a scratch WorkflowVersion and
-// lifting the three definition fields onto the output.
+// The definition JSONB carries the marshaled parameters + trigger + root +
+// error_sequence (written by the CreateWorkflowVersion path via a scratch
+// WorkflowVersion); here it round-trips back by unmarshaling onto a scratch
+// WorkflowVersion and lifting those definition fields onto the output.
 func WorkflowVersionToProto(v db.WorkflowVersion, workflowName string, actors map[uuid.UUID]*typespb.Actor) *workflowsv1.WorkflowVersion {
 	out := &workflowsv1.WorkflowVersion{
 		Name:       workflowName + "/versions/" + strconv.FormatInt(v.VersionNumber, 10),
@@ -91,6 +91,7 @@ func WorkflowVersionToProto(v db.WorkflowVersion, workflowName string, actors ma
 			out.Parameters = scratch.GetParameters()
 			out.Trigger = scratch.GetTrigger()
 			out.Root = scratch.GetRoot()
+			out.ErrorSequence = scratch.GetErrorSequence()
 		}
 	}
 	return out
@@ -107,7 +108,7 @@ func runState(s string) workflowsv1.State {
 
 // WorkflowRunToProto maps a workflow_runs row to its proto. workflowName is the
 // parent Workflow's resource name
-// ("organizations/{org}[/spaces/{space}]/workflows/{wf-uuid}"); the run's own
+// ("organizations/{org}[/spaces/{space}]/workflows/{wf-slug}"); the run's own
 // name appends "/runs/{run-uuid}".
 //
 // The OUTPUT_ONLY `version` pointer is the pinned WorkflowVersion's numbered

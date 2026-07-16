@@ -129,60 +129,65 @@ func scope(ctx context.Context) (orgID uuid.UUID, spaceID pgtype.UUID, namePrefi
 	return orgID, spaceID, namePrefix
 }
 
-// parseWorkflowName extracts the leaf UUID from a full Workflow resource name
-// ("organizations/{org}[/spaces/{space}]/workflows/{uuid}"). A malformed name
-// or non-UUID leaf is NotFound (the named workflow doesn't exist).
-func parseWorkflowName(name string) (uuid.UUID, error) {
+// parseWorkflowName extracts the slug leaf from a full Workflow resource name
+// ("organizations/{org}[/spaces/{space}]/workflows/{slug}"). The slug is the
+// user-assigned id, unique within the workflow's parent scope; the handler
+// resolves it to the internal uuid via a scoped (org + space + slug) lookup, so
+// a name that names another org's workflow simply finds no row in this scope
+// (NotFound, no cross-scope leak). A name with no leaf is NotFound.
+func parseWorkflowName(name string) (string, error) {
 	idx := strings.LastIndex(name, "/")
-	if idx < 0 {
-		return uuid.Nil, apierr.NotFound("Workflow", name)
+	if idx < 0 || idx == len(name)-1 {
+		return "", apierr.NotFound("Workflow", name)
 	}
-	id, err := uuid.Parse(name[idx+1:])
-	if err != nil {
-		return uuid.Nil, apierr.NotFound("Workflow", name)
-	}
-	return id, nil
+	return name[idx+1:], nil
 }
 
 // parseWorkflowVersionName splits a full WorkflowVersion resource name
-// ("organizations/{org}[/spaces/{space}]/workflows/{wf-uuid}/versions/{n}")
-// into the parent workflow's uuid and the monotonic version number. Any
+// ("organizations/{org}[/spaces/{space}]/workflows/{wf-slug}/versions/{n}")
+// into the parent workflow's slug and the monotonic version number. Any
 // malformation is NotFound.
-func parseWorkflowVersionName(name string) (workflowID uuid.UUID, versionNumber int64, err error) {
+func parseWorkflowVersionName(name string) (workflowSlug string, versionNumber int64, err error) {
 	const marker = "/versions/"
 	idx := strings.LastIndex(name, marker)
 	if idx < 0 {
-		return uuid.Nil, 0, apierr.NotFound("WorkflowVersion", name)
+		return "", 0, apierr.NotFound("WorkflowVersion", name)
 	}
 	num, perr := strconv.ParseInt(name[idx+len(marker):], 10, 64)
 	if perr != nil || num <= 0 {
-		return uuid.Nil, 0, apierr.NotFound("WorkflowVersion", name)
+		return "", 0, apierr.NotFound("WorkflowVersion", name)
 	}
 	// The segment before "/versions/" is the parent Workflow name; its leaf
-	// is the workflow uuid.
+	// is the workflow slug.
 	wfName := name[:idx]
 	li := strings.LastIndex(wfName, "/")
-	if li < 0 {
-		return uuid.Nil, 0, apierr.NotFound("WorkflowVersion", name)
+	if li < 0 || li == len(wfName)-1 {
+		return "", 0, apierr.NotFound("WorkflowVersion", name)
 	}
-	id, perr := uuid.Parse(wfName[li+1:])
-	if perr != nil {
-		return uuid.Nil, 0, apierr.NotFound("WorkflowVersion", name)
-	}
-	return id, num, nil
+	return wfName[li+1:], num, nil
 }
 
-// checkWorkflowScope enforces that a workflow fetched by its (global) uuid
-// actually belongs to the caller's interceptor-resolved scope. Without this, a
-// caller with access to org A could read/mutate a workflow in org B by
-// crafting "organizations/A/workflows/{B-uuid}" — the interceptor gates on A
-// but never verifies the uuid is A's. A mismatch is NotFound (don't leak
-// existence).
-func checkWorkflowScope(w db.Workflow, orgID uuid.UUID, spaceID pgtype.UUID, name string) error {
-	if w.OrgID != orgID || w.SpaceID != spaceID {
-		return apierr.NotFound("Workflow", name)
+// getWorkflowByParent resolves a Workflow by its parent scope + slug (the
+// resource-name leaf). A missing row is NotFound attributed to name — the
+// scoped lookup is itself the cross-scope guard (another org's workflow isn't
+// in this scope). Callers use the returned row's ID for child-table FKs.
+func getWorkflowByParent(ctx context.Context, q db.Querier, orgID uuid.UUID, spaceID pgtype.UUID, slug, name string) (db.Workflow, error) {
+	wf, err := q.GetWorkflowByParent(ctx, db.GetWorkflowByParentParams{OrgID: orgID, SpaceID: spaceID, Slug: slug})
+	if err != nil {
+		return db.Workflow{}, apierr.HandleResourceError(err, "Workflow", name)
 	}
-	return nil
+	return wf, nil
+}
+
+// lockWorkflowByParent resolves AND row-locks a Workflow by parent scope + slug,
+// for update/promote/delete/version-create txs (the etag check and the write
+// serialize against a concurrent mutation).
+func lockWorkflowByParent(ctx context.Context, q db.Querier, orgID uuid.UUID, spaceID pgtype.UUID, slug, name string) (db.Workflow, error) {
+	wf, err := q.GetWorkflowByParentForUpdate(ctx, db.GetWorkflowByParentForUpdateParams{OrgID: orgID, SpaceID: spaceID, Slug: slug})
+	if err != nil {
+		return db.Workflow{}, apierr.HandleResourceError(err, "Workflow", name)
+	}
+	return wf, nil
 }
 
 // marshalAnnotations renders the labels map as JSONB. Empty map → "{}" (the
@@ -209,13 +214,14 @@ func marshalWorkflowConfig(cfg *structpb.Struct) (json.RawMessage, error) {
 }
 
 // marshalDefinition renders a version's definition (parameters + trigger +
-// root) as JSONB via a scratch WorkflowVersion carrying only those fields —
-// symmetric with convert.WorkflowVersionToProto's read path.
+// root + error_sequence) as JSONB via a scratch WorkflowVersion carrying only
+// those fields — symmetric with convert.WorkflowVersionToProto's read path.
 func marshalDefinition(in *workflowsv1.WorkflowVersion) (json.RawMessage, error) {
 	scratch := &workflowsv1.WorkflowVersion{
-		Parameters: in.GetParameters(),
-		Trigger:    in.GetTrigger(),
-		Root:       in.GetRoot(),
+		Parameters:    in.GetParameters(),
+		Trigger:       in.GetTrigger(),
+		Root:          in.GetRoot(),
+		ErrorSequence: in.GetErrorSequence(),
 	}
 	b, err := protojson.Marshal(scratch)
 	if err != nil {
@@ -346,16 +352,13 @@ func (s *WorkflowsServer) ListWorkflows(ctx context.Context, req *workflowsv1.Li
 }
 
 func (s *WorkflowsServer) GetWorkflow(ctx context.Context, req *workflowsv1.GetWorkflowRequest) (*workflowsv1.Workflow, error) {
-	id, err := parseWorkflowName(req.GetName())
+	slug, err := parseWorkflowName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
 	orgID, spaceID, prefix := scope(ctx)
-	row, err := s.queries.GetWorkflow(ctx, id)
+	row, err := getWorkflowByParent(ctx, s.queries, orgID, spaceID, slug, req.GetName())
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Workflow", req.GetName())
-	}
-	if err := checkWorkflowScope(row, orgID, spaceID, req.GetName()); err != nil {
 		return nil, err
 	}
 	return s.toProto(ctx, row, prefix), nil
@@ -394,7 +397,7 @@ func (s *WorkflowsServer) CreateWorkflow(ctx context.Context, req *workflowsv1.C
 		ID:          id,
 		OrgID:       orgID,
 		SpaceID:     spaceID,
-		WorkflowID:  workflowID,
+		Slug:        workflowID,
 		DisplayName: in.GetDisplayName(),
 		Description: in.GetDescription(),
 		Enabled:     in.GetEnabled(),
@@ -414,7 +417,7 @@ func (s *WorkflowsServer) CreateWorkflow(ctx context.Context, req *workflowsv1.C
 
 func (s *WorkflowsServer) UpdateWorkflow(ctx context.Context, req *workflowsv1.UpdateWorkflowRequest) (*workflowsv1.Workflow, error) {
 	in := req.GetWorkflow()
-	id, err := parseWorkflowName(in.GetName())
+	slug, err := parseWorkflowName(in.GetName())
 	if err != nil {
 		return nil, err
 	}
@@ -430,8 +433,8 @@ func (s *WorkflowsServer) UpdateWorkflow(ctx context.Context, req *workflowsv1.U
 		return slices.Contains(mask.GetPaths(), field)
 	}
 
+	// ID is filled in-tx from the scope-resolved row (the name leaf is the slug).
 	params := db.UpdateWorkflowParams{
-		ID:        id,
 		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 	if inScope("display_name") {
@@ -460,16 +463,14 @@ func (s *WorkflowsServer) UpdateWorkflow(ctx context.Context, req *workflowsv1.U
 
 	var row db.Workflow
 	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
-		existing, err := qtx.GetWorkflowForUpdate(ctx, id)
+		existing, err := lockWorkflowByParent(ctx, qtx, orgID, spaceID, slug, in.GetName())
 		if err != nil {
-			return apierr.HandleResourceError(err, "Workflow", in.GetName())
-		}
-		if err := checkWorkflowScope(existing, orgID, spaceID, in.GetName()); err != nil {
 			return err
 		}
 		if etag := in.GetEtag(); etag != "" && etag != existing.Etag {
 			return apierr.Aborted("Workflow", in.GetName(), "etag mismatch")
 		}
+		params.ID = existing.ID
 		row, err = qtx.UpdateWorkflow(ctx, params)
 		if err != nil {
 			return apierr.HandleResourceError(err, "Workflow", in.GetName())
@@ -483,23 +484,20 @@ func (s *WorkflowsServer) UpdateWorkflow(ctx context.Context, req *workflowsv1.U
 }
 
 func (s *WorkflowsServer) DeleteWorkflow(ctx context.Context, req *workflowsv1.DeleteWorkflowRequest) (*emptypb.Empty, error) {
-	id, err := parseWorkflowName(req.GetName())
+	slug, err := parseWorkflowName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
 	orgID, spaceID, _ := scope(ctx)
 	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
-		existing, err := qtx.GetWorkflowForUpdate(ctx, id)
+		existing, err := lockWorkflowByParent(ctx, qtx, orgID, spaceID, slug, req.GetName())
 		if err != nil {
-			return apierr.HandleResourceError(err, "Workflow", req.GetName())
-		}
-		if err := checkWorkflowScope(existing, orgID, spaceID, req.GetName()); err != nil {
 			return err
 		}
 		if etag := req.GetEtag(); etag != "" && etag != existing.Etag {
 			return apierr.Aborted("Workflow", req.GetName(), "etag mismatch")
 		}
-		active, err := qtx.CountActiveWorkflowRuns(ctx, id)
+		active, err := qtx.CountActiveWorkflowRuns(ctx, existing.ID)
 		if err != nil {
 			return apierr.Internal(err, "check active runs")
 		}
@@ -510,14 +508,14 @@ func (s *WorkflowsServer) DeleteWorkflow(ctx context.Context, req *workflowsv1.D
 			// force: cancel the active runs (DB state only) before the delete
 			// cascades them away.
 			// Phase 6: also stop the River job backing each cancelled run.
-			if err := qtx.CancelActiveWorkflowRuns(ctx, id); err != nil {
+			if err := qtx.CancelActiveWorkflowRuns(ctx, existing.ID); err != nil {
 				return apierr.Internal(err, "cancel active runs")
 			}
 		}
 		// Deleting the workflow cascades its versions + runs (the version_id
 		// NO ACTION FK is checked at end-of-statement, so the cascade is
 		// internally consistent).
-		return qtx.DeleteWorkflow(ctx, id)
+		return qtx.DeleteWorkflow(ctx, existing.ID)
 	})
 	if err != nil {
 		return nil, err
@@ -530,13 +528,14 @@ func (s *WorkflowsServer) ForkWorkflow(ctx context.Context, req *workflowsv1.For
 	if workflowID == "" {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("workflow_id", "is required"))
 	}
-	srcID, err := parseWorkflowName(req.GetName())
+	srcSlug, err := parseWorkflowName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
 	// scope(ctx) is resolved from the request's `parent` (the fork's
 	// destination) via the permission interceptor's scope_field. The source
-	// must live in that same scope — checkWorkflowScope enforces it.
+	// must live in that same scope — the scoped by-slug lookup enforces it (a
+	// source in another scope isn't found).
 	orgID, spaceID, prefix := scope(ctx)
 	callerID := convert.PgUUID(server.MustUserID(ctx))
 
@@ -550,11 +549,8 @@ func (s *WorkflowsServer) ForkWorkflow(ctx context.Context, req *workflowsv1.For
 	}
 
 	row, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Workflow, error) {
-		src, err := qtx.GetWorkflow(ctx, srcID)
+		src, err := getWorkflowByParent(ctx, qtx, orgID, spaceID, srcSlug, req.GetName())
 		if err != nil {
-			return db.Workflow{}, apierr.HandleResourceError(err, "Workflow", req.GetName())
-		}
-		if err := checkWorkflowScope(src, orgID, spaceID, req.GetName()); err != nil {
 			return db.Workflow{}, err
 		}
 
@@ -570,7 +566,7 @@ func (s *WorkflowsServer) ForkWorkflow(ctx context.Context, req *workflowsv1.For
 			ID:          newID,
 			OrgID:       orgID,
 			SpaceID:     spaceID,
-			WorkflowID:  workflowID,
+			Slug:        workflowID,
 			DisplayName: req.GetDisplayName(),
 			Description: "",
 			Enabled:     false,
@@ -607,16 +603,16 @@ func (s *WorkflowsServer) ForkWorkflow(ctx context.Context, req *workflowsv1.For
 // none is given, the source's promoted live version.
 func resolveForkSource(ctx context.Context, qtx db.Querier, src db.Workflow, sourceVersion string) (db.WorkflowVersion, error) {
 	if sourceVersion != "" {
-		svWfID, svNum, err := parseWorkflowVersionName(sourceVersion)
+		svWfSlug, svNum, err := parseWorkflowVersionName(sourceVersion)
 		if err != nil {
 			return db.WorkflowVersion{}, err
 		}
-		if svWfID != src.ID {
+		if svWfSlug != src.Slug {
 			return db.WorkflowVersion{}, apierr.InvalidArgument(apierr.FieldViolation(
 				"source_version", "must be a version of the source workflow"))
 		}
 		ver, err := qtx.GetWorkflowVersionByNumber(ctx, db.GetWorkflowVersionByNumberParams{
-			WorkflowID:    svWfID,
+			WorkflowID:    src.ID,
 			VersionNumber: svNum,
 		})
 		if err != nil {
@@ -643,11 +639,11 @@ func resolveForkSource(ctx context.Context, qtx db.Querier, src db.Workflow, sou
 }
 
 func (s *WorkflowsServer) PromoteWorkflowVersion(ctx context.Context, req *workflowsv1.PromoteWorkflowVersionRequest) (*workflowsv1.Workflow, error) {
-	wfID, err := parseWorkflowName(req.GetName())
+	wfSlug, err := parseWorkflowName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
-	verWfID, verNum, err := parseWorkflowVersionName(req.GetVersion())
+	verWfSlug, verNum, err := parseWorkflowVersionName(req.GetVersion())
 	if err != nil {
 		return nil, err
 	}
@@ -655,18 +651,19 @@ func (s *WorkflowsServer) PromoteWorkflowVersion(ctx context.Context, req *workf
 	callerID := convert.PgUUID(server.MustUserID(ctx))
 
 	row, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.Workflow, error) {
-		wf, err := qtx.GetWorkflowForUpdate(ctx, wfID)
+		wf, err := lockWorkflowByParent(ctx, qtx, orgID, spaceID, wfSlug, req.GetName())
 		if err != nil {
-			return db.Workflow{}, apierr.HandleResourceError(err, "Workflow", req.GetName())
-		}
-		if err := checkWorkflowScope(wf, orgID, spaceID, req.GetName()); err != nil {
 			return db.Workflow{}, err
 		}
-		// Resolve the named version's uuid. Then SetWorkflowVersion's join
-		// (v.workflow_id = w.id) is the authoritative belonging check: a
-		// version of another workflow yields no row → FailedPrecondition.
+		// The version name must name this same workflow; a version of another
+		// workflow can't be promoted here.
+		if verWfSlug != wfSlug {
+			return db.Workflow{}, apierr.FailedPrecondition("version does not belong to this workflow")
+		}
+		// Resolve the named version's uuid under this workflow. SetWorkflowVersion's
+		// join (v.workflow_id = w.id) is the authoritative belonging backstop.
 		ver, err := qtx.GetWorkflowVersionByNumber(ctx, db.GetWorkflowVersionByNumberParams{
-			WorkflowID:    verWfID,
+			WorkflowID:    wf.ID,
 			VersionNumber: verNum,
 		})
 		if err != nil {
@@ -676,7 +673,7 @@ func (s *WorkflowsServer) PromoteWorkflowVersion(ctx context.Context, req *workf
 			return db.Workflow{}, apierr.Internal(err, "load version")
 		}
 		updated, err := qtx.SetWorkflowVersion(ctx, db.SetWorkflowVersionParams{
-			ID:        wfID,
+			ID:        wf.ID,
 			UpdatedBy: callerID,
 			Version:   ver.ID,
 		})
@@ -715,12 +712,13 @@ func (s *WorkflowsServer) toProto(ctx context.Context, row db.Workflow, prefix s
 // ============================================================================
 
 func (s *WorkflowVersionsServer) ListWorkflowVersions(ctx context.Context, req *workflowsv1.ListWorkflowVersionsRequest) (*workflowsv1.ListWorkflowVersionsResponse, error) {
-	wfID, err := parseWorkflowName(req.GetParent())
+	wfSlug, err := parseWorkflowName(req.GetParent())
 	if err != nil {
 		return nil, err
 	}
 	orgID, spaceID, prefix := scope(ctx)
-	if err := s.checkParentWorkflow(ctx, wfID, orgID, spaceID, req.GetParent()); err != nil {
+	wf, err := getWorkflowByParent(ctx, s.queries, orgID, spaceID, wfSlug, req.GetParent())
+	if err != nil {
 		return nil, err
 	}
 	pageSize := clampPageSize(req.GetPageSize())
@@ -731,7 +729,7 @@ func (s *WorkflowVersionsServer) ListWorkflowVersions(ctx context.Context, req *
 	}
 
 	rows, err := s.queries.ListWorkflowVersions(ctx, db.ListWorkflowVersionsParams{
-		WorkflowID: wfID,
+		WorkflowID: wf.ID,
 		Cursor:     cursor,
 		PageLimit:  pageSize + 1,
 	})
@@ -748,7 +746,7 @@ func (s *WorkflowVersionsServer) ListWorkflowVersions(ctx context.Context, req *
 		rows = rows[:pageSize]
 	}
 
-	workflowName := prefix + "/workflows/" + wfID.String()
+	workflowName := prefix + "/workflows/" + wfSlug
 	actors := resolveActors(ctx, s.audit, versionActorIDs(rows))
 	out := make([]*workflowsv1.WorkflowVersion, 0, len(rows))
 	for _, r := range rows {
@@ -758,28 +756,29 @@ func (s *WorkflowVersionsServer) ListWorkflowVersions(ctx context.Context, req *
 }
 
 func (s *WorkflowVersionsServer) GetWorkflowVersion(ctx context.Context, req *workflowsv1.GetWorkflowVersionRequest) (*workflowsv1.WorkflowVersion, error) {
-	wfID, verNum, err := parseWorkflowVersionName(req.GetName())
+	wfSlug, verNum, err := parseWorkflowVersionName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
 	orgID, spaceID, prefix := scope(ctx)
-	if err := s.checkParentWorkflow(ctx, wfID, orgID, spaceID, req.GetName()); err != nil {
+	wf, err := getWorkflowByParent(ctx, s.queries, orgID, spaceID, wfSlug, req.GetName())
+	if err != nil {
 		return nil, err
 	}
 	ver, err := s.queries.GetWorkflowVersionByNumber(ctx, db.GetWorkflowVersionByNumberParams{
-		WorkflowID:    wfID,
+		WorkflowID:    wf.ID,
 		VersionNumber: verNum,
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "WorkflowVersion", req.GetName())
 	}
-	workflowName := prefix + "/workflows/" + wfID.String()
+	workflowName := prefix + "/workflows/" + wfSlug
 	actors := resolveActors(ctx, s.audit, versionActorIDs([]db.WorkflowVersion{ver}))
 	return convert.WorkflowVersionToProto(ver, workflowName, actors), nil
 }
 
 func (s *WorkflowVersionsServer) CreateWorkflowVersion(ctx context.Context, req *workflowsv1.CreateWorkflowVersionRequest) (*workflowsv1.WorkflowVersion, error) {
-	wfID, err := parseWorkflowName(req.GetParent())
+	wfSlug, err := parseWorkflowName(req.GetParent())
 	if err != nil {
 		return nil, err
 	}
@@ -802,20 +801,17 @@ func (s *WorkflowVersionsServer) CreateWorkflowVersion(ctx context.Context, req 
 	ver, err := db.RunInTxValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) (db.WorkflowVersion, error) {
 		// Lock the parent so concurrent version creates serialize — the
 		// NextWorkflowVersionNumber contract (its MAX+1 must not race).
-		wf, err := qtx.GetWorkflowForUpdate(ctx, wfID)
+		wf, err := lockWorkflowByParent(ctx, qtx, orgID, spaceID, wfSlug, req.GetParent())
 		if err != nil {
-			return db.WorkflowVersion{}, apierr.HandleResourceError(err, "Workflow", req.GetParent())
-		}
-		if err := checkWorkflowScope(wf, orgID, spaceID, req.GetParent()); err != nil {
 			return db.WorkflowVersion{}, err
 		}
-		next, err := qtx.NextWorkflowVersionNumber(ctx, wfID)
+		next, err := qtx.NextWorkflowVersionNumber(ctx, wf.ID)
 		if err != nil {
 			return db.WorkflowVersion{}, apierr.Internal(err, "allocate version number")
 		}
 		row, err := qtx.CreateWorkflowVersion(ctx, db.CreateWorkflowVersionParams{
 			ID:            verID,
-			WorkflowID:    wfID,
+			WorkflowID:    wf.ID,
 			VersionNumber: int64(next),
 			Note:          in.GetNote(),
 			Definition:    definition,
@@ -832,13 +828,13 @@ func (s *WorkflowVersionsServer) CreateWorkflowVersion(ctx context.Context, req 
 	if err != nil {
 		return nil, err
 	}
-	workflowName := prefix + "/workflows/" + wfID.String()
+	workflowName := prefix + "/workflows/" + wfSlug
 	actors := resolveActors(ctx, s.audit, versionActorIDs([]db.WorkflowVersion{ver}))
 	return convert.WorkflowVersionToProto(ver, workflowName, actors), nil
 }
 
 func (s *WorkflowVersionsServer) DeleteWorkflowVersion(ctx context.Context, req *workflowsv1.DeleteWorkflowVersionRequest) (*emptypb.Empty, error) {
-	wfID, verNum, err := parseWorkflowVersionName(req.GetName())
+	wfSlug, verNum, err := parseWorkflowVersionName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
@@ -846,15 +842,12 @@ func (s *WorkflowVersionsServer) DeleteWorkflowVersion(ctx context.Context, req 
 	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
 		// Lock the parent so the promoted-pointer check serializes against a
 		// concurrent promote.
-		wf, err := qtx.GetWorkflowForUpdate(ctx, wfID)
+		wf, err := lockWorkflowByParent(ctx, qtx, orgID, spaceID, wfSlug, req.GetName())
 		if err != nil {
-			return apierr.HandleResourceError(err, "Workflow", req.GetName())
-		}
-		if err := checkWorkflowScope(wf, orgID, spaceID, req.GetName()); err != nil {
 			return err
 		}
 		ver, err := qtx.GetWorkflowVersionByNumber(ctx, db.GetWorkflowVersionByNumberParams{
-			WorkflowID:    wfID,
+			WorkflowID:    wf.ID,
 			VersionNumber: verNum,
 		})
 		if err != nil {
@@ -882,17 +875,6 @@ func (s *WorkflowVersionsServer) DeleteWorkflowVersion(ctx context.Context, req 
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
-}
-
-// checkParentWorkflow fetches the parent workflow by uuid and verifies it
-// belongs to the caller's scope. A missing or out-of-scope parent is NotFound
-// on the Workflow (attributed to the version resource name the caller used).
-func (s *WorkflowVersionsServer) checkParentWorkflow(ctx context.Context, wfID uuid.UUID, orgID uuid.UUID, spaceID pgtype.UUID, name string) error {
-	wf, err := s.queries.GetWorkflow(ctx, wfID)
-	if err != nil {
-		return apierr.HandleResourceError(err, "Workflow", name)
-	}
-	return checkWorkflowScope(wf, orgID, spaceID, name)
 }
 
 // versionActorIDs collects the created_by ids across a page of version rows

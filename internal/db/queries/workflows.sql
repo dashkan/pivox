@@ -6,25 +6,41 @@
 -- id is app-generated so the caller has it before the write. `version` is
 -- always NULL at create — a workflow is created version-less, then a version
 -- is minted and promoted (workflow-first insert order avoids the circular FK).
-INSERT INTO workflows (id, org_id, space_id, workflow_id, display_name, description, enabled, config, origin, annotations, created_by, updated_by)
+INSERT INTO workflows (id, org_id, space_id, slug, display_name, description, enabled, config, origin, annotations, created_by, updated_by)
 VALUES ($1, $2, sqlc.narg('space_id'), $3, $4, $5, $6, $7, $8, $9, $10, $10)
 RETURNING *;
 
 -- name: GetWorkflow :one
+-- Resolves a Workflow by its internal uuid. Used by the Worker Process and the
+-- execution engine, which hold a run's workflow_id FK (a uuid, not the slug).
 SELECT * FROM workflows WHERE id = $1;
 
 -- name: GetWorkflowByParent :one
--- Resolves a Workflow from its parent + slug. space_id IS NOT DISTINCT FROM
--- treats NULL (org-scoped) as a matchable value.
+-- Resolves a Workflow from its parent + slug (the resource-name leaf).
+-- space_id IS NOT DISTINCT FROM treats NULL (org-scoped) as a matchable value.
 SELECT * FROM workflows
 WHERE org_id = $1
   AND space_id IS NOT DISTINCT FROM sqlc.narg('space_id')
-  AND workflow_id = $2;
+  AND slug = sqlc.arg('slug');
 
--- GetWorkflowForUpdate locks the row for the update/promote/delete tx so the
--- etag check and the write serialize against a concurrent mutation.
--- name: GetWorkflowForUpdate :one
-SELECT * FROM workflows WHERE id = $1 FOR UPDATE;
+-- GetWorkflowByParentForUpdate resolves a Workflow by parent + slug AND locks
+-- the row for the update/promote/delete/version-create tx, so the etag check
+-- and the write serialize against a concurrent mutation. The slug is the
+-- resource-name leaf, so handlers resolve their target by scope + slug in one
+-- statement.
+-- name: GetWorkflowByParentForUpdate :one
+SELECT * FROM workflows
+WHERE org_id = $1
+  AND space_id IS NOT DISTINCT FROM sqlc.narg('space_id')
+  AND slug = sqlc.arg('slug')
+FOR UPDATE;
+
+-- name: WorkflowSlugsByIDs :many
+-- Maps a set of workflow uuids to their slug. The scope-wide run listings
+-- (the workflows/- wildcard) return workflow_runs rows carrying only the
+-- workflow_id uuid FK; the run's resource name needs the workflow slug, so the
+-- page's distinct workflow ids are resolved in one round-trip (no N+1).
+SELECT id, slug FROM workflows WHERE id = ANY(@ids::uuid[]);
 
 -- name: UpdateWorkflow :one
 -- Masked update of the container fields. `version` (promoted pointer) and
@@ -48,7 +64,8 @@ RETURNING *;
 -- without the join a cross-workflow promote would corrupt the
 -- container→definition link (Workflow A executing B's definition). No row is
 -- returned (→ ErrNoRows) when the version isn't this workflow's; the handler
--- maps that to FailedPrecondition. Serialized under GetWorkflowForUpdate's lock.
+-- maps that to FailedPrecondition. Serialized under the workflow row lock taken
+-- by GetWorkflowByParentForUpdate.
 UPDATE workflows w
 SET version = v.id,
     updated_by = $2,
@@ -142,9 +159,10 @@ DELETE FROM workflow_versions WHERE id = $1;
 
 -- name: CreateWorkflowRun :one
 -- A run is created PENDING; output/error/end_time are filled in later via
--- UpdateWorkflowRunState. triggered_by is NULL for system triggers.
-INSERT INTO workflow_runs (id, workflow_id, version_id, state, trigger, subject, input, steps, triggered_by)
-VALUES ($1, $2, $3, $4, $5, $6, sqlc.narg('input'), $7, sqlc.narg('triggered_by'))
+-- UpdateWorkflowRunState. triggered_by is NULL for system triggers. org_id /
+-- space_id are the run's workflow's scope, denormalized for scope-wide listing.
+INSERT INTO workflow_runs (id, workflow_id, org_id, space_id, version_id, state, trigger, subject, input, steps, triggered_by)
+VALUES ($1, $2, $3, sqlc.narg('space_id'), $4, $5, $6, $7, sqlc.narg('input'), $8, sqlc.narg('triggered_by'))
 RETURNING *;
 
 -- name: GetWorkflowRun :one
@@ -158,9 +176,35 @@ SELECT * FROM workflow_runs WHERE id = $1;
 SELECT * FROM workflow_runs WHERE id = $1 FOR UPDATE;
 
 -- name: ListWorkflowRuns :many
--- Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+-- Runs of one workflow. Keyset pagination on id (fetch page_limit+1 to detect a
+-- next page), with an optional state filter (NULL = all states). order_by is not
+-- honored — runs are always id (creation) order, the keyset column.
 SELECT * FROM workflow_runs
 WHERE workflow_id = @workflow_id
+  AND (sqlc.narg('state')::text IS NULL OR state = sqlc.narg('state'))
+  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
+ORDER BY id
+LIMIT @page_limit;
+
+-- name: ListWorkflowRunsByOrg :many
+-- Org-scope wildcard listing (organizations/{org}/workflows/-/runs): ALL runs in
+-- the org — both org-direct runs (space_id NULL) and runs of the org's
+-- space-scoped workflows (the "org + all its spaces" global view). Keyset on id
+-- via idx_workflow_runs_org, optional state filter.
+SELECT * FROM workflow_runs
+WHERE org_id = @org_id
+  AND (sqlc.narg('state')::text IS NULL OR state = sqlc.narg('state'))
+  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
+ORDER BY id
+LIMIT @page_limit;
+
+-- name: ListWorkflowRunsBySpace :many
+-- Space-scope wildcard listing
+-- (organizations/{org}/spaces/{space}/workflows/-/runs): runs of that space's
+-- workflows. Keyset on id via idx_workflow_runs_space, optional state filter.
+SELECT * FROM workflow_runs
+WHERE space_id = @space_id
+  AND (sqlc.narg('state')::text IS NULL OR state = sqlc.narg('state'))
   AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
 ORDER BY id
 LIMIT @page_limit;

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -18,22 +17,6 @@ import (
 	workflowsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/workflows/v1"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
-
-func idFromName(t *testing.T, name string) uuid.UUID {
-	t.Helper()
-	parts := strings.Split(name, "/")
-	// For a Workflow the leaf is the uuid; for a Version the workflow uuid is
-	// the segment before "/versions/".
-	for i, p := range parts {
-		if p == "workflows" && i+1 < len(parts) {
-			id, err := uuid.Parse(parts[i+1])
-			require.NoError(t, err, "workflow segment must be a uuid: %s", name)
-			return id
-		}
-	}
-	t.Fatalf("no workflow uuid in name %q", name)
-	return uuid.Nil
-}
 
 // setStepDefinition builds a minimal-but-valid version definition: a single
 // SetActivity step, one parameter, and an optional trigger left absent (a
@@ -84,6 +67,8 @@ func TestE2E_Workflow_CRUD(t *testing.T) {
 	assert.True(t, created.GetEnabled())
 	assert.Equal(t, workflowsv1.WorkflowOrigin_OWNED, created.GetOrigin(), "workflows are created OWNED")
 	assert.Empty(t, created.GetVersion(), "a new workflow has no promoted version")
+	// The resource name's leaf is the user-assigned slug, not the internal uuid.
+	assert.Equal(t, "organizations/"+owned.Slug+"/workflows/nightly-ingest", created.GetName())
 	require.NotEmpty(t, created.GetName())
 	require.NotEmpty(t, created.GetEtag())
 	assert.Equal(t, "prod", created.GetConfig().GetFields()["env"].GetStringValue())
@@ -172,8 +157,9 @@ func TestE2E_Workflow_ValidateOnly(t *testing.T) {
 	assert.Equal(t, codes.AlreadyExists, status.Code(err))
 }
 
-// TestE2E_Workflow_ScopeIsolation pins that a workflow's uuid can't be read or
-// deleted through a different org's name prefix.
+// TestE2E_Workflow_ScopeIsolation pins that a workflow can't be read or deleted
+// through a different org's name prefix. The slug leaf is unique only within
+// its parent, so naming another org's workflow here resolves to no row.
 func TestE2E_Workflow_ScopeIsolation(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -190,15 +176,14 @@ func TestE2E_Workflow_ScopeIsolation(t *testing.T) {
 	require.True(t, op.GetDone())
 
 	client := workflowsv1.NewWorkflowsClient(h.Conn())
-	created, err := client.CreateWorkflow(ctx, &workflowsv1.CreateWorkflowRequest{
+	_, err = client.CreateWorkflow(ctx, &workflowsv1.CreateWorkflowRequest{
 		Parent:     "organizations/wiso-b",
 		WorkflowId: "b-wf",
 		Workflow:   &workflowsv1.Workflow{},
 	})
 	require.NoError(t, err)
-	bID := idFromName(t, created.GetName())
 
-	crossName := "organizations/wiso-a/workflows/" + bID.String()
+	crossName := "organizations/wiso-a/workflows/b-wf"
 	_, err = client.GetWorkflow(ctx, &workflowsv1.GetWorkflowRequest{Name: crossName})
 	require.Error(t, err)
 	assert.Equal(t, codes.NotFound, status.Code(err), "cross-scope read must be NotFound")
@@ -250,6 +235,63 @@ func TestE2E_WorkflowVersion_CreateAndMonotonic(t *testing.T) {
 	v2, err := verClient.GetWorkflowVersion(ctx, &workflowsv1.GetWorkflowVersionRequest{Name: wf.GetName() + "/versions/2"})
 	require.NoError(t, err)
 	assert.Equal(t, wf.GetName()+"/versions/2", v2.GetName())
+}
+
+// TestE2E_WorkflowVersion_ErrorSequenceRoundTrips pins that a version's
+// workflow-level error_sequence survives the write→read round-trip: it must be
+// persisted by the create path and re-emitted on read (the canvas "on error"
+// region depends on it). Regression guard for the silent-drop bug.
+func TestE2E_WorkflowVersion_ErrorSequenceRoundTrips(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithWorkflowsServer(),
+		grpcharness.WithWorkflowVersionsServer())
+	owned := h.SeedOwnedOrg(t, "wkf-errseq", "WF ErrSeq", "workflows")
+	ctx := context.Background()
+	wfClient := workflowsv1.NewWorkflowsClient(h.Conn())
+	verClient := workflowsv1.NewWorkflowVersionsClient(h.Conn())
+
+	wf, err := wfClient.CreateWorkflow(ctx, &workflowsv1.CreateWorkflowRequest{
+		Parent:     "organizations/" + owned.Slug,
+		WorkflowId: "flow",
+		Workflow:   &workflowsv1.Workflow{},
+	})
+	require.NoError(t, err)
+
+	// A version carrying BOTH a root and a distinct error_sequence (the handler
+	// that runs when an uncaught failure bubbles to the workflow level).
+	def := setStepDefinition("p", "v", `"x"`)
+	def.ErrorSequence = &workflowsv1.Sequence{Steps: []*workflowsv1.Step{{
+		Id: "on-error",
+		Kind: &workflowsv1.Step_Activity{Activity: &workflowsv1.Activity{
+			Kind: &workflowsv1.Activity_Set{Set: &workflowsv1.SetActivity{
+				Assignments: map[string]string{"handled": "true"},
+			}},
+		}},
+	}}}
+
+	created, err := verClient.CreateWorkflowVersion(ctx, &workflowsv1.CreateWorkflowVersionRequest{
+		Parent:          wf.GetName(),
+		WorkflowVersion: def,
+	})
+	require.NoError(t, err)
+	// The create response must echo the error_sequence back.
+	require.NotNil(t, created.GetErrorSequence(), "create must return the error_sequence")
+	require.Len(t, created.GetErrorSequence().GetSteps(), 1)
+	assert.Equal(t, "on-error", created.GetErrorSequence().GetSteps()[0].GetId())
+
+	// And a fresh Get must re-emit it intact (proves it was PERSISTED, not just
+	// reflected from the request).
+	got, err := verClient.GetWorkflowVersion(ctx, &workflowsv1.GetWorkflowVersionRequest{Name: created.GetName()})
+	require.NoError(t, err)
+	require.NotNil(t, got.GetErrorSequence(), "get must return the persisted error_sequence")
+	require.Len(t, got.GetErrorSequence().GetSteps(), 1)
+	assert.Equal(t, "on-error", got.GetErrorSequence().GetSteps()[0].GetId())
+	assert.True(t, proto.Equal(def.GetErrorSequence(), got.GetErrorSequence()),
+		"the round-tripped error_sequence must equal what was written")
 }
 
 // TestE2E_Workflow_Promote covers the happy promote (the container's version

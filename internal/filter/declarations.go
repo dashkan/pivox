@@ -18,6 +18,12 @@ type FilterableField struct {
 // Kept deliberately narrow — ordering has fewer semantic knobs than filtering.
 type SortableField struct {
 	Column string
+	// Type is the CEL type of the column, used ONLY by the compound-cursor
+	// keyset path (BuildListQuery) to know whether a page-token's encoded sort
+	// value must be re-parsed into a time.Time (TypeTimestamp) before it is
+	// bound as a parameter. nil is treated as TypeString. It does not affect
+	// the simpler filter.Query / ParseOrderBy path.
+	Type *expr.Type
 }
 
 // ResourceFilter holds per-resource metadata needed to translate AIP-132/160
@@ -235,6 +241,41 @@ func ArtifactVersionFilter() *ResourceFilter {
 		CursorColumn:    "id",
 		CursorDirection: "DESC",
 		ParentColumn:    "artifact_id",
+	}
+}
+
+// ConnectorFilter returns the filter config for workflow Connectors.
+//
+// Connectors are an org+space *leveled* resource: a row lives directly under an
+// org (space_id NULL) or under a space (space_id set). That two-column
+// partition — `org_id = … AND space_id IS NOT DISTINCT FROM …` — is NOT
+// expressible via ResourceFilter.ParentColumn (a single `col = $` predicate),
+// so ListConnectors does NOT use filter.Query. It uses BuildListQuery with a
+// handler-supplied base scope; this declaration supplies only the filterable +
+// sortable surface (the transpiler + order_by whitelist). See
+// docs/aip-list-transpiler-procedure.md.
+func ConnectorFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString, AllowPartial: true},
+			"description": {Column: "description", Type: filtering.TypeString, AllowPartial: true},
+			"agent":       {Column: "agent", Type: filtering.TypeString},
+			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
+			"updateTime":  {Column: "update_time", Type: filtering.TypeTimestamp},
+			"annotations": {Column: "annotations", Type: filtering.TypeMap(filtering.TypeString, filtering.TypeString), JSONB: true},
+		},
+		Sortable: map[string]SortableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
+			"updateTime":  {Column: "update_time", Type: filtering.TypeTimestamp},
+		},
+		Table:         "connectors",
+		SoftDelete:    false, // connectors hard-delete; no delete_time column
+		OrderBy:       "id ASC",
+		CursorColumn:  "id",
+		DefaultFields: []string{"displayName"},
+		// ParentColumn intentionally unset — the org+space base scope is applied
+		// by the handler via BuildListQuery.Base, not by filter.Query.
 	}
 }
 

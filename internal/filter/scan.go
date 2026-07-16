@@ -258,6 +258,43 @@ func ScanTagBindings(rows pgx.Rows) ([]db.TagBinding, error) {
 	return results, rows.Err()
 }
 
+// ScanConnectors scans rows into db.Connector structs.
+//
+// The destination order MUST match the `connectors` column order from the init
+// migration exactly — this scans `SELECT *` from BuildListQuery, so adding a
+// column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanConnectors(rows pgx.Rows) ([]db.Connector, error) {
+	defer rows.Close()
+	var results []db.Connector
+	for rows.Next() {
+		var c db.Connector
+		// Order MUST match `connectors`: id, org_id, space_id, slug,
+		// display_name, description, config, agent, annotations, etag,
+		// created_by, updated_by, create_time, update_time.
+		if err := rows.Scan(
+			&c.ID,
+			&c.OrgID,
+			&c.SpaceID,
+			&c.Slug,
+			&c.DisplayName,
+			&c.Description,
+			&c.Config,
+			&c.Agent,
+			&c.Annotations,
+			&c.Etag,
+			&c.CreatedBy,
+			&c.UpdatedBy,
+			&c.CreateTime,
+			&c.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, c)
+	}
+	return results, rows.Err()
+}
+
 // ScanApiKeys scans rows into db.ApiKey structs.
 func ScanApiKeys(rows pgx.Rows) ([]db.ApiKey, error) {
 	defer rows.Close()

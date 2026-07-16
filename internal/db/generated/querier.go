@@ -188,7 +188,8 @@ type Querier interface {
 	// workflow_runs (executions)
 	// ============================================================================
 	// A run is created PENDING; output/error/end_time are filled in later via
-	// UpdateWorkflowRunState. triggered_by is NULL for system triggers.
+	// UpdateWorkflowRunState. triggered_by is NULL for system triggers. org_id /
+	// space_id are the run's workflow's scope, denormalized for scope-wide listing.
 	CreateWorkflowRun(ctx context.Context, arg CreateWorkflowRunParams) (WorkflowRun, error)
 	CreateWorkflowVersion(ctx context.Context, arg CreateWorkflowVersionParams) (WorkflowVersion, error)
 	DeleteArtifact(ctx context.Context, id uuid.UUID) error
@@ -307,12 +308,14 @@ type Querier interface {
 	GetAssetVersion(ctx context.Context, id uuid.UUID) (AssetVersion, error)
 	GetAssetVersionByNumber(ctx context.Context, arg GetAssetVersionByNumberParams) (AssetVersion, error)
 	GetConnector(ctx context.Context, id uuid.UUID) (Connector, error)
-	// Resolves a Connector from its parent + slug. space_id IS NOT DISTINCT FROM
-	// treats NULL (org-scoped) as a matchable value.
+	// Resolves a Connector from its parent + slug (the resource-name leaf).
+	// space_id IS NOT DISTINCT FROM treats NULL (org-scoped) as a matchable value.
 	GetConnectorByParent(ctx context.Context, arg GetConnectorByParentParams) (Connector, error)
-	// GetConnectorForUpdate locks the row for the update/delete tx so the etag
-	// check and the write serialize against a concurrent update.
-	GetConnectorForUpdate(ctx context.Context, id uuid.UUID) (Connector, error)
+	// GetConnectorByParentForUpdate resolves a Connector by parent + slug AND locks
+	// the row for the update/delete tx, so the etag check and the write serialize
+	// against a concurrent mutation. The slug (not the uuid) is the resource-name
+	// leaf, so update/delete resolve their target by scope + slug in one statement.
+	GetConnectorByParentForUpdate(ctx context.Context, arg GetConnectorByParentForUpdateParams) (Connector, error)
 	GetConversationByID(ctx context.Context, id uuid.UUID) (AiConversation, error)
 	// GetConversationByIDForUpdate is the locking variant used by
 	// runGenerate / persistInputMessage inside their per-message
@@ -412,12 +415,14 @@ type Querier interface {
 	GetRequestByNameForUpdate(ctx context.Context, arg GetRequestByNameForUpdateParams) (AssetRequest, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
 	GetSecret(ctx context.Context, id uuid.UUID) (Secret, error)
-	// Resolves a Secret from its parent + slug. space_id IS NOT DISTINCT FROM
-	// treats NULL (org-scoped) as a matchable value.
+	// Resolves a Secret from its parent + slug (the resource-name leaf).
+	// space_id IS NOT DISTINCT FROM treats NULL (org-scoped) as a matchable value.
 	GetSecretByParent(ctx context.Context, arg GetSecretByParentParams) (Secret, error)
-	// GetSecretForUpdate locks the row for the update/delete tx so the etag
-	// check and the write serialize against a concurrent rotate.
-	GetSecretForUpdate(ctx context.Context, id uuid.UUID) (Secret, error)
+	// GetSecretByParentForUpdate resolves a Secret by parent + slug AND locks the
+	// row, so the etag check and the write serialize against a concurrent rotate.
+	// The slug is the resource-name leaf, so update/delete resolve their target by
+	// scope + slug in one statement.
+	GetSecretByParentForUpdate(ctx context.Context, arg GetSecretByParentForUpdateParams) (Secret, error)
 	GetSpace(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceByName(ctx context.Context, arg GetSpaceByNameParams) (Space, error)
 	// GetSpaceByNameForGate looks up a space by (org, slug) regardless of
@@ -428,6 +433,12 @@ type Querier interface {
 	GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceMemberByGroup(ctx context.Context, arg GetSpaceMemberByGroupParams) (GetSpaceMemberByGroupRow, error)
 	GetSpaceMemberByUser(ctx context.Context, arg GetSpaceMemberByUserParams) (GetSpaceMemberByUserRow, error)
+	// Maps a set of space uuids to their slug (the `name` column), scoped to the
+	// org so a foreign org's space slug can never be resolved. Used to build
+	// space-scoped resource names for an org-level connector rollup page (rows that
+	// reference their space by uuid) in one round-trip instead of N+1. Includes
+	// soft-deleted spaces so a name still renders during the grace window.
+	GetSpaceSlugsByIDs(ctx context.Context, arg GetSpaceSlugsByIDsParams) ([]GetSpaceSlugsByIDsRow, error)
 	// GetSsoConfigByOrgID looks up the SSO config row for an org, if
 	// one exists. UNIQUE(org_id) ensures at most one row. Used by
 	// GetSsoConfig to surface the current config to the caller.
@@ -479,13 +490,18 @@ type Querier interface {
 	// commits — eliminating the TOCTOU window between "no bindings"
 	// and "delete value".
 	GetTagValueForUpdate(ctx context.Context, id uuid.UUID) (TagValue, error)
+	// Resolves a Workflow by its internal uuid. Used by the Worker Process and the
+	// execution engine, which hold a run's workflow_id FK (a uuid, not the slug).
 	GetWorkflow(ctx context.Context, id uuid.UUID) (Workflow, error)
-	// Resolves a Workflow from its parent + slug. space_id IS NOT DISTINCT FROM
-	// treats NULL (org-scoped) as a matchable value.
+	// Resolves a Workflow from its parent + slug (the resource-name leaf).
+	// space_id IS NOT DISTINCT FROM treats NULL (org-scoped) as a matchable value.
 	GetWorkflowByParent(ctx context.Context, arg GetWorkflowByParentParams) (Workflow, error)
-	// GetWorkflowForUpdate locks the row for the update/promote/delete tx so the
-	// etag check and the write serialize against a concurrent mutation.
-	GetWorkflowForUpdate(ctx context.Context, id uuid.UUID) (Workflow, error)
+	// GetWorkflowByParentForUpdate resolves a Workflow by parent + slug AND locks
+	// the row for the update/promote/delete/version-create tx, so the etag check
+	// and the write serialize against a concurrent mutation. The slug is the
+	// resource-name leaf, so handlers resolve their target by scope + slug in one
+	// statement.
+	GetWorkflowByParentForUpdate(ctx context.Context, arg GetWorkflowByParentForUpdateParams) (Workflow, error)
 	GetWorkflowRun(ctx context.Context, id uuid.UUID) (WorkflowRun, error)
 	// Locks the run row for a cancel/transition tx so the terminal-state check and
 	// the state write serialize against a concurrent transition — the Phase-6
@@ -602,14 +618,24 @@ type Querier interface {
 	// role_permissions supplies the generic read grant (all system roles
 	// hold it today, but the join future-proofs custom roles that may not).
 	ListAuthorizedOperations(ctx context.Context, arg ListAuthorizedOperationsParams) ([]Operation, error)
-	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
-	// (AIP-160 filter / order_by are not yet wired — ordered by id.)
-	ListConnectorsByParent(ctx context.Context, arg ListConnectorsByParentParams) ([]Connector, error)
 	// Live dashboards in a space, newest-first. Pagination is offset-
 	// based for v1 — the catalog is small (≤ 100s of dashboards per
 	// space) and the surface won't grow until customers start
 	// composing them programmatically.
 	ListDashboardsBySpace(ctx context.Context, arg ListDashboardsBySpaceParams) ([]Dashboard, error)
+	// ListConnectors is NOT a static sqlc query: it is a dynamic AIP-160
+	// filtered + AIP-132 sorted + compound-cursor keyset list assembled by
+	// internal/filter.BuildListQuery (base scope org_id + space_id IS NOT DISTINCT
+	// FROM, layered filter/order_by/keyset). See internal/service/connectors and
+	// docs/aip-list-transpiler-procedure.md.
+	// The org-rollup "agents in use" facet: the distinct non-empty agent values
+	// across the whole org — org-direct connectors AND every space — matching the
+	// org-level list's base scope. Cloud connectors (agent = '') are excluded.
+	// Connectors hard-delete, so there is no soft-delete predicate.
+	ListDistinctConnectorAgentsInOrg(ctx context.Context, orgID uuid.UUID) ([]string, error)
+	// The space-scoped "agents in use" facet: the distinct non-empty agent values
+	// within one space, matching a space-level list's base scope.
+	ListDistinctConnectorAgentsInSpace(ctx context.Context, arg ListDistinctConnectorAgentsInSpaceParams) ([]string, error)
 	// ListDomainsByOrg returns all domains for an org, oldest-first.
 	// 100-row LIMIT is a defensive backstop; the typical org has a
 	// handful of claimed domains.
@@ -732,8 +758,24 @@ type Querier interface {
 	// names across gateways collapse to one pattern).
 	ListStorageEndpointShortNamesByOrg(ctx context.Context, orgID uuid.UUID) ([]string, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
-	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+	// Keyset pagination on id, scoped to a single org. Fetch page_limit+1 to
+	// detect a next page. (AIP-160 filter / order_by are not yet wired — the
+	// proto advertises them but the connector "agent" dropdown only needs an
+	// unfiltered id-ordered enumeration; ordered by id.)
+	ListStorageGatewaysByOrg(ctx context.Context, arg ListStorageGatewaysByOrgParams) ([]StorageGateway, error)
+	// Runs of one workflow. Keyset pagination on id (fetch page_limit+1 to detect a
+	// next page), with an optional state filter (NULL = all states). order_by is not
+	// honored — runs are always id (creation) order, the keyset column.
 	ListWorkflowRuns(ctx context.Context, arg ListWorkflowRunsParams) ([]WorkflowRun, error)
+	// Org-scope wildcard listing (organizations/{org}/workflows/-/runs): ALL runs in
+	// the org — both org-direct runs (space_id NULL) and runs of the org's
+	// space-scoped workflows (the "org + all its spaces" global view). Keyset on id
+	// via idx_workflow_runs_org, optional state filter.
+	ListWorkflowRunsByOrg(ctx context.Context, arg ListWorkflowRunsByOrgParams) ([]WorkflowRun, error)
+	// Space-scope wildcard listing
+	// (organizations/{org}/spaces/{space}/workflows/-/runs): runs of that space's
+	// workflows. Keyset on id via idx_workflow_runs_space, optional state filter.
+	ListWorkflowRunsBySpace(ctx context.Context, arg ListWorkflowRunsBySpaceParams) ([]WorkflowRun, error)
 	// Keyset pagination on id (uuidv7 is time-ordered, matching version_number
 	// order). Fetch page_limit+1 to detect a next page.
 	ListWorkflowVersions(ctx context.Context, arg ListWorkflowVersionsParams) ([]WorkflowVersion, error)
@@ -808,7 +850,8 @@ type Querier interface {
 	// without the join a cross-workflow promote would corrupt the
 	// container→definition link (Workflow A executing B's definition). No row is
 	// returned (→ ErrNoRows) when the version isn't this workflow's; the handler
-	// maps that to FailedPrecondition. Serialized under GetWorkflowForUpdate's lock.
+	// maps that to FailedPrecondition. Serialized under the workflow row lock taken
+	// by GetWorkflowByParentForUpdate.
 	SetWorkflowVersion(ctx context.Context, arg SetWorkflowVersionParams) (Workflow, error)
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
@@ -836,6 +879,11 @@ type Querier interface {
 	// Returns the updated row.
 	SoftDeleteOrganization(ctx context.Context, arg SoftDeleteOrganizationParams) (Organization, error)
 	SoftDeleteSpace(ctx context.Context, arg SoftDeleteSpaceParams) (Space, error)
+	// Maps a set of space uuids to their slug (the `name` column). Used to build
+	// space-scoped resource names for a page of rows that reference spaces by uuid
+	// (e.g. org-wide workflow-run listing) in one round-trip instead of N+1.
+	// Includes soft-deleted spaces so a name still renders during the grace window.
+	SpaceSlugsByIDs(ctx context.Context, ids []uuid.UUID) ([]SpaceSlugsByIDsRow, error)
 	SumTokensByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)
 	UndeleteAsset(ctx context.Context, id uuid.UUID) error
@@ -952,6 +1000,11 @@ type Querier interface {
 	// cleared secret would render an enabled SsoConfig non-functional, so
 	// callers that want to disable SSO flip `enabled=false` instead.
 	UpsertSsoConfig(ctx context.Context, arg UpsertSsoConfigParams) (SsoConfig, error)
+	// Maps a set of workflow uuids to their slug. The scope-wide run listings
+	// (the workflows/- wildcard) return workflow_runs rows carrying only the
+	// workflow_id uuid FK; the run's resource name needs the workflow slug, so the
+	// page's distinct workflow ids are resolved in one round-trip (no N+1).
+	WorkflowSlugsByIDs(ctx context.Context, ids []uuid.UUID) ([]WorkflowSlugsByIDsRow, error)
 	// Maps a set of version uuids to their monotonic version_number. A Workflow's
 	// promoted `version` column stores the version uuid, but the resource name
 	// renders the number — List/Get resolve the page's promoted pointers in one

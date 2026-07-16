@@ -21,7 +21,7 @@ func SecretToProto(s db.Secret, namePrefix string, actors map[uuid.UUID]*typespb
 		_ = json.Unmarshal(s.Annotations, &annotations)
 	}
 	return &secretsv1.Secret{
-		Name:        namePrefix + "/secrets/" + s.ID.String(),
+		Name:        namePrefix + "/secrets/" + s.Slug,
 		DisplayName: s.DisplayName,
 		Annotations: annotations,
 		Etag:        s.Etag,

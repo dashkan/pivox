@@ -120,31 +120,18 @@ func (s *SecretsServer) resolveActors(ctx context.Context, rows []db.Secret) map
 	return actors
 }
 
-// parseSecretName extracts the leaf UUID from a full Secret resource name
-// ("organizations/{org}[/spaces/{space}]/secrets/{uuid}"). A malformed name
-// or non-UUID leaf is NotFound (the named secret doesn't exist).
-func parseSecretName(name string) (uuid.UUID, error) {
+// parseSecretName extracts the slug leaf from a full Secret resource name
+// ("organizations/{org}[/spaces/{space}]/secrets/{slug}"). The slug is the
+// user-assigned id, unique within the secret's parent scope; the handler
+// resolves it to the internal uuid via a scoped (org + space + slug) lookup, so
+// a name that names another org's secret simply finds no row in this scope
+// (NotFound, no cross-scope leak). A name with no leaf is NotFound.
+func parseSecretName(name string) (string, error) {
 	idx := strings.LastIndex(name, "/")
-	if idx < 0 {
-		return uuid.Nil, apierr.NotFound("Secret", name)
+	if idx < 0 || idx == len(name)-1 {
+		return "", apierr.NotFound("Secret", name)
 	}
-	id, err := uuid.Parse(name[idx+1:])
-	if err != nil {
-		return uuid.Nil, apierr.NotFound("Secret", name)
-	}
-	return id, nil
-}
-
-// checkScope enforces that a secret fetched by its (global) uuid actually
-// belongs to the caller's interceptor-resolved scope. Without this, a caller
-// with access to org A could read/mutate a secret in org B by crafting
-// "organizations/A/secrets/{B-uuid}" — the interceptor gates on A but never
-// verifies the uuid is A's. A mismatch is NotFound (don't leak existence).
-func checkScope(row db.Secret, orgID uuid.UUID, spaceID pgtype.UUID, name string) error {
-	if row.OrgID != orgID || row.SpaceID != spaceID {
-		return apierr.NotFound("Secret", name)
-	}
-	return nil
+	return name[idx+1:], nil
 }
 
 // marshalAnnotations renders the labels map as JSONB. Empty map → "{}" (the
@@ -206,17 +193,18 @@ func (s *SecretsServer) ListSecrets(ctx context.Context, req *secretsv1.ListSecr
 }
 
 func (s *SecretsServer) GetSecret(ctx context.Context, req *secretsv1.GetSecretRequest) (*secretsv1.Secret, error) {
-	id, err := parseSecretName(req.GetName())
+	slug, err := parseSecretName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
 	orgID, spaceID, prefix := s.scope(ctx)
-	row, err := s.queries.GetSecret(ctx, id)
+	row, err := s.queries.GetSecretByParent(ctx, db.GetSecretByParentParams{
+		OrgID:   orgID,
+		SpaceID: spaceID,
+		Slug:    slug,
+	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Secret", req.GetName())
-	}
-	if err := checkScope(row, orgID, spaceID, req.GetName()); err != nil {
-		return nil, err
 	}
 	return convert.SecretToProto(row, prefix, s.resolveActors(ctx, []db.Secret{row})), nil
 }
@@ -254,7 +242,7 @@ func (s *SecretsServer) CreateSecret(ctx context.Context, req *secretsv1.CreateS
 		ID:              id,
 		OrgID:           orgID,
 		SpaceID:         spaceID,
-		SecretID:        secretID,
+		Slug:            secretID,
 		DisplayName:     in.GetDisplayName(),
 		ValueCiphertext: ciphertext,
 		Annotations:     annotations,
@@ -274,7 +262,7 @@ func (s *SecretsServer) CreateSecret(ctx context.Context, req *secretsv1.CreateS
 
 func (s *SecretsServer) UpdateSecret(ctx context.Context, req *secretsv1.UpdateSecretRequest) (*secretsv1.Secret, error) {
 	in := req.GetSecret()
-	id, err := parseSecretName(in.GetName())
+	slug, err := parseSecretName(in.GetName())
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +283,6 @@ func (s *SecretsServer) UpdateSecret(ctx context.Context, req *secretsv1.UpdateS
 	valueInMask := mask != nil && slices.Contains(mask.GetPaths(), "value")
 
 	params := db.UpdateSecretParams{
-		ID:        id,
 		UpdatedBy: convert.PgUUID(server.MustUserID(ctx)),
 	}
 	if inScope("display_name") {
@@ -308,31 +295,65 @@ func (s *SecretsServer) UpdateSecret(ctx context.Context, req *secretsv1.UpdateS
 		}
 		params.Annotations = annotations
 	}
+
+	// Encrypt the new value BEFORE the tx. The AAD binds ciphertext to the
+	// secret's immutable uuid, so we first resolve that uuid via a NON-locking
+	// read, then encrypt outside any lock — Tink's envelope Encrypt is an
+	// uncancellable KMS round-trip, and holding a row's FOR UPDATE lock + tx +
+	// pooled connection across an external call is exactly what we must avoid.
+	// The in-tx re-lock below re-checks the uuid before writing.
+	var (
+		newCiphertext []byte
+		encryptedID   uuid.UUID
+	)
 	if valueInMask {
-		value := in.GetValue()
-		if len(value) == 0 {
+		newValue := in.GetValue()
+		if len(newValue) == 0 {
 			return nil, apierr.InvalidArgument(apierr.FieldViolation("secret.value",
 				"must not be empty when in the update mask — delete the secret to remove it"))
 		}
-		ciphertext, err := s.encryptor.Encrypt(value, secretAAD(id))
+		existing, err := s.queries.GetSecretByParent(ctx, db.GetSecretByParentParams{
+			OrgID:   orgID,
+			SpaceID: spaceID,
+			Slug:    slug,
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Secret", in.GetName())
+		}
+		ciphertext, err := s.encryptor.Encrypt(newValue, secretAAD(existing.ID))
 		if err != nil {
 			slog.ErrorContext(ctx, "secrets: encrypt failed", "error", err)
 			return nil, apierr.Internal(err, "encrypt secret value")
 		}
-		params.ValueCiphertext = ciphertext
+		newCiphertext = ciphertext
+		encryptedID = existing.ID
 	}
 
 	var row db.Secret
 	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
-		existing, err := qtx.GetSecretForUpdate(ctx, id)
+		existing, err := qtx.GetSecretByParentForUpdate(ctx, db.GetSecretByParentForUpdateParams{
+			OrgID:   orgID,
+			SpaceID: spaceID,
+			Slug:    slug,
+		})
 		if err != nil {
 			return apierr.HandleResourceError(err, "Secret", in.GetName())
 		}
-		if err := checkScope(existing, orgID, spaceID, in.GetName()); err != nil {
-			return err
-		}
 		if etag := in.GetEtag(); etag != "" && etag != existing.Etag {
 			return apierr.Aborted("Secret", in.GetName(), "etag mismatch")
+		}
+		params.ID = existing.ID
+		if valueInMask {
+			// The precomputed ciphertext is bound to the id read before the tx.
+			// If the row was deleted + recreated with the same slug in the
+			// meantime it now has a different uuid, so that ciphertext would be
+			// mis-bound (its AAD wouldn't match). Bail so the client retries and
+			// re-encrypts against the new row rather than persisting an
+			// undecryptable value. (Retry-safe: nothing is committed here.)
+			if existing.ID != encryptedID {
+				return apierr.Aborted("Secret", in.GetName(), "secret was modified concurrently")
+			}
+			params.ValueCiphertext = newCiphertext
 		}
 		row, err = qtx.UpdateSecret(ctx, params)
 		if err != nil {
@@ -347,18 +368,19 @@ func (s *SecretsServer) UpdateSecret(ctx context.Context, req *secretsv1.UpdateS
 }
 
 func (s *SecretsServer) DeleteSecret(ctx context.Context, req *secretsv1.DeleteSecretRequest) (*emptypb.Empty, error) {
-	id, err := parseSecretName(req.GetName())
+	slug, err := parseSecretName(req.GetName())
 	if err != nil {
 		return nil, err
 	}
 	orgID, spaceID, _ := s.scope(ctx)
 	err = db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
-		existing, err := qtx.GetSecretForUpdate(ctx, id)
+		existing, err := qtx.GetSecretByParentForUpdate(ctx, db.GetSecretByParentForUpdateParams{
+			OrgID:   orgID,
+			SpaceID: spaceID,
+			Slug:    slug,
+		})
 		if err != nil {
 			return apierr.HandleResourceError(err, "Secret", req.GetName())
-		}
-		if err := checkScope(existing, orgID, spaceID, req.GetName()); err != nil {
-			return err
 		}
 		if etag := req.GetEtag(); etag != "" && etag != existing.Etag {
 			return apierr.Aborted("Secret", req.GetName(), "etag mismatch")
@@ -371,20 +393,20 @@ func (s *SecretsServer) DeleteSecret(ctx context.Context, req *secretsv1.DeleteS
 		// the actual block. (A referencing connector is always in this
 		// secret's own scope, since cross-scope refs are rejected at connector
 		// write time, so naming its slug here leaks nothing.)
-		refs, err := qtx.ConnectorsReferencingSecret(ctx, id)
+		refs, err := qtx.ConnectorsReferencingSecret(ctx, existing.ID)
 		if err != nil {
 			return apierr.Internal(err, "check secret references")
 		}
 		if len(refs) > 0 {
 			slugs := make([]string, 0, len(refs))
 			for _, r := range refs {
-				slugs = append(slugs, r.ConnectorID)
+				slugs = append(slugs, r.Slug)
 			}
 			return apierr.FailedPrecondition(fmt.Sprintf(
 				"secret is referenced by connector(s) %s; remove the reference before deleting",
 				strings.Join(slugs, ", ")))
 		}
-		return qtx.DeleteSecret(ctx, id)
+		return qtx.DeleteSecret(ctx, existing.ID)
 	})
 	if err != nil {
 		return nil, err

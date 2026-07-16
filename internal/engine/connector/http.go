@@ -126,22 +126,24 @@ func (a *HTTPActivity) Execute(ctx context.Context, rc *engine.RunContext, step 
 // connector is terminal (and reported as not-found, not leaking cross-scope
 // existence).
 func (a *HTTPActivity) resolveConnector(ctx context.Context, rc *engine.RunContext, ref string) (db.Connector, error) {
-	id, err := parseConnectorLeaf(ref)
+	slug, err := parseConnectorLeaf(ref)
 	if err != nil {
 		return db.Connector{}, fmt.Errorf("connector: reference %q is not a valid connector resource name: %w", ref, err)
 	}
-	conn, err := a.store.GetConnector(ctx, id)
+	orgID, spaceID := rc.Scope()
+	// Resolve by slug SCOPED to the run's org+space. The scoped lookup is the
+	// cross-scope guard: a connector in another scope isn't found (its existence
+	// never leaks), so no separate scope check is needed.
+	conn, err := a.store.GetConnectorByParent(ctx, db.GetConnectorByParentParams{
+		OrgID:   orgID,
+		SpaceID: pgtype.UUID{Bytes: spaceID, Valid: spaceID != uuid.Nil},
+		Slug:    slug,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.Connector{}, fmt.Errorf("connector: %q not found", ref)
 		}
 		return db.Connector{}, engine.Retryable(fmt.Errorf("connector: resolve %q: %w", ref, err))
-	}
-	orgID, spaceID := rc.Scope()
-	if conn.OrgID != orgID || !sameSpace(conn.SpaceID, spaceID) {
-		// Not in the run's scope — treat as not found so a crafted cross-scope
-		// reference can't confirm the connector exists.
-		return db.Connector{}, fmt.Errorf("connector: %q not found", ref)
 	}
 	return conn, nil
 }
@@ -279,26 +281,13 @@ func headerMap(h http.Header) map[string]any {
 	return out
 }
 
-// parseConnectorLeaf extracts the leaf UUID from a Connector resource name
-// ("organizations/{org}[/spaces/{space}]/connectors/{uuid}").
-func parseConnectorLeaf(name string) (uuid.UUID, error) {
+// parseConnectorLeaf extracts the slug leaf from a Connector resource name
+// ("organizations/{org}[/spaces/{space}]/connectors/{slug}"). The slug is
+// resolved to a concrete connector against the run's scope by the caller.
+func parseConnectorLeaf(name string) (string, error) {
 	idx := strings.LastIndex(name, "/")
-	if idx < 0 {
-		return uuid.Nil, errors.New("not a connector resource name")
+	if idx < 0 || idx == len(name)-1 {
+		return "", errors.New("not a connector resource name")
 	}
-	id, err := uuid.Parse(name[idx+1:])
-	if err != nil {
-		return uuid.Nil, errors.New("connector name leaf is not a uuid")
-	}
-	return id, nil
-}
-
-// sameSpace reports whether a connector's (nullable) space matches the run's
-// space. uuid.Nil run space means org-scoped, which matches only a connector
-// with no space.
-func sameSpace(connSpace pgtype.UUID, runSpace uuid.UUID) bool {
-	if runSpace == uuid.Nil {
-		return !connSpace.Valid
-	}
-	return connSpace.Valid && uuid.UUID(connSpace.Bytes) == runSpace
+	return name[idx+1:], nil
 }

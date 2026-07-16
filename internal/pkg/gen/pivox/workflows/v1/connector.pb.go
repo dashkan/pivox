@@ -351,6 +351,14 @@ type ListConnectorsResponse struct {
 	Connectors []*Connector `protobuf:"bytes,1,rep,name=connectors,proto3" json:"connectors,omitempty"`
 	// A pagination token for the next page, empty if there are no more.
 	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	// The distinct, sorted set of non-empty `agent` values present across the
+	// list's BASE SCOPE — the whole org (org-direct connectors plus every space)
+	// for an org-level list, or the selected space for a space-level list. It is
+	// NOT narrowed by the request `filter`, so a client can populate an
+	// agent-filter facet with every agent actually assigned to a connector in
+	// scope, regardless of the current page's filter. Empty when every connector
+	// in scope runs on the cloud controller (agent = "").
+	AgentsInUse   []string `protobuf:"bytes,3,rep,name=agents_in_use,json=agentsInUse,proto3" json:"agents_in_use,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -397,6 +405,13 @@ func (x *ListConnectorsResponse) GetNextPageToken() string {
 		return x.NextPageToken
 	}
 	return ""
+}
+
+func (x *ListConnectorsResponse) GetAgentsInUse() []string {
+	if x != nil {
+		return x.AgentsInUse
+	}
+	return nil
 }
 
 // Request for GetConnector.
@@ -686,12 +701,13 @@ const file_pivox_workflows_v1_connector_proto_rawDesc = "" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
 	"\x06filter\x18\x04 \x01(\tB\x03\xe0A\x01R\x06filter\x12\x1e\n" +
-	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"\x7f\n" +
+	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"\xa3\x01\n" +
 	"\x16ListConnectorsResponse\x12=\n" +
 	"\n" +
 	"connectors\x18\x01 \x03(\v2\x1d.pivox.workflows.v1.ConnectorR\n" +
 	"connectors\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"R\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12\"\n" +
+	"\ragents_in_use\x18\x03 \x03(\tR\vagentsInUse\"R\n" +
 	"\x13GetConnectorRequest\x12;\n" +
 	"\x04name\x18\x01 \x01(\tB'\xe0A\x02\xfaA\x1b\n" +
 	"\x19pivox.workflows/Connector\xbaH\x03\xc8\x01\x01R\x04name\"\xf3\x01\n" +

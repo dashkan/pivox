@@ -14,15 +14,15 @@ import (
 )
 
 const createSecret = `-- name: CreateSecret :one
-INSERT INTO secrets (id, org_id, space_id, secret_id, display_name, value_ciphertext, annotations, created_by, updated_by)
+INSERT INTO secrets (id, org_id, space_id, slug, display_name, value_ciphertext, annotations, created_by, updated_by)
 VALUES ($1, $2, $8, $3, $4, $5, $6, $7, $7)
-RETURNING id, org_id, space_id, secret_id, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, space_id, slug, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time
 `
 
 type CreateSecretParams struct {
 	ID              uuid.UUID       `json:"id"`
 	OrgID           uuid.UUID       `json:"org_id"`
-	SecretID        string          `json:"secret_id"`
+	Slug            string          `json:"slug"`
 	DisplayName     string          `json:"display_name"`
 	ValueCiphertext []byte          `json:"value_ciphertext"`
 	Annotations     json.RawMessage `json:"annotations"`
@@ -36,7 +36,7 @@ func (q *Queries) CreateSecret(ctx context.Context, arg CreateSecretParams) (Sec
 	row := q.db.QueryRow(ctx, createSecret,
 		arg.ID,
 		arg.OrgID,
-		arg.SecretID,
+		arg.Slug,
 		arg.DisplayName,
 		arg.ValueCiphertext,
 		arg.Annotations,
@@ -48,7 +48,7 @@ func (q *Queries) CreateSecret(ctx context.Context, arg CreateSecretParams) (Sec
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.SecretID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.ValueCiphertext,
 		&i.Annotations,
@@ -71,7 +71,7 @@ func (q *Queries) DeleteSecret(ctx context.Context, id uuid.UUID) error {
 }
 
 const getSecret = `-- name: GetSecret :one
-SELECT id, org_id, space_id, secret_id, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time FROM secrets WHERE id = $1
+SELECT id, org_id, space_id, slug, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time FROM secrets WHERE id = $1
 `
 
 func (q *Queries) GetSecret(ctx context.Context, id uuid.UUID) (Secret, error) {
@@ -81,7 +81,7 @@ func (q *Queries) GetSecret(ctx context.Context, id uuid.UUID) (Secret, error) {
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.SecretID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.ValueCiphertext,
 		&i.Annotations,
@@ -95,28 +95,28 @@ func (q *Queries) GetSecret(ctx context.Context, id uuid.UUID) (Secret, error) {
 }
 
 const getSecretByParent = `-- name: GetSecretByParent :one
-SELECT id, org_id, space_id, secret_id, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time FROM secrets
+SELECT id, org_id, space_id, slug, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time FROM secrets
 WHERE org_id = $1
-  AND space_id IS NOT DISTINCT FROM $3
-  AND secret_id = $2
+  AND space_id IS NOT DISTINCT FROM $2
+  AND slug = $3
 `
 
 type GetSecretByParentParams struct {
-	OrgID    uuid.UUID   `json:"org_id"`
-	SecretID string      `json:"secret_id"`
-	SpaceID  pgtype.UUID `json:"space_id"`
+	OrgID   uuid.UUID   `json:"org_id"`
+	SpaceID pgtype.UUID `json:"space_id"`
+	Slug    string      `json:"slug"`
 }
 
-// Resolves a Secret from its parent + slug. space_id IS NOT DISTINCT FROM
-// treats NULL (org-scoped) as a matchable value.
+// Resolves a Secret from its parent + slug (the resource-name leaf).
+// space_id IS NOT DISTINCT FROM treats NULL (org-scoped) as a matchable value.
 func (q *Queries) GetSecretByParent(ctx context.Context, arg GetSecretByParentParams) (Secret, error) {
-	row := q.db.QueryRow(ctx, getSecretByParent, arg.OrgID, arg.SecretID, arg.SpaceID)
+	row := q.db.QueryRow(ctx, getSecretByParent, arg.OrgID, arg.SpaceID, arg.Slug)
 	var i Secret
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.SecretID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.ValueCiphertext,
 		&i.Annotations,
@@ -129,20 +129,32 @@ func (q *Queries) GetSecretByParent(ctx context.Context, arg GetSecretByParentPa
 	return i, err
 }
 
-const getSecretForUpdate = `-- name: GetSecretForUpdate :one
-SELECT id, org_id, space_id, secret_id, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time FROM secrets WHERE id = $1 FOR UPDATE
+const getSecretByParentForUpdate = `-- name: GetSecretByParentForUpdate :one
+SELECT id, org_id, space_id, slug, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time FROM secrets
+WHERE org_id = $1
+  AND space_id IS NOT DISTINCT FROM $2
+  AND slug = $3
+FOR UPDATE
 `
 
-// GetSecretForUpdate locks the row for the update/delete tx so the etag
-// check and the write serialize against a concurrent rotate.
-func (q *Queries) GetSecretForUpdate(ctx context.Context, id uuid.UUID) (Secret, error) {
-	row := q.db.QueryRow(ctx, getSecretForUpdate, id)
+type GetSecretByParentForUpdateParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	SpaceID pgtype.UUID `json:"space_id"`
+	Slug    string      `json:"slug"`
+}
+
+// GetSecretByParentForUpdate resolves a Secret by parent + slug AND locks the
+// row, so the etag check and the write serialize against a concurrent rotate.
+// The slug is the resource-name leaf, so update/delete resolve their target by
+// scope + slug in one statement.
+func (q *Queries) GetSecretByParentForUpdate(ctx context.Context, arg GetSecretByParentForUpdateParams) (Secret, error) {
+	row := q.db.QueryRow(ctx, getSecretByParentForUpdate, arg.OrgID, arg.SpaceID, arg.Slug)
 	var i Secret
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.SecretID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.ValueCiphertext,
 		&i.Annotations,
@@ -156,7 +168,7 @@ func (q *Queries) GetSecretForUpdate(ctx context.Context, id uuid.UUID) (Secret,
 }
 
 const listSecretsByParent = `-- name: ListSecretsByParent :many
-SELECT id, org_id, space_id, secret_id, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time FROM secrets
+SELECT id, org_id, space_id, slug, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time FROM secrets
 WHERE org_id = $1
   AND space_id IS NOT DISTINCT FROM $2
   AND ($3::uuid IS NULL OR id > $3)
@@ -191,7 +203,7 @@ func (q *Queries) ListSecretsByParent(ctx context.Context, arg ListSecretsByPare
 			&i.ID,
 			&i.OrgID,
 			&i.SpaceID,
-			&i.SecretID,
+			&i.Slug,
 			&i.DisplayName,
 			&i.ValueCiphertext,
 			&i.Annotations,
@@ -220,7 +232,7 @@ SET display_name = COALESCE($3, display_name),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, space_id, secret_id, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, space_id, slug, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time
 `
 
 type UpdateSecretParams struct {
@@ -246,7 +258,7 @@ func (q *Queries) UpdateSecret(ctx context.Context, arg UpdateSecretParams) (Sec
 		&i.ID,
 		&i.OrgID,
 		&i.SpaceID,
-		&i.SecretID,
+		&i.Slug,
 		&i.DisplayName,
 		&i.ValueCiphertext,
 		&i.Annotations,

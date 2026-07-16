@@ -1,7 +1,7 @@
 -- name: CreateSecret :one
 -- id is app-generated (uuid.New) so the caller has it for AAD binding
 -- before the value is encrypted.
-INSERT INTO secrets (id, org_id, space_id, secret_id, display_name, value_ciphertext, annotations, created_by, updated_by)
+INSERT INTO secrets (id, org_id, space_id, slug, display_name, value_ciphertext, annotations, created_by, updated_by)
 VALUES ($1, $2, sqlc.narg('space_id'), $3, $4, $5, $6, $7, $7)
 RETURNING *;
 
@@ -9,17 +9,23 @@ RETURNING *;
 SELECT * FROM secrets WHERE id = $1;
 
 -- name: GetSecretByParent :one
--- Resolves a Secret from its parent + slug. space_id IS NOT DISTINCT FROM
--- treats NULL (org-scoped) as a matchable value.
+-- Resolves a Secret from its parent + slug (the resource-name leaf).
+-- space_id IS NOT DISTINCT FROM treats NULL (org-scoped) as a matchable value.
 SELECT * FROM secrets
 WHERE org_id = $1
   AND space_id IS NOT DISTINCT FROM sqlc.narg('space_id')
-  AND secret_id = $2;
+  AND slug = sqlc.arg('slug');
 
--- GetSecretForUpdate locks the row for the update/delete tx so the etag
--- check and the write serialize against a concurrent rotate.
--- name: GetSecretForUpdate :one
-SELECT * FROM secrets WHERE id = $1 FOR UPDATE;
+-- GetSecretByParentForUpdate resolves a Secret by parent + slug AND locks the
+-- row, so the etag check and the write serialize against a concurrent rotate.
+-- The slug is the resource-name leaf, so update/delete resolve their target by
+-- scope + slug in one statement.
+-- name: GetSecretByParentForUpdate :one
+SELECT * FROM secrets
+WHERE org_id = $1
+  AND space_id IS NOT DISTINCT FROM sqlc.narg('space_id')
+  AND slug = sqlc.arg('slug')
+FOR UPDATE;
 
 -- name: UpdateSecret :one
 -- Masked update: a nil arg leaves the column unchanged. value_ciphertext is

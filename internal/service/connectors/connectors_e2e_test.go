@@ -2,7 +2,6 @@ package connectors_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -22,14 +21,6 @@ import (
 // shape the ref extractor statically scans for.
 func secretRefHeader(secretName string) string {
 	return `"Bearer " + secret("` + secretName + `")`
-}
-
-func idFromName(t *testing.T, name string) uuid.UUID {
-	t.Helper()
-	parts := strings.Split(name, "/")
-	id, err := uuid.Parse(parts[len(parts)-1])
-	require.NoError(t, err, "resource name leaf must be a uuid: %s", name)
-	return id
 }
 
 // TestE2E_Connector_CRUD covers the create→get→list→update→delete happy path
@@ -66,6 +57,8 @@ func TestE2E_Connector_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "VizRT Hub", created.GetDisplayName())
 	assert.Equal(t, "HTTP into the VizRT hub", created.GetDescription())
+	// The resource name's leaf is the user-assigned slug, not the internal uuid.
+	assert.Equal(t, "organizations/"+owned.Slug+"/connectors/vizrt-hub", created.GetName())
 	require.NotEmpty(t, created.GetName())
 	require.NotEmpty(t, created.GetEtag())
 	assert.Equal(t, map[string]string{"team": "playout"}, created.GetAnnotations())
@@ -159,12 +152,11 @@ func TestE2E_Connector_ValidateOnly(t *testing.T) {
 	assert.Equal(t, codes.AlreadyExists, status.Code(err))
 }
 
-// TestE2E_Connector_ScopeIsolation pins that a connector's uuid can't be read
-// or deleted through a different org's name prefix. The resource-name leaf is
-// a global uuid; the interceptor gates on the name's org, so the handler must
-// verify the fetched connector actually belongs to that org (else a member of
-// org A could reach org B's connector via
-// "organizations/A/connectors/{B-uuid}").
+// TestE2E_Connector_ScopeIsolation pins that a connector can't be read or
+// deleted through a different org's name prefix. The resource-name leaf is the
+// slug, unique only within its parent; the handler resolves it by (org, space,
+// slug), so naming another org's connector under this org's prefix finds no row
+// (NotFound) rather than leaking cross-scope existence.
 func TestE2E_Connector_ScopeIsolation(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -183,7 +175,7 @@ func TestE2E_Connector_ScopeIsolation(t *testing.T) {
 	require.True(t, op.GetDone())
 
 	client := workflowsv1.NewConnectorsClient(h.Conn())
-	created, err := client.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
+	_, err = client.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
 		Parent:      "organizations/iso-b",
 		ConnectorId: "b-connector",
 		Connector: &workflowsv1.Connector{
@@ -191,10 +183,11 @@ func TestE2E_Connector_ScopeIsolation(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	bID := idFromName(t, created.GetName())
 
 	// Read iso-b's connector through iso-a's name prefix → NotFound, not leaked.
-	crossName := "organizations/iso-a/connectors/" + bID.String()
+	// (The leaf is the slug; iso-a has no connector by that slug, so the scoped
+	// lookup finds nothing — cross-scope existence never leaks.)
+	crossName := "organizations/iso-a/connectors/b-connector"
 	_, err = client.GetConnector(ctx, &workflowsv1.GetConnectorRequest{Name: crossName})
 	require.Error(t, err)
 	assert.Equal(t, codes.NotFound, status.Code(err), "cross-scope read must be NotFound")
@@ -205,15 +198,20 @@ func TestE2E_Connector_ScopeIsolation(t *testing.T) {
 	assert.Equal(t, codes.NotFound, status.Code(err), "cross-scope delete must be NotFound")
 }
 
-// countSecretRefs returns how many connector_secret_refs rows link the given
-// connector and secret — used to assert a config's secret("…") reference was
-// tracked in the same tx that wrote the connector.
-func countSecretRefs(t *testing.T, h *grpcharness.Harness, connectorID, secretID uuid.UUID) int {
+// countSecretRefs returns how many connector_secret_refs rows link the named
+// connector and secret (both by slug, within the org named orgSlug) — used to
+// assert a config's secret("…") reference was tracked in the same tx that wrote
+// the connector.
+func countSecretRefs(t *testing.T, h *grpcharness.Harness, orgSlug, connSlug, secretSlug string) int {
 	t.Helper()
 	var n int
 	require.NoError(t, h.Pool.QueryRow(context.Background(),
-		`SELECT count(*) FROM connector_secret_refs WHERE connector_id = $1 AND secret_id = $2`,
-		connectorID, secretID).Scan(&n))
+		`SELECT count(*) FROM connector_secret_refs r
+		 JOIN connectors c ON c.id = r.connector_id
+		 JOIN secrets s ON s.id = r.secret_id
+		 JOIN organizations o ON o.id = c.org_id
+		 WHERE o.name = $1 AND c.slug = $2 AND s.slug = $3`,
+		orgSlug, connSlug, secretSlug).Scan(&n))
 	return n
 }
 
@@ -240,7 +238,6 @@ func TestE2E_Connector_SecretRef_TrackedAndGuarded(t *testing.T) {
 		Secret:   &secretsv1.Secret{Value: []byte("s3cr3t")},
 	})
 	require.NoError(t, err)
-	secretID := idFromName(t, secret.GetName())
 
 	created, err := connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
 		Parent:      "organizations/" + owned.Slug,
@@ -253,10 +250,9 @@ func TestE2E_Connector_SecretRef_TrackedAndGuarded(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	connID := idFromName(t, created.GetName())
 
 	// The ref was tracked in the same tx as the connector write.
-	assert.Equal(t, 1, countSecretRefs(t, h, connID, secretID))
+	assert.Equal(t, 1, countSecretRefs(t, h, owned.Slug, "vizrt-hub", "hub-token"))
 
 	// The secret is now referenced → DeleteSecret is blocked.
 	_, err = secretsClient.DeleteSecret(ctx, &secretsv1.DeleteSecretRequest{Name: secret.GetName()})
@@ -288,7 +284,7 @@ func TestE2E_Connector_SecretRef_Nonexistent(t *testing.T) {
 	ctx := context.Background()
 	connClient := workflowsv1.NewConnectorsClient(h.Conn())
 
-	// A well-formed name whose leaf uuid resolves to no secret.
+	// A well-formed name whose slug leaf resolves to no secret.
 	danglingName := "organizations/" + owned.Slug + "/secrets/" + uuid.New().String()
 	_, err := connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
 		Parent:      "organizations/" + owned.Slug,
@@ -303,14 +299,15 @@ func TestE2E_Connector_SecretRef_Nonexistent(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 
-	// And a malformed ref (leaf isn't a uuid) is likewise rejected.
+	// And a bare ref with no collection path (no "/") is likewise rejected as a
+	// malformed Secret resource name.
 	_, err = connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
 		Parent:      "organizations/" + owned.Slug,
 		ConnectorId: "malformed",
 		Connector: &workflowsv1.Connector{
 			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
 				BaseUrl: "https://api.example.com",
-				Headers: map[string]string{"Authorization": secretRefHeader("not/a/secret/name")},
+				Headers: map[string]string{"Authorization": secretRefHeader("bare-name")},
 			}},
 		},
 	})
@@ -318,9 +315,55 @@ func TestE2E_Connector_SecretRef_Nonexistent(t *testing.T) {
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
+// TestE2E_Connector_SecretRef_WrongScopePrefixRejected pins that the ref name's
+// PARENT segments are validated against the connector's scope — a ref written as
+// organizations/OTHER/secrets/foo must NOT silently rebind to the connector's
+// own local "foo". Without parent validation the leaf slug would resolve in the
+// connector's scope, quietly pointing the config at a different secret than the
+// name says.
+func TestE2E_Connector_SecretRef_WrongScopePrefixRejected(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithSecretsServer(),
+		grpcharness.WithConnectorsServer())
+	owned := h.SeedOwnedOrg(t, "ref-scope", "Ref Scope", "connectors")
+	ctx := context.Background()
+	secretsClient := secretsv1.NewSecretsClient(h.Conn())
+	connClient := workflowsv1.NewConnectorsClient(h.Conn())
+
+	// A real secret "foo" exists in the connector's OWN org.
+	_, err := secretsClient.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
+		Parent:   "organizations/" + owned.Slug,
+		SecretId: "foo",
+		Secret:   &secretsv1.Secret{Value: []byte("v")},
+	})
+	require.NoError(t, err)
+
+	// The connector references "foo" under a DIFFERENT org prefix. The leaf slug
+	// matches the local secret, but the parent scope does not — it must be
+	// rejected, not silently rebound to the local "foo".
+	wrongScopeRef := "organizations/some-other-org/secrets/foo"
+	_, err = connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
+		Parent:      "organizations/" + owned.Slug,
+		ConnectorId: "c",
+		Connector: &workflowsv1.Connector{
+			Config: &workflowsv1.Connector_Http{Http: &workflowsv1.HttpConnector{
+				BaseUrl: "https://api.example.com",
+				Headers: map[string]string{"Authorization": secretRefHeader(wrongScopeRef)},
+			}},
+		},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err),
+		"a ref whose parent scope differs from the connector's must be rejected")
+}
+
 // TestE2E_Connector_SecretRef_CrossScope pins that a connector can't reference
-// a secret in a different org, even by its real uuid — the ref must resolve to
-// a secret in the connector's own scope.
+// a secret in a different org — the ref is resolved (by slug) against the
+// connector's own scope, so another org's secret is simply not found there.
 func TestE2E_Connector_SecretRef_CrossScope(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -342,15 +385,16 @@ func TestE2E_Connector_SecretRef_CrossScope(t *testing.T) {
 	require.True(t, op.GetDone())
 
 	secretsClient := secretsv1.NewSecretsClient(h.Conn())
-	bSecret, err := secretsClient.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
+	_, err = secretsClient.CreateSecret(ctx, &secretsv1.CreateSecretRequest{
 		Parent:   "organizations/xs-b",
 		SecretId: "b-secret",
 		Secret:   &secretsv1.Secret{Value: []byte("b")},
 	})
 	require.NoError(t, err)
 
-	// Connector in org A referencing org B's secret (real uuid, A's prefix).
-	crossName := "organizations/xs-a/secrets/" + idFromName(t, bSecret.GetName()).String()
+	// Connector in org A referencing org B's secret by name under A's prefix.
+	// The slug is resolved in A's scope, where "b-secret" doesn't exist.
+	crossName := "organizations/xs-a/secrets/b-secret"
 	_, err = workflowsv1.NewConnectorsClient(h.Conn()).CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
 		Parent:      "organizations/xs-a",
 		ConnectorId: "cross",
@@ -389,7 +433,6 @@ func TestE2E_Connector_SecretRef_UpdateRetracks(t *testing.T) {
 		Secret:   &secretsv1.Secret{Value: []byte("v")},
 	})
 	require.NoError(t, err)
-	secretID := idFromName(t, secret.GetName())
 
 	created, err := connClient.CreateConnector(ctx, &workflowsv1.CreateConnectorRequest{
 		Parent:      "organizations/" + owned.Slug,
@@ -402,8 +445,7 @@ func TestE2E_Connector_SecretRef_UpdateRetracks(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	connID := idFromName(t, created.GetName())
-	require.Equal(t, 1, countSecretRefs(t, h, connID, secretID))
+	require.Equal(t, 1, countSecretRefs(t, h, owned.Slug, "c", "tok"))
 
 	// A config update pointing at a missing secret is rejected (and the tx
 	// rolls back, so the existing ref survives).
@@ -419,7 +461,7 @@ func TestE2E_Connector_SecretRef_UpdateRetracks(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
-	assert.Equal(t, 1, countSecretRefs(t, h, connID, secretID), "failed update must not drop the ref")
+	assert.Equal(t, 1, countSecretRefs(t, h, owned.Slug, "c", "tok"), "failed update must not drop the ref")
 
 	// An update that drops the reference (no secret in the new config) frees
 	// the secret to be deleted.
@@ -433,7 +475,7 @@ func TestE2E_Connector_SecretRef_UpdateRetracks(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, 0, countSecretRefs(t, h, connID, secretID), "update dropping the ref must clear it")
+	assert.Equal(t, 0, countSecretRefs(t, h, owned.Slug, "c", "tok"), "update dropping the ref must clear it")
 
 	_, err = secretsClient.DeleteSecret(ctx, &secretsv1.DeleteSecretRequest{Name: secret.GetName()})
 	require.NoError(t, err, "with the ref dropped, the secret is deletable")
