@@ -1,8 +1,8 @@
 'use client';
 
-import { Navigate } from '@tanstack/react-router';
-
 import { useAuth } from '@/auth/use-auth';
+
+import type { NavigateComponent } from '@/navigation';
 
 /**
  * Gates the authenticated app shell on the user having a Keycloak session. Wrap
@@ -20,12 +20,21 @@ import { useAuth } from '@/auth/use-auth';
  *     (`OrgGateFeature`, etc.) layer their own preconditions on top.
  *
  * The destination is hardcoded because the gate's purpose IS the
- * redirect; there's no use case for a different login URL.
+ * redirect; there's no use case for a different login URL. Only the
+ * router primitive is injected (`Navigate`) so this package stays
+ * router-agnostic — the consumer adapts its router's redirect
+ * component to `NavigateComponent`.
  *
  * Mirrors the SwiftUI native auth check at
  * `native/platform/macos/swift/Auth/AuthGate.swift`.
  */
-export function AuthGateFeature({ children }: { children: React.ReactNode }) {
+export function AuthGateFeature({
+  Navigate,
+  children,
+}: {
+  Navigate: NavigateComponent;
+  children: React.ReactNode;
+}) {
   const { user, loading } = useAuth();
 
   if (loading) return <AuthGateLoading />;

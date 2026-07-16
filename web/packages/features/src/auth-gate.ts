@@ -6,3 +6,4 @@
  */
 
 export { AuthGateFeature } from './auth-gate/auth-gate-feature';
+export type { NavigateComponent } from './navigation';

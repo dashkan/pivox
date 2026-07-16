@@ -8,6 +8,7 @@ import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
 import { SidebarProvider } from '@pivox/ui/sidebar-provider';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
 import { $api } from '@renderer/lib/api-client';
+import { Navigate } from '@renderer/lib/navigate';
 import { ACCOUNT_CONSOLE_URL } from '@renderer/lib/oidc-env';
 import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
 import { useCallback } from 'react';
@@ -24,7 +25,7 @@ export const Route = createFileRoute('/_app')({
 function AppLayoutRoute() {
   const router = useRouter();
   return (
-    <AuthGateFeature>
+    <AuthGateFeature Navigate={Navigate}>
       <AppShellFeature
         $api={$api}
         onCreateOrganization={() => {
