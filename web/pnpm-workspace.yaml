@@ -82,7 +82,7 @@ catalog:
   "@vitejs/plugin-react": "6.0.3"
   "@xyflow/react": "12.11.2"
   "ai": "6.0.219"
-  "electron": "43.1.0"
+  "electron": "43.1.1"
   "elkjs": "0.11.1"
   "jsdom": "29.1.1"
   "keycloak-js": "26.2.4"
