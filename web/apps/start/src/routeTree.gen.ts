@@ -18,7 +18,11 @@ import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
+import { Route as AppWorkflowsIndexRouteImport } from './routes/_app/workflows/index'
+import { Route as AppSecretsIndexRouteImport } from './routes/_app/secrets/index'
+import { Route as AppConnectorsIndexRouteImport } from './routes/_app/connectors/index'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
+import { Route as AppWorkflowsWorkflowIdRouteImport } from './routes/_app/workflows/$workflowId'
 
 const LaunchRoute = LaunchRouteImport.update({
   id: '/launch',
@@ -64,10 +68,30 @@ const AppAboutRoute = AppAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => AppRoute,
 } as any)
+const AppWorkflowsIndexRoute = AppWorkflowsIndexRouteImport.update({
+  id: '/workflows/',
+  path: '/workflows/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSecretsIndexRoute = AppSecretsIndexRouteImport.update({
+  id: '/secrets/',
+  path: '/secrets/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConnectorsIndexRoute = AppConnectorsIndexRouteImport.update({
+  id: '/connectors/',
+  path: '/connectors/',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
   id: '/api/v1/$',
   path: '/api/v1/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppWorkflowsWorkflowIdRoute = AppWorkflowsWorkflowIdRouteImport.update({
+  id: '/workflows/$workflowId',
+  path: '/workflows/$workflowId',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -79,7 +103,11 @@ export interface FileRoutesByFullPath {
   '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/auth/sign-in': typeof AuthSignInRoute
+  '/workflows/$workflowId': typeof AppWorkflowsWorkflowIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/connectors/': typeof AppConnectorsIndexRoute
+  '/secrets/': typeof AppSecretsIndexRoute
+  '/workflows/': typeof AppWorkflowsIndexRoute
 }
 export interface FileRoutesByTo {
   '/launch': typeof LaunchRoute
@@ -90,7 +118,11 @@ export interface FileRoutesByTo {
   '/auth/logout': typeof AuthLogoutRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/': typeof AppIndexRoute
+  '/workflows/$workflowId': typeof AppWorkflowsWorkflowIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/connectors': typeof AppConnectorsIndexRoute
+  '/secrets': typeof AppSecretsIndexRoute
+  '/workflows': typeof AppWorkflowsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -103,7 +135,11 @@ export interface FileRoutesById {
   '/auth/logout': typeof AuthLogoutRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/workflows/$workflowId': typeof AppWorkflowsWorkflowIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/_app/connectors/': typeof AppConnectorsIndexRoute
+  '/_app/secrets/': typeof AppSecretsIndexRoute
+  '/_app/workflows/': typeof AppWorkflowsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -116,7 +152,11 @@ export interface FileRouteTypes {
     | '/auth/create-org'
     | '/auth/logout'
     | '/auth/sign-in'
+    | '/workflows/$workflowId'
     | '/api/v1/$'
+    | '/connectors/'
+    | '/secrets/'
+    | '/workflows/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/launch'
@@ -127,7 +167,11 @@ export interface FileRouteTypes {
     | '/auth/logout'
     | '/auth/sign-in'
     | '/'
+    | '/workflows/$workflowId'
     | '/api/v1/$'
+    | '/connectors'
+    | '/secrets'
+    | '/workflows'
   id:
     | '__root__'
     | '/_app'
@@ -139,7 +183,11 @@ export interface FileRouteTypes {
     | '/auth/logout'
     | '/auth/sign-in'
     | '/_app/'
+    | '/_app/workflows/$workflowId'
     | '/api/v1/$'
+    | '/_app/connectors/'
+    | '/_app/secrets/'
+    | '/_app/workflows/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -217,12 +265,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAboutRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/workflows/': {
+      id: '/_app/workflows/'
+      path: '/workflows'
+      fullPath: '/workflows/'
+      preLoaderRoute: typeof AppWorkflowsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/secrets/': {
+      id: '/_app/secrets/'
+      path: '/secrets'
+      fullPath: '/secrets/'
+      preLoaderRoute: typeof AppSecretsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/connectors/': {
+      id: '/_app/connectors/'
+      path: '/connectors'
+      fullPath: '/connectors/'
+      preLoaderRoute: typeof AppConnectorsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/v1/$': {
       id: '/api/v1/$'
       path: '/api/v1/$'
       fullPath: '/api/v1/$'
       preLoaderRoute: typeof ApiV1SplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/workflows/$workflowId': {
+      id: '/_app/workflows/$workflowId'
+      path: '/workflows/$workflowId'
+      fullPath: '/workflows/$workflowId'
+      preLoaderRoute: typeof AppWorkflowsWorkflowIdRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
@@ -231,12 +307,20 @@ interface AppRouteChildren {
   AppAboutRoute: typeof AppAboutRoute
   AppImageEditorRoute: typeof AppImageEditorRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppWorkflowsWorkflowIdRoute: typeof AppWorkflowsWorkflowIdRoute
+  AppConnectorsIndexRoute: typeof AppConnectorsIndexRoute
+  AppSecretsIndexRoute: typeof AppSecretsIndexRoute
+  AppWorkflowsIndexRoute: typeof AppWorkflowsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAboutRoute: AppAboutRoute,
   AppImageEditorRoute: AppImageEditorRoute,
   AppIndexRoute: AppIndexRoute,
+  AppWorkflowsWorkflowIdRoute: AppWorkflowsWorkflowIdRoute,
+  AppConnectorsIndexRoute: AppConnectorsIndexRoute,
+  AppSecretsIndexRoute: AppSecretsIndexRoute,
+  AppWorkflowsIndexRoute: AppWorkflowsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

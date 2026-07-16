@@ -38,6 +38,18 @@
     "./chat": {
       "types": "./dist/esm/chat.d.ts",
       "import": "./dist/esm/chat.js"
+    },
+    "./workflows": {
+      "types": "./dist/esm/workflows.d.ts",
+      "import": "./dist/esm/workflows.js"
+    },
+    "./connectors": {
+      "types": "./dist/esm/connectors.d.ts",
+      "import": "./dist/esm/connectors.js"
+    },
+    "./secrets": {
+      "types": "./dist/esm/secrets.d.ts",
+      "import": "./dist/esm/secrets.js"
     }
   },
   "files": [
@@ -62,7 +74,10 @@
   "devDependencies": {
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-router": "catalog:",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/react": "catalog:",
     "@types/react": "catalog:",
+    "jsdom": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:",
@@ -76,6 +91,8 @@
     "@pivox/primitives": "workspace:*",
     "@pivox/storage": "workspace:*",
     "@pivox/ui": "workspace:*",
-    "ai": "catalog:"
+    "@xyflow/react": "catalog:",
+    "ai": "catalog:",
+    "elkjs": "catalog:"
   }
 }

@@ -23,13 +23,24 @@
  */
 
 import { organizationId } from '@pivox/client';
+import {
+  buildConnectorsListRequest,
+  fetchAgentOptions,
+} from '@pivox/features/connectors';
 import { ACTIVE_ORG } from '@pivox/storage';
 import { createServerFn } from '@tanstack/react-start';
 import { getCookie } from '@tanstack/react-start/server';
 
+import { searchToValue, type ConnectorsSearch } from '../lib/connectors-search';
+
 import { getSsrAccessToken } from './oidc/ssr-token';
 import { createServerApiClient } from './pivox-server-api';
 
+import type {
+  ConnectorsListQuery,
+  ConnectorsListRequest,
+} from '@pivox/features/connectors';
+import type { AgentOption } from '@pivox/ui/resource-admin';
 import type { components } from '@pivox/client/types';
 
 /**
@@ -47,7 +58,135 @@ export type ListAccountOrganizationsResponse =
  * the route's QueryClient with data the client's useQuery picks up
  * by matching key.
  */
-export type ListSpacesResponse = components['schemas']['v1ListSpacesResponse'];
+export type ListSpacesResponse =
+  components['schemas']['v1ListSpacesResponse'];
+
+/** Slim wire-shape of the connectors list responses (org rollup + space). */
+export type ListConnectorsResponse =
+  components['schemas']['v1ListConnectorsResponse'];
+
+const CONNECTORS_PATH = '/v1/organizations/{organization}/connectors' as const;
+const SPACE_CONNECTORS_PATH =
+  '/v1/organizations/{organization}/spaces/{space}/connectors' as const;
+
+/**
+ * Result of prefetchConnectors. Carries the built request so the loader can
+ * reproduce the exact react-query key (via `$api.queryOptions`) the client hook
+ * uses — the byte-identical key is what makes the primed data hydrate instead of
+ * silently refetching. Null whenever SSR can't fetch (no session / active org).
+ */
+export type PrefetchedConnectors = ConnectorsListRequest & {
+  orgSlug: string;
+  query: ConnectorsListQuery;
+  connectors: ListConnectorsResponse;
+};
+
+/**
+ * prefetchConnectors server-fn: reads the active-org cookie, builds the SAME
+ * list request the client hook builds (via the shared `buildConnectorsListRequest`),
+ * and GETs the org-rollup or space-scoped connectors path per the URL scope.
+ * Returns null on any failure — SSR must never throw; the client useQuery
+ * retries on hydration.
+ */
+export const prefetchConnectors = createServerFn({ method: 'GET' })
+  .validator((search: ConnectorsSearch): ConnectorsSearch => search)
+  .handler(async ({ data }): Promise<PrefetchedConnectors | null> => {
+    const accessToken = await getSsrAccessToken();
+    if (!accessToken) return null;
+
+    const activeOrg = getCookie(ACTIVE_ORG.name);
+    if (!activeOrg) return null;
+
+    try {
+      const orgSlug = organizationId(activeOrg);
+      if (!orgSlug) return null;
+
+      const req = buildConnectorsListRequest(orgSlug, searchToValue(data));
+      const client = createServerApiClient(accessToken);
+
+      if (req.isSpaceScoped) {
+        const { data: body, response } = await client.GET(SPACE_CONNECTORS_PATH, {
+          params: { path: req.pathParams, query: req.query },
+        });
+        if (!body) {
+          console.warn('[ssr-prefetch] connectors: space non-2xx or empty', {
+            status: response.status,
+            orgSlug,
+          });
+          return null;
+        }
+        return {
+          orgSlug,
+          isSpaceScoped: true,
+          pathParams: req.pathParams,
+          query: req.query,
+          connectors: body,
+        };
+      }
+
+      const { data: body, response } = await client.GET(CONNECTORS_PATH, {
+        params: { path: { organization: orgSlug }, query: req.query },
+      });
+      if (!body) {
+        console.warn('[ssr-prefetch] connectors: org non-2xx or empty', {
+          status: response.status,
+          orgSlug,
+        });
+        return null;
+      }
+      return {
+        orgSlug,
+        isSpaceScoped: false,
+        pathParams: req.pathParams,
+        query: req.query,
+        connectors: body,
+      };
+    } catch (err) {
+      console.warn('[ssr-prefetch] connectors: threw', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  });
+
+/** Result of prefetchConnectorAgents: the org the options belong to + the options. */
+export interface PrefetchedConnectorAgents {
+  orgSlug: string;
+  options: AgentOption[];
+}
+
+/**
+ * prefetchConnectorAgents server-fn: reads the active-org cookie itself (rather
+ * than taking orgSlug as input) so the connectors loader can run it in parallel
+ * with prefetchConnectors instead of waterfalling on that result. Fans out
+ * gateways → agents for the active org (via the shared `fetchAgentOptions`) so
+ * the page's agent options are SSR-primed and no gateways/agents XHR fires on
+ * load. Returns the resolved orgSlug alongside the options so the loader can key
+ * the primed data. Null on any failure — the client's composite query then
+ * fetches on hydration.
+ */
+export const prefetchConnectorAgents = createServerFn({
+  method: 'GET',
+}).handler(async (): Promise<PrefetchedConnectorAgents | null> => {
+  const accessToken = await getSsrAccessToken();
+  if (!accessToken) return null;
+
+  const activeOrg = getCookie(ACTIVE_ORG.name);
+  if (!activeOrg) return null;
+
+  try {
+    const orgSlug = organizationId(activeOrg);
+    if (!orgSlug) return null;
+
+    const client = createServerApiClient(accessToken);
+    return { orgSlug, options: await fetchAgentOptions(client, orgSlug) };
+  } catch (err) {
+    console.warn('[ssr-prefetch] connector-agents: threw', {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+});
 
 /**
  * getActiveOrgCookie server-fn: returns the SSR-time value of the

@@ -67,6 +67,14 @@
       "types": "./dist/esm/chat.d.ts",
       "import": "./dist/esm/chat.js"
     },
+    "./workflow": {
+      "types": "./dist/esm/workflow.d.ts",
+      "import": "./dist/esm/workflow.js"
+    },
+    "./resource-admin": {
+      "types": "./dist/esm/resource-admin.d.ts",
+      "import": "./dist/esm/resource-admin.js"
+    },
     "./colors.css": "./src/colors.css"
   },
   "files": [
@@ -92,8 +100,11 @@
   "devDependencies": {
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-router": "catalog:",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/react": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:",
@@ -107,6 +118,7 @@
     "@pivox/observability": "workspace:*",
     "@pivox/primitives": "workspace:*",
     "@pivox/storage": "workspace:*",
+    "@xyflow/react": "catalog:",
     "ai": "catalog:",
     "lucide-react": "catalog:",
     "qrcode.react": "4.2.0"

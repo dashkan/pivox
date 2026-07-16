@@ -26,7 +26,7 @@ const config = defineConfig({
     watch: false,
     globals: true,
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -61,6 +61,8 @@ export default mergeConfig(
       './src/sidebar-provider.ts',
       './src/image-editor.ts',
       './src/chat.ts',
+      './src/workflow.ts',
+      './src/resource-admin.ts',
     ],
     srcDir: './src',
   }),

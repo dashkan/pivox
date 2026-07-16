@@ -6,7 +6,15 @@ import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
 import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
 import { SidebarProvider } from '@pivox/ui/sidebar-provider';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
-import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
+import {
+  Outlet,
+  createFileRoute,
+  useRouter,
+  useRouterState,
+} from '@tanstack/react-router';
+import { ShieldIcon, WorkflowIcon } from 'lucide-react';
+
+import type { NavMainItem } from '@pivox/ui/app-shell';
 
 import { $api } from '@/lib/api-client';
 import { requireKcSession } from '@/lib/auth-gate';
@@ -111,8 +119,39 @@ export const Route = createFileRoute('/_app')({
   component: AppLayoutRoute,
 });
 
+/**
+ * Sidebar nav groups. `href` on a group is unused (the trigger toggles the
+ * group); subitems carry the real routes. `isActive` opens the group holding
+ * the current route. "Definitions" points at the workflows catalog (T5);
+ * "Connectors" and "Secrets" ship here.
+ */
+function useNavMain(): NavMainItem[] {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  return [
+    {
+      title: 'Workflows',
+      href: '/workflows',
+      icon: <WorkflowIcon />,
+      isActive:
+        pathname.startsWith('/workflows') || pathname.startsWith('/connectors'),
+      items: [
+        { title: 'Definitions', href: '/workflows' },
+        { title: 'Connectors', href: '/connectors' },
+      ],
+    },
+    {
+      title: 'Admin',
+      href: '/secrets',
+      icon: <ShieldIcon />,
+      isActive: pathname.startsWith('/secrets'),
+      items: [{ title: 'Secrets', href: '/secrets' }],
+    },
+  ];
+}
+
 function AppLayoutRoute() {
   const router = useRouter();
+  const navMain = useNavMain();
   const {
     user,
     accountConsoleUrl,
@@ -124,6 +163,7 @@ function AppLayoutRoute() {
     <KeycloakAuthProvider user={user}>
       <AppShellFeature
         $api={$api}
+        navMain={navMain}
         // Seed the shell with the server-verified user so the nav-
         // user menu paints with name + photo on first SSR render,
         // not a half-rendered avatar that pops in after the client

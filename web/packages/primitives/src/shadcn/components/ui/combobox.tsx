@@ -91,20 +91,36 @@ function ComboboxContent({
   align = "start",
   alignOffset = 0,
   anchor,
+  container,
+  positionMethod,
+  collisionBoundary,
   ...props
 }: ComboboxPrimitive.Popup.Props &
   Pick<
     ComboboxPrimitive.Positioner.Props,
-    "side" | "align" | "sideOffset" | "alignOffset" | "anchor"
-  >) {
+    | "side"
+    | "align"
+    | "sideOffset"
+    | "alignOffset"
+    | "anchor"
+    | "positionMethod"
+    | "collisionBoundary"
+  > &
+  Pick<ComboboxPrimitive.Portal.Props, "container">) {
   return (
-    <ComboboxPrimitive.Portal>
+    <ComboboxPrimitive.Portal container={container}>
       <ComboboxPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
+        collisionBoundary={collisionBoundary}
+        // When portaled into a container (e.g. a modal dialog), float via
+        // `position: fixed` so the popup overlays instead of joining the
+        // container's flow (which would push/grow/flicker the dialog). The
+        // default body portal keeps `absolute`, so filter comboboxes are unchanged.
+        positionMethod={positionMethod ?? (container ? "fixed" : undefined)}
         className="isolate z-50"
       >
         <ComboboxPrimitive.Popup
