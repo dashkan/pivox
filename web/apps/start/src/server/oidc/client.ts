@@ -1,6 +1,6 @@
-import { createConfigProvider, type ConfigProvider } from '@pivox/oidc'
+import { createConfigProvider, type ConfigProvider } from '@pivox/oidc';
 
-import type * as oidc from 'openid-client'
+import type * as oidc from 'openid-client';
 
 /**
  * OIDC (Keycloak) client configuration for the `start` BFF.
@@ -12,19 +12,19 @@ import type * as oidc from 'openid-client'
  * cost, by which point the IdP is reachable.
  */
 
-const ISSUER = 'PIVOX_OIDC_ISSUER'
-const CLIENT_ID = 'PIVOX_OIDC_CLIENT_ID'
-const CLIENT_SECRET = 'PIVOX_OIDC_CLIENT_SECRET'
+const ISSUER = 'PIVOX_OIDC_ISSUER';
+const CLIENT_ID = 'PIVOX_OIDC_CLIENT_ID';
+const CLIENT_SECRET = 'PIVOX_OIDC_CLIENT_SECRET';
 
 function required(name: string): string {
-  const value = process.env[name]
+  const value = process.env[name];
   if (!value) {
-    throw new Error(`${name} is required for the OIDC BFF`)
+    throw new Error(`${name} is required for the OIDC BFF`);
   }
-  return value
+  return value;
 }
 
-let provider: ConfigProvider | undefined
+let provider: ConfigProvider | undefined;
 
 /**
  * Discovers and returns the memoized Keycloak {@link oidc.Configuration} for the
@@ -37,16 +37,16 @@ export function getOidcConfig(): Promise<oidc.Configuration> {
       issuer: required(ISSUER),
       clientId: required(CLIENT_ID),
       clientSecret: required(CLIENT_SECRET),
-    })
+    });
   }
-  return provider()
+  return provider();
 }
 
 /**
  * Scopes requested at login. `openid` is required for an ID token; `profile` and
  * `email` feed the backend's lazy provisioning from standard claims.
  */
-export const OIDC_SCOPE = 'openid profile email'
+export const OIDC_SCOPE = 'openid profile email offline_access';
 
 /**
  * Allowed public origins (PIVOX_ALLOWED_ORIGINS, comma-separated). When set, the
@@ -56,17 +56,17 @@ export const OIDC_SCOPE = 'openid profile email'
  * the request's own origin (dev convenience).
  */
 function allowedOrigins(): string[] | null {
-  const raw = process.env.PIVOX_ALLOWED_ORIGINS
-  if (!raw) return null
+  const raw = process.env.PIVOX_ALLOWED_ORIGINS;
+  if (!raw) return null;
   return raw
     .split(',')
     .map((o) => o.trim())
-    .filter(Boolean)
+    .filter(Boolean);
 }
 
 function firstHeaderValue(request: Request, name: string): string | undefined {
-  const value = request.headers.get(name)
-  return value ? value.split(',')[0].trim() : undefined
+  const value = request.headers.get(name);
+  return value ? value.split(',')[0].trim() : undefined;
 }
 
 /**
@@ -82,16 +82,20 @@ function firstHeaderValue(request: Request, name: string): string | undefined {
  * URL, so sign-in and callback must agree on it exactly.
  */
 export function publicOrigin(request: Request): string {
-  const url = new URL(request.url)
-  const proto = firstHeaderValue(request, 'x-forwarded-proto') ?? url.protocol.replace(/:$/, '')
-  const host = firstHeaderValue(request, 'x-forwarded-host') ?? url.host
-  const origin = `${proto}://${host}`
+  const url = new URL(request.url);
+  const proto =
+    firstHeaderValue(request, 'x-forwarded-proto') ??
+    url.protocol.replace(/:$/, '');
+  const host = firstHeaderValue(request, 'x-forwarded-host') ?? url.host;
+  const origin = `${proto}://${host}`;
 
-  const allow = allowedOrigins()
+  const allow = allowedOrigins();
   if (allow && !allow.includes(origin)) {
-    throw new Error(`oidc: request origin ${origin} is not in PIVOX_ALLOWED_ORIGINS`)
+    throw new Error(
+      `oidc: request origin ${origin} is not in PIVOX_ALLOWED_ORIGINS`,
+    );
   }
-  return origin
+  return origin;
 }
 
 /**
@@ -99,5 +103,5 @@ export function publicOrigin(request: Request): string {
  * produce MUST be a registered Valid Redirect URI on the `start` client.
  */
 export function callbackUrl(request: Request): URL {
-  return new URL('/auth/callback', publicOrigin(request))
+  return new URL('/auth/callback', publicOrigin(request));
 }
