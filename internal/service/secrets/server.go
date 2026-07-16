@@ -175,13 +175,11 @@ func (s *SecretsServer) ListSecrets(ctx context.Context, req *secretsv1.ListSecr
 		return nil, apierr.Internal(err, "list secrets")
 	}
 
-	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize].ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
-		rows = rows[:pageSize]
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.Secret) (string, error) {
+		return filter.EncodeNextPageToken(s.codec, last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	actors := s.resolveActors(ctx, rows)

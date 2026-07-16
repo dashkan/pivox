@@ -210,17 +210,16 @@ func (s *ConnectorsServer) ListConnectors(ctx context.Context, req *workflowsv1.
 		return nil, apierr.Internal(err, "list connectors")
 	}
 
-	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		// The keyset cursor is the LAST returned row (index pageSize-1), never
-		// the first un-returned row — the resume predicate is strict `>`/`<`,
-		// so encoding rows[pageSize] would silently drop it next page.
-		rows = rows[:pageSize]
-		last := rows[pageSize-1]
-		nextPageToken, err = filter.EncodeCursor(s.codec, plan, connectorSortValue(plan, last), last.ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row — never the first un-returned
+	// row (the resume predicate is a strict `>`/`<`, so rows[pageSize] would
+	// silently drop it next page). Owning both the trim and the token here makes
+	// that off-by-one unrepresentable at the call site.
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.Connector) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, connectorSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	actors := s.resolveActors(ctx, rows)
