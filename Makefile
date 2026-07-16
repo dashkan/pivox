@@ -4,7 +4,7 @@
 	ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go \
-	proto-generate-openapi-v3 proto-generate-typescript api-lint \
+	proto-generate-openapi-v2 proto-generate-openapi-v3 proto-generate-typescript api-lint \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down \
 	web-build web-build-watch web-build-start \
@@ -108,11 +108,19 @@ generate:
 # new descriptors — currently the permission registry, but the
 # pattern extends to anything else built via `//go:generate` that
 # walks proto descriptors.
-proto-generate: proto-generate-go proto-generate-openapi-v3 proto-generate-typescript generate
+proto-generate: proto-generate-go proto-generate-openapi-v2 proto-generate-openapi-v3 proto-generate-typescript generate
 
-# Go codegen (BE + internal gRPC types).
+# Go codegen (BE + internal gRPC types). Uses the default buf.gen.yaml,
+# which generates go/go-grpc/grpc-gateway over ALL protos (mcp included).
 proto-generate-go:
 	$(TOOL) buf generate
+
+# OpenAPI v2 (merged swagger) codegen. Split into its own buf template so
+# it can EXCLUDE pivox.mcp.v1 from the web-facing spec (mcp's message names
+# collide with the canonical pivox.api.v1 ones under allow_merge). Must run
+# before proto-generate-openapi-v3, which upgrades this output to v3.
+proto-generate-openapi-v2:
+	$(TOOL) buf generate --template buf.gen.openapi.yaml
 
 # Upgrade the merged OpenAPI v2 spec directly to OpenAPI v3.1 using
 # @scalar/cli. grpc-gateway's protoc-gen-openapiv3 is alpha/unpublished,

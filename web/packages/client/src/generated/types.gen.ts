@@ -11,7 +11,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Gets the authenticated caller's account (whoami). Returns the
+         *     caller's identity as carried on the verified access token
+         *     (subject, email, display_name) plus the single organization the
+         *     token is scoped to (`active_organization`), derived from the
+         *     token's `organization` claim and resolved against the caller's
+         *     own memberships so its `role` matches what
+         *     `ListAccountOrganizations` reports for that org.
+         * @description `active_organization` is unset when the token carries no
+         *     `organization` claim (the non-MCP web/electron tokens, where the
+         *     claim is gated behind the `organization` scope) or when the
+         *     claimed org is not one the caller is an active member of.
+         *
+         *     On the membership-exempt list, like `ListAccountOrganizations`
+         *     and `DeleteAccount`: whoami targets `accounts/me`, the caller's
+         *     own account, with no org scope. A memberless caller (mid-bootstrap)
+         *     must be able to learn who they are; gating this on membership
+         *     would be chicken-and-egg. Authn still runs; the result only ever
+         *     surfaces the caller's own identity, so there is no over-disclosure
+         *     vector beyond what authentication already grants.
+         */
+        get: operations["Iam_GetAccount"];
         put?: never;
         post?: never;
         /**
@@ -3908,6 +3929,66 @@ export interface components {
             invitation?: components["schemas"]["v1Invitation"];
         };
         /**
+         * @description Account is the singleton representing the authenticated caller's
+         *     global Pivox account, mirrored from the Keycloak identity. It is
+         *     the addressing target for the `accounts/me` whoami (`GetAccount`)
+         *     and for custom verbs Pivox legitimately owns (today: DeleteAccount;
+         *     future: data export, account disable, etc.).
+         *
+         *     `GetAccount` is the whoami: it echoes back the caller's identity as
+         *     carried on the verified access token, plus the single organization
+         *     the token is scoped to. It does NOT read the mutable Keycloak
+         *     profile from Pivox's replica — every field is sourced from the
+         *     token itself, so there's no stale-replica or write-through concern.
+         *
+         *     Update, Create, and List remain intentionally NOT exposed:
+         *
+         *       - Profile fields (email, display_name, photo_url, email_verified)
+         *         are owned by Keycloak and synced into Pivox via the
+         *         KC→Kafka→Pivox identity-sync pipeline. Surfacing Update here
+         *         would force Pivox to write through to the IdP from the server,
+         *         violating the "Keycloak owns the account profile" rule.
+         *
+         *       - Create is implicit via Keycloak registration + the identity-
+         *         sync pipeline; not a public RPC.
+         */
+        v1Account: {
+            /**
+             * @description The resource name. Always `accounts/me`. The caller is implicit
+             *     from the authentication context — there's no other account a
+             *     caller can address.
+             */
+            name?: string;
+            /**
+             * @description Output only. The caller's Pivox identity id — the Keycloak access
+             *     token's `sub`, which IS the Pivox `identities.id` (a UUID). Same
+             *     value the API keys every membership and audit reference off.
+             */
+            readonly subject?: string;
+            /**
+             * @description Output only. The caller's email, as carried on the verified access
+             *     token (`email` claim). Empty when the token omits it.
+             */
+            readonly email?: string;
+            /**
+             * @description Output only. The caller's human-readable display name, from the
+             *     token's `name` claim. Empty when the token omits it.
+             */
+            readonly displayName?: string;
+            /**
+             * @description Output only. The single organization the caller's token is scoped
+             *     to, derived from the token's `organization` claim and resolved to
+             *     the caller's own membership (so `role` matches exactly what
+             *     `ListAccountOrganizations` reports for that org).
+             *
+             *     Unset when the token carries no `organization` claim — the case
+             *     for the non-MCP web/electron tokens, where the claim is gated
+             *     behind the `organization` scope. Also unset if the claimed org is
+             *     not one the caller is an active member of.
+             */
+            readonly activeOrganization?: components["schemas"]["v1AccountOrganization"];
+        };
+        /**
          * @description AccountOrganization is the slim, caller-scoped projection of an
          *     org the authenticated caller has membership in. Intentionally NOT
          *     a `google.api.resource` — it's a derived view (Organization joined
@@ -5741,6 +5822,16 @@ export interface components {
             connectors?: components["schemas"]["v1Connector"][];
             /** @description A pagination token for the next page, empty if there are no more. */
             nextPageToken?: string;
+            /**
+             * @description The distinct, sorted set of non-empty `agent` values present across the
+             *     list's BASE SCOPE — the whole org (org-direct connectors plus every space)
+             *     for an org-level list, or the selected space for a space-level list. It is
+             *     NOT narrowed by the request `filter`, so a client can populate an
+             *     agent-filter facet with every agent actually assigned to a connector in
+             *     scope, regardless of the current page's filter. Empty when every connector
+             *     in scope runs on the cloud controller (agent = "").
+             */
+            agentsInUse?: string[];
         };
         /** @description Response message for `ListConversations`. */
         v1ListConversationsResponse: {
@@ -7984,6 +8075,41 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    Iam_GetAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Required. Must be `accounts/me`. The caller is implicit from the
+                 *     authentication context.
+                 */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["v1Account"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["rpcStatus"];
+                };
+            };
+        };
+    };
     Iam_DeleteAccount: {
         parameters: {
             query?: never;

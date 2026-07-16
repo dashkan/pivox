@@ -19,7 +19,6 @@ tags:
   - name: Assets
   - name: Requests
   - name: Iam
-  - name: McpService
   - name: Secrets
   - name: Agents
   - name: Endpoints
@@ -63,7 +62,7 @@ paths:
         "200":
           description: A successful response.
           schema:
-            $ref: '#/definitions/pivoxIamV1Account'
+            $ref: '#/definitions/v1Account'
         default:
           description: An unexpected error response.
           schema:
@@ -282,7 +281,7 @@ paths:
           in: body
           required: true
           schema:
-            $ref: '#/definitions/pivoxApiV1Organization'
+            $ref: '#/definitions/v1Organization'
         - name: organizationId
           description: |-
             Optional. A unique identifier for the organization. If not provided, the
@@ -308,7 +307,7 @@ paths:
         "200":
           description: A successful response.
           schema:
-            $ref: '#/definitions/pivoxApiV1Organization'
+            $ref: '#/definitions/v1Organization'
         default:
           description: An unexpected error response.
           schema:
@@ -2470,7 +2469,7 @@ paths:
         "200":
           description: A successful response.
           schema:
-            $ref: '#/definitions/pivoxApiV1ListSpacesResponse'
+            $ref: '#/definitions/v1ListSpacesResponse'
         default:
           description: An unexpected error response.
           schema:
@@ -2574,7 +2573,7 @@ paths:
           in: body
           required: true
           schema:
-            $ref: '#/definitions/pivoxApiV1Space'
+            $ref: '#/definitions/v1Space'
         - name: spaceId
           description: |-
             Optional. A unique identifier for the space. If not provided, the server will
@@ -2604,7 +2603,7 @@ paths:
         "200":
           description: A successful response.
           schema:
-            $ref: '#/definitions/pivoxApiV1Space'
+            $ref: '#/definitions/v1Space'
         default:
           description: An unexpected error response.
           schema:
@@ -11387,263 +11386,6 @@ definitions:
     description: |-
       This resource represents a long-running operation that is the result of a
       network API call.
-  pivoxApiV1ListSpacesResponse:
-    type: object
-    properties:
-      spaces:
-        type: array
-        items:
-          type: object
-          $ref: '#/definitions/pivoxApiV1Space'
-        description: The list of Spaces under the parent. This list can be paginated.
-      nextPageToken:
-        type: string
-        description: |-
-          Pagination token.
-
-          If the result set is too large to fit in a single response, this token
-          is returned. It encodes the position of the current result cursor.
-          Feeding this value into a new list request with the `page_token` parameter
-          gives the next page of the results.
-
-          When `next_page_token` is not filled in, there is no next page and
-          the list returned is the last page in the result set.
-
-          Pagination tokens have a limited lifetime.
-    description: |-
-      A page of the response received from the
-      [ListSpaces][pivox.api.v1.Spaces.ListSpaces]
-      method.
-
-      A paginated response where more pages are available has
-      `next_page_token` set. This token can be used in a subsequent request to
-      retrieve the next request page.
-
-      NOTE: A response may contain fewer elements than the request `page_size` and
-      still have a `next_page_token`.
-  pivoxApiV1Organization:
-    type: object
-    properties:
-      name:
-        type: string
-        description: |-
-          Output only. The resource name of the organization. This is the
-          organization's relative path in the API. Its format is
-          "organizations/[organization_id]". For example, "organizations/1234".
-        readOnly: true
-      displayName:
-        type: string
-        description: |-
-          Output only. A human-readable string that refers to the organization in the
-          Pivox Console. This string is set by the server and cannot be
-          changed. The string will be set to the primary domain (for example,
-          "acme.com") of the customer that owns the organization.
-        readOnly: true
-      state:
-        $ref: '#/definitions/v1OrganizationState'
-        description: Output only. The organization's current lifecycle state.
-        readOnly: true
-      createdBy:
-        $ref: '#/definitions/typesActor'
-        description: Output only. The identity that created this organization.
-        readOnly: true
-      createTime:
-        type: string
-        format: date-time
-        description: Output only. Timestamp when the Organization was created.
-        readOnly: true
-      updatedBy:
-        $ref: '#/definitions/typesActor'
-        description: Output only. The identity that last modified this organization.
-        readOnly: true
-      updateTime:
-        type: string
-        format: date-time
-        description: Output only. Timestamp when the Organization was last modified.
-        readOnly: true
-      deletedBy:
-        $ref: '#/definitions/typesActor'
-        description: Output only. The identity that requested deletion of this organization.
-        readOnly: true
-      deleteTime:
-        type: string
-        format: date-time
-        description: Output only. Timestamp when the Organization was requested for deletion.
-        readOnly: true
-      purgeTime:
-        type: string
-        format: date-time
-        description: |-
-          Output only. The time at which this organization will be purged.
-          Approximately 30 days after deletion.
-        readOnly: true
-      etag:
-        type: string
-        description: |-
-          Output only. A checksum computed by the server based on the current value
-          of the Organization resource. This may be sent on update and delete
-          requests to ensure the client has an up-to-date value before proceeding.
-        readOnly: true
-      annotations:
-        type: object
-        additionalProperties:
-          type: string
-        description: |-
-          Optional. Labels associated with this organization.
-          Labels are key-value pairs that can be used to organize and track resources.
-    description: |-
-      The root node in the resource hierarchy to which a particular entity's
-      (a company, for example) resources belong.
-  pivoxApiV1Space:
-    type: object
-    properties:
-      name:
-        type: string
-        description: |-
-          Output only. The unique resource name of the space.
-
-          Example: `organizations/123/spaces/my-space`
-        readOnly: true
-      displayName:
-        type: string
-        description: |-
-          Optional. A user-assigned display name of the space.
-          When present it must be between 4 to 30 characters.
-          Allowed characters are: lowercase and uppercase letters, numbers,
-          hyphen, single-quote, double-quote, space, and exclamation point.
-
-          Example: `My Space`
-      state:
-        $ref: '#/definitions/v1SpaceState'
-        description: Output only. The space lifecycle state.
-        readOnly: true
-      createdBy:
-        $ref: '#/definitions/typesActor'
-        description: Output only. The identity that created this space.
-        readOnly: true
-      createTime:
-        type: string
-        format: date-time
-        description: Output only. Creation time.
-        readOnly: true
-      updatedBy:
-        $ref: '#/definitions/typesActor'
-        description: Output only. The identity that last modified this space.
-        readOnly: true
-      updateTime:
-        type: string
-        format: date-time
-        description: Output only. The most recent time this resource was modified.
-        readOnly: true
-      deletedBy:
-        $ref: '#/definitions/typesActor'
-        description: Output only. The identity that requested deletion of this space.
-        readOnly: true
-      deleteTime:
-        type: string
-        format: date-time
-        description: Output only. The time at which this resource was requested for deletion.
-        readOnly: true
-      purgeTime:
-        type: string
-        format: date-time
-        description: |-
-          Output only. The time at which this space will be purged.
-          Approximately 30 days after deletion.
-        readOnly: true
-      etag:
-        type: string
-        description: |-
-          Output only. A checksum computed by the server based on the current value
-          of the Space resource. This may be sent on update and delete requests to
-          ensure the client has an up-to-date value before proceeding.
-        readOnly: true
-      labels:
-        type: object
-        additionalProperties:
-          type: string
-        description: |-
-          Optional. The labels associated with this space.
-
-          Label keys must be between 1 and 63 characters long and must conform
-          to the following regular expression: \[a-z\](\[-a-z0-9\]*\[a-z0-9\])?.
-
-          Label values must be between 0 and 63 characters long and must conform
-          to the regular expression (\[a-z\](\[-a-z0-9\]*\[a-z0-9\])?)?.
-
-          No more than 64 labels can be associated with a given resource.
-
-          Clients should store labels in a representation such as JSON that does not
-          depend on specific characters being disallowed.
-
-          Example: `"myBusinessDimension" : "businessValue"`
-    description: |-
-      A space is a high-level Pivox entity. It is a
-      container for ACLs, APIs, and other Pivox resources.
-  pivoxIamV1Account:
-    type: object
-    properties:
-      name:
-        type: string
-        description: |-
-          The resource name. Always `accounts/me`. The caller is implicit
-          from the authentication context — there's no other account a
-          caller can address.
-      subject:
-        type: string
-        description: |-
-          Output only. The caller's Pivox identity id — the Keycloak access
-          token's `sub`, which IS the Pivox `identities.id` (a UUID). Same
-          value the API keys every membership and audit reference off.
-        readOnly: true
-      email:
-        type: string
-        description: |-
-          Output only. The caller's email, as carried on the verified access
-          token (`email` claim). Empty when the token omits it.
-        readOnly: true
-      displayName:
-        type: string
-        description: |-
-          Output only. The caller's human-readable display name, from the
-          token's `name` claim. Empty when the token omits it.
-        readOnly: true
-      activeOrganization:
-        $ref: '#/definitions/v1AccountOrganization'
-        description: |-
-          Output only. The single organization the caller's token is scoped
-          to, derived from the token's `organization` claim and resolved to
-          the caller's own membership (so `role` matches exactly what
-          `ListAccountOrganizations` reports for that org).
-
-          Unset when the token carries no `organization` claim — the case
-          for the non-MCP web/electron tokens, where the claim is gated
-          behind the `organization` scope. Also unset if the claimed org is
-          not one the caller is an active member of.
-        readOnly: true
-    description: |
-      Account is the singleton representing the authenticated caller's
-      global Pivox account, mirrored from the Keycloak identity. It is
-      the addressing target for the `accounts/me` whoami (`GetAccount`)
-      and for custom verbs Pivox legitimately owns (today: DeleteAccount;
-      future: data export, account disable, etc.).
-
-      `GetAccount` is the whoami: it echoes back the caller's identity as
-      carried on the verified access token, plus the single organization
-      the token is scoped to. It does NOT read the mutable Keycloak
-      profile from Pivox's replica — every field is sourced from the
-      token itself, so there's no stale-replica or write-through concern.
-
-      Update, Create, and List remain intentionally NOT exposed:
-
-        - Profile fields (email, display_name, photo_url, email_verified)
-          are owned by Keycloak and synced into Pivox via the
-          KC→Kafka→Pivox identity-sync pipeline. Surfacing Update here
-          would force Pivox to write through to the IdP from the server,
-          violating the "Keycloak owns the account profile" rule.
-
-        - Create is implicit via Keycloak registration + the identity-
-          sync pipeline; not a public RPC.
   protobufAny:
     type: object
     properties:
@@ -12034,6 +11776,70 @@ definitions:
         $ref: '#/definitions/v1Invitation'
         description: The accepted invitation.
     description: Response message for `AcceptInvitation`.
+  v1Account:
+    type: object
+    properties:
+      name:
+        type: string
+        description: |-
+          The resource name. Always `accounts/me`. The caller is implicit
+          from the authentication context — there's no other account a
+          caller can address.
+      subject:
+        type: string
+        description: |-
+          Output only. The caller's Pivox identity id — the Keycloak access
+          token's `sub`, which IS the Pivox `identities.id` (a UUID). Same
+          value the API keys every membership and audit reference off.
+        readOnly: true
+      email:
+        type: string
+        description: |-
+          Output only. The caller's email, as carried on the verified access
+          token (`email` claim). Empty when the token omits it.
+        readOnly: true
+      displayName:
+        type: string
+        description: |-
+          Output only. The caller's human-readable display name, from the
+          token's `name` claim. Empty when the token omits it.
+        readOnly: true
+      activeOrganization:
+        $ref: '#/definitions/v1AccountOrganization'
+        description: |-
+          Output only. The single organization the caller's token is scoped
+          to, derived from the token's `organization` claim and resolved to
+          the caller's own membership (so `role` matches exactly what
+          `ListAccountOrganizations` reports for that org).
+
+          Unset when the token carries no `organization` claim — the case
+          for the non-MCP web/electron tokens, where the claim is gated
+          behind the `organization` scope. Also unset if the claimed org is
+          not one the caller is an active member of.
+        readOnly: true
+    description: |
+      Account is the singleton representing the authenticated caller's
+      global Pivox account, mirrored from the Keycloak identity. It is
+      the addressing target for the `accounts/me` whoami (`GetAccount`)
+      and for custom verbs Pivox legitimately owns (today: DeleteAccount;
+      future: data export, account disable, etc.).
+
+      `GetAccount` is the whoami: it echoes back the caller's identity as
+      carried on the verified access token, plus the single organization
+      the token is scoped to. It does NOT read the mutable Keycloak
+      profile from Pivox's replica — every field is sourced from the
+      token itself, so there's no stale-replica or write-through concern.
+
+      Update, Create, and List remain intentionally NOT exposed:
+
+        - Profile fields (email, display_name, photo_url, email_verified)
+          are owned by Keycloak and synced into Pivox via the
+          KC→Kafka→Pivox identity-sync pipeline. Surfacing Update here
+          would force Pivox to write through to the IdP from the server,
+          violating the "Keycloak owns the account profile" rule.
+
+        - Create is implicit via Keycloak registration + the identity-
+          sync pipeline; not a public RPC.
   v1AccountOrganization:
     type: object
     properties:
@@ -14314,6 +14120,18 @@ definitions:
       nextPageToken:
         type: string
         description: A pagination token for the next page, empty if there are no more.
+      agentsInUse:
+        type: array
+        items:
+          type: string
+        description: |-
+          The distinct, sorted set of non-empty `agent` values present across the
+          list's BASE SCOPE — the whole org (org-direct connectors plus every space)
+          for an org-level list, or the selected space for a space-level list. It is
+          NOT narrowed by the request `filter`, so a client can populate an
+          agent-filter facet with every agent actually assigned to a connector in
+          scope, regardless of the current page's filter. Empty when every connector
+          in scope runs on the cloud controller (agent = "").
     description: Response for ListConnectors.
   v1ListConversationsResponse:
     type: object
@@ -14491,7 +14309,7 @@ definitions:
         type: array
         items:
           type: object
-          $ref: '#/definitions/pivoxApiV1Organization'
+          $ref: '#/definitions/v1Organization'
         description: |-
           The list of Organizations that matched the list request, possibly
           paginated.
@@ -14556,6 +14374,40 @@ definitions:
         type: string
         description: A pagination token for the next page, empty if there are no more.
     description: The response message for ListSecrets.
+  v1ListSpacesResponse:
+    type: object
+    properties:
+      spaces:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/v1Space'
+        description: The list of Spaces under the parent. This list can be paginated.
+      nextPageToken:
+        type: string
+        description: |-
+          Pagination token.
+
+          If the result set is too large to fit in a single response, this token
+          is returned. It encodes the position of the current result cursor.
+          Feeding this value into a new list request with the `page_token` parameter
+          gives the next page of the results.
+
+          When `next_page_token` is not filled in, there is no next page and
+          the list returned is the last page in the result set.
+
+          Pagination tokens have a limited lifetime.
+    description: |-
+      A page of the response received from the
+      [ListSpaces][pivox.api.v1.Spaces.ListSpaces]
+      method.
+
+      A paginated response where more pages are available has
+      `next_page_token` set. This token can be used in a subsequent request to
+      retrieve the next request page.
+
+      NOTE: A response may contain fewer elements than the request `page_size` and
+      still have a `next_page_token`.
   v1ListStorageGatewaysResponse:
     type: object
     properties:
@@ -14960,6 +14812,79 @@ definitions:
       - issuer
       - clientId
       - responseType
+  v1Organization:
+    type: object
+    properties:
+      name:
+        type: string
+        description: |-
+          Output only. The resource name of the organization. This is the
+          organization's relative path in the API. Its format is
+          "organizations/[organization_id]". For example, "organizations/1234".
+        readOnly: true
+      displayName:
+        type: string
+        description: |-
+          Output only. A human-readable string that refers to the organization in the
+          Pivox Console. This string is set by the server and cannot be
+          changed. The string will be set to the primary domain (for example,
+          "acme.com") of the customer that owns the organization.
+        readOnly: true
+      state:
+        $ref: '#/definitions/v1OrganizationState'
+        description: Output only. The organization's current lifecycle state.
+        readOnly: true
+      createdBy:
+        $ref: '#/definitions/typesActor'
+        description: Output only. The identity that created this organization.
+        readOnly: true
+      createTime:
+        type: string
+        format: date-time
+        description: Output only. Timestamp when the Organization was created.
+        readOnly: true
+      updatedBy:
+        $ref: '#/definitions/typesActor'
+        description: Output only. The identity that last modified this organization.
+        readOnly: true
+      updateTime:
+        type: string
+        format: date-time
+        description: Output only. Timestamp when the Organization was last modified.
+        readOnly: true
+      deletedBy:
+        $ref: '#/definitions/typesActor'
+        description: Output only. The identity that requested deletion of this organization.
+        readOnly: true
+      deleteTime:
+        type: string
+        format: date-time
+        description: Output only. Timestamp when the Organization was requested for deletion.
+        readOnly: true
+      purgeTime:
+        type: string
+        format: date-time
+        description: |-
+          Output only. The time at which this organization will be purged.
+          Approximately 30 days after deletion.
+        readOnly: true
+      etag:
+        type: string
+        description: |-
+          Output only. A checksum computed by the server based on the current value
+          of the Organization resource. This may be sent on update and delete
+          requests to ensure the client has an up-to-date value before proceeding.
+        readOnly: true
+      annotations:
+        type: object
+        additionalProperties:
+          type: string
+        description: |-
+          Optional. Labels associated with this organization.
+          Labels are key-value pairs that can be used to organize and track resources.
+    description: |-
+      The root node in the resource hierarchy to which a particular entity's
+      (a company, for example) resources belong.
   v1OrganizationState:
     type: string
     enum:
@@ -15877,6 +15802,92 @@ definitions:
         type: string
       providerMetadata:
         type: object
+  v1Space:
+    type: object
+    properties:
+      name:
+        type: string
+        description: |-
+          Output only. The unique resource name of the space.
+
+          Example: `organizations/123/spaces/my-space`
+        readOnly: true
+      displayName:
+        type: string
+        description: |-
+          Optional. A user-assigned display name of the space.
+          When present it must be between 4 to 30 characters.
+          Allowed characters are: lowercase and uppercase letters, numbers,
+          hyphen, single-quote, double-quote, space, and exclamation point.
+
+          Example: `My Space`
+      state:
+        $ref: '#/definitions/v1SpaceState'
+        description: Output only. The space lifecycle state.
+        readOnly: true
+      createdBy:
+        $ref: '#/definitions/typesActor'
+        description: Output only. The identity that created this space.
+        readOnly: true
+      createTime:
+        type: string
+        format: date-time
+        description: Output only. Creation time.
+        readOnly: true
+      updatedBy:
+        $ref: '#/definitions/typesActor'
+        description: Output only. The identity that last modified this space.
+        readOnly: true
+      updateTime:
+        type: string
+        format: date-time
+        description: Output only. The most recent time this resource was modified.
+        readOnly: true
+      deletedBy:
+        $ref: '#/definitions/typesActor'
+        description: Output only. The identity that requested deletion of this space.
+        readOnly: true
+      deleteTime:
+        type: string
+        format: date-time
+        description: Output only. The time at which this resource was requested for deletion.
+        readOnly: true
+      purgeTime:
+        type: string
+        format: date-time
+        description: |-
+          Output only. The time at which this space will be purged.
+          Approximately 30 days after deletion.
+        readOnly: true
+      etag:
+        type: string
+        description: |-
+          Output only. A checksum computed by the server based on the current value
+          of the Space resource. This may be sent on update and delete requests to
+          ensure the client has an up-to-date value before proceeding.
+        readOnly: true
+      labels:
+        type: object
+        additionalProperties:
+          type: string
+        description: |-
+          Optional. The labels associated with this space.
+
+          Label keys must be between 1 and 63 characters long and must conform
+          to the following regular expression: \[a-z\](\[-a-z0-9\]*\[a-z0-9\])?.
+
+          Label values must be between 0 and 63 characters long and must conform
+          to the regular expression (\[a-z\](\[-a-z0-9\]*\[a-z0-9\])?)?.
+
+          No more than 64 labels can be associated with a given resource.
+
+          Clients should store labels in a representation such as JSON that does not
+          depend on specific characters being disallowed.
+
+          Example: `"myBusinessDimension" : "businessValue"`
+    description: |-
+      A space is a high-level Pivox entity. It is a
+      container for ACLs, APIs, and other Pivox resources.
   v1SpaceState:
     type: string
     enum:

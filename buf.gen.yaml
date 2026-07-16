@@ -27,12 +27,8 @@ plugins:
     out: internal/pkg/gen
     opt:
       - module=github.com/dashkan/pivox/internal/pkg/gen
-  - local: protoc-gen-openapiv2
-    out: api/openapi/v2
-    strategy: all
-    opt:
-      - expand_slashed_path_patterns=true
-      - allow_merge=true
-      - merge_file_name=pivox
-      - output_format=yaml
-      - openapi_configuration=api/openapiv2.config.yaml
+  # protoc-gen-openapiv2 lives in buf.gen.openapi.yaml, not here: the
+  # web-facing swagger must EXCLUDE pivox.mcp.v1 (its Organization/Space/
+  # ListSpacesResponse messages collide with the canonical pivox.api.v1
+  # ones under allow_merge and pollute the web client types). The Go/gRPC
+  # plugins above keep generating over every proto, mcp included.

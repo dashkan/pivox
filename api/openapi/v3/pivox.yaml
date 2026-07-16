@@ -16924,6 +16924,29 @@ components:
         nextPageToken:
           type: string
           description: A pagination token for the next page, empty if there are no more.
+        agentsInUse:
+          type: array
+          items:
+            type: string
+          description: >-
+            The distinct, sorted set of non-empty `agent` values present across
+            the
+
+            list's BASE SCOPE — the whole org (org-direct connectors plus every
+            space)
+
+            for an org-level list, or the selected space for a space-level list.
+            It is
+
+            NOT narrowed by the request `filter`, so a client can populate an
+
+            agent-filter facet with every agent actually assigned to a connector
+            in
+
+            scope, regardless of the current page's filter. Empty when every
+            connector
+
+            in scope runs on the cloud controller (agent = "").
       description: Response for ListConnectors.
     v1ListConversationsResponse:
       type: object
