@@ -175,64 +175,6 @@ func (q *Queries) GetStorageGatewayByToken(ctx context.Context, registrationToke
 	return i, err
 }
 
-const listStorageGatewaysByOrg = `-- name: ListStorageGatewaysByOrg :many
-SELECT id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time FROM storage_gateways
-WHERE org_id = $1
-  AND ($2::uuid IS NULL OR id > $2)
-ORDER BY id
-LIMIT $3
-`
-
-type ListStorageGatewaysByOrgParams struct {
-	OrgID     uuid.UUID   `json:"org_id"`
-	Cursor    pgtype.UUID `json:"cursor"`
-	PageLimit int32       `json:"page_limit"`
-}
-
-// Keyset pagination on id, scoped to a single org. Fetch page_limit+1 to
-// detect a next page. (AIP-160 filter / order_by are not yet wired — the
-// proto advertises them but the connector "agent" dropdown only needs an
-// unfiltered id-ordered enumeration; ordered by id.)
-func (q *Queries) ListStorageGatewaysByOrg(ctx context.Context, arg ListStorageGatewaysByOrgParams) ([]StorageGateway, error) {
-	rows, err := q.db.Query(ctx, listStorageGatewaysByOrg, arg.OrgID, arg.Cursor, arg.PageLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []StorageGateway{}
-	for rows.Next() {
-		var i StorageGateway
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.Name,
-			&i.DisplayName,
-			&i.IpAddresses,
-			&i.RegistrationToken,
-			&i.TargetVersion,
-			&i.CurrentVersion,
-			&i.Hostname,
-			&i.Annotations,
-			&i.State,
-			&i.CertState,
-			&i.CertExpiryTime,
-			&i.Etag,
-			&i.Revision,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const rotateRegistrationToken = `-- name: RotateRegistrationToken :one
 UPDATE storage_gateways
 SET registration_token = $2, update_time = now(), etag = md5(now()::text)

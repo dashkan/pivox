@@ -566,9 +566,11 @@ func serve(cmd *cobra.Command, args []string) error {
 		CookieDomain:      storageSessionCookieDomain,
 		SessionSigningKey: storageSessionSigningKey,
 	}))
-	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(storage.AgentsConfig{Queries: queries}))
+	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(storage.AgentsConfig{
+		Pool: pool, Queries: queries, Codec: appCodec,
+	}))
 	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(storage.EndpointsConfig{
-		Pool: pool, Queries: queries, Encryptor: enc, AuditResolver: auditResolver,
+		Pool: pool, Queries: queries, Codec: appCodec, Encryptor: enc, AuditResolver: auditResolver,
 	}))
 
 	// Asset and request services

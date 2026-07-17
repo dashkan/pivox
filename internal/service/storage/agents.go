@@ -4,34 +4,52 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 )
 
 type AgentsServer struct {
 	storagev1.UnimplementedAgentsServer
+	pool    db.RWPool
 	queries db.Querier
+	codec   *appkey.Codec
 }
 
 // AgentsConfig is the constructor input for AgentsServer.
 type AgentsConfig struct {
+	// Pool is the database pool. Used by ListAgents for the dynamic
+	// (filter + order_by + keyset) SELECT. *pgxpool.Pool satisfies it. Required.
+	Pool db.RWPool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
+	// Codec opaque-encodes keyset page tokens for ListAgents. Required.
+	Codec *appkey.Codec
 }
 
 // NewAgentsServer constructs the server from cfg. Panics on a missing
 // required field.
 func NewAgentsServer(cfg AgentsConfig) *AgentsServer {
+	if cfg.Pool == nil {
+		panic("storage: AgentsConfig.Pool is required")
+	}
 	if cfg.Queries == nil {
 		panic("storage: AgentsConfig.Queries is required")
 	}
+	if cfg.Codec == nil {
+		panic("storage: AgentsConfig.Codec is required")
+	}
 	return &AgentsServer{
+		pool:    cfg.Pool,
 		queries: cfg.Queries,
+		codec:   cfg.Codec,
 	}
 }
 
@@ -90,6 +108,14 @@ func (s *AgentsServer) GetAgent(ctx context.Context, req *storagev1.GetAgentRequ
 	return convert.AgentToProto(agent, gatewayName), nil
 }
 
+// ListAgents is a dynamic AIP-160 filtered + AIP-132 sorted + compound-cursor
+// keyset list. The parent storage gateway (resolved via org + gateway lookup,
+// membership-gated by the interceptor) is the NON-NEGOTIABLE base scope
+// (gateway_id = $), ANDed as the base of the query; the request's
+// filter/order_by layer ON TOP of it and can only narrow, never widen. Every
+// value is bound as a $N parameter by filter.BuildListQuery; column/direction
+// come only from AgentFilter's whitelist. Agents carry no audit columns, so no
+// Actor resolution runs.
 func (s *AgentsServer) ListAgents(ctx context.Context, req *storagev1.ListAgentsRequest) (*storagev1.ListAgentsResponse, error) {
 	orgName, gwName, err := parseGatewayParent(req.GetParent())
 	if err != nil {
@@ -101,9 +127,45 @@ func (s *AgentsServer) ListAgents(ctx context.Context, req *storagev1.ListAgents
 		return nil, err
 	}
 
-	agents, err := s.queries.ListStorageAgentsByGateway(ctx, gw.ID)
+	rf := filter.AgentFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
+
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {
-		return nil, apierr.Internal(err, "failed to list agents")
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "gateway_id = %s", Arg: gw.ID}},
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
+	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter).
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list agents")
+	}
+	agents, err := filter.ScanStorageAgents(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list agents")
+	}
+
+	agents, nextPageToken, err := filter.Paginate(agents, int(pageSize), func(last db.StorageAgent) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, agentSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
@@ -113,8 +175,25 @@ func (s *AgentsServer) ListAgents(ctx context.Context, req *storagev1.ListAgents
 	}
 
 	return &storagev1.ListAgentsResponse{
-		Agents: pbAgents,
+		Agents:        pbAgents,
+		NextPageToken: nextPageToken,
 	}, nil
+}
+
+// agentSortValue renders the primary order_by column's value for the given row
+// as the string the compound page token carries (timestamps as RFC3339Nano).
+// For the id-only default it is unused, so "" is returned.
+func agentSortValue(plan filter.OrderByPlan, a db.StorageAgent) string {
+	switch plan.Field {
+	case "hostname":
+		return a.Hostname
+	case "joinTime":
+		return a.JoinTime.UTC().Format(time.RFC3339Nano)
+	case "lastSeenTime":
+		return a.LastSeenTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *AgentsServer) DrainAgent(ctx context.Context, req *storagev1.DrainAgentRequest) (*storagev1.Agent, error) {

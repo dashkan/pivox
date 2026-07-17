@@ -454,6 +454,101 @@ func SecretFilter() *ResourceFilter {
 	}
 }
 
+// StorageGatewayFilter returns the filter config for storage gateways. Consumed
+// by the compound-cursor keyset path (filter.BuildListQuery) in
+// ListStorageGateways — the base scope (org_id = $) is supplied by the handler
+// via ListQuery.Base. The proto (storage_gateway.proto) advertises `state`,
+// `displayName`, and `createTime` as filterable and `displayName`, `createTime`,
+// `name` as order_by fields; only those appear below. `state` is the
+// storage_gateway_state enum column, compared as text exactly as Space/Asset do.
+// Every Sortable column is NOT NULL in the init migration (name, display_name,
+// create_time), which the compound-cursor row comparison requires. DefaultOrder
+// is "name" (the proto's documented default: name ascending). storage_gateways
+// hard-deletes (no delete_time column), so SoftDelete is false.
+func StorageGatewayFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"state":       {Column: "state", Type: filtering.TypeString},
+			"displayName": {Column: "display_name", Type: filtering.TypeString, AllowPartial: true},
+			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Sortable: map[string]SortableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+			"name":       {Column: "name", Type: filtering.TypeString},
+		},
+		Table:         "storage_gateways",
+		SoftDelete:    false, // storage_gateways hard-delete; no delete_time column
+		DefaultOrder:  "name",
+		DefaultFields: []string{"displayName"},
+		// The org base scope is applied by the handler via BuildListQuery.Base.
+	}
+}
+
+// EndpointFilter returns the filter config for storage endpoints. Consumed by
+// the compound-cursor keyset path (filter.BuildListQuery) in ListEndpoints — the
+// base scope (gateway_id = $) is supplied by the handler via ListQuery.Base. The
+// proto (endpoint.proto) advertises `state` + `displayName` as filterable and
+// `displayName`, `createTime`, `name` as order_by fields; only those appear
+// below. `state` is the endpoint_state enum column, compared as text. Every
+// Sortable column is NOT NULL in the init migration (display_name, create_time,
+// name). DefaultOrder is "createTime" (the proto's documented default: createTime
+// ascending). storage_endpoints hard-deletes (no delete_time column).
+func EndpointFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"state":       {Column: "state", Type: filtering.TypeString},
+			"displayName": {Column: "display_name", Type: filtering.TypeString, AllowPartial: true},
+		},
+		Sortable: map[string]SortableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+			"name":       {Column: "name", Type: filtering.TypeString},
+		},
+		Table:         "storage_endpoints",
+		SoftDelete:    false, // storage_endpoints hard-delete; no delete_time column
+		DefaultOrder:  "createTime",
+		DefaultFields: []string{"displayName"},
+		// The gateway base scope is applied by the handler via BuildListQuery.Base.
+	}
+}
+
+// AgentFilter returns the filter config for storage agents. Consumed by the
+// compound-cursor keyset path (filter.BuildListQuery) in ListAgents — the base
+// scope (gateway_id = $) is supplied by the handler via ListQuery.Base. The
+// proto (agent.proto) advertises `state`, `hostname`, `version` as filterable and
+// `joinTime`, `lastSeenTime`, `hostname` as order_by fields; only those appear
+// below. `state` is the agent_state enum column, compared as text. Every Sortable
+// column is NOT NULL in the init migration (join_time, last_seen_time, hostname).
+// DefaultOrder is "joinTime" (the proto's documented default: joinTime ascending).
+// storage_agents has no delete_time column (agents self-register and are hard-
+// removed), so SoftDelete is false. Agents carry no audit columns.
+func AgentFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"state":    {Column: "state", Type: filtering.TypeString},
+			"hostname": {Column: "hostname", Type: filtering.TypeString, AllowPartial: true},
+			"version":  {Column: "version", Type: filtering.TypeString},
+		},
+		Sortable: map[string]SortableField{
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"joinTime":     {Column: "join_time", Type: filtering.TypeTimestamp},
+			"lastSeenTime": {Column: "last_seen_time", Type: filtering.TypeTimestamp},
+			"hostname":     {Column: "hostname", Type: filtering.TypeString},
+		},
+		Table:         "storage_agents",
+		SoftDelete:    false, // storage_agents has no delete_time column
+		DefaultOrder:  "joinTime",
+		DefaultFields: []string{"hostname"},
+		// The gateway base scope is applied by the handler via BuildListQuery.Base.
+	}
+}
+
 // ApiKeyFilter returns the filter config for API keys. Consumed by the
 // compound-cursor keyset path (filter.BuildListQuery) in ListKeys — the base
 // scope (org_id = $) is supplied by the handler via ListQuery.Base. Both

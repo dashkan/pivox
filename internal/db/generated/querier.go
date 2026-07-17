@@ -758,7 +758,6 @@ type Querier interface {
 	ListSpacesPastPurgeTime(ctx context.Context) ([]Space, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
-	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	// Returns the DISTINCT endpoint short names across every gateway in
 	// an org. Used by CreateStorageSession (#27 phase 2) to enumerate
 	// the prefix-pattern endpoint segments — patterns are glob-matched
@@ -775,11 +774,6 @@ type Querier interface {
 	// names across gateways collapse to one pattern).
 	ListStorageEndpointShortNamesByOrg(ctx context.Context, orgID uuid.UUID) ([]string, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
-	// Keyset pagination on id, scoped to a single org. Fetch page_limit+1 to
-	// detect a next page. (AIP-160 filter / order_by are not yet wired — the
-	// proto advertises them but the connector "agent" dropdown only needs an
-	// unfiltered id-ordered enumeration; ordered by id.)
-	ListStorageGatewaysByOrg(ctx context.Context, arg ListStorageGatewaysByOrgParams) ([]StorageGateway, error)
 	// Runs of one workflow. Keyset pagination on id (fetch page_limit+1 to detect a
 	// next page), with an optional state filter (NULL = all states). order_by is not
 	// honored — runs are always id (creation) order, the keyset column.

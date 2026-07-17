@@ -105,7 +105,7 @@ func newSessionTestEnv(t *testing.T, opts ...sessionTestOpts) *sessionTestEnv {
 				CookieDomain:  o.CookieDomain,
 			}))
 			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
-				Pool: h.Pool, Queries: h.Queries, Encryptor: h.Encryptor,
+				Pool: h.Pool, Queries: h.Queries, Codec: grpcharness.TestAppCodec(), Encryptor: h.Encryptor,
 			}))
 		}))
 	return &sessionTestEnv{
@@ -734,7 +734,7 @@ func TestIntegration_SessionSigningKey_RoundTripsControllerToAgent(t *testing.T)
 				SessionSigningKey: []byte(sharedKey),
 			}))
 			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
-				Pool: h.Pool, Queries: h.Queries, Encryptor: h.Encryptor,
+				Pool: h.Pool, Queries: h.Queries, Codec: grpcharness.TestAppCodec(), Encryptor: h.Encryptor,
 			}))
 		}))
 	gwClient := storagev1.NewStorageGatewaysClient(h.Conn())

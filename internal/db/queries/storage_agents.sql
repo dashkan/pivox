@@ -9,9 +9,6 @@ SELECT * FROM storage_agents WHERE id = $1;
 -- name: GetStorageAgentByGatewayAndIP :one
 SELECT * FROM storage_agents WHERE gateway_id = $1 AND ip_address = $2;
 
--- name: ListStorageAgentsByGateway :many
-SELECT * FROM storage_agents WHERE gateway_id = $1 ORDER BY join_time;
-
 -- name: UpdateStorageAgentState :one
 UPDATE storage_agents SET state = $2, last_seen_time = now() WHERE id = $1 RETURNING *;
 

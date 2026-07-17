@@ -39,7 +39,7 @@ import (
 
 type StorageGatewaysServer struct {
 	storagev1.UnimplementedStorageGatewaysServer
-	pool              db.TxBeginner
+	pool              db.RWPool
 	queries           db.Querier
 	encryptor         crypto.Encryptor
 	conns             *agentstream.ConnectionManager
@@ -64,9 +64,10 @@ const defaultSessionTTL = 1 * time.Hour
 // StorageGatewaysConfig is the constructor input for
 // StorageGatewaysServer.
 type StorageGatewaysConfig struct {
-	// Pool begins transactions for tx-wrapped writes (used by the
-	// validate_only dry-run path). *pgxpool.Pool satisfies it. Required.
-	Pool db.TxBeginner
+	// Pool begins transactions for tx-wrapped writes (validate_only dry-run) and
+	// runs the dynamic ListStorageGateways SELECT (filter + order_by + keyset).
+	// *pgxpool.Pool satisfies it. Required.
+	Pool db.RWPool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Codec opaque-encodes keyset page tokens for ListStorageGateways.
@@ -261,51 +262,58 @@ func (s *StorageGatewaysServer) GetStorageGateway(ctx context.Context, req *stor
 	return convert.StorageGatewayToProto(gw, orgName, actors), nil
 }
 
+// ListStorageGateways is a dynamic AIP-160 filtered + AIP-132 sorted +
+// compound-cursor keyset list. The interceptor already resolved and
+// membership-gated the org named by `parent`, so its id is the NON-NEGOTIABLE
+// base scope, ANDed as the base of the query; the request's filter/order_by
+// layer ON TOP of it and can only narrow, never widen. Every value (org id,
+// filter operands, cursor values, page size) is bound as a $N parameter by
+// filter.BuildListQuery — nothing is string-interpolated — and column/direction
+// come only from StorageGatewayFilter's whitelist.
 func (s *StorageGatewaysServer) ListStorageGateways(ctx context.Context, req *storagev1.ListStorageGatewaysRequest) (*storagev1.ListStorageGatewaysResponse, error) {
-	// The interceptor already resolved and membership-gated the org named by
-	// `parent`, so the scope is authoritative here — a `parent` naming another
-	// org the caller can't reach never reaches this handler. Listing is scoped
-	// to exactly the resolved org's id; there is no cross-org leak.
 	org := server.MustResolvedOrgFromContext(ctx)
 
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
+	rf := filter.StorageGatewayFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
+
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
 	}
-	if pageSize > 1000 {
-		pageSize = 1000
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
 	}
 
-	var cursor pgtype.UUID
-	if tok := req.GetPageToken(); tok != "" {
-		raw, err := s.codec.Decrypt(tok)
-		if err != nil || len(raw) != 16 {
-			return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
-		}
-		var id uuid.UUID
-		copy(id[:], raw)
-		cursor = convert.PgUUID(id)
-	}
-
-	rows, err := s.queries.ListStorageGatewaysByOrg(ctx, db.ListStorageGatewaysByOrgParams{
-		OrgID:     org.ID,
-		Cursor:    cursor,
-		PageLimit: pageSize + 1,
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "org_id = %s", Arg: org.ID}},
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter).
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list storage gateways")
+	}
+	rows, err := filter.ScanStorageGateways(pgxRows)
 	if err != nil {
 		return nil, apierr.Internal(err, "list storage gateways")
 	}
 
-	// Keyset cursor = the LAST RETURNED row's id (rows[pageSize-1]) against the
-	// `id > cursor` predicate. Encoding the first un-returned row (rows[pageSize])
-	// would skip it on the next page — the off-by-one CLEANUP-1 tracks.
-	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		rows = rows[:pageSize]
-		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize-1].ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row via the compound cursor.
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.StorageGateway) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, gatewaySortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	actors, err := s.resolveGatewayActors(ctx, rows)
@@ -320,6 +328,24 @@ func (s *StorageGatewaysServer) ListStorageGateways(ctx context.Context, req *st
 		StorageGateways: out,
 		NextPageToken:   nextPageToken,
 	}, nil
+}
+
+// gatewaySortValue renders the primary order_by column's value for the given row
+// as the string the compound page token carries. Timestamps use RFC3339Nano so
+// filter.DecodeCursor can parse them back to an exact time.Time. For the id-only
+// default (plan.Field == "") the value is unused (EncodeCursor emits the id-only
+// token), so "" is returned.
+func gatewaySortValue(plan filter.OrderByPlan, r db.StorageGateway) string {
+	switch plan.Field {
+	case "displayName":
+		return r.DisplayName
+	case "name":
+		return r.Name
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *storagev1.UpdateStorageGatewayRequest) (*longrunningpb.Operation, error) {

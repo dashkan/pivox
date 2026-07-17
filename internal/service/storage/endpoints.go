@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"log/slog"
 
@@ -13,10 +14,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
@@ -25,19 +28,23 @@ import (
 
 type EndpointsServer struct {
 	storagev1.UnimplementedEndpointsServer
-	pool      db.TxBeginner
+	pool      db.RWPool
 	queries   db.Querier
+	codec     *appkey.Codec
 	encryptor crypto.Encryptor
 	audit     *audit.Resolver
 }
 
 // EndpointsConfig is the constructor input for EndpointsServer.
 type EndpointsConfig struct {
-	// Pool begins transactions for tx-wrapped writes (used by the
-	// validate_only dry-run path). *pgxpool.Pool satisfies it. Required.
-	Pool db.TxBeginner
+	// Pool begins transactions for tx-wrapped writes (validate_only dry-run) and
+	// runs the dynamic ListEndpoints SELECT (filter + order_by + keyset).
+	// *pgxpool.Pool satisfies it. Required.
+	Pool db.RWPool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
+	// Codec opaque-encodes keyset page tokens for ListEndpoints. Required.
+	Codec *appkey.Codec
 	// Encryptor wraps Cloud KMS for column-level encryption.
 	// Optional.
 	Encryptor crypto.Encryptor
@@ -55,9 +62,13 @@ func NewEndpointsServer(cfg EndpointsConfig) *EndpointsServer {
 	if cfg.Queries == nil {
 		panic("storage: EndpointsConfig.Queries is required")
 	}
+	if cfg.Codec == nil {
+		panic("storage: EndpointsConfig.Codec is required")
+	}
 	return &EndpointsServer{
 		pool:      cfg.Pool,
 		queries:   cfg.Queries,
+		codec:     cfg.Codec,
 		encryptor: cfg.Encryptor,
 		audit:     cfg.AuditResolver,
 	}
@@ -250,6 +261,13 @@ func (s *EndpointsServer) GetEndpoint(ctx context.Context, req *storagev1.GetEnd
 	return convert.EndpointToProto(endpoint, gatewayName, actors), nil
 }
 
+// ListEndpoints is a dynamic AIP-160 filtered + AIP-132 sorted + compound-cursor
+// keyset list. The parent storage gateway (resolved via org + gateway lookup,
+// membership-gated by the interceptor) is the NON-NEGOTIABLE base scope
+// (gateway_id = $), ANDed as the base of the query; the request's
+// filter/order_by layer ON TOP of it and can only narrow, never widen. Every
+// value is bound as a $N parameter by filter.BuildListQuery; column/direction
+// come only from EndpointFilter's whitelist.
 func (s *EndpointsServer) ListEndpoints(ctx context.Context, req *storagev1.ListEndpointsRequest) (*storagev1.ListEndpointsResponse, error) {
 	orgName, gwName, err := parseGatewayParent(req.GetParent())
 	if err != nil {
@@ -261,9 +279,45 @@ func (s *EndpointsServer) ListEndpoints(ctx context.Context, req *storagev1.List
 		return nil, err
 	}
 
-	endpoints, err := s.queries.ListStorageEndpointsByGateway(ctx, gw.ID)
+	rf := filter.EndpointFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
+
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {
-		return nil, apierr.Internal(err, "failed to list endpoints")
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "gateway_id = %s", Arg: gw.ID}},
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
+	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter).
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list endpoints")
+	}
+	endpoints, err := filter.ScanStorageEndpoints(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list endpoints")
+	}
+
+	endpoints, nextPageToken, err := filter.Paginate(endpoints, int(pageSize), func(last db.StorageEndpoint) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, endpointSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
@@ -277,8 +331,25 @@ func (s *EndpointsServer) ListEndpoints(ctx context.Context, req *storagev1.List
 	}
 
 	return &storagev1.ListEndpointsResponse{
-		Endpoints: pbEndpoints,
+		Endpoints:     pbEndpoints,
+		NextPageToken: nextPageToken,
 	}, nil
+}
+
+// endpointSortValue renders the primary order_by column's value for the given
+// row as the string the compound page token carries (timestamps as RFC3339Nano).
+// For the id-only default it is unused, so "" is returned.
+func endpointSortValue(plan filter.OrderByPlan, ep db.StorageEndpoint) string {
+	switch plan.Field {
+	case "displayName":
+		return ep.DisplayName
+	case "name":
+		return ep.Name
+	case "createTime":
+		return ep.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.UpdateEndpointRequest) (*longrunningpb.Operation, error) {

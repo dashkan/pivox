@@ -53,7 +53,27 @@ func WithStorageGatewaysServer() Option {
 func WithAgentsServer() Option {
 	return func(c *config) {
 		c.registerServices = append(c.registerServices, func(h *Harness, s *grpc.Server) {
-			storagev1.RegisterAgentsServer(s, storage.NewAgentsServer(storage.AgentsConfig{Queries: h.Queries}))
+			storagev1.RegisterAgentsServer(s, storage.NewAgentsServer(storage.AgentsConfig{
+				Pool:    h.Pool,
+				Queries: h.Queries,
+				Codec:   TestAppCodec(),
+			}))
+		})
+	}
+}
+
+// WithEndpointsServer registers the Endpoints service with default wiring
+// (harness Pool/Queries/Encryptor + the shared test codec for keyset page
+// tokens).
+func WithEndpointsServer() Option {
+	return func(c *config) {
+		c.registerServices = append(c.registerServices, func(h *Harness, s *grpc.Server) {
+			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
+				Pool:      h.Pool,
+				Queries:   h.Queries,
+				Codec:     TestAppCodec(),
+				Encryptor: h.Encryptor,
+			}))
 		})
 	}
 }
@@ -77,6 +97,26 @@ func (h *Harness) SeedStorageGateway(t *testing.T, orgID uuid.UUID, name string)
 	})
 	require.NoError(t, err)
 	return gw
+}
+
+// SeedStorageEndpoint inserts an endpoint under `gatewayID` directly (bypassing
+// the CreateEndpoint LRO) and returns the row. `name` is the slug (unique within
+// the gateway) and doubles as the display name. A minimal filesystem
+// configuration is stored so the row satisfies the NOT NULL configuration
+// column. Use this to stage endpoints for list/filter/order/pagination tests.
+func (h *Harness) SeedStorageEndpoint(t *testing.T, gatewayID uuid.UUID, name string) db.StorageEndpoint {
+	t.Helper()
+	ep, err := h.Queries.CreateStorageEndpoint(context.Background(), db.CreateStorageEndpointParams{
+		ID:            uuid.New(),
+		GatewayID:     gatewayID,
+		Name:          name,
+		DisplayName:   name,
+		Configuration: json.RawMessage(`{"type":"filesystem","path":"/mnt/` + name + `"}`),
+		CacheEviction: db.EvictionPolicyLRU,
+		Annotations:   json.RawMessage("{}"),
+	})
+	require.NoError(t, err)
+	return ep
 }
 
 // SeedStorageAgent inserts an agent under `gatewayID` directly. Agents cannot

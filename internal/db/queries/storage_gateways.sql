@@ -12,17 +12,6 @@ SELECT * FROM storage_gateways WHERE org_id = $1 AND name = $2;
 -- name: GetStorageGatewayByToken :one
 SELECT * FROM storage_gateways WHERE registration_token = $1;
 
--- name: ListStorageGatewaysByOrg :many
--- Keyset pagination on id, scoped to a single org. Fetch page_limit+1 to
--- detect a next page. (AIP-160 filter / order_by are not yet wired — the
--- proto advertises them but the connector "agent" dropdown only needs an
--- unfiltered id-ordered enumeration; ordered by id.)
-SELECT * FROM storage_gateways
-WHERE org_id = @org_id
-  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
-ORDER BY id
-LIMIT @page_limit;
-
 -- name: UpdateStorageGateway :one
 UPDATE storage_gateways
 SET display_name = COALESCE(sqlc.narg('display_name'), display_name),

@@ -130,41 +130,6 @@ func (q *Queries) GetStorageAgentByGatewayAndIP(ctx context.Context, arg GetStor
 	return i, err
 }
 
-const listStorageAgentsByGateway = `-- name: ListStorageAgentsByGateway :many
-SELECT id, gateway_id, ip_address, hostname, version, cache_used_gb, state, cert_expiry_time, join_time, last_seen_time FROM storage_agents WHERE gateway_id = $1 ORDER BY join_time
-`
-
-func (q *Queries) ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error) {
-	rows, err := q.db.Query(ctx, listStorageAgentsByGateway, gatewayID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []StorageAgent{}
-	for rows.Next() {
-		var i StorageAgent
-		if err := rows.Scan(
-			&i.ID,
-			&i.GatewayID,
-			&i.IpAddress,
-			&i.Hostname,
-			&i.Version,
-			&i.CacheUsedGb,
-			&i.State,
-			&i.CertExpiryTime,
-			&i.JoinTime,
-			&i.LastSeenTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateStorageAgentCacheUsed = `-- name: UpdateStorageAgentCacheUsed :exec
 UPDATE storage_agents SET cache_used_gb = $2, last_seen_time = now() WHERE id = $1
 `

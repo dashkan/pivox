@@ -432,6 +432,123 @@ func ScanAssets(rows pgx.Rows) ([]db.Asset, error) {
 	return results, rows.Err()
 }
 
+// ScanStorageGateways scans rows into db.StorageGateway structs.
+//
+// The destination order MUST match the `storage_gateways` column order from the
+// init migration exactly — this scans `SELECT *` from BuildListQuery, so adding
+// a column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanStorageGateways(rows pgx.Rows) ([]db.StorageGateway, error) {
+	defer rows.Close()
+	var results []db.StorageGateway
+	for rows.Next() {
+		var g db.StorageGateway
+		// Order MUST match `storage_gateways`: id, org_id, name, display_name,
+		// ip_addresses, registration_token, target_version, current_version,
+		// hostname, annotations, state, cert_state, cert_expiry_time, etag,
+		// revision, created_by, updated_by, create_time, update_time.
+		if err := rows.Scan(
+			&g.ID,
+			&g.OrgID,
+			&g.Name,
+			&g.DisplayName,
+			&g.IpAddresses,
+			&g.RegistrationToken,
+			&g.TargetVersion,
+			&g.CurrentVersion,
+			&g.Hostname,
+			&g.Annotations,
+			&g.State,
+			&g.CertState,
+			&g.CertExpiryTime,
+			&g.Etag,
+			&g.Revision,
+			&g.CreatedBy,
+			&g.UpdatedBy,
+			&g.CreateTime,
+			&g.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, g)
+	}
+	return results, rows.Err()
+}
+
+// ScanStorageEndpoints scans rows into db.StorageEndpoint structs.
+//
+// The destination order MUST match the `storage_endpoints` column order from the
+// init migration exactly — this scans `SELECT *` from BuildListQuery, so adding
+// a column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanStorageEndpoints(rows pgx.Rows) ([]db.StorageEndpoint, error) {
+	defer rows.Close()
+	var results []db.StorageEndpoint
+	for rows.Next() {
+		var e db.StorageEndpoint
+		// Order MUST match `storage_endpoints`: id, gateway_id, name,
+		// display_name, configuration, cache_enabled, cache_max_size_gb,
+		// cache_eviction, cache_ttl_hours, annotations, state, etag, revision,
+		// created_by, updated_by, create_time, update_time.
+		if err := rows.Scan(
+			&e.ID,
+			&e.GatewayID,
+			&e.Name,
+			&e.DisplayName,
+			&e.Configuration,
+			&e.CacheEnabled,
+			&e.CacheMaxSizeGb,
+			&e.CacheEviction,
+			&e.CacheTtlHours,
+			&e.Annotations,
+			&e.State,
+			&e.Etag,
+			&e.Revision,
+			&e.CreatedBy,
+			&e.UpdatedBy,
+			&e.CreateTime,
+			&e.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, e)
+	}
+	return results, rows.Err()
+}
+
+// ScanStorageAgents scans rows into db.StorageAgent structs.
+//
+// The destination order MUST match the `storage_agents` column order from the
+// init migration exactly — this scans `SELECT *` from BuildListQuery, so adding
+// a column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanStorageAgents(rows pgx.Rows) ([]db.StorageAgent, error) {
+	defer rows.Close()
+	var results []db.StorageAgent
+	for rows.Next() {
+		var a db.StorageAgent
+		// Order MUST match `storage_agents`: id, gateway_id, ip_address, hostname,
+		// version, cache_used_gb, state, cert_expiry_time, join_time,
+		// last_seen_time.
+		if err := rows.Scan(
+			&a.ID,
+			&a.GatewayID,
+			&a.IpAddress,
+			&a.Hostname,
+			&a.Version,
+			&a.CacheUsedGb,
+			&a.State,
+			&a.CertExpiryTime,
+			&a.JoinTime,
+			&a.LastSeenTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, a)
+	}
+	return results, rows.Err()
+}
+
 // ScanApiKeys scans rows into db.ApiKey structs.
 func ScanApiKeys(rows pgx.Rows) ([]db.ApiKey, error) {
 	defer rows.Close()
