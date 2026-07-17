@@ -9,6 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// basicRF is a minimal ResourceFilter for BuildListQuery assembly tests: no
+// filterable/sortable surface, just a table name. Tests set SoftDelete or add
+// scope predicates as needed.
+func basicRF() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{},
+		Sortable:   map[string]SortableField{},
+		Table:      "t",
+	}
+}
+
 func TestPlanOrderBy_DefaultIsIDOnly(t *testing.T) {
 	plan, err := PlanOrderBy(ConnectorFilter(), "")
 	require.NoError(t, err)

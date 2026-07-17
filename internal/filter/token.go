@@ -23,32 +23,9 @@ func EncodeNextPageToken(codec *appkey.Codec, id uuid.UUID) (string, error) {
 	return codec.Encrypt(id[:])
 }
 
-// decodeCursor turns an encrypted page_token back into a UUID string for SQL.
-// Empty token → empty string (caller treats as "no cursor"). Unparseable or
-// tampered token → error.
-func decodeCursor(codec *appkey.Codec, token string) (string, error) {
-	if token == "" {
-		return "", nil
-	}
-	if codec == nil {
-		return "", fmt.Errorf("filter: page token codec is required")
-	}
-	raw, err := codec.Decrypt(token)
-	if err != nil {
-		return "", fmt.Errorf("invalid page_token: %w", err)
-	}
-	if len(raw) != 16 {
-		return "", fmt.Errorf("invalid page_token: expected 16 bytes, got %d", len(raw))
-	}
-	var id uuid.UUID
-	copy(id[:], raw)
-	return id.String(), nil
-}
-
 // DecodePageToken decodes an id-only page token into its row id. Empty token →
-// uuid.Nil (caller treats as "no cursor"). Tampered/short token → error. This
-// is the exported, uuid-typed sibling of decodeCursor, used by the
-// compound-cursor keyset path (BuildListQuery / DecodeCursor).
+// uuid.Nil (caller treats as "no cursor"). Tampered/short token → error. Used by
+// the compound-cursor keyset path (BuildListQuery / DecodeCursor).
 func DecodePageToken(codec *appkey.Codec, token string) (uuid.UUID, error) {
 	if token == "" {
 		return uuid.Nil, nil

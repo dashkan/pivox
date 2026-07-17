@@ -18,7 +18,6 @@ func TestTagValueFilter(t *testing.T) {
 	rf := TagValueFilter()
 	require.NotNil(t, rf)
 	assert.Equal(t, "tag_values", rf.Table)
-	assert.Equal(t, "tag_key_id", rf.ParentColumn)
 	assert.False(t, rf.SoftDelete)
 	assert.NotEmpty(t, rf.Filterable)
 }
@@ -27,7 +26,6 @@ func TestTagBindingFilter(t *testing.T) {
 	rf := TagBindingFilter()
 	require.NotNil(t, rf)
 	assert.Equal(t, "tag_bindings", rf.Table)
-	assert.Equal(t, "parent_resource", rf.ParentColumn)
 	assert.False(t, rf.SoftDelete)
 	assert.NotEmpty(t, rf.Filterable)
 }
@@ -36,7 +34,6 @@ func TestApiKeyFilter(t *testing.T) {
 	rf := ApiKeyFilter()
 	require.NotNil(t, rf)
 	assert.Equal(t, "api_keys", rf.Table)
-	assert.Equal(t, "org_id", rf.ParentColumn)
 	assert.True(t, rf.SoftDelete)
 	assert.NotEmpty(t, rf.Filterable)
 }
@@ -55,98 +52,13 @@ func TestOrganizationFilter(t *testing.T) {
 	require.NotNil(t, rf)
 	assert.Equal(t, "organizations", rf.Table)
 	assert.True(t, rf.SoftDelete)
-	assert.Empty(t, rf.ParentColumn)
 }
 
 func TestTagKeyFilter(t *testing.T) {
 	rf := TagKeyFilter()
 	require.NotNil(t, rf)
 	assert.Equal(t, "tag_keys", rf.Table)
-	assert.Equal(t, "org_id", rf.ParentColumn)
 	assert.False(t, rf.SoftDelete)
-}
-
-// ---------------------------------------------------------------------------
-// ParseOrderBy
-// ---------------------------------------------------------------------------
-
-func TestParseOrderBy(t *testing.T) {
-	rf := SpaceFilter()
-
-	tests := []struct {
-		name    string
-		input   string
-		want    string
-		wantErr bool
-	}{
-		{
-			name:  "single field default asc",
-			input: "displayName",
-			want:  "display_name ASC",
-		},
-		{
-			name:  "single field explicit asc",
-			input: "displayName asc",
-			want:  "display_name ASC",
-		},
-		{
-			name:  "single field desc",
-			input: "displayName desc",
-			want:  "display_name DESC",
-		},
-		{
-			name:  "multiple fields",
-			input: "createTime desc, name",
-			want:  "create_time DESC, name ASC",
-		},
-		{
-			name:  "name field always allowed",
-			input: "name desc",
-			want:  "name DESC",
-		},
-		{
-			name:  "empty input",
-			input: "",
-			want:  "",
-		},
-		{
-			name:  "whitespace only",
-			input: "   ",
-			want:  "",
-		},
-		{
-			name:    "invalid field",
-			input:   "unknownField",
-			wantErr: true,
-		},
-		{
-			name:    "invalid direction",
-			input:   "displayName sideways",
-			wantErr: true,
-		},
-		{
-			name:    "too many tokens",
-			input:   "displayName asc extra",
-			wantErr: true,
-		},
-		{
-			name:    "JSONB field not orderable",
-			input:   "labels",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseOrderBy(rf, tt.input)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -418,16 +330,17 @@ func TestFilterSortSplit_FilterOnlyField_FilterWorks(t *testing.T) {
 
 func TestFilterSortSplit_FilterOnlyField_OrderByRejected(t *testing.T) {
 	rf := filterOnlyRF()
-	_, err := ParseOrderBy(rf, "searchOnly")
+	_, err := PlanOrderBy(rf, "searchOnly")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid order_by field")
 }
 
 func TestFilterSortSplit_SortOnlyField_OrderByWorks(t *testing.T) {
 	rf := sortOnlyRF()
-	got, err := ParseOrderBy(rf, "sortOnly desc")
+	plan, err := PlanOrderBy(rf, "sortOnly desc")
 	require.NoError(t, err)
-	assert.Equal(t, "sort_only DESC", got)
+	assert.Equal(t, "sort_only", plan.Column)
+	assert.True(t, plan.Descending)
 }
 
 func TestFilterSortSplit_SortOnlyField_FilterRejected(t *testing.T) {
@@ -443,6 +356,6 @@ func TestSpaceFilter_JSONBLabelsNotSortable(t *testing.T) {
 	rf := SpaceFilter()
 	assert.Contains(t, rf.Filterable, "labels")
 	assert.NotContains(t, rf.Sortable, "labels")
-	_, err := ParseOrderBy(rf, "labels")
+	_, err := PlanOrderBy(rf, "labels")
 	require.Error(t, err)
 }

@@ -30,18 +30,19 @@ the columns it may reach.
 
 ## 0. Does this pattern apply?
 
-Use this recipe for **leveled** resources (row lives at org level *or* under a
-space — `space_id` nullable; connectors, secrets, workflows) whose base scope
-is `org_id = … AND space_id IS NOT DISTINCT FROM …`. That two-column partition
-is NOT expressible via `ResourceFilter.ParentColumn` (a single `col = $`
-predicate), so these resources use `filter.BuildListQuery` with a
-handler-supplied base scope — NOT `filter.Query`.
+Use this recipe for any dynamic AIP-160/132 list. It fits both:
 
-For **flat single-parent** resources (one `parent_id = $` predicate: gateways,
-requests, assets, members, roles) prefer `filter.Query` + a `ResourceFilter`
-with `ParentColumn` set — see `docs/aip-list-audit.md` §E. That path already
-handles filter + order_by + soft-delete + a single-column keyset. The rest of
-this doc is the leveled/bespoke path.
+- **Leveled** resources (row lives at org level *or* under a space —
+  `space_id` nullable; connectors, secrets, workflows) whose base scope is
+  `org_id = … AND space_id IS NOT DISTINCT FROM …`.
+- **Flat single-parent** resources (one `parent_id = $` predicate: spaces,
+  api keys, tags, requests, assets) whose base scope is a single equality.
+
+Both supply their base scope as handler-built `ListQuery.Base` predicates and
+run through `filter.BuildListQuery` — the single compound-cursor engine. (The
+older `filter.Query` engine, which took a single `ParentColumn` `=` predicate
+baked into the `ResourceFilter`, has been **deleted**; every handler is on
+`BuildListQuery` now.)
 
 Rollup (`spaces/-` wildcard, AIP-159) is **out of scope** here — keep the
 existing single-scope partition. Add rollup later per audit §G.
@@ -70,10 +71,9 @@ func ConnectorFilter() *ResourceFilter {
         },
         Table:         "connectors",
         SoftDelete:    false,   // true adds `delete_time IS NULL` (only if the table has it)
-        OrderBy:       "id ASC",
-        CursorColumn:  "id",
         DefaultFields: []string{"displayName"}, // fields a bare `foo` term searches
-        // ParentColumn intentionally UNSET — base scope is handler-supplied.
+        // Base scope (org_id / space_id / parent_id) is handler-supplied via
+        // ListQuery.Base — never baked into the ResourceFilter.
     }
 }
 ```
@@ -111,11 +111,9 @@ never request input.
   desc"` gives a newest-first list whose token is still the 16-byte id cursor
   (`ORDER BY id DESC`, resume `id < $cursor`). Any other token must be a
   registered `Sortable` field, in which case the default uses the compound
-  `(col, id)` cursor. Unset → historical id-ASC default. **Note:** this is
-  distinct from the legacy `OrderBy` field, which is raw-SQL and consumed ONLY by
-  the `filter.Query` path — a compound-path resource sets `DefaultOrder`, not
-  `OrderBy`. (aichat is the first DESC default: `DefaultOrder: "id desc"` keeps
-  the four AiChat lists newest-first.)
+  `(col, id)` cursor. Unset → historical id-ASC default. (aichat is the first
+  DESC default: `DefaultOrder: "id desc"` keeps the four AiChat lists
+  newest-first.)
 - **`DefaultPageSize int32` / `MaxPageSize int32`** — applied by
   `filter.ClampPageSize(rf, req.GetPageSize())`, the single shared helper that
   replaced the per-handler `clampPageSize` copies. A `page_size <= 0` becomes
@@ -228,43 +226,43 @@ untouched.
 
 ---
 
-## Migrating a legacy `filter.Query` handler to compound-cursor
+## Historical: migrating the legacy `filter.Query` handlers (complete)
 
-The recipe above (§1–5) converts a **static-sqlc** list. A second, larger class
-of handlers is already **dynamic** but on the **legacy `filter.Query` engine**:
-they pair an **id-only cursor** (`CursorColumn: "id"` + `EncodeNextPageToken` /
-`DecodeCursor`) with a `Sortable` set that exposes **non-id** columns. That is a
-latent correctness bug: a client passing `order_by=displayName` gets
-`ORDER BY display_name` but the keyset resumes on `id > $cursor` — sort and
-keyset disagree, so rows **drop and duplicate across page boundaries** whenever
-display_name order differs from id order. (Pinned red→green in
+> This migration is **done** and the legacy `filter.Query` engine has been
+> **deleted**. The section is retained for the design rationale (why the
+> compound cursor exists) and because its per-step notes still describe how a
+> flat single-parent list is assembled on `BuildListQuery`. There are no more
+> legacy handlers to convert.
+
+A class of handlers was already **dynamic** but ran on the legacy `filter.Query`
+engine: they paired an **id-only cursor** (`EncodeNextPageToken` /
+`DecodeCursor`) with a `Sortable` set that exposed **non-id** columns. That was a
+latent correctness bug: a client passing `order_by=displayName` got
+`ORDER BY display_name` but the keyset resumed on `id > $cursor` — sort and
+keyset disagreed, so rows **dropped and duplicated across page boundaries**
+whenever display_name order differed from id order. (Pinned red→green in
 `TestE2E_ListSpaces_OrderByDisplayNameKeysetBoundary`: the legacy path returned
 `[aa,bb,cc,bb,dd,ee]` — `bb` duplicated, `ff`/`gg` dropped — for 7 rows at
-page_size 3.)
+page_size 3.) The compound `(col, id)` cursor below is the fix.
 
-**Worked example (the pilot): `ListSpaces`** (`internal/service/spaces/server.go`).
-This is the template for the fan-out (organizations, apikeys, tags, aichat, mcp).
-The moving parts differ from §1–5 as follows:
+**Worked example: `ListSpaces`** (`internal/service/spaces/server.go`) — the
+template the fan-out (organizations, apikeys, tags, aichat, mcp) followed. The
+moving parts of a flat single-parent list differ from §1–5 as follows:
 
 1. **Make the declaration compound-capable.** In `SpaceFilter()`, set
    `SortableField.Type` on every sortable column — **`filtering.TypeTimestamp`
    on timestamp columns is mandatory** (it is what tells `DecodeCursor` to
    reparse the token's sort value into a `time.Time`); non-timestamp columns get
-   `filtering.TypeString`. Leave `OrderBy`/`CursorColumn`/`ParentColumn` in place
-   — they are inert on the compound path (`BuildListQuery` uses `Table`,
-   `SoftDelete`, and the `Filterable`/`Sortable` whitelists only) but keep the
-   declaration honest and are still read by any *other* legacy caller during the
-   sweep (e.g. `mcp.ListSpaces` also uses `SpaceFilter()` on `filter.Query`).
+   `filtering.TypeString`.
 
 2. **Soft-delete is handled by the engine, not the base scope.** `spaces` is
    soft-deleting (`SoftDelete: true`, request has `show_deleted`).
-   `BuildListQuery` now honors `q.Resource.SoftDelete && !q.ShowDeleted` by
-   emitting a **no-arg** `delete_time IS NULL` predicate (mirroring
-   `filter.Query`'s `buildQuery`). So you do **not** put soft-delete in `Base`
-   (a `Predicate` must carry exactly one `%s`/arg, and `delete_time IS NULL` has
-   none) — you plumb `ShowDeleted: req.GetShowDeleted()` into `ListQuery` and let
-   the engine add it. Hard-delete resources (no `delete_time` column) leave
-   `SoftDelete: false` and nothing is emitted.
+   `BuildListQuery` honors `q.Resource.SoftDelete && !q.ShowDeleted` by emitting
+   a **no-arg** `delete_time IS NULL` predicate. So you do **not** put soft-delete
+   in `Base` (a `Predicate` must carry exactly one `%s`/arg, and
+   `delete_time IS NULL` has none) — you plumb `ShowDeleted: req.GetShowDeleted()`
+   into `ListQuery` and let the engine add it. Hard-delete resources (no
+   `delete_time` column) leave `SoftDelete: false` and nothing is emitted.
 
 3. **Base scope is the flat parent predicate.** Unlike the leveled connectors
    (`org_id = … AND space_id IS NOT DISTINCT FROM …`), a flat single-parent
@@ -276,13 +274,11 @@ The moving parts differ from §1–5 as follows:
    the row's value for the active sort column, timestamps as
    `.UTC().Format(time.RFC3339Nano)`, `default: ""` for the id-only path.
 
-5. **Encode via `filter.Paginate` + `filter.EncodeCursor`.** These handlers
-   already went through the Phase-B `filter.Paginate` off-by-one fix, so the only
-   token change is swapping the id-only `EncodeNextPageToken(last.ID)` inside the
-   `Paginate` callback for the compound
-   `EncodeCursor(codec, plan, spaceSortValue(plan, last), last.ID)`, and building
-   the query with `BuildListQuery` instead of `filter.Query`. `Paginate` keeps
-   the trim + last-returned-row discipline.
+5. **Encode via `filter.Paginate` + `filter.EncodeCursor`.** Inside the
+   `Paginate` callback, encode the compound
+   `EncodeCursor(codec, plan, spaceSortValue(plan, last), last.ID)` and build the
+   query with `BuildListQuery`. `Paginate` keeps the trim + last-returned-row
+   discipline.
 
 6. **Nullable-column rule (per Phase C).** Every column you register as
    `Sortable` MUST be `NOT NULL` (see the keyset section below for the

@@ -187,8 +187,8 @@ func BuildListQuery(q ListQuery) (string, []any, error) {
 		args       []any
 	)
 
-	// Soft-delete filter — resource-level, mirroring filter.Query's buildQuery:
-	// exclude soft-deleted rows unless the caller passes ShowDeleted. It is a
+	// Soft-delete filter — resource-level: exclude soft-deleted rows unless the
+	// caller passes ShowDeleted. It is a
 	// no-arg literal predicate, so it never consumes a $N placeholder and leaves
 	// the base/filter/cursor numbering below untouched. Only fires for a resource
 	// whose table actually has a delete_time column (SoftDelete set).
