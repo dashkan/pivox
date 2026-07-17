@@ -333,6 +333,82 @@ func ConnectorFilter() *ResourceFilter {
 	}
 }
 
+// WorkflowFilter returns the filter config for workflow containers (the
+// ListWorkflows RPC), on the compound-cursor keyset path (filter.BuildListQuery).
+//
+// Workflows are an org+space *leveled* resource, exactly like connectors: a row
+// lives directly under an org (space_id NULL) or under a space (space_id set).
+// ListWorkflows preserves the pre-migration scope semantics by supplying that
+// partition as a single BuildListQuery base predicate
+// (space_id IS NOT DISTINCT FROM $), so an org-level list returns only the
+// org-direct workflows (space_id NULL) and a space-level list returns that
+// space's — NOT the connectors-style rollup. This declaration supplies only the
+// filterable + sortable surface.
+//
+// workflows hard-deletes (no delete_time column), so SoftDelete is false. Every
+// Sortable column is NOT NULL in the init migration (display_name TEXT NOT NULL
+// DEFAULT ”, create_time / update_time TIMESTAMPTZ NOT NULL), which the
+// compound-cursor row comparison requires — a nullable sort column would go
+// UNKNOWN on NULLs and drop/duplicate rows across page boundaries. See
+// docs/aip-list-transpiler-procedure.md.
+func WorkflowFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString, AllowPartial: true},
+			"description": {Column: "description", Type: filtering.TypeString, AllowPartial: true},
+			"enabled":     {Column: "enabled", Type: filtering.TypeBool},
+			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
+			"updateTime":  {Column: "update_time", Type: filtering.TypeTimestamp},
+			"annotations": {Column: "annotations", Type: filtering.TypeMap(filtering.TypeString, filtering.TypeString), JSONB: true},
+		},
+		Sortable: map[string]SortableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+			"updateTime": {Column: "update_time", Type: filtering.TypeTimestamp},
+		},
+		Table:         "workflows",
+		SoftDelete:    false, // workflows hard-delete; no delete_time column
+		DefaultFields: []string{"displayName"},
+		// The org+space base scope is applied by the handler via BuildListQuery.Base.
+	}
+}
+
+// WorkflowRunFilter returns the filter config for workflow runs (the
+// ListWorkflowRuns RPC), on the compound-cursor keyset path (filter.BuildListQuery).
+//
+// A run's base scope is one of three predicates the handler selects from the
+// parent (a single workflow's workflow_id, or — for the AIP-159 workflows/-
+// wildcard — a space_id or an org_id rollup); this declaration supplies only the
+// filter/sort surface.
+//
+// `state` is the only filterable field — it replaces the pre-migration bespoke
+// `state = "VALUE"` parser, so `filter: "state = \"RUNNING\""` narrows via the
+// generic AIP-160 transpiler (state is a TEXT column storing the enum label).
+// NOTE: unlike the old parser, the generic engine does NOT validate the operand
+// against the run-state enum, so an unknown state (e.g. state = "BOGUS") now
+// yields an empty page rather than InvalidArgument — standard AIP-160 behavior.
+//
+// The lone Sortable column, create_time, is NOT NULL in the init migration, as
+// the compound-cursor row comparison requires. With no DefaultOrder the list
+// defaults to id ASC (creation order), preserving the pre-migration ordering.
+func WorkflowRunFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"state": {Column: "state", Type: filtering.TypeString},
+		},
+		Sortable: map[string]SortableField{
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Table:      "workflow_runs",
+		SoftDelete: false, // workflow_runs has no delete_time column
+		// The per-parent base scope is applied by the handler via BuildListQuery.Base.
+	}
+}
+
 // RequestFilter returns the filter config for asset requests (the ListRequests
 // RPC), on the compound-cursor keyset path (filter.BuildListQuery).
 //

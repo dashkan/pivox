@@ -99,15 +99,6 @@ SET state = 'CANCELLED',
 WHERE workflow_id = $1
   AND state IN ('RUNNING', 'WAITING');
 
--- name: ListWorkflowsByParent :many
--- Keyset pagination on id. Fetch page_limit+1 to detect a next page.
-SELECT * FROM workflows
-WHERE org_id = @org_id
-  AND space_id IS NOT DISTINCT FROM sqlc.narg('space_id')
-  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
-ORDER BY id
-LIMIT @page_limit;
-
 -- ============================================================================
 -- workflow_versions (immutable definitions)
 -- ============================================================================
@@ -174,40 +165,6 @@ SELECT * FROM workflow_runs WHERE id = $1;
 -- engine advancing the run, or DeleteWorkflow's force cancel (both take
 -- run-row locks).
 SELECT * FROM workflow_runs WHERE id = $1 FOR UPDATE;
-
--- name: ListWorkflowRuns :many
--- Runs of one workflow. Keyset pagination on id (fetch page_limit+1 to detect a
--- next page), with an optional state filter (NULL = all states). order_by is not
--- honored — runs are always id (creation) order, the keyset column.
-SELECT * FROM workflow_runs
-WHERE workflow_id = @workflow_id
-  AND (sqlc.narg('state')::text IS NULL OR state = sqlc.narg('state'))
-  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
-ORDER BY id
-LIMIT @page_limit;
-
--- name: ListWorkflowRunsByOrg :many
--- Org-scope wildcard listing (organizations/{org}/workflows/-/runs): ALL runs in
--- the org — both org-direct runs (space_id NULL) and runs of the org's
--- space-scoped workflows (the "org + all its spaces" global view). Keyset on id
--- via idx_workflow_runs_org, optional state filter.
-SELECT * FROM workflow_runs
-WHERE org_id = @org_id
-  AND (sqlc.narg('state')::text IS NULL OR state = sqlc.narg('state'))
-  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
-ORDER BY id
-LIMIT @page_limit;
-
--- name: ListWorkflowRunsBySpace :many
--- Space-scope wildcard listing
--- (organizations/{org}/spaces/{space}/workflows/-/runs): runs of that space's
--- workflows. Keyset on id via idx_workflow_runs_space, optional state filter.
-SELECT * FROM workflow_runs
-WHERE space_id = @space_id
-  AND (sqlc.narg('state')::text IS NULL OR state = sqlc.narg('state'))
-  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
-ORDER BY id
-LIMIT @page_limit;
 
 -- name: UpdateWorkflowRunSteps :exec
 -- Checkpoints live per-step progress into the steps JSONB as the executor

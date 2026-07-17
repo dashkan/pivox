@@ -332,6 +332,84 @@ func ScanSecrets(rows pgx.Rows) ([]db.Secret, error) {
 	return results, rows.Err()
 }
 
+// ScanWorkflows scans rows into db.Workflow structs.
+//
+// The destination order MUST match the `workflows` column order from the init
+// migration exactly — this scans `SELECT *` from BuildListQuery, so adding a
+// column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanWorkflows(rows pgx.Rows) ([]db.Workflow, error) {
+	defer rows.Close()
+	var results []db.Workflow
+	for rows.Next() {
+		var w db.Workflow
+		// Order MUST match `workflows`: id, org_id, space_id, slug, display_name,
+		// description, enabled, version, config, origin, annotations, etag,
+		// created_by, updated_by, create_time, update_time.
+		if err := rows.Scan(
+			&w.ID,
+			&w.OrgID,
+			&w.SpaceID,
+			&w.Slug,
+			&w.DisplayName,
+			&w.Description,
+			&w.Enabled,
+			&w.Version,
+			&w.Config,
+			&w.Origin,
+			&w.Annotations,
+			&w.Etag,
+			&w.CreatedBy,
+			&w.UpdatedBy,
+			&w.CreateTime,
+			&w.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, w)
+	}
+	return results, rows.Err()
+}
+
+// ScanWorkflowRuns scans rows into db.WorkflowRun structs.
+//
+// The destination order MUST match the `workflow_runs` column order from the
+// init migration exactly — this scans `SELECT *` from BuildListQuery, so adding
+// a column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanWorkflowRuns(rows pgx.Rows) ([]db.WorkflowRun, error) {
+	defer rows.Close()
+	var results []db.WorkflowRun
+	for rows.Next() {
+		var r db.WorkflowRun
+		// Order MUST match `workflow_runs`: id, workflow_id, org_id, space_id,
+		// version_id, state, trigger, subject, input, output, steps, error,
+		// triggered_by, create_time, start_time, end_time.
+		if err := rows.Scan(
+			&r.ID,
+			&r.WorkflowID,
+			&r.OrgID,
+			&r.SpaceID,
+			&r.VersionID,
+			&r.State,
+			&r.Trigger,
+			&r.Subject,
+			&r.Input,
+			&r.Output,
+			&r.Steps,
+			&r.Error,
+			&r.TriggeredBy,
+			&r.CreateTime,
+			&r.StartTime,
+			&r.EndTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
 // ScanRequests scans rows into db.AssetRequest structs.
 //
 // The destination order MUST match the `asset_requests` column order from the

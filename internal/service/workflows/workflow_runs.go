@@ -6,15 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"go.einride.tech/aip/filtering"
-	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 	"riverqueue.com/riverpro"
@@ -221,103 +218,116 @@ func (s *WorkflowRunsServer) GetWorkflowRun(ctx context.Context, req *workflowsv
 	return s.toProto(ctx, run, prefix+"/workflows/"+wfSlug), nil
 }
 
+// ListWorkflowRuns is a dynamic AIP-160 filtered + AIP-132 sorted +
+// compound-cursor keyset list over workflow_runs. It shares one filter/sort
+// surface (filter.WorkflowRunFilter) across three base scopes selected from the
+// parent: a concrete workflow (workflow_id), or — for the AIP-159 workflows/-
+// wildcard — a space rollup (space_id) or an org rollup (org_id). Every value
+// (scope ids, the `state` filter operand, cursor values, page size) is bound as
+// a $N parameter by filter.BuildListQuery; the sort column/direction come only
+// from WorkflowRunFilter's whitelist.
+//
+// The `state` filter now flows through the generic AIP-160 transpiler
+// (state = "RUNNING") instead of the removed bespoke parser; order_by (e.g.
+// createTime desc), previously accepted-but-ignored, is now honored.
 func (s *WorkflowRunsServer) ListWorkflowRuns(ctx context.Context, req *workflowsv1.ListWorkflowRunsRequest) (*workflowsv1.ListWorkflowRunsResponse, error) {
 	orgID, spaceID, prefix := scope(ctx)
-	pageSize := clampPageSize(req.GetPageSize())
-	cursor, err := decodePageToken(s.codec, req.GetPageToken())
+	rf := filter.WorkflowRunFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
+
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {
-		return nil, err
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
 	}
-	// order_by is accepted but ignored (runs are always id/creation order, the
-	// keyset column); the `state` filter is honored on both the per-workflow and
-	// the scope-wide paths.
-	stateFilter, err := parseRunStateFilter(req.GetFilter())
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
 	if err != nil {
-		return nil, err
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
 	}
 
-	// AIP-159 `-` wildcard: organizations/{org}[/spaces/{space}]/workflows/-
-	// lists runs across the whole scope instead of one workflow. The permission
-	// interceptor already gated workflows.read at that org/space scope (via the
-	// parent's scope prefix), so there is no single parent workflow to re-check.
-	if isWorkflowWildcard(req.GetParent()) {
-		// Space-scope wildcard: one space, so `prefix` (which already carries
-		// /spaces/{space}) + each run's own workflow_id builds the name.
-		if spaceID.Valid {
-			rows, err := s.queries.ListWorkflowRunsBySpace(ctx, db.ListWorkflowRunsBySpaceParams{
-				SpaceID:   spaceID,
-				State:     stateFilter,
-				Cursor:    cursor,
-				PageLimit: pageSize + 1,
-			})
+	// Select the base scope + the per-run name builder from the parent. The
+	// AIP-159 `-` wildcard lists runs across the whole scope (a space, or the org
+	// rollup); a concrete parent lists one workflow's runs. The permission
+	// interceptor already gated workflows.read at the parent's scope. buildNames
+	// runs AFTER the keyset trim, over the returned page only.
+	var (
+		base       []filter.Predicate
+		buildNames func(ctx context.Context, page []db.WorkflowRun) ([]string, error)
+	)
+	switch {
+	case isWorkflowWildcard(req.GetParent()) && spaceID.Valid:
+		// Space-scope wildcard: one space (prefix already carries /spaces/{space}),
+		// but potentially many workflows — each run's name carries its own
+		// workflow's slug, resolved over the page in one batched lookup (no N+1).
+		base = []filter.Predicate{{SQL: "space_id = %s", Arg: spaceID}}
+		buildNames = func(ctx context.Context, page []db.WorkflowRun) ([]string, error) {
+			wfSlugs, err := s.resolveWorkflowSlugs(ctx, page)
 			if err != nil {
-				return nil, apierr.Internal(err, "list workflow runs")
+				return nil, err
 			}
-			// One space, but potentially many workflows: each run's name carries
-			// its own workflow's slug, resolved (over the returned page only) in
-			// one batched lookup over the page's distinct workflows (no N+1).
-			return s.renderRunPage(ctx, rows, pageSize, func(ctx context.Context, page []db.WorkflowRun) ([]string, error) {
-				wfSlugs, err := s.resolveWorkflowSlugs(ctx, page)
-				if err != nil {
-					return nil, err
+			names := make([]string, len(page))
+			for i, r := range page {
+				slug, ok := wfSlugs[r.WorkflowID]
+				if !ok {
+					return nil, apierr.Internal(
+						fmt.Errorf("workflow %s for run %s has no row", r.WorkflowID, r.ID),
+						"resolve workflow slug")
 				}
-				names := make([]string, len(page))
-				for i, r := range page {
-					slug, ok := wfSlugs[r.WorkflowID]
-					if !ok {
-						return nil, apierr.Internal(
-							fmt.Errorf("workflow %s for run %s has no row", r.WorkflowID, r.ID),
-							"resolve workflow slug")
-					}
-					names[i] = prefix + "/workflows/" + slug
-				}
-				return names, nil
-			})
+				names[i] = prefix + "/workflows/" + slug
+			}
+			return names, nil
 		}
-
-		// Org-scope wildcard: ALL runs in the org, including runs of space-scoped
-		// workflows. Each run's name must reflect its actual location, so a
-		// space-scoped run needs its space slug — resolved (over the returned page
-		// only) in one batched lookup over the page's distinct spaces (no N+1).
-		rows, err := s.queries.ListWorkflowRunsByOrg(ctx, db.ListWorkflowRunsByOrgParams{
-			OrgID:     orgID,
-			State:     stateFilter,
-			Cursor:    cursor,
-			PageLimit: pageSize + 1,
-		})
-		if err != nil {
-			return nil, apierr.Internal(err, "list workflow runs")
-		}
-		return s.renderRunPage(ctx, rows, pageSize, func(ctx context.Context, page []db.WorkflowRun) ([]string, error) {
+	case isWorkflowWildcard(req.GetParent()):
+		// Org-scope wildcard (rollup): ALL runs in the org, org-direct AND runs of
+		// space-scoped workflows. Each run's name reflects its actual location, so a
+		// space-scoped run needs its space slug — resolved over the page in one
+		// batched lookup (no N+1).
+		base = []filter.Predicate{{SQL: "org_id = %s", Arg: orgID}}
+		buildNames = func(ctx context.Context, page []db.WorkflowRun) ([]string, error) {
 			return s.orgRunNames(ctx, page, prefix)
-		})
+		}
+	default:
+		wfSlug, err := parseWorkflowName(req.GetParent())
+		if err != nil {
+			return nil, err
+		}
+		wf, err := getWorkflowByParent(ctx, s.queries, orgID, spaceID, wfSlug, req.GetParent())
+		if err != nil {
+			return nil, err
+		}
+		workflowName := prefix + "/workflows/" + wfSlug
+		base = []filter.Predicate{{SQL: "workflow_id = %s", Arg: wf.ID}}
+		buildNames = func(_ context.Context, page []db.WorkflowRun) ([]string, error) {
+			names := make([]string, len(page))
+			for i := range page {
+				names[i] = workflowName
+			}
+			return names, nil
+		}
 	}
 
-	wfSlug, err := parseWorkflowName(req.GetParent())
-	if err != nil {
-		return nil, err
-	}
-	wf, err := getWorkflowByParent(ctx, s.queries, orgID, spaceID, wfSlug, req.GetParent())
-	if err != nil {
-		return nil, err
-	}
-	rows, err := s.queries.ListWorkflowRuns(ctx, db.ListWorkflowRunsParams{
-		WorkflowID: wf.ID,
-		State:      stateFilter,
-		Cursor:     cursor,
-		PageLimit:  pageSize + 1,
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     base,
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter) —
+		// surface it as InvalidArgument on "filter".
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, apierr.Internal(err, "list workflow runs")
 	}
-	workflowName := prefix + "/workflows/" + wfSlug
-	return s.renderRunPage(ctx, rows, pageSize, func(_ context.Context, page []db.WorkflowRun) ([]string, error) {
-		names := make([]string, len(page))
-		for i := range page {
-			names[i] = workflowName
-		}
-		return names, nil
-	})
+	rows, err := filter.ScanWorkflowRuns(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list workflow runs")
+	}
+	return s.renderRunPage(ctx, rows, pageSize, plan, buildNames)
 }
 
 // isWorkflowWildcard reports whether a ListWorkflowRuns parent uses the AIP-159
@@ -413,28 +423,25 @@ func (s *WorkflowRunsServer) resolveWorkflowSlugs(ctx context.Context, page []db
 	return slugs, nil
 }
 
-// renderRunPage trims the keyset over-fetch into a page + next-page token,
-// resolves the page's version numbers and actors, and renders each run to
-// proto. buildNames runs AFTER the trim over the returned page only, yielding
-// one resource name per run (index-aligned) — so a dropped over-fetch row can
-// never trigger a lookup or an error that poisons the response.
+// renderRunPage trims the keyset over-fetch into a page + next-page token (via
+// filter.Paginate, which derives the token from the LAST RETURNED row against
+// the resolved order plan), resolves the page's version numbers and actors, and
+// renders each run to proto. buildNames runs AFTER the trim over the returned
+// page only, yielding one resource name per run (index-aligned) — so a dropped
+// over-fetch row can never trigger a lookup or an error that poisons the
+// response.
 func (s *WorkflowRunsServer) renderRunPage(
 	ctx context.Context,
 	rows []db.WorkflowRun,
 	pageSize int32,
+	plan filter.OrderByPlan,
 	buildNames func(ctx context.Context, page []db.WorkflowRun) ([]string, error),
 ) (*workflowsv1.ListWorkflowRunsResponse, error) {
-	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		// The keyset cursor is the LAST returned row's id; the next page's query
-		// resumes with `id > cursor`. (Encoding the first *un*returned row here
-		// would skip it, since the resume predicate is strict `>`.)
-		tok, err := filter.EncodeNextPageToken(s.codec, rows[pageSize-1].ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
-		nextPageToken = tok
-		rows = rows[:pageSize]
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.WorkflowRun) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, runSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 	names, err := buildNames(ctx, rows)
 	if err != nil {
@@ -449,55 +456,18 @@ func (s *WorkflowRunsServer) renderRunPage(
 	return &workflowsv1.ListWorkflowRunsResponse{WorkflowRuns: out, NextPageToken: nextPageToken}, nil
 }
 
-// parseRunStateFilter parses the ListWorkflowRuns AIP-160 filter. The only
-// supported shape is `state = "VALUE"` (matching the proto's documented
-// example); an empty filter yields an unset (match-all) column value. Any other
-// shape, or an unknown run state, is InvalidArgument rather than a silently
-// ignored or empty result.
-func parseRunStateFilter(filterExpr string) (pgtype.Text, error) {
-	if strings.TrimSpace(filterExpr) == "" {
-		return pgtype.Text{}, nil
+// runSortValue renders the primary order_by column's value for the given run as
+// the string the compound page token carries. create_time uses RFC3339Nano so
+// filter.DecodeCursor can parse it back to an exact time.Time. For the default
+// id ordering (plan.Field == "") the value is unused (EncodeCursor emits the
+// id-only token), so "" is returned. Mirrors connectorSortValue.
+func runSortValue(plan filter.OrderByPlan, r db.WorkflowRun) string {
+	switch plan.Field {
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
 	}
-	unsupported := apierr.InvalidArgument(apierr.FieldViolation("filter",
-		`only 'state = "VALUE"' is supported`))
-
-	var parser filtering.Parser
-	parser.Init(filterExpr)
-	parsed, err := parser.Parse()
-	if err != nil {
-		return pgtype.Text{}, apierr.InvalidArgument(apierr.FieldViolation("filter", "invalid filter expression"))
-	}
-	call := parsed.GetExpr().GetCallExpr()
-	if call == nil || call.GetFunction() != filtering.FunctionEquals || len(call.GetArgs()) != 2 {
-		return pgtype.Text{}, unsupported
-	}
-	if call.GetArgs()[0].GetIdentExpr().GetName() != "state" {
-		return pgtype.Text{}, unsupported
-	}
-	state, ok := filterStringValue(call.GetArgs()[1])
-	if !ok {
-		return pgtype.Text{}, unsupported
-	}
-	if !runjob.IsValidState(state) {
-		return pgtype.Text{}, apierr.InvalidArgument(apierr.FieldViolation("filter",
-			"unknown run state "+strconv.Quote(state)))
-	}
-	return pgtype.Text{String: state, Valid: true}, nil
-}
-
-// filterStringValue extracts a string from an AIP-160 value expression — either
-// a quoted string constant (`state = "RUNNING"`) or a bare identifier
-// (`state = RUNNING`), both of which the einride parser accepts.
-func filterStringValue(e *expr.Expr) (string, bool) {
-	switch v := e.GetExprKind().(type) {
-	case *expr.Expr_ConstExpr:
-		if s, ok := v.ConstExpr.GetConstantKind().(*expr.Constant_StringValue); ok {
-			return s.StringValue, true
-		}
-	case *expr.Expr_IdentExpr:
-		return v.IdentExpr.GetName(), true
-	}
-	return "", false
 }
 
 func (s *WorkflowRunsServer) CancelWorkflowRun(ctx context.Context, req *workflowsv1.CancelWorkflowRunRequest) (*workflowsv1.WorkflowRun, error) {

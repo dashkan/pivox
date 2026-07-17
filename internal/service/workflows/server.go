@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -314,27 +315,73 @@ func clampPageSize(pageSize int32) int32 {
 // WorkflowsServer
 // ============================================================================
 
+// ListWorkflows is a dynamic AIP-160 filtered + AIP-132 sorted + compound-cursor
+// keyset list, structurally identical to ListConnectors/ListSecrets. The
+// interceptor-resolved (org, space) is the NON-NEGOTIABLE base scope, ANDed as
+// the base of the query; the request's filter/order_by layer ON TOP of it and
+// can only narrow, never widen. Every value (scope ids, filter operands, cursor
+// values, page size) is bound as a $N parameter by filter.BuildListQuery —
+// nothing is string-interpolated — and column/direction come only from
+// WorkflowFilter's whitelist.
+//
+// The base scope uses `space_id IS NOT DISTINCT FROM $` (NULL-matchable),
+// preserving the pre-migration ListWorkflowsByParent semantics: an org-level
+// parent lists only the org-direct workflows (space_id NULL), a space-level
+// parent lists that space's — this is deliberately NOT the connectors-style
+// org-level rollup. See docs/aip-list-transpiler-procedure.md.
 func (s *WorkflowsServer) ListWorkflows(ctx context.Context, req *workflowsv1.ListWorkflowsRequest) (*workflowsv1.ListWorkflowsResponse, error) {
 	orgID, spaceID, prefix := scope(ctx)
-	pageSize := clampPageSize(req.GetPageSize())
+	rf := filter.WorkflowFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
 
-	cursor, err := decodePageToken(s.codec, req.GetPageToken())
+	// Resolve order_by against the sortable whitelist (default: id). The plan
+	// also tells the cursor codec whether the sort value is a timestamp.
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {
-		return nil, err
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
 	}
 
-	rows, err := s.queries.ListWorkflowsByParent(ctx, db.ListWorkflowsByParentParams{
-		OrgID:     orgID,
-		SpaceID:   spaceID,
-		Cursor:    cursor,
-		PageLimit: pageSize + 1,
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	// Base scope: the interceptor-resolved org (always) + the workflow's org+space
+	// leveling. `space_id IS NOT DISTINCT FROM $` treats NULL (org-scoped) as a
+	// matchable value, so it selects exactly the parent's level — org-direct or
+	// one space — never a rollup. The AIP filter layers on top and can only narrow.
+	base := []filter.Predicate{
+		{SQL: "org_id = %s", Arg: orgID},
+		{SQL: "space_id IS NOT DISTINCT FROM %s", Arg: spaceID},
+	}
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     base,
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter) —
+		// surface it as InvalidArgument on "filter".
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list workflows")
+	}
+	rows, err := filter.ScanWorkflows(pgxRows)
 	if err != nil {
 		return nil, apierr.Internal(err, "list workflows")
 	}
 
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row (see the connectors comment for
+	// the off-by-one this closes).
 	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.Workflow) (string, error) {
-		return filter.EncodeNextPageToken(s.codec, last.ID)
+		return filter.EncodeCursor(s.codec, plan, workflowSortValue(plan, last), last.ID)
 	})
 	if err != nil {
 		return nil, apierr.Internal(err, "encode page token")
@@ -347,6 +394,24 @@ func (s *WorkflowsServer) ListWorkflows(ctx context.Context, req *workflowsv1.Li
 		out = append(out, convert.WorkflowToProto(r, prefix, actors, versionNumbers))
 	}
 	return &workflowsv1.ListWorkflowsResponse{Workflows: out, NextPageToken: nextPageToken}, nil
+}
+
+// workflowSortValue renders the primary order_by column's value for the given
+// row as the string the compound page token carries. Timestamps use RFC3339Nano
+// so filter.DecodeCursor can parse them back to an exact time.Time. For the
+// default id ordering (plan.Field == "") the value is unused (EncodeCursor emits
+// the id-only token), so "" is returned. Mirrors connectorSortValue.
+func workflowSortValue(plan filter.OrderByPlan, r db.Workflow) string {
+	switch plan.Field {
+	case "displayName":
+		return r.DisplayName
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	case "updateTime":
+		return r.UpdateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *WorkflowsServer) GetWorkflow(ctx context.Context, req *workflowsv1.GetWorkflowRequest) (*workflowsv1.Workflow, error) {

@@ -219,13 +219,25 @@ func TestE2E_ListWorkflowRuns_WildcardStateFilter(t *testing.T) {
 	assert.Contains(t, got, pendingRun.GetName())
 	assert.Contains(t, got, runningRun.GetName())
 
-	// An unknown state value is rejected, not silently ignored.
-	_, err = runClient.ListWorkflowRuns(ctx, &workflowsv1.ListWorkflowRunsRequest{
+	// An unknown state value now yields an EMPTY page (standard AIP-160): the
+	// generic transpiler binds `state = 'BOGUS'`, which matches no rows. The
+	// pre-migration bespoke parser rejected it with InvalidArgument; that
+	// enum-domain validation was dropped in the move to the shared engine.
+	unknown, err := runClient.ListWorkflowRuns(ctx, &workflowsv1.ListWorkflowRunsRequest{
 		Parent: orgParent + "/workflows/-",
 		Filter: `state = "BOGUS"`,
 	})
+	require.NoError(t, err)
+	assert.Empty(t, unknown.GetWorkflowRuns(), "an unknown state value matches no runs")
+
+	// A structurally invalid filter (unknown field) is still InvalidArgument —
+	// the transpiler rejects fields outside the whitelist.
+	_, err = runClient.ListWorkflowRuns(ctx, &workflowsv1.ListWorkflowRunsRequest{
+		Parent: orgParent + "/workflows/-",
+		Filter: `bogusfield = "x"`,
+	})
 	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, codes.InvalidArgument, status.Code(err), "an unknown filter field is rejected")
 }
 
 // TestE2E_ListWorkflowRuns_WildcardPagination covers keyset pagination across

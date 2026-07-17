@@ -708,6 +708,9 @@ type Querier interface {
 	// full set in one call without paging.
 	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
+	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
+	// (AIP-160 filter / order_by are not yet wired — ordered by id.)
+	ListSecretsByParent(ctx context.Context, arg ListSecretsByParentParams) ([]Secret, error)
 	// ListSoleOwnerOrgsForIdentity returns active orgs where the given
 	// identity is the ONLY owner. Used by DeleteAccount's VALIDATING
 	// phase to refuse deletion when the caller would leave any org
@@ -740,14 +743,12 @@ type Querier interface {
 	// The MCP surface is a deliberately narrow, agent-facing read, so it rides a
 	// hand-written query instead of the dynamic internal/filter engine. Scoped to
 	// one org, excludes soft-deleted rows, applies an optional case-insensitive
-	// LITERAL prefix match on display_name (the handler pre-builds the pattern:
-	// LIKE metacharacters escaped, a trailing '%' anchor appended; NULL = no
-	// filter), and keyset-paginates on id (strict id > cursor; NULL cursor = first
-	// page). The ILIKE uses an explicit ESCAPE '\' so the handler's backslash
-	// escapes of '%'/'_'/'\' are honored and the caller's input matches literally.
-	// The handler passes page_limit = page_size + 1 so an extra row signals a
-	// further page. Served by idx_spaces_org (org_id WHERE delete_time IS NULL),
-	// the same access path the filter engine used.
+	// prefix match on display_name (the handler pre-builds the escaped ILIKE
+	// pattern with a trailing '%'; NULL = no filter), and keyset-paginates on id
+	// (strict id > cursor; NULL cursor = first page). The handler passes
+	// page_limit = page_size + 1 so an extra row signals a further page. Served by
+	// idx_spaces_org (org_id WHERE delete_time IS NULL), the same access path the
+	// filter engine used.
 	ListSpacesForMCP(ctx context.Context, arg ListSpacesForMCPParams) ([]Space, error)
 	// ListSpacesPastPurgeTime returns soft-deleted spaces whose
 	// purge_time has elapsed. Used by SpacePurgeWorker to drive the
@@ -758,6 +759,7 @@ type Querier interface {
 	ListSpacesPastPurgeTime(ctx context.Context) ([]Space, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
+	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	// Returns the DISTINCT endpoint short names across every gateway in
 	// an org. Used by CreateStorageSession (#27 phase 2) to enumerate
 	// the prefix-pattern endpoint segments — patterns are glob-matched
@@ -774,24 +776,14 @@ type Querier interface {
 	// names across gateways collapse to one pattern).
 	ListStorageEndpointShortNamesByOrg(ctx context.Context, orgID uuid.UUID) ([]string, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
-	// Runs of one workflow. Keyset pagination on id (fetch page_limit+1 to detect a
-	// next page), with an optional state filter (NULL = all states). order_by is not
-	// honored — runs are always id (creation) order, the keyset column.
-	ListWorkflowRuns(ctx context.Context, arg ListWorkflowRunsParams) ([]WorkflowRun, error)
-	// Org-scope wildcard listing (organizations/{org}/workflows/-/runs): ALL runs in
-	// the org — both org-direct runs (space_id NULL) and runs of the org's
-	// space-scoped workflows (the "org + all its spaces" global view). Keyset on id
-	// via idx_workflow_runs_org, optional state filter.
-	ListWorkflowRunsByOrg(ctx context.Context, arg ListWorkflowRunsByOrgParams) ([]WorkflowRun, error)
-	// Space-scope wildcard listing
-	// (organizations/{org}/spaces/{space}/workflows/-/runs): runs of that space's
-	// workflows. Keyset on id via idx_workflow_runs_space, optional state filter.
-	ListWorkflowRunsBySpace(ctx context.Context, arg ListWorkflowRunsBySpaceParams) ([]WorkflowRun, error)
+	// Keyset pagination on id, scoped to a single org. Fetch page_limit+1 to
+	// detect a next page. (AIP-160 filter / order_by are not yet wired — the
+	// proto advertises them but the connector "agent" dropdown only needs an
+	// unfiltered id-ordered enumeration; ordered by id.)
+	ListStorageGatewaysByOrg(ctx context.Context, arg ListStorageGatewaysByOrgParams) ([]StorageGateway, error)
 	// Keyset pagination on id (uuidv7 is time-ordered, matching version_number
 	// order). Fetch page_limit+1 to detect a next page.
 	ListWorkflowVersions(ctx context.Context, arg ListWorkflowVersionsParams) ([]WorkflowVersion, error)
-	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
-	ListWorkflowsByParent(ctx context.Context, arg ListWorkflowsByParentParams) ([]Workflow, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
 	// MarkDomainFailed flips a PENDING domain to FAILED. Same race-
 	// safety as MarkDomainVerified.
