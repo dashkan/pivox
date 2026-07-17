@@ -223,7 +223,7 @@ const listSpacesForMCP = `-- name: ListSpacesForMCP :many
 SELECT id, org_id, name, display_name, labels, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM spaces
 WHERE org_id = $1
   AND delete_time IS NULL
-  AND ($2::text IS NULL OR display_name ILIKE $2::text)
+  AND ($2::text IS NULL OR display_name ILIKE $2::text ESCAPE '\')
   AND ($3::uuid IS NULL OR id > $3)
 ORDER BY id
 LIMIT $4
@@ -240,12 +240,14 @@ type ListSpacesForMCPParams struct {
 // The MCP surface is a deliberately narrow, agent-facing read, so it rides a
 // hand-written query instead of the dynamic internal/filter engine. Scoped to
 // one org, excludes soft-deleted rows, applies an optional case-insensitive
-// prefix match on display_name (the handler pre-builds the escaped ILIKE
-// pattern with a trailing '%'; NULL = no filter), and keyset-paginates on id
-// (strict id > cursor; NULL cursor = first page). The handler passes
-// page_limit = page_size + 1 so an extra row signals a further page. Served by
-// idx_spaces_org (org_id WHERE delete_time IS NULL), the same access path the
-// filter engine used.
+// LITERAL prefix match on display_name (the handler pre-builds the pattern:
+// LIKE metacharacters escaped, a trailing '%' anchor appended; NULL = no
+// filter), and keyset-paginates on id (strict id > cursor; NULL cursor = first
+// page). The ILIKE uses an explicit ESCAPE '\' so the handler's backslash
+// escapes of '%'/'_'/'\' are honored and the caller's input matches literally.
+// The handler passes page_limit = page_size + 1 so an extra row signals a
+// further page. Served by idx_spaces_org (org_id WHERE delete_time IS NULL),
+// the same access path the filter engine used.
 func (q *Queries) ListSpacesForMCP(ctx context.Context, arg ListSpacesForMCPParams) ([]Space, error) {
 	rows, err := q.db.Query(ctx, listSpacesForMCP,
 		arg.OrgID,

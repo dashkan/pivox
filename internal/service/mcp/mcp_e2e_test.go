@@ -252,6 +252,56 @@ func TestE2E_Mcp_ListSpaces_NamePrefix(t *testing.T) {
 		"name_prefix is a case-insensitive display-name prefix; non-matches excluded")
 }
 
+// TestE2E_Mcp_ListSpaces_NamePrefix_Literal proves name_prefix is a PURE
+// LITERAL prefix at the SQL layer: LIKE metacharacters in the caller's input
+// ('*', '%', '_', '\') match themselves, never as wildcards. The only
+// wildcard is the implicit trailing anchor. This guards the ESCAPE '\' fix
+// against the old AIP-160 grammar quirks (an embedded '*' meaning "any", a
+// bare '\' being swallowed as the escape char, unescaped '%'/'_').
+func TestE2E_Mcp_ListSpaces_NamePrefix_Literal(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := newMcpHarness(t)
+	client := mcpv1.NewMcpServiceClient(h.Conn())
+
+	h.SeedOwnedOrg(t, "acme", "Acme Inc", "mcp-lit")
+	// Seed pairs where a metacharacter-literal name sits next to a name that a
+	// wildcard interpretation of the query would spuriously match.
+	h.SeedOwnedSpace(t, "acme", "sp-star", "p*d literal-star")
+	h.SeedOwnedSpace(t, "acme", "sp-xany", "pXd wildcard-would-hit")
+	h.SeedOwnedSpace(t, "acme", "sp-under", "a_b literal-underscore")
+	h.SeedOwnedSpace(t, "acme", "sp-axb", "axb underscore-would-hit")
+	h.SeedOwnedSpace(t, "acme", "sp-pct", "50% literal-percent")
+	h.SeedOwnedSpace(t, "acme", "sp-back", `a\b literal-backslash`)
+
+	cases := []struct {
+		name   string
+		prefix string
+		want   []string
+	}{
+		{"asterisk is literal, not a wildcard", "p*d", []string{"sp-star"}},
+		{"underscore is literal, not single-char wildcard", "a_b", []string{"sp-under"}},
+		{"percent is literal, not multi-char wildcard", "50%", []string{"sp-pct"}},
+		{"backslash is literal, not the escape char", `a\b`, []string{"sp-back"}},
+		{"trailing wildcard still anchors the prefix", "p", []string{"sp-star", "sp-xany"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, err := client.ListSpaces(context.Background(), &mcpv1.ListSpacesRequest{
+				Org: "acme", NamePrefix: tc.prefix,
+			})
+			require.NoError(t, err)
+			gotSlugs := make([]string, 0, len(resp.GetSpaces()))
+			for _, sp := range resp.GetSpaces() {
+				gotSlugs = append(gotSlugs, sp.GetSlug())
+			}
+			assert.ElementsMatch(t, tc.want, gotSlugs,
+				"name_prefix %q must match only the literal-prefix rows", tc.prefix)
+		})
+	}
+}
+
 // TestE2E_Mcp_GetSpace pins the space membership gate and its uniform
 // fail-closed NotFound.
 func TestE2E_Mcp_GetSpace(t *testing.T) {

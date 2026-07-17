@@ -21,12 +21,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestNamePrefixPattern pins the ILIKE pattern the static ListSpacesForMCP
-// query receives. An empty prefix yields a NULL text (the query treats NULL
-// as "no filter"); a non-empty prefix yields a case-insensitive prefix
-// pattern with LIKE metacharacters neutralized. The mapping is preserved
-// byte-for-byte from the removed filter-engine transpiler, so behaviour is
-// unchanged across the migration.
+// TestNamePrefixPattern pins the ESCAPE '\' pattern the static
+// ListSpacesForMCP query receives. An empty prefix yields a NULL text (the
+// query treats NULL as "no filter"); a non-empty prefix is treated as a PURE
+// LITERAL prefix — every LIKE metacharacter in the caller's input ('\', '%',
+// '_') is escaped so it matches literally, and '*' is an ordinary character.
+// The only wildcard is the implicit trailing '%' that anchors the prefix
+// match. Backslash is escaped FIRST so the escapes we add aren't re-escaped.
 func TestNamePrefixPattern(t *testing.T) {
 	t.Parallel()
 
@@ -34,10 +35,13 @@ func TestNamePrefixPattern(t *testing.T) {
 	assert.Equal(t, pgtype.Text{}, namePrefixPattern(""))
 
 	cases := map[string]string{
-		"prod": `prod%`, // plain prefix + trailing wildcard
-		`a%b`:  `a\%b%`, // '%' escaped so it matches literally
-		`a_b`:  `a\_b%`, // '_' escaped so it matches literally
-		`p*d`:  `p%d%`,  // AIP-160 '*' carried through as a wildcard
+		"prod": `prod%`,   // plain prefix + implicit trailing wildcard
+		`a%b`:  `a\%b%`,   // '%' escaped so it matches literally
+		`a_b`:  `a\_b%`,   // '_' escaped so it matches literally
+		`p*d`:  `p*d%`,    // '*' is a LITERAL, not a wildcard
+		`a\b`:  `a\\b%`,   // '\' escaped so it matches literally
+		`50%`:  `50\%%`,   // trailing literal '%' escaped; implicit '%' appended
+		`a\%b`: `a\\\%b%`, // '\' escaped first, then the literal '%' escaped
 	}
 	for in, want := range cases {
 		got := namePrefixPattern(in)

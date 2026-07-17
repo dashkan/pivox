@@ -115,22 +115,27 @@ func (s *McpServer) ListSpaces(ctx context.Context, req *mcpv1.ListSpacesRequest
 	return &mcpv1.ListSpacesResponse{Spaces: spaces, NextPageToken: nextToken}, nil
 }
 
+// likeEscaper neutralizes the three LIKE/ILIKE metacharacters — the escape
+// char '\' plus the wildcards '%' and '_' — so a caller-supplied string
+// matches literally under `LIKE ... ESCAPE '\'`. Backslash is listed FIRST so
+// the replacer's single left-to-right pass escapes it before (not after) the
+// escapes it introduces for '%' and '_'; strings.Replacer never re-scans its
+// own output, so there is no double-escaping regardless of order, but keeping
+// '\' first makes the intent explicit.
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
 // namePrefixPattern builds the ILIKE pattern for the optional display-name
-// prefix filter, or a NULL text (no filter) when prefix is empty. It
-// preserves EXACTLY the match the removed filter-engine path produced: LIKE
-// metacharacters in the caller's input are escaped so '%' and '_' match
-// literally, an AIP-160 '*' is treated as a wildcard, and a trailing '*' is
-// always appended to anchor a case-insensitive prefix match. The result is
-// bound as a query parameter, so caller input can never alter query structure.
+// prefix filter, or a NULL text (no filter) when prefix is empty. The caller's
+// input is a PURE LITERAL prefix: every LIKE metacharacter is escaped so '*',
+// '%', '_', and '\' all match themselves, and the only wildcard is the trailing
+// '%' appended to anchor a case-insensitive prefix match. The result is bound
+// as a query parameter — caller input can never alter query structure — and
+// the query matches with an explicit `ESCAPE '\'`.
 func namePrefixPattern(prefix string) pgtype.Text {
 	if prefix == "" {
 		return pgtype.Text{}
 	}
-	pattern := prefix + "*"
-	pattern = strings.ReplaceAll(pattern, "%", `\%`)
-	pattern = strings.ReplaceAll(pattern, "_", `\_`)
-	pattern = strings.ReplaceAll(pattern, "*", "%")
-	return pgtype.Text{String: pattern, Valid: true}
+	return pgtype.Text{String: likeEscaper.Replace(prefix) + "%", Valid: true}
 }
 
 // GetSpace returns a single space by (org, slug), gated on the caller's

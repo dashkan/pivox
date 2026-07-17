@@ -31,17 +31,19 @@ SELECT * FROM spaces WHERE org_id = $1 AND name = $2 AND delete_time IS NULL;
 -- The MCP surface is a deliberately narrow, agent-facing read, so it rides a
 -- hand-written query instead of the dynamic internal/filter engine. Scoped to
 -- one org, excludes soft-deleted rows, applies an optional case-insensitive
--- prefix match on display_name (the handler pre-builds the escaped ILIKE
--- pattern with a trailing '%'; NULL = no filter), and keyset-paginates on id
--- (strict id > cursor; NULL cursor = first page). The handler passes
--- page_limit = page_size + 1 so an extra row signals a further page. Served by
--- idx_spaces_org (org_id WHERE delete_time IS NULL), the same access path the
--- filter engine used.
+-- LITERAL prefix match on display_name (the handler pre-builds the pattern:
+-- LIKE metacharacters escaped, a trailing '%' anchor appended; NULL = no
+-- filter), and keyset-paginates on id (strict id > cursor; NULL cursor = first
+-- page). The ILIKE uses an explicit ESCAPE '\' so the handler's backslash
+-- escapes of '%'/'_'/'\' are honored and the caller's input matches literally.
+-- The handler passes page_limit = page_size + 1 so an extra row signals a
+-- further page. Served by idx_spaces_org (org_id WHERE delete_time IS NULL),
+-- the same access path the filter engine used.
 -- name: ListSpacesForMCP :many
 SELECT * FROM spaces
 WHERE org_id = @org_id
   AND delete_time IS NULL
-  AND (sqlc.narg('name_prefix')::text IS NULL OR display_name ILIKE sqlc.narg('name_prefix')::text)
+  AND (sqlc.narg('name_prefix')::text IS NULL OR display_name ILIKE sqlc.narg('name_prefix')::text ESCAPE '\')
   AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
 ORDER BY id
 LIMIT @page_limit;
