@@ -606,7 +606,6 @@ type Querier interface {
 	// column reference through a regular LEFT JOIN, which sqlc infers
 	// correctly as pgtype.Text.
 	ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]ListAssetsBySpaceRow, error)
-	ListAssetsBySpaceWithDeleted(ctx context.Context, arg ListAssetsBySpaceWithDeletedParams) ([]Asset, error)
 	// Operations the caller is permitted to see, scope-trimmed in one query
 	// (no N+1):
 	//   - account-scoped (no org/space): only the creator;
@@ -699,7 +698,6 @@ type Querier interface {
 	// pagination — the catalog is small (~100 rows) so v1 returns the
 	// full set in one call without paging.
 	ListPermissions(ctx context.Context) ([]Permission, error)
-	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
 	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
 	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
 	// (AIP-160 filter / order_by are not yet wired — ordered by id.)

@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -126,6 +127,36 @@ func TestEncodeDecodeCursor_CompoundTimestampRoundTrip(t *testing.T) {
 	gotTS, ok := got.SortValue.(time.Time)
 	require.True(t, ok, "timestamp cursor decodes to time.Time, got %T", got.SortValue)
 	assert.True(t, ts.Equal(gotTS), "timestamp round-trips exactly: want %s got %s", ts, gotTS)
+}
+
+func TestEncodeDecodeCursor_CompoundIntRoundTrip(t *testing.T) {
+	c := newTestCodec(t)
+	id := uuid.New()
+	plan := OrderByPlan{Field: "sizeBytes", Column: "size_bytes", Type: filtering.TypeInt}
+
+	// A BIGINT sort column must resume as an int64, not a text literal — pgx's
+	// int8 codec rejects a Go string bound against the bigint column.
+	const size int64 = 9_223_372_036_854_775_806 // near math.MaxInt64
+	tok, err := EncodeCursor(c, plan, strconv.FormatInt(size, 10), id)
+	require.NoError(t, err)
+
+	got, err := DecodeCursor(c, plan, tok)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	gotN, ok := got.SortValue.(int64)
+	require.True(t, ok, "int cursor decodes to int64, got %T", got.SortValue)
+	assert.Equal(t, size, gotN, "int64 round-trips exactly")
+}
+
+func TestDecodeCursor_BadIntCursorRejected(t *testing.T) {
+	c := newTestCodec(t)
+	plan := OrderByPlan{Field: "sizeBytes", Column: "size_bytes", Type: filtering.TypeInt}
+	// A non-numeric sort value in the token (tampered/forged) must be rejected,
+	// not silently coerced.
+	tok, err := EncodeCursor(c, plan, "not-a-number", uuid.New())
+	require.NoError(t, err)
+	_, err = DecodeCursor(c, plan, tok)
+	require.Error(t, err)
 }
 
 func TestDecodeCursor_EmptyTokenIsNilCursor(t *testing.T) {

@@ -4,16 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
@@ -25,16 +29,20 @@ type AssetsServer struct {
 	assetsv1.UnimplementedAssetsServer
 	pool    db.RWPool
 	queries db.Querier
+	codec   *appkey.Codec
 	audit   *audit.Resolver
 }
 
 // Config is the constructor input for AssetsServer.
 type Config struct {
-	// Pool is the database pool — DBTX for reads + TxBeginner for
-	// tx-wrapped writes. Required.
+	// Pool is the database pool — DBTX for reads (including the ListAssets
+	// keyset query via filter.BuildListQuery) + TxBeginner for tx-wrapped
+	// writes. Required.
 	Pool db.RWPool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
+	// Codec opaque-encodes ListAssets page tokens. Required.
+	Codec *appkey.Codec
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
 	// Optional; nil leaves Actor fields unset.
 	AuditResolver *audit.Resolver
@@ -49,9 +57,13 @@ func NewAssetsServer(cfg Config) *AssetsServer {
 	if cfg.Queries == nil {
 		panic("assets: Config.Queries is required")
 	}
+	if cfg.Codec == nil {
+		panic("assets: Config.Codec is required")
+	}
 	return &AssetsServer{
 		pool:    cfg.Pool,
 		queries: cfg.Queries,
+		codec:   cfg.Codec,
 		audit:   cfg.AuditResolver,
 	}
 }
@@ -177,6 +189,23 @@ func (s *AssetsServer) GetAsset(ctx context.Context, req *assetsv1.GetAssetReque
 	return proto, nil
 }
 
+// ListAssets is a dynamic AIP-160 filtered + AIP-132 sorted + compound-cursor
+// keyset list of a space's assets. The parent space (resolved from the request
+// parent) is the NON-NEGOTIABLE base scope (space_id = $), applied as the base of
+// the query; the request's filter/order_by layer ON TOP of it and can only
+// narrow, never widen. show_deleted maps to ListQuery.ShowDeleted — the engine
+// adds `delete_time IS NULL` unless the caller opts in. Every value (space id,
+// filter operands, cursor values, page size) is bound as a $N parameter by
+// filter.BuildListQuery — nothing is string-interpolated — and column/direction
+// come only from AssetFilter's whitelist.
+//
+// This replaced a static-sqlc path that queried `LIMIT pageSize+1 OFFSET 0` with
+// a hardcoded 0 offset and emitted a next_page_token that was never decoded, so
+// every "next page" re-ran page 1 forever. It also went through the JOINED
+// ListAssetsBySpace and discarded the dashboard-only join columns; this handler
+// reads the PLAIN assets table instead. The dashboards service keeps its joined
+// queries (ListAssetsBySpace / ListAssetsByOrg) untouched. See
+// docs/aip-list-transpiler-procedure.md.
 func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsRequest) (*assetsv1.ListAssetsResponse, error) {
 	orgName, spaceName, err := parseAssetParent(req.GetParent())
 	if err != nil {
@@ -187,50 +216,51 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 		return nil, err
 	}
 
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
+	rf := filter.AssetFilter()
+	pageSize := clampPageSize(req.GetPageSize())
 
-	// ListAssetsBySpace returns ListAssetsBySpaceRow (with embedded
-	// Asset + dashboard-only `latest_version_*` and `endpoint_slug`
-	// columns added in Phase 6c) — this RPC only needs the embedded
-	// Asset, so unwrap to []db.Asset before the downstream proto
-	// conversion. ListAssetsBySpaceWithDeleted still returns []db.Asset
-	// directly (deliberately not migrated; the show_deleted branch is
-	// out-of-scope for the dashboards synthesizer).
-	var rows []db.Asset
-	if req.GetShowDeleted() {
-		rows, err = s.queries.ListAssetsBySpaceWithDeleted(ctx, db.ListAssetsBySpaceWithDeletedParams{
-			SpaceID: spaceID,
-			Limit:   pageSize + 1,
-			Offset:  0,
-		})
-	} else {
-		spaceRows, listErr := s.queries.ListAssetsBySpace(ctx, db.ListAssetsBySpaceParams{
-			SpaceID: spaceID,
-			Limit:   pageSize + 1,
-			Offset:  0,
-		})
-		err = listErr
-		if listErr == nil {
-			rows = make([]db.Asset, len(spaceRows))
-			for i, r := range spaceRows {
-				rows[i] = r.Asset
-			}
-		}
-	}
+	// Resolve order_by against the sortable whitelist (default: id). The plan
+	// also tells the cursor codec the sort value's type (timestamp / int64).
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {
-		return nil, apierr.Internal(err, "database error")
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
 	}
 
-	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		nextPageToken = rows[pageSize].ID.String()
-		rows = rows[:pageSize]
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource:    rf,
+		Base:        []filter.Predicate{{SQL: "space_id = %s", Arg: spaceID}},
+		Filter:      req.GetFilter(),
+		Order:       plan,
+		PageSize:    pageSize,
+		Cursor:      cursor,
+		ShowDeleted: req.GetShowDeleted(),
+	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter).
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list assets")
+	}
+	rows, err := filter.ScanAssets(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list assets")
+	}
+
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row via the compound cursor —
+	// encoding (sortValue, id) so the resume predicate matches the ORDER BY.
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.Asset) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, assetSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
@@ -247,6 +277,40 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 		Assets:        assets,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+// clampPageSize applies the server page-size policy: default 100, cap 1000.
+func clampPageSize(n int32) int32 {
+	if n <= 0 {
+		return 100
+	}
+	if n > 1000 {
+		return 1000
+	}
+	return n
+}
+
+// assetSortValue renders the active order_by column's value for the given row as
+// the string the compound page token carries. Timestamps use RFC3339Nano so
+// filter.DecodeCursor can parse them back to an exact time.Time; sizeBytes uses a
+// plain decimal so it reparses to an int64 (see filter.DecodeCursor). For the
+// default id ordering (plan.Field == "") the value is unused (EncodeCursor emits
+// the id-only token), so "" is returned.
+func assetSortValue(plan filter.OrderByPlan, r db.Asset) string {
+	switch plan.Field {
+	case "displayName":
+		return r.DisplayName
+	case "name":
+		return r.Name
+	case "sizeBytes":
+		return strconv.FormatInt(r.SizeBytes, 10)
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	case "updateTime":
+		return r.UpdateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAssetRequest) (*longrunningpb.Operation, error) {

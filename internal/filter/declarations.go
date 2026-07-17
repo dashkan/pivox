@@ -290,6 +290,101 @@ func ConnectorFilter() *ResourceFilter {
 	}
 }
 
+// RequestFilter returns the filter config for asset requests (the ListRequests
+// RPC), on the compound-cursor keyset path (filter.BuildListQuery).
+//
+// A request is a flat, single-parent resource: every row lives under exactly
+// one space (space_id NOT NULL). ListRequests supplies that scope as a
+// BuildListQuery base predicate (space_id = $) rather than via ParentColumn, so
+// this declaration provides only the filter/sort surface — matching the
+// compound-cursor path connectors/spaces use. See
+// docs/aip-list-transpiler-procedure.md.
+//
+// asset_requests has NO delete_time column (SoftDelete: false); the RPC's
+// show_deleted flag is therefore inert. Every Sortable column is NOT NULL in the
+// init migration (display_name, name, priority, create_time, update_time), which
+// the compound-cursor row comparison requires — a nullable sort column would go
+// UNKNOWN on NULLs and drop/duplicate rows across page boundaries. due_time is
+// nullable, so although the proto advertises it as an order_by field it is
+// registered filterable-only (a client ordering on it gets InvalidArgument, not
+// a silently broken keyset).
+func RequestFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString, AllowPartial: true},
+			"state":       {Column: "state", Type: filtering.TypeString},
+			"priority":    {Column: "priority", Type: filtering.TypeString},
+			"assignee":    {Column: "assignee", Type: filtering.TypeString, AllowPartial: true},
+			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
+			"dueTime":     {Column: "due_time", Type: filtering.TypeTimestamp}, // nullable → filterable-only
+		},
+		Sortable: map[string]SortableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			"name":        {Column: "name", Type: filtering.TypeString},
+			"priority":    {Column: "priority", Type: filtering.TypeString}, // enum text label round-trips
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+			"updateTime": {Column: "update_time", Type: filtering.TypeTimestamp},
+		},
+		Table:         "asset_requests",
+		SoftDelete:    false, // asset_requests has no delete_time column
+		OrderBy:       "id ASC",
+		CursorColumn:  "id",
+		DefaultFields: []string{"displayName"},
+		// ParentColumn intentionally unset — the space base scope is applied by
+		// the handler via BuildListQuery.Base.
+	}
+}
+
+// AssetFilter returns the filter config for assets over the PLAIN assets table
+// (the ListAssets RPC), on the compound-cursor keyset path.
+//
+// This is deliberately independent of the dashboards service, which joins
+// latest-version + endpoint columns via its own queries (ListAssetsBySpace /
+// ListAssetsByOrg) and does NOT go through this declaration — ListAssets lists a
+// single space's assets (space_id NOT NULL, supplied as a BuildListQuery base
+// predicate).
+//
+// SoftDelete is true (assets carry delete_time); the RPC's show_deleted flag
+// maps to ListQuery.ShowDeleted. Every Sortable column is NOT NULL in the init
+// migration (display_name, name, size_bytes, create_time, update_time). size_bytes
+// is a BIGINT: its Type is filtering.TypeInt so DecodeCursor reparses the token
+// value into an int64 (a string bound against the bigint column would fail pgx
+// encoding). expire_time is nullable, so it is registered filterable-only (the
+// proto lists it only as a filter field, never an order_by).
+func AssetFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString, AllowPartial: true},
+			"state":       {Column: "state", Type: filtering.TypeString},
+			"mediaType":   {Column: "media_type", Type: filtering.TypeString},
+			"mimeType":    {Column: "content_type", Type: filtering.TypeString},
+			"path":        {Column: "import_path", Type: filtering.TypeString, AllowPartial: true},
+			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
+			"expireTime":  {Column: "expire_time", Type: filtering.TypeTimestamp}, // nullable → filterable-only
+		},
+		Sortable: map[string]SortableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			"name":        {Column: "name", Type: filtering.TypeString},
+			// size_bytes is BIGINT; TypeInt tells DecodeCursor to reparse the
+			// token's sort value into an int64 (see token.go) so the keyset row
+			// comparison binds a bigint, not a text literal.
+			"sizeBytes": {Column: "size_bytes", Type: filtering.TypeInt},
+			// TypeTimestamp: DecodeCursor reparses the token value to time.Time.
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+			"updateTime": {Column: "update_time", Type: filtering.TypeTimestamp},
+		},
+		Table:         "assets",
+		SoftDelete:    true,
+		OrderBy:       "id ASC",
+		CursorColumn:  "id",
+		DefaultFields: []string{"displayName"},
+		// ParentColumn intentionally unset — the space base scope is applied by
+		// the handler via BuildListQuery.Base.
+	}
+}
+
 // ApiKeyFilter returns the filter config for API keys.
 func ApiKeyFilter() *ResourceFilter {
 	return &ResourceFilter{

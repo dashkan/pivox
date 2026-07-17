@@ -196,58 +196,6 @@ func (q *Queries) GetRequestByNameForUpdate(ctx context.Context, arg GetRequestB
 	return i, err
 }
 
-const listRequestsBySpace = `-- name: ListRequestsBySpace :many
-SELECT id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time FROM asset_requests
-WHERE space_id = $1
-ORDER BY create_time DESC
-LIMIT $2 OFFSET $3
-`
-
-type ListRequestsBySpaceParams struct {
-	SpaceID uuid.UUID `json:"space_id"`
-	Limit   int32     `json:"limit"`
-	Offset  int32     `json:"offset"`
-}
-
-func (q *Queries) ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error) {
-	rows, err := q.db.Query(ctx, listRequestsBySpace, arg.SpaceID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []AssetRequest{}
-	for rows.Next() {
-		var i AssetRequest
-		if err := rows.Scan(
-			&i.ID,
-			&i.SpaceID,
-			&i.Name,
-			&i.DisplayName,
-			&i.Description,
-			&i.Priority,
-			&i.Assignee,
-			&i.Annotations,
-			&i.State,
-			&i.Etag,
-			&i.Revision,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-			&i.DueTime,
-			&i.DeliveredTime,
-			&i.ApprovedTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateRequest = `-- name: UpdateRequest :one
 UPDATE asset_requests
 SET display_name = COALESCE($3, display_name),

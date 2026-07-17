@@ -63,12 +63,6 @@ WHERE assets.space_id = $1 AND assets.delete_time IS NULL
 ORDER BY assets.create_time DESC, assets.id DESC
 LIMIT $2 OFFSET $3;
 
--- name: ListAssetsBySpaceWithDeleted :many
-SELECT * FROM assets
-WHERE space_id = $1
-ORDER BY create_time DESC, id DESC
-LIMIT $2 OFFSET $3;
-
 -- name: CountAssetsBySpace :one
 SELECT count(*) FROM assets WHERE space_id = $1 AND delete_time IS NULL;
 

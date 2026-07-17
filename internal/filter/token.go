@@ -3,6 +3,7 @@ package filter
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -127,12 +128,23 @@ func DecodeCursor(codec *appkey.Codec, plan OrderByPlan, token string) (*KeysetC
 		return nil, fmt.Errorf("invalid page_token: %w", err)
 	}
 	var sortValue any = c.Sort
-	if plan.Type == filtering.TypeTimestamp {
+	switch plan.Type {
+	case filtering.TypeTimestamp:
 		ts, err := time.Parse(time.RFC3339Nano, c.Sort)
 		if err != nil {
 			return nil, fmt.Errorf("invalid page_token: bad timestamp cursor: %w", err)
 		}
 		sortValue = ts
+	case filtering.TypeInt:
+		// Integer sort columns (e.g. a BIGINT size_bytes) must resume as an int64,
+		// not a text literal: pgx has a registered int8 codec that rejects a Go
+		// string bound against the bigint column, so the row comparison would fail
+		// to encode. Reparse the RFC-decimal cursor value the handler encoded.
+		n, err := strconv.ParseInt(c.Sort, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid page_token: bad integer cursor: %w", err)
+		}
+		sortValue = n
 	}
 	return &KeysetCursor{SortValue: sortValue, ID: c.ID}, nil
 }

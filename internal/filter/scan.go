@@ -297,6 +297,106 @@ func ScanConnectors(rows pgx.Rows) ([]db.Connector, error) {
 	return results, rows.Err()
 }
 
+// ScanRequests scans rows into db.AssetRequest structs.
+//
+// The destination order MUST match the `asset_requests` column order from the
+// init migration exactly — this scans `SELECT *` from BuildListQuery, so adding
+// a column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanRequests(rows pgx.Rows) ([]db.AssetRequest, error) {
+	defer rows.Close()
+	var results []db.AssetRequest
+	for rows.Next() {
+		var r db.AssetRequest
+		// Order MUST match `asset_requests`: id, space_id, name, display_name,
+		// description, priority, assignee, annotations, state, etag, revision,
+		// created_by, updated_by, create_time, update_time, due_time,
+		// delivered_time, approved_time.
+		if err := rows.Scan(
+			&r.ID,
+			&r.SpaceID,
+			&r.Name,
+			&r.DisplayName,
+			&r.Description,
+			&r.Priority,
+			&r.Assignee,
+			&r.Annotations,
+			&r.State,
+			&r.Etag,
+			&r.Revision,
+			&r.CreatedBy,
+			&r.UpdatedBy,
+			&r.CreateTime,
+			&r.UpdateTime,
+			&r.DueTime,
+			&r.DeliveredTime,
+			&r.ApprovedTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+// ScanAssets scans rows into db.Asset structs.
+//
+// The destination order MUST match the `assets` column order from the init
+// migration exactly — this scans `SELECT *` from BuildListQuery, so adding a
+// column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanAssets(rows pgx.Rows) ([]db.Asset, error) {
+	defer rows.Close()
+	var results []db.Asset
+	for rows.Next() {
+		var a db.Asset
+		// Order MUST match `assets`: id, space_id, endpoint_id, name,
+		// display_name, import_path, filename, media_type, content_type,
+		// checksum_sha256, size_bytes, technical_metadata, ai_description,
+		// transcription, duration_seconds, width, height, annotations,
+		// search_vector, embedding, state, etag, revision, created_by,
+		// updated_by, deleted_by, create_time, update_time, delete_time,
+		// purge_time, expire_time.
+		if err := rows.Scan(
+			&a.ID,
+			&a.SpaceID,
+			&a.EndpointID,
+			&a.Name,
+			&a.DisplayName,
+			&a.ImportPath,
+			&a.Filename,
+			&a.MediaType,
+			&a.ContentType,
+			&a.ChecksumSha256,
+			&a.SizeBytes,
+			&a.TechnicalMetadata,
+			&a.AiDescription,
+			&a.Transcription,
+			&a.DurationSeconds,
+			&a.Width,
+			&a.Height,
+			&a.Annotations,
+			&a.SearchVector,
+			&a.Embedding,
+			&a.State,
+			&a.Etag,
+			&a.Revision,
+			&a.CreatedBy,
+			&a.UpdatedBy,
+			&a.DeletedBy,
+			&a.CreateTime,
+			&a.UpdateTime,
+			&a.DeleteTime,
+			&a.PurgeTime,
+			&a.ExpireTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, a)
+	}
+	return results, rows.Err()
+}
+
 // ScanApiKeys scans rows into db.ApiKey structs.
 func ScanApiKeys(rows pgx.Rows) ([]db.ApiKey, error) {
 	defer rows.Close()

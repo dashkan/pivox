@@ -26,7 +26,7 @@ func newAssetsHarness(t *testing.T, orgSlug, spaceSlug string) (*grpcharness.Har
 		grpcharness.WithSpacesServer(),
 		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 			assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{
-				Pool: h.Pool, Queries: h.Queries,
+				Pool: h.Pool, Queries: h.Queries, Codec: grpcharness.TestAppCodec(),
 			}))
 		}))
 	h.SeedOwnedOrg(t, orgSlug, "Acme", "assets")

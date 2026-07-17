@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"log/slog"
 
@@ -15,9 +16,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
@@ -26,22 +29,24 @@ import (
 
 type RequestsServer struct {
 	assetsv1.UnimplementedRequestsServer
-	pool    db.TxBeginner
+	pool    db.RWPool
 	queries db.Querier
+	codec   *appkey.Codec
 	audit   *audit.Resolver
 }
 
 // Config is the constructor input for RequestsServer.
 type Config struct {
-	// Pool is the database pool used to begin transactions for
-	// multi-step write paths (CreateRequest fans out to
-	// CreateRequest + CreateAsset + CreateLineItem per line item).
-	// Required. Wrapped in a *db.PoolTxer internally; unit tests
-	// that need mock-Querier-level control should construct the
-	// server struct literal directly with a *db.PassthroughTxer.
-	Pool db.TxBeginner
+	// Pool is the database pool. It begins transactions for multi-step write
+	// paths (CreateRequest fans out to CreateRequest + CreateAsset +
+	// CreateLineItem per line item) AND serves the dynamic keyset read in
+	// ListRequests (filter.BuildListQuery runs on the DBTX surface). Required.
+	// *pgxpool.Pool satisfies db.RWPool (DBTX + TxBeginner) directly.
+	Pool db.RWPool
 	// Queries is the sqlc query interface for read paths. Required.
 	Queries db.Querier
+	// Codec opaque-encodes ListRequests page tokens. Required.
+	Codec *appkey.Codec
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
 	// Optional; nil leaves Actor fields unset.
 	AuditResolver *audit.Resolver
@@ -56,9 +61,13 @@ func NewRequestsServer(cfg Config) *RequestsServer {
 	if cfg.Queries == nil {
 		panic("requests: Config.Queries is required")
 	}
+	if cfg.Codec == nil {
+		panic("requests: Config.Codec is required")
+	}
 	return &RequestsServer{
 		pool:    cfg.Pool,
 		queries: cfg.Queries,
+		codec:   cfg.Codec,
 		audit:   cfg.AuditResolver,
 	}
 }
@@ -225,6 +234,20 @@ func (s *RequestsServer) GetRequest(ctx context.Context, req *assetsv1.GetReques
 	return proto, nil
 }
 
+// ListRequests is a dynamic AIP-160 filtered + AIP-132 sorted + compound-cursor
+// keyset list of a space's asset requests. The parent space (resolved from the
+// request parent) is the NON-NEGOTIABLE base scope (space_id = $), applied as the
+// base of the query; the request's filter/order_by layer ON TOP of it and can
+// only narrow, never widen. Every value (space id, filter operands, cursor
+// values, page size) is bound as a $N parameter by filter.BuildListQuery —
+// nothing is string-interpolated — and column/direction come only from
+// RequestFilter's whitelist.
+//
+// This replaced a static-sqlc path (ListRequestsBySpace) that queried
+// `LIMIT pageSize+1 OFFSET 0` with a hardcoded 0 offset and emitted a
+// next_page_token that was never decoded, so every "next page" re-ran page 1
+// forever. asset_requests has no delete_time column, so show_deleted is inert.
+// See docs/aip-list-transpiler-procedure.md.
 func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListRequestsRequest) (*assetsv1.ListRequestsResponse, error) {
 	orgName, spaceName, err := parseRequestParent(req.GetParent())
 	if err != nil {
@@ -235,29 +258,52 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 		return nil, err
 	}
 
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
+	rf := filter.RequestFilter()
+	pageSize := clampPageSize(req.GetPageSize())
 
-	var rows []db.AssetRequest
-	rows, err = s.queries.ListRequestsBySpace(ctx, db.ListRequestsBySpaceParams{
-		SpaceID: spaceID,
-		Limit:   pageSize + 1,
-		Offset:  0,
-	})
-	_ = req.GetShowDeleted() // soft-delete removed; flag is a no-op
+	// Resolve order_by against the sortable whitelist (default: id). The plan
+	// also tells the cursor codec whether the sort value is a timestamp.
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {
-		return nil, apierr.Internal(err, "database error")
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
 	}
 
-	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		nextPageToken = rows[pageSize].ID.String()
-		rows = rows[:pageSize]
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "space_id = %s", Arg: spaceID}},
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
+		// asset_requests has no delete_time; ShowDeleted is inert (SoftDelete
+		// false on RequestFilter). Left unset rather than plumbing an ignored flag.
+	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter).
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list requests")
+	}
+	rows, err := filter.ScanRequests(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list requests")
+	}
+
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row via the compound cursor —
+	// encoding (sortValue, id) so the resume predicate matches the ORDER BY.
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.AssetRequest) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, requestSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
@@ -274,6 +320,39 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 		Requests:      requests,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+// clampPageSize applies the server page-size policy: default 100, cap 1000.
+func clampPageSize(n int32) int32 {
+	if n <= 0 {
+		return 100
+	}
+	if n > 1000 {
+		return 1000
+	}
+	return n
+}
+
+// requestSortValue renders the active order_by column's value for the given row
+// as the string the compound page token carries. Timestamps use RFC3339Nano so
+// filter.DecodeCursor can parse them back to an exact time.Time; priority carries
+// its enum text label. For the default id ordering (plan.Field == "") the value
+// is unused (EncodeCursor emits the id-only token), so "" is returned.
+func requestSortValue(plan filter.OrderByPlan, r db.AssetRequest) string {
+	switch plan.Field {
+	case "displayName":
+		return r.DisplayName
+	case "name":
+		return r.Name
+	case "priority":
+		return string(r.Priority)
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	case "updateTime":
+		return r.UpdateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.CreateRequestRequest) (*longrunningpb.Operation, error) {
