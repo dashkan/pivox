@@ -36,21 +36,10 @@ SELECT * FROM dashboards
 WHERE space_id = $1 AND name = $2 AND delete_time IS NULL
 FOR UPDATE;
 
--- name: ListDashboardsBySpace :many
--- Live dashboards in a space, newest-first. Pagination is offset-
--- based for v1 — the catalog is small (≤ 100s of dashboards per
--- space) and the surface won't grow until customers start
--- composing them programmatically.
-SELECT * FROM dashboards
-WHERE space_id = $1 AND delete_time IS NULL
-ORDER BY create_time DESC, id DESC
-LIMIT $2 OFFSET $3;
-
--- name: CountDashboardsBySpace :one
--- Companion to ListDashboardsBySpace for next_page_token computation:
--- emit a token iff (offset + page_size) < count.
-SELECT COUNT(*) FROM dashboards
-WHERE space_id = $1 AND delete_time IS NULL;
+-- ListDashboards (space branch) is served by the dynamic keyset engine
+-- (filter.BuildListQuery in internal/service/dashboards) — AIP-160 filter +
+-- AIP-132 order_by + compound-cursor pagination — so there is no static
+-- ListDashboardsBySpace query here.
 
 -- name: UpdateDashboardByName :one
 -- Optimistic-concurrency update: if etag in the WHERE doesn't match,

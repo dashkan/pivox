@@ -33,6 +33,7 @@
 package dashboards
 
 import (
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/dashboard/system"
 	"github.com/dashkan/pivox/internal/dashboard/templates"
@@ -46,6 +47,7 @@ type Server struct {
 
 	pool    db.RWPool
 	queries db.Querier
+	codec   *appkey.Codec
 	audit   *audit.Resolver
 }
 
@@ -59,6 +61,10 @@ type Config struct {
 
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
+
+	// Codec opaque-encodes ListDashboards page tokens (the space
+	// branch's keyset cursor). Required.
+	Codec *appkey.Codec
 
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
 	// Optional; nil leaves Actor fields unset on USER_MANAGED
@@ -82,12 +88,16 @@ func NewServer(cfg Config) *Server {
 	if cfg.Queries == nil {
 		panic("dashboards: Config.Queries is required")
 	}
+	if cfg.Codec == nil {
+		panic("dashboards: Config.Codec is required")
+	}
 	if err := validateRegistries(templates.All(), system.All()); err != nil {
 		panic("dashboards: " + err.Error())
 	}
 	return &Server{
 		pool:    cfg.Pool,
 		queries: cfg.Queries,
+		codec:   cfg.Codec,
 		audit:   cfg.AuditResolver,
 	}
 }

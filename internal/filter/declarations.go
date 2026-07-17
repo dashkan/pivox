@@ -541,6 +541,45 @@ func SecretFilter() *ResourceFilter {
 	}
 }
 
+// DashboardFilter returns the filter config for space-scoped USER_MANAGED
+// dashboards (the ListDashboards space branch), on the compound-cursor keyset
+// path (filter.BuildListQuery).
+//
+// A dashboard is a flat, single-parent resource: every space-scoped row lives
+// under exactly one space (space_id NOT NULL). ListDashboards supplies that
+// scope as a BuildListQuery base predicate (space_id = $), so this declaration
+// provides only the filter/sort surface — matching connectors/secrets. The
+// org-level SYSTEM_MANAGED catalog is served from an in-memory registry and
+// does NOT go through this declaration.
+//
+// The proto (dashboards.proto ListDashboardsRequest) advertises displayName +
+// createTime as both filterable and sortable, with a default order of
+// createTime descending — mirrored in DefaultOrder here. Both Sortable columns
+// are NOT NULL in the init migration (display_name TEXT NOT NULL DEFAULT ”,
+// create_time TIMESTAMPTZ NOT NULL), which the compound-cursor row comparison
+// requires: a nullable sort column would go UNKNOWN on NULLs and drop/duplicate
+// rows across page boundaries. dashboards carries delete_time (SoftDelete
+// true), so soft-deleted rows are excluded by the engine.
+func DashboardFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString, AllowPartial: true},
+			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Sortable: map[string]SortableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Table:         "dashboards",
+		SoftDelete:    true,
+		DefaultOrder:  "createTime desc",
+		DefaultFields: []string{"displayName"},
+		// The space base scope is applied by the handler via BuildListQuery.Base.
+	}
+}
+
 // StorageGatewayFilter returns the filter config for storage gateways. Consumed
 // by the compound-cursor keyset path (filter.BuildListQuery) in
 // ListStorageGateways — the base scope (org_id = $) is supplied by the handler
@@ -633,6 +672,40 @@ func AgentFilter() *ResourceFilter {
 		DefaultOrder:  "joinTime",
 		DefaultFields: []string{"hostname"},
 		// The gateway base scope is applied by the handler via BuildListQuery.Base.
+	}
+}
+
+// OperationFilter returns the filter config for long-running operations (the
+// AIP-151 ListOperations RPC), on the compound-cursor keyset path.
+//
+// Operations are unusual: their visibility is not a simple column-equality
+// scope but a set-wise membership authorization (account-scoped ops the caller
+// created, plus org/space ops the caller can read). ListOperations supplies
+// that authorization as a BuildListQuery base predicate binding the caller;
+// this declaration provides only the filter/sort surface.
+//
+// The standard google.longrunning.ListOperationsRequest declares no order_by
+// and an opaque `filter` string, so the surface is intentionally minimal:
+// `done` is the conventional AIP-151 operations filter (list pending vs
+// completed). DefaultOrder is createTime descending (newest-first, matching the
+// pre-migration ORDER BY); create_time is NOT NULL in the init migration, which
+// the compound-cursor row comparison requires. operations has no delete_time
+// column (SoftDelete false).
+func OperationFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"done": {Column: "done", Type: filtering.TypeBool},
+		},
+		Sortable: map[string]SortableField{
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Table:        "operations",
+		SoftDelete:   false, // operations has no delete_time column
+		DefaultOrder: "createTime desc",
+		// The caller-authorization base scope is applied by the handler via
+		// BuildListQuery.Base.
 	}
 }
 

@@ -49,6 +49,7 @@ func newDashboardsHarness(t *testing.T) *grpcharness.Harness {
 			apiv1.RegisterDashboardsServer(s, dashboards.NewServer(dashboards.Config{
 				Pool:    h.Pool,
 				Queries: h.Queries,
+				Codec:   grpcharness.TestAppCodec(),
 			}))
 		}),
 	)
@@ -330,7 +331,11 @@ func TestE2E_ListDashboards_SpaceScoped_ReturnsAll(t *testing.T) {
 	}
 }
 
-func TestE2E_ListDashboards_SpaceScoped_FilterRejected(t *testing.T) {
+// TestE2E_ListDashboards_SpaceScoped_FilterNarrows proves the AIP-160 filter
+// is wired for the space branch: an exact-match filter returns only the
+// matching dashboard. Before the BuildListQuery migration the space branch
+// rejected any filter with InvalidArgument, so this failed.
+func TestE2E_ListDashboards_SpaceScoped_FilterNarrows(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -339,11 +344,110 @@ func TestE2E_ListDashboards_SpaceScoped_FilterRejected(t *testing.T) {
 	fx := seedFixture(t, h, "dash-list-flt")
 
 	client := apiv1.NewDashboardsClient(h.Conn())
-	_, err := client.ListDashboards(context.Background(), &apiv1.ListDashboardsRequest{
+	for slug, name := range map[string]string{"alpha": "Alpha", "beta": "Beta", "gamma": "Gamma"} {
+		_, err := client.CreateDashboard(context.Background(), &apiv1.CreateDashboardRequest{
+			Parent:      fx.spaceParent,
+			DashboardId: slug,
+			Dashboard:   &apiv1.Dashboard{DisplayName: name},
+		})
+		require.NoError(t, err)
+	}
+
+	resp, err := client.ListDashboards(context.Background(), &apiv1.ListDashboardsRequest{
 		Parent: fx.spaceParent,
-		Filter: `displayName = "Sprint"`,
+		Filter: `displayName = "Beta"`,
 	})
-	requireGRPCCode(t, err, codes.InvalidArgument)
+	require.NoError(t, err)
+	require.Len(t, resp.GetDashboards(), 1, "filter must narrow to the single match")
+	assert.Equal(t, "Beta", resp.GetDashboards()[0].GetDisplayName())
+}
+
+// TestE2E_ListDashboards_SpaceScoped_OrderBy proves order_by is wired and that
+// ascending and descending produce opposite orders. Before the migration the
+// space branch rejected order_by with InvalidArgument.
+func TestE2E_ListDashboards_SpaceScoped_OrderBy(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newDashboardsHarness(t)
+	fx := seedFixture(t, h, "dash-list-ord")
+
+	client := apiv1.NewDashboardsClient(h.Conn())
+	for slug, name := range map[string]string{"aaaa": "Aaa", "bbbb": "Bbb", "cccc": "Ccc"} {
+		_, err := client.CreateDashboard(context.Background(), &apiv1.CreateDashboardRequest{
+			Parent:      fx.spaceParent,
+			DashboardId: slug,
+			Dashboard:   &apiv1.Dashboard{DisplayName: name},
+		})
+		require.NoError(t, err)
+	}
+
+	names := func(order string) []string {
+		resp, err := client.ListDashboards(context.Background(), &apiv1.ListDashboardsRequest{
+			Parent:  fx.spaceParent,
+			OrderBy: order,
+		})
+		require.NoError(t, err)
+		out := make([]string, 0, len(resp.GetDashboards()))
+		for _, d := range resp.GetDashboards() {
+			out = append(out, d.GetDisplayName())
+		}
+		return out
+	}
+
+	asc := names("displayName asc")
+	desc := names("displayName desc")
+	assert.Equal(t, []string{"Aaa", "Bbb", "Ccc"}, asc)
+	assert.Equal(t, []string{"Ccc", "Bbb", "Aaa"}, desc)
+	assert.NotEqual(t, asc, desc, "asc and desc must differ")
+}
+
+// TestE2E_ListDashboards_SpaceScoped_Pagination proves keyset pagination
+// round-trips past the first page. Before the migration the offset stub
+// ignored page_token and never emitted a next_page_token.
+func TestE2E_ListDashboards_SpaceScoped_Pagination(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newDashboardsHarness(t)
+	fx := seedFixture(t, h, "dash-list-pg")
+
+	client := apiv1.NewDashboardsClient(h.Conn())
+	want := map[string]bool{}
+	for _, slug := range []string{"pgone", "pgtwo", "pgthree"} {
+		_, err := client.CreateDashboard(context.Background(), &apiv1.CreateDashboardRequest{
+			Parent:      fx.spaceParent,
+			DashboardId: slug,
+			Dashboard:   &apiv1.Dashboard{DisplayName: slug},
+		})
+		require.NoError(t, err)
+		want[fx.spaceParent+"/dashboards/"+slug] = true
+	}
+
+	page1, err := client.ListDashboards(context.Background(), &apiv1.ListDashboardsRequest{
+		Parent:   fx.spaceParent,
+		PageSize: 2,
+	})
+	require.NoError(t, err)
+	require.Len(t, page1.GetDashboards(), 2)
+	require.NotEmpty(t, page1.GetNextPageToken())
+
+	page2, err := client.ListDashboards(context.Background(), &apiv1.ListDashboardsRequest{
+		Parent:    fx.spaceParent,
+		PageSize:  2,
+		PageToken: page1.GetNextPageToken(),
+	})
+	require.NoError(t, err)
+	require.Len(t, page2.GetDashboards(), 1)
+
+	seen := map[string]bool{}
+	for _, d := range append(page1.GetDashboards(), page2.GetDashboards()...) {
+		assert.False(t, seen[d.GetName()], "no dashboard may repeat across pages")
+		seen[d.GetName()] = true
+	}
+	assert.Equal(t, want, seen, "union of pages must be exactly the three dashboards")
 }
 
 func TestE2E_UpdateDashboard_HappyPath(t *testing.T) {

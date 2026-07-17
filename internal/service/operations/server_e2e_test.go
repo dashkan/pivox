@@ -17,6 +17,7 @@ import (
 	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/service/operations"
@@ -44,7 +45,9 @@ func newOperationsHarness(t *testing.T) *grpcharness.Harness {
 			}))
 			longrunningpb.RegisterOperationsServer(s, operations.NewOperationsServer(operations.Config{
 				LRO:      h.LROManager,
+				Pool:     h.Pool,
 				Queries:  h.Queries,
+				Codec:    codec,
 				Resolver: permResolver,
 			}))
 		}),
@@ -121,6 +124,97 @@ func TestE2E_Operations_GetScopeAuthz(t *testing.T) {
 		_, err := ops.CancelOperation(ctx, &longrunningpb.CancelOperationRequest{Name: orgOp})
 		assert.Equal(t, codes.NotFound, status.Code(err))
 	})
+}
+
+// TestE2E_Operations_ListPagination_RoundTrips proves keyset pagination
+// works past the first page: a page_size=2 request over three visible ops
+// returns two ops plus a non-empty next_page_token, and resuming with that
+// token returns the remaining op with no overlap — while a cross-tenant op
+// never appears on any page (the authorization trim survives the migration).
+//
+// Against the pre-migration handler this fails: ListOperations accepted
+// page_size but never returned a next_page_token, so page two was
+// unreachable and the caller could not see all three ops.
+func TestE2E_Operations_ListPagination_RoundTrips(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := newOperationsHarness(t)
+	ctx := context.Background()
+	ops := longrunningpb.NewOperationsClient(h.Conn())
+
+	orgA := h.SeedOwnedOrg(t, "ops-pg-a", "Ops Pg A", "pga")
+	orgB := h.SeedOwnedOrg(t, "ops-pg-b", "Ops Pg B", "pgb")
+
+	// Three account-scoped ops visible only to orgA's owner.
+	want := map[string]bool{}
+	for range 3 {
+		name := seedOp(t, h, "accounts/me",
+			pgtype.UUID{}, pgtype.UUID{}, convert.PgUUID(orgA.Owner.IdentityID))
+		want[name] = true
+	}
+	// A cross-tenant op that must never surface on any page.
+	orgBOp := seedOp(t, h, "organizations/ops-pg-b",
+		convert.PgUUID(orgB.Row.ID), pgtype.UUID{}, convert.PgUUID(orgB.Owner.IdentityID))
+
+	h.SetCaller(orgA.Owner)
+
+	page1, err := ops.ListOperations(ctx, &longrunningpb.ListOperationsRequest{PageSize: 2})
+	require.NoError(t, err)
+	require.Len(t, page1.GetOperations(), 2, "first page must honor page_size=2")
+	require.NotEmpty(t, page1.GetNextPageToken(), "a further page exists, so a token must be returned")
+
+	page2, err := ops.ListOperations(ctx, &longrunningpb.ListOperationsRequest{
+		PageSize:  2,
+		PageToken: page1.GetNextPageToken(),
+	})
+	require.NoError(t, err)
+	require.Len(t, page2.GetOperations(), 1, "second page must return the remaining op")
+
+	seen := map[string]bool{}
+	for _, o := range page1.GetOperations() {
+		assert.False(t, seen[o.GetName()], "no op may repeat across pages")
+		seen[o.GetName()] = true
+	}
+	for _, o := range page2.GetOperations() {
+		assert.False(t, seen[o.GetName()], "no op may repeat across pages")
+		seen[o.GetName()] = true
+	}
+	assert.Equal(t, want, seen, "the union of both pages must be exactly the three visible ops")
+	assert.False(t, seen[orgBOp], "cross-tenant op must never appear")
+}
+
+// TestE2E_Operations_ListFilter_Done proves the AIP-160 filter is wired: a
+// `done = true` filter narrows the result to completed ops only. Against the
+// pre-migration handler this fails: the filter was dropped and every visible
+// op was returned regardless.
+func TestE2E_Operations_ListFilter_Done(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	h := newOperationsHarness(t)
+	ctx := context.Background()
+	ops := longrunningpb.NewOperationsClient(h.Conn())
+
+	orgA := h.SeedOwnedOrg(t, "ops-flt-a", "Ops Flt A", "flta")
+
+	pendingOp := seedOp(t, h, "accounts/me",
+		pgtype.UUID{}, pgtype.UUID{}, convert.PgUUID(orgA.Owner.IdentityID))
+	doneOp := seedOp(t, h, "accounts/me",
+		pgtype.UUID{}, pgtype.UUID{}, convert.PgUUID(orgA.Owner.IdentityID))
+	// Mark doneOp complete directly — the handler under test doesn't own
+	// completion, and this keeps the filter assertion independent of a worker.
+	doneID, err := lro.ParseOperationName(doneOp)
+	require.NoError(t, err)
+	_, err = h.Pool.Exec(ctx, `UPDATE operations SET done = true WHERE id = $1`, doneID)
+	require.NoError(t, err)
+
+	h.SetCaller(orgA.Owner)
+	resp, err := ops.ListOperations(ctx, &longrunningpb.ListOperationsRequest{Filter: "done = true"})
+	require.NoError(t, err)
+
+	assert.True(t, containsOp(resp.GetOperations(), doneOp), "done op must match the filter")
+	assert.False(t, containsOp(resp.GetOperations(), pendingOp), "pending op must be filtered out")
 }
 
 func TestE2E_Operations_ListTrimsToVisibleScopes(t *testing.T) {

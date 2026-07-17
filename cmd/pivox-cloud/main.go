@@ -465,7 +465,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	// caller's visible scopes in one query.
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(operations.Config{
 		LRO:      lroManager,
+		Pool:     pool,
 		Queries:  queries,
+		Codec:    appCodec,
 		Resolver: permResolver,
 	}))
 
@@ -519,7 +521,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// regression, so this line doubles as a boot-time invariant
 	// check.
 	apiv1.RegisterDashboardsServer(grpcServer, dashboards.NewServer(dashboards.Config{
-		Pool: pool, Queries: queries, AuditResolver: auditResolver,
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
 
 	// Iam service: cross-cutting IAM (role reads, permission catalog,

@@ -13,20 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countDashboardsBySpace = `-- name: CountDashboardsBySpace :one
-SELECT COUNT(*) FROM dashboards
-WHERE space_id = $1 AND delete_time IS NULL
-`
-
-// Companion to ListDashboardsBySpace for next_page_token computation:
-// emit a token iff (offset + page_size) < count.
-func (q *Queries) CountDashboardsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countDashboardsBySpace, spaceID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createDashboard = `-- name: CreateDashboard :one
 
 INSERT INTO dashboards (
@@ -168,60 +154,6 @@ func (q *Queries) GetDashboardByNameForUpdate(ctx context.Context, arg GetDashbo
 	return i, err
 }
 
-const listDashboardsBySpace = `-- name: ListDashboardsBySpace :many
-SELECT id, space_id, name, display_name, description, management_mode, payload, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM dashboards
-WHERE space_id = $1 AND delete_time IS NULL
-ORDER BY create_time DESC, id DESC
-LIMIT $2 OFFSET $3
-`
-
-type ListDashboardsBySpaceParams struct {
-	SpaceID uuid.UUID `json:"space_id"`
-	Limit   int32     `json:"limit"`
-	Offset  int32     `json:"offset"`
-}
-
-// Live dashboards in a space, newest-first. Pagination is offset-
-// based for v1 — the catalog is small (≤ 100s of dashboards per
-// space) and the surface won't grow until customers start
-// composing them programmatically.
-func (q *Queries) ListDashboardsBySpace(ctx context.Context, arg ListDashboardsBySpaceParams) ([]Dashboard, error) {
-	rows, err := q.db.Query(ctx, listDashboardsBySpace, arg.SpaceID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Dashboard{}
-	for rows.Next() {
-		var i Dashboard
-		if err := rows.Scan(
-			&i.ID,
-			&i.SpaceID,
-			&i.Name,
-			&i.DisplayName,
-			&i.Description,
-			&i.ManagementMode,
-			&i.Payload,
-			&i.Etag,
-			&i.Revision,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.DeletedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-			&i.DeleteTime,
-			&i.PurgeTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const softDeleteDashboardByName = `-- name: SoftDeleteDashboardByName :one
 UPDATE dashboards
 SET
@@ -268,6 +200,7 @@ func (q *Queries) SoftDeleteDashboardByName(ctx context.Context, arg SoftDeleteD
 }
 
 const updateDashboardByName = `-- name: UpdateDashboardByName :one
+
 UPDATE dashboards
 SET
     display_name = $3,
@@ -291,6 +224,10 @@ type UpdateDashboardByNameParams struct {
 	Etag        string          `json:"etag"`
 }
 
+// ListDashboards (space branch) is served by the dynamic keyset engine
+// (filter.BuildListQuery in internal/service/dashboards) — AIP-160 filter +
+// AIP-132 order_by + compound-cursor pagination — so there is no static
+// ListDashboardsBySpace query here.
 // Optimistic-concurrency update: if etag in the WHERE doesn't match,
 // the UPDATE returns zero rows and the handler maps that to Aborted.
 // The caller is expected to re-marshal the full Dashboard proto

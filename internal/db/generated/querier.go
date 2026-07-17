@@ -67,6 +67,12 @@ type Querier interface {
 	// transitioned row so the caller can fire local LRO Manager
 	// cancels for goroutines running on this replica.
 	CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) ([]uuid.UUID, error)
+	// ListOperations (the AIP-151 public RPC) is served by the dynamic keyset
+	// engine (filter.BuildListQuery in internal/service/operations) so that the
+	// caller-visibility authorization can compose with an AIP-160 filter + a
+	// working keyset cursor. That authorization SQL lives in the handler as the
+	// BuildListQuery base predicate (authorizedOperationsScope), so there is no
+	// static ListAuthorizedOperations query here.
 	CompleteOperation(ctx context.Context, arg CompleteOperationParams) (Operation, error)
 	// The DeleteSecret guard's lookup: connectors that reference a given secret,
 	// with enough identity (slug + scope) to name them in the FailedPrecondition
@@ -82,9 +88,6 @@ type Querier interface {
 	CountAssetsByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountAssetsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountConnectedStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
-	// Companion to ListDashboardsBySpace for next_page_token computation:
-	// emit a token iff (offset + page_size) < count.
-	CountDashboardsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountFulfilledLineItems(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountLineItemsByRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountMessagesByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
@@ -615,22 +618,6 @@ type Querier interface {
 	// column reference through a regular LEFT JOIN, which sqlc infers
 	// correctly as pgtype.Text.
 	ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]ListAssetsBySpaceRow, error)
-	// Operations the caller is permitted to see, scope-trimmed in one query
-	// (no N+1):
-	//   - account-scoped (no org/space): only the creator;
-	//   - org-scoped: caller has organizations.read at the op's org;
-	//   - space-scoped: caller has spaces.read at the op's space, via direct
-	//     space membership OR inherited parent-org membership.
-	// Membership resolves both direct (user_id) and group (group_id)
-	// bindings, mirroring GetEffectiveOrgRoles/GetEffectiveSpaceRoles;
-	// role_permissions supplies the generic read grant (all system roles
-	// hold it today, but the join future-proofs custom roles that may not).
-	ListAuthorizedOperations(ctx context.Context, arg ListAuthorizedOperationsParams) ([]Operation, error)
-	// Live dashboards in a space, newest-first. Pagination is offset-
-	// based for v1 — the catalog is small (≤ 100s of dashboards per
-	// space) and the surface won't grow until customers start
-	// composing them programmatically.
-	ListDashboardsBySpace(ctx context.Context, arg ListDashboardsBySpaceParams) ([]Dashboard, error)
 	// ListConnectors is NOT a static sqlc query: it is a dynamic AIP-160
 	// filtered + AIP-132 sorted + compound-cursor keyset list assembled by
 	// internal/filter.BuildListQuery (base scope org_id + space_id IS NOT DISTINCT
@@ -911,6 +898,10 @@ type Querier interface {
 	// raised here, never lowered — once a user has curated a title, that
 	// intent is sticky.
 	UpdateConversation(ctx context.Context, arg UpdateConversationParams) (AiConversation, error)
+	// ListDashboards (space branch) is served by the dynamic keyset engine
+	// (filter.BuildListQuery in internal/service/dashboards) — AIP-160 filter +
+	// AIP-132 order_by + compound-cursor pagination — so there is no static
+	// ListDashboardsBySpace query here.
 	// Optimistic-concurrency update: if etag in the WHERE doesn't match,
 	// the UPDATE returns zero rows and the handler maps that to Aborted.
 	// The caller is expected to re-marshal the full Dashboard proto

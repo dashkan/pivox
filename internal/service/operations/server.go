@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"errors"
+	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
@@ -10,8 +11,9 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
-	"github.com/dashkan/pivox/internal/convert"
+	"github.com/dashkan/pivox/internal/appkey"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/permission"
 	"github.com/dashkan/pivox/internal/server"
@@ -39,7 +41,9 @@ type LROManager interface {
 type OperationsServer struct {
 	longrunningpb.UnimplementedOperationsServer
 	lro      LROManager
+	pool     db.RWPool
 	queries  db.Querier
+	codec    *appkey.Codec
 	resolver *permission.Resolver
 }
 
@@ -48,9 +52,15 @@ type Config struct {
 	// LRO is the long-running operation manager that backs the action
 	// methods (wait/cancel/delete). Required.
 	LRO LROManager
-	// Queries reads an operation row for its authz scope and runs the
-	// membership-scoped list query. Required.
+	// Pool runs the dynamic, keyset-paginated ListOperations query
+	// (filter.BuildListQuery). Required.
+	Pool db.RWPool
+	// Queries reads an operation row for its authz scope
+	// (Get/Wait/Cancel/Delete). Required.
 	Queries db.Querier
+	// Codec opaque-encodes ListOperations page tokens (the keyset cursor).
+	// Required.
+	Codec *appkey.Codec
 	// Resolver answers the per-operation permission check for
 	// Get/Wait/Cancel/Delete. Required.
 	Resolver *permission.Resolver
@@ -62,13 +72,19 @@ func NewOperationsServer(cfg Config) *OperationsServer {
 	if cfg.LRO == nil {
 		panic("operations: Config.LRO is required")
 	}
+	if cfg.Pool == nil {
+		panic("operations: Config.Pool is required")
+	}
 	if cfg.Queries == nil {
 		panic("operations: Config.Queries is required")
+	}
+	if cfg.Codec == nil {
+		panic("operations: Config.Codec is required")
 	}
 	if cfg.Resolver == nil {
 		panic("operations: Config.Resolver is required")
 	}
-	return &OperationsServer{lro: cfg.LRO, queries: cfg.Queries, resolver: cfg.Resolver}
+	return &OperationsServer{lro: cfg.LRO, pool: cfg.Pool, queries: cfg.Queries, codec: cfg.Codec, resolver: cfg.Resolver}
 }
 
 // authorizeOp loads the operation named by `name` and confirms the
@@ -125,22 +141,110 @@ func (s *OperationsServer) GetOperation(ctx context.Context, req *longrunningpb.
 	return lro.OperationToProto(op)
 }
 
+// authorizedOperationsScope is the set-wise visibility predicate for
+// ListOperations: the caller sees an account-scoped op only if they created
+// it, an org-scoped op if they hold organizations.read at its org, and a
+// space-scoped op if they hold spaces.read at its space (via direct space
+// membership OR inherited parent-org membership). Membership resolves both
+// direct (user_id) and group (group_id) bindings.
+//
+// It is the non-negotiable base scope ANDed into filter.BuildListQuery — the
+// request's filter/order_by layer ON TOP and can only narrow, never widen it.
+// This is the same authorization the pre-migration ListAuthorizedOperations
+// sqlc query enforced (its cross-tenant-IDOR regression tests still guard it);
+// the migration moves it here as a base predicate so the keyset cursor + AIP
+// filter can compose with it.
+//
+// The single `%[1]s` verb is BuildListQuery's placeholder for this predicate's
+// one bound Arg (the caller's identity). Go's explicit-argument-index verb
+// emits that SAME placeholder at every caller reference, so the caller is bound
+// EXACTLY ONCE and reused — no value is ever interpolated, and the placeholder
+// tracks whatever $N BuildListQuery assigns. The outer parentheses keep the
+// OR-expression intact when BuildListQuery ANDs it with the filter/cursor.
+// Column refs are qualified `operations.` because BuildListQuery selects
+// `FROM operations` with no alias.
+const authorizedOperationsScope = `(
+  (operations.org_id IS NULL AND operations.space_id IS NULL AND operations.created_by = %[1]s)
+  OR (operations.space_id IS NULL AND operations.org_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM org_members om
+          JOIN role_permissions rp ON rp.role_id = om.role_id
+          JOIN permissions perm ON perm.id = rp.permission_id
+         WHERE om.org_id = operations.org_id
+           AND perm.permission_id = 'organizations.read'
+           AND (om.user_id = %[1]s
+                OR om.group_id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = %[1]s))))
+  OR (operations.space_id IS NOT NULL AND (
+        EXISTS (SELECT 1 FROM space_members sm
+                  JOIN role_permissions rp ON rp.role_id = sm.role_id
+                  JOIN permissions perm ON perm.id = rp.permission_id
+                 WHERE sm.space_id = operations.space_id
+                   AND perm.permission_id = 'spaces.read'
+                   AND (sm.user_id = %[1]s
+                        OR sm.group_id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = %[1]s)))
+        OR EXISTS (SELECT 1 FROM spaces s
+                     JOIN org_members om ON om.org_id = s.org_id
+                     JOIN role_permissions rp ON rp.role_id = om.role_id
+                     JOIN permissions perm ON perm.id = rp.permission_id
+                    WHERE s.id = operations.space_id
+                      AND perm.permission_id = 'spaces.read'
+                      AND (om.user_id = %[1]s
+                           OR om.group_id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = %[1]s))))))`
+
 // ListOperations returns the operations the caller is permitted to see,
-// scope-trimmed in a single query (account ops they created, plus org/
-// space ops they can read). The request's name/filter are not used as a
-// server-side prefix — visibility is the trim.
+// scope-trimmed set-wise (account ops they created, plus org/space ops they can
+// read) via the dynamic keyset engine (filter.BuildListQuery). The
+// authorization is the NON-NEGOTIABLE base scope; the request's AIP-160 filter
+// (e.g. `done = true`) layers on top and can only narrow. Pagination is a
+// compound (create_time, id) keyset — every page returns a working
+// next_page_token so a client can read past the first page (the pre-migration
+// handler accepted page_size but never emitted a token).
 func (s *OperationsServer) ListOperations(ctx context.Context, req *longrunningpb.ListOperationsRequest) (*longrunningpb.ListOperationsResponse, error) {
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
+	rf := filter.OperationFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
+
+	// The longrunning request has no order_by field; the plan is always the
+	// declared default (createTime desc → compound (create_time, id) keyset).
+	plan, err := filter.PlanOrderBy(rf, "")
+	if err != nil {
+		return nil, apierr.Internal(err, "resolve operations order")
 	}
 
-	rows, err := s.queries.ListAuthorizedOperations(ctx, db.ListAuthorizedOperationsParams{
-		Caller:   convert.PgUUID(server.MustUserID(ctx)),
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: authorizedOperationsScope, Arg: server.MustUserID(ctx)}},
+		Filter:   req.GetFilter(),
+		Order:    plan,
 		PageSize: pageSize,
+		Cursor:   cursor,
 	})
 	if err != nil {
+		// The only error source is the filter transpiler (bad user filter, e.g.
+		// an unknown field) — surface it as InvalidArgument on "filter".
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
 		return nil, apierr.Internal(err, "failed to list operations")
+	}
+	rows, err := filter.ScanOperations(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "failed to list operations")
+	}
+
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row (see the connectors comment for
+	// the off-by-one this closes).
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.Operation) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, operationSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	ops := make([]*longrunningpb.Operation, 0, len(rows))
@@ -151,7 +255,18 @@ func (s *OperationsServer) ListOperations(ctx context.Context, req *longrunningp
 		}
 		ops = append(ops, p)
 	}
-	return &longrunningpb.ListOperationsResponse{Operations: ops}, nil
+	return &longrunningpb.ListOperationsResponse{Operations: ops, NextPageToken: nextPageToken}, nil
+}
+
+// operationSortValue renders the primary order_by column's value for the given
+// row as the string the compound page token carries. The only sortable column
+// is create_time (RFC3339Nano so filter.DecodeCursor round-trips it to an exact
+// time.Time). Mirrors connectorSortValue.
+func operationSortValue(plan filter.OrderByPlan, r db.Operation) string {
+	if plan.Field == "createTime" {
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	}
+	return ""
 }
 
 // WaitOperation waits until the operation is done or the timeout elapses,

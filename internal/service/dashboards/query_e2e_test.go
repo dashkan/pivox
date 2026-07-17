@@ -49,7 +49,7 @@ func newQueryHarness(t *testing.T) *grpcharness.Harness {
 				Pool: h.Pool, Queries: h.Queries, Codec: grpcharness.TestAppCodec(),
 			}))
 			apiv1.RegisterDashboardsServer(s, dashboards.NewServer(dashboards.Config{
-				Pool: h.Pool, Queries: h.Queries,
+				Pool: h.Pool, Queries: h.Queries, Codec: grpcharness.TestAppCodec(),
 			}))
 		}),
 	)

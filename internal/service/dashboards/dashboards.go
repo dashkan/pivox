@@ -19,6 +19,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/dashkan/pivox/internal/convert"
 	"github.com/dashkan/pivox/internal/dashboard/system"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/server"
 )
@@ -152,42 +154,73 @@ func listOrgDashboards(orgSlug string) *apiv1.ListDashboardsResponse {
 	return out
 }
 
-// listSpaceDashboards reads space-scoped USER_MANAGED dashboards
-// out of the dashboards table. AIP-160 filter / order_by are
-// rejected with InvalidArgument while the wiring lives in a
-// future phase — silently ignoring them would be a footgun.
+// listSpaceDashboards reads space-scoped USER_MANAGED dashboards out of the
+// dashboards table via the dynamic AIP-160 filtered + AIP-132 sorted +
+// compound-cursor keyset engine (filter.BuildListQuery), mirroring
+// ListConnectors / ListSecrets. The interceptor-resolved space is the
+// NON-NEGOTIABLE base scope (space_id = $), ANDed as the base of the query; the
+// request's filter/order_by layer ON TOP and can only narrow. Every value
+// (space id, filter operands, cursor values, page size) is bound as a $N
+// parameter — column/direction come only from DashboardFilter's whitelist. See
+// docs/aip-list-transpiler-procedure.md.
 func (s *Server) listSpaceDashboards(ctx context.Context, req *apiv1.ListDashboardsRequest) (*apiv1.ListDashboardsResponse, error) {
-	if req.GetFilter() != "" {
-		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter",
-			"AIP-160 filter is not yet implemented for dashboards; track in a future phase"))
-	}
-	if req.GetOrderBy() != "" {
-		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by",
-			"order_by is not yet implemented for dashboards; default order is create_time DESC"))
-	}
-
 	resolved := server.MustResolvedSpaceFromContext(ctx)
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
+	rf := filter.DashboardFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
+
+	// Resolve order_by against the sortable whitelist (default: createTime
+	// desc). The plan also tells the cursor codec whether the sort value is a
+	// timestamp.
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
 	}
 
-	rows, err := s.queries.ListDashboardsBySpace(ctx, db.ListDashboardsBySpaceParams{
-		SpaceID: resolved.ID,
-		Limit:   pageSize,
-		Offset:  0, // page_token wiring lands when filter does
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	// Base scope: the interceptor-resolved space. The AIP filter is layered on
+	// top — it can only narrow within the space.
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "space_id = %s", Arg: resolved.ID}},
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Dashboard", req.GetParent())
+		// The only error source is the filter transpiler (bad user filter, e.g.
+		// an unknown field) — surface it as InvalidArgument on "filter".
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list dashboards")
+	}
+	rows, err := filter.ScanDashboards(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list dashboards")
+	}
+
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row (see the connectors comment for
+	// the off-by-one this closes).
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.Dashboard) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, dashboardSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	orgSlug, spaceSlug := orgSpaceSlugsFromContext(ctx)
 	parent := spaceParentName(orgSlug, spaceSlug)
 	out := &apiv1.ListDashboardsResponse{
-		Dashboards: make([]*apiv1.Dashboard, 0, len(rows)),
+		Dashboards:    make([]*apiv1.Dashboard, 0, len(rows)),
+		NextPageToken: nextPageToken,
 	}
 	for _, row := range rows {
 		d, err := convert.DashboardToProto(row, parent, nil)
@@ -197,6 +230,23 @@ func (s *Server) listSpaceDashboards(ctx context.Context, req *apiv1.ListDashboa
 		out.Dashboards = append(out.Dashboards, d)
 	}
 	return out, nil
+}
+
+// dashboardSortValue renders the primary order_by column's value for the given
+// row as the string the compound page token carries. Timestamps use
+// RFC3339Nano so filter.DecodeCursor can parse them back to an exact
+// time.Time. For the default id ordering (plan.Field == "") the value is unused
+// (EncodeCursor emits the id-only token), so "" is returned. Mirrors
+// connectorSortValue.
+func dashboardSortValue(plan filter.OrderByPlan, r db.Dashboard) string {
+	switch plan.Field {
+	case "displayName":
+		return r.DisplayName
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 // GetDashboard returns one dashboard by name. At org-scoped names

@@ -553,6 +553,46 @@ func ScanStorageGateways(rows pgx.Rows) ([]db.StorageGateway, error) {
 	return results, rows.Err()
 }
 
+// ScanDashboards scans rows into db.Dashboard structs.
+//
+// The destination order MUST match the `dashboards` column order from the init
+// migration exactly — this scans `SELECT *` from BuildListQuery, so adding a
+// column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanDashboards(rows pgx.Rows) ([]db.Dashboard, error) {
+	defer rows.Close()
+	var results []db.Dashboard
+	for rows.Next() {
+		var d db.Dashboard
+		// Order MUST match `dashboards`: id, space_id, name, display_name,
+		// description, management_mode, payload, etag, revision, created_by,
+		// updated_by, deleted_by, create_time, update_time, delete_time,
+		// purge_time.
+		if err := rows.Scan(
+			&d.ID,
+			&d.SpaceID,
+			&d.Name,
+			&d.DisplayName,
+			&d.Description,
+			&d.ManagementMode,
+			&d.Payload,
+			&d.Etag,
+			&d.Revision,
+			&d.CreatedBy,
+			&d.UpdatedBy,
+			&d.DeletedBy,
+			&d.CreateTime,
+			&d.UpdateTime,
+			&d.DeleteTime,
+			&d.PurgeTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, d)
+	}
+	return results, rows.Err()
+}
+
 // ScanOrgMembers scans rows into db.ListOrgMembersRow structs.
 //
 // The source is the OrgMemberFilter derived table
@@ -693,6 +733,42 @@ func ScanSpaceMembers(rows pgx.Rows) ([]db.ListSpaceMembersRow, error) {
 			return nil, err
 		}
 		results = append(results, m)
+	}
+	return results, rows.Err()
+}
+
+// ScanOperations scans rows into db.Operation structs.
+//
+// The destination order MUST match the `operations` column order from the init
+// migration exactly — this scans `SELECT *` from BuildListQuery, so adding a
+// column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanOperations(rows pgx.Rows) ([]db.Operation, error) {
+	defer rows.Close()
+	var results []db.Operation
+	for rows.Next() {
+		var o db.Operation
+		// Order MUST match `operations`: id, parent, done, metadata, result,
+		// error_code, error_message, org_id, space_id, created_by, create_time,
+		// update_time, expire_time.
+		if err := rows.Scan(
+			&o.ID,
+			&o.Parent,
+			&o.Done,
+			&o.Metadata,
+			&o.Result,
+			&o.ErrorCode,
+			&o.ErrorMessage,
+			&o.OrgID,
+			&o.SpaceID,
+			&o.CreatedBy,
+			&o.CreateTime,
+			&o.UpdateTime,
+			&o.ExpireTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, o)
 	}
 	return results, rows.Err()
 }
