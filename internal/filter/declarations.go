@@ -43,7 +43,16 @@ type ResourceFilter struct {
 	UserColumn      string   // column name for implicit user-scoped access control (e.g. "created_by"); QueryParams.UserID is required when set
 }
 
-// SpaceFilter returns the filter config for spaces.
+// SpaceFilter returns the filter config for spaces. Consumed by the
+// compound-cursor keyset path (filter.BuildListQuery) in ListSpaces — the base
+// scope (org_id = $) is supplied by the handler via ListQuery.Base, so
+// ParentColumn is unused on that path (kept for documentation of the scope
+// column). Every Sortable column below is NOT NULL in the init migration
+// (name, display_name, create_time), which the compound-cursor row comparison
+// requires: a nullable sort column would go UNKNOWN on NULLs and drop/duplicate
+// rows across page boundaries, so such a column must be registered
+// filterable-only, never Sortable. Spaces has no nullable sortable columns, so
+// none are demoted.
 func SpaceFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -54,9 +63,11 @@ func SpaceFilter() *ResourceFilter {
 			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Sortable: map[string]SortableField{
-			"displayName": {Column: "display_name"},
-			"name":        {Column: "name"},
-			"createTime":  {Column: "create_time"},
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			"name":        {Column: "name", Type: filtering.TypeString},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Table:         "spaces",
 		SoftDelete:    true,

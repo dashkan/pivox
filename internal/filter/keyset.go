@@ -107,6 +107,10 @@ type ListQuery struct {
 	Order    OrderByPlan     // resolved via PlanOrderBy
 	PageSize int32           // clamped to [1,1000]; the query fetches PageSize+1
 	Cursor   *KeysetCursor   // nil → first page
+	// ShowDeleted, when true, includes soft-deleted rows. Only meaningful for a
+	// resource whose ResourceFilter has SoftDelete set; otherwise ignored. This
+	// is the AIP `show_deleted` request flag, plumbed by the handler.
+	ShowDeleted bool
 }
 
 // BuildListQuery assembles the parameterized SQL and args for a keyset list.
@@ -128,6 +132,15 @@ func BuildListQuery(q ListQuery) (string, []any, error) {
 		conditions []string
 		args       []any
 	)
+
+	// Soft-delete filter — resource-level, mirroring filter.Query's buildQuery:
+	// exclude soft-deleted rows unless the caller passes ShowDeleted. It is a
+	// no-arg literal predicate, so it never consumes a $N placeholder and leaves
+	// the base/filter/cursor numbering below untouched. Only fires for a resource
+	// whose table actually has a delete_time column (SoftDelete set).
+	if q.Resource.SoftDelete && !q.ShowDeleted {
+		conditions = append(conditions, "delete_time IS NULL")
+	}
 
 	// Base scope — always first, so filter params never collide with it.
 	for _, p := range q.Base {

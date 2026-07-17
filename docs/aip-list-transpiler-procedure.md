@@ -195,6 +195,87 @@ untouched.
 
 ---
 
+## Migrating a legacy `filter.Query` handler to compound-cursor
+
+The recipe above (§1–5) converts a **static-sqlc** list. A second, larger class
+of handlers is already **dynamic** but on the **legacy `filter.Query` engine**:
+they pair an **id-only cursor** (`CursorColumn: "id"` + `EncodeNextPageToken` /
+`DecodeCursor`) with a `Sortable` set that exposes **non-id** columns. That is a
+latent correctness bug: a client passing `order_by=displayName` gets
+`ORDER BY display_name` but the keyset resumes on `id > $cursor` — sort and
+keyset disagree, so rows **drop and duplicate across page boundaries** whenever
+display_name order differs from id order. (Pinned red→green in
+`TestE2E_ListSpaces_OrderByDisplayNameKeysetBoundary`: the legacy path returned
+`[aa,bb,cc,bb,dd,ee]` — `bb` duplicated, `ff`/`gg` dropped — for 7 rows at
+page_size 3.)
+
+**Worked example (the pilot): `ListSpaces`** (`internal/service/spaces/server.go`).
+This is the template for the fan-out (organizations, apikeys, tags, aichat, mcp).
+The moving parts differ from §1–5 as follows:
+
+1. **Make the declaration compound-capable.** In `SpaceFilter()`, set
+   `SortableField.Type` on every sortable column — **`filtering.TypeTimestamp`
+   on timestamp columns is mandatory** (it is what tells `DecodeCursor` to
+   reparse the token's sort value into a `time.Time`); non-timestamp columns get
+   `filtering.TypeString`. Leave `OrderBy`/`CursorColumn`/`ParentColumn` in place
+   — they are inert on the compound path (`BuildListQuery` uses `Table`,
+   `SoftDelete`, and the `Filterable`/`Sortable` whitelists only) but keep the
+   declaration honest and are still read by any *other* legacy caller during the
+   sweep (e.g. `mcp.ListSpaces` also uses `SpaceFilter()` on `filter.Query`).
+
+2. **Soft-delete is handled by the engine, not the base scope.** `spaces` is
+   soft-deleting (`SoftDelete: true`, request has `show_deleted`).
+   `BuildListQuery` now honors `q.Resource.SoftDelete && !q.ShowDeleted` by
+   emitting a **no-arg** `delete_time IS NULL` predicate (mirroring
+   `filter.Query`'s `buildQuery`). So you do **not** put soft-delete in `Base`
+   (a `Predicate` must carry exactly one `%s`/arg, and `delete_time IS NULL` has
+   none) — you plumb `ShowDeleted: req.GetShowDeleted()` into `ListQuery` and let
+   the engine add it. Hard-delete resources (no `delete_time` column) leave
+   `SoftDelete: false` and nothing is emitted.
+
+3. **Base scope is the flat parent predicate.** Unlike the leveled connectors
+   (`org_id = … AND space_id IS NOT DISTINCT FROM …`), a flat single-parent
+   resource supplies **one** base predicate:
+   `Base: []filter.Predicate{{SQL: "org_id = %s", Arg: resolvedOrg.ID}}`.
+
+4. **`sortValue` helper** — same shape as `connectorSortValue`
+   (`spaceSortValue(plan, r db.Space) string`): a `switch plan.Field` returning
+   the row's value for the active sort column, timestamps as
+   `.UTC().Format(time.RFC3339Nano)`, `default: ""` for the id-only path.
+
+5. **Encode via `filter.Paginate` + `filter.EncodeCursor`.** These handlers
+   already went through the Phase-B `filter.Paginate` off-by-one fix, so the only
+   token change is swapping the id-only `EncodeNextPageToken(last.ID)` inside the
+   `Paginate` callback for the compound
+   `EncodeCursor(codec, plan, spaceSortValue(plan, last), last.ID)`, and building
+   the query with `BuildListQuery` instead of `filter.Query`. `Paginate` keeps
+   the trim + last-returned-row discipline.
+
+6. **Nullable-column rule (per Phase C).** Every column you register as
+   `Sortable` MUST be `NOT NULL` (see the keyset section below for the
+   mechanism). Spaces' three sortables (`name`, `display_name`, `create_time`)
+   are all `NOT NULL`, so none are demoted. If a resource has a nullable column
+   a client might want to sort on, register it **filterable-only** — a client
+   sorting on it then gets `InvalidArgument` from `PlanOrderBy` (not a silently
+   broken keyset).
+
+7. **Orphaned static query? Usually none — but grep before you delete.** §5
+   deletes the static sqlc list query that a static→dynamic migration orphans. A
+   legacy-`filter.Query` handler was **already dynamic**, so it typically has
+   **no** static list query to delete and **no** sqlc regen step. Confirm with
+   `grep -rn 'name: List<Resource>' internal/db/queries/` and grep the generated
+   caller set. **Do not delete a shared list query**: `spaces.sql` has
+   `ListSpacesPastPurgeTime`, but that is the **purge worker's** query
+   (`internal/workers/purge_spaces.go`), not the RPC's — it stays. Only delete a
+   query with **zero** remaining callers after your migration; when you do
+   regenerate sqlc, verify the diff contains **only** the removed query (no
+   schema churn).
+
+Everything else (the handler assembly in §3, the security contract, the test
+matrix) is identical to the static-sqlc recipe.
+
+---
+
 ## The compound-cursor keyset (why it is correct)
 
 A keyset list resumes with a `WHERE` predicate on the sort column, not

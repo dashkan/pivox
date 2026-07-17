@@ -184,6 +184,58 @@ func TestBuildListQuery_CompoundCursorDescFlipsOperator(t *testing.T) {
 	assert.Contains(t, sql, "ORDER BY create_time DESC, id DESC")
 }
 
+// TestBuildListQuery_SoftDeleteExcludesDeletedByDefault pins that a
+// SoftDelete resource excludes soft-deleted rows by default, mirroring the
+// legacy filter.Query path. Spaces is the first SoftDelete resource to move
+// onto the compound-cursor engine, so BuildListQuery must honor rf.SoftDelete.
+func TestBuildListQuery_SoftDeleteExcludesDeletedByDefault(t *testing.T) {
+	rf := basicRF()
+	rf.SoftDelete = true
+	sql, _, err := BuildListQuery(ListQuery{Resource: rf, PageSize: 10})
+	require.NoError(t, err)
+	assert.Contains(t, sql, "delete_time IS NULL")
+}
+
+// TestBuildListQuery_ShowDeletedIncludesSoftDeleted pins the show_deleted
+// escape hatch: with ShowDeleted set, the soft-delete predicate is dropped.
+func TestBuildListQuery_ShowDeletedIncludesSoftDeleted(t *testing.T) {
+	rf := basicRF()
+	rf.SoftDelete = true
+	sql, _, err := BuildListQuery(ListQuery{Resource: rf, PageSize: 10, ShowDeleted: true})
+	require.NoError(t, err)
+	assert.NotContains(t, sql, "delete_time IS NULL")
+}
+
+// TestBuildListQuery_HardDeleteHasNoSoftDeletePredicate pins that a hard-delete
+// resource (ConnectorFilter, SoftDelete:false — no delete_time column) never
+// emits the predicate, so the existing connectors SQL is unaffected.
+func TestBuildListQuery_HardDeleteHasNoSoftDeletePredicate(t *testing.T) {
+	_, _, base := baseScope(t)
+	sql, _, err := BuildListQuery(ListQuery{Resource: ConnectorFilter(), Base: base, PageSize: 10})
+	require.NoError(t, err)
+	assert.NotContains(t, sql, "delete_time")
+}
+
+// TestBuildListQuery_SoftDeleteWithBaseScope_NumbersArgsCorrectly pins the
+// security-critical numbering: the soft-delete predicate is a no-arg literal,
+// so the base scope still binds at $1 and the limit at $2 — the placeholder
+// stream stays aligned with the args slice.
+func TestBuildListQuery_SoftDeleteWithBaseScope_NumbersArgsCorrectly(t *testing.T) {
+	rf := basicRF()
+	rf.SoftDelete = true
+	orgID := uuid.New()
+	sql, args, err := BuildListQuery(ListQuery{
+		Resource: rf,
+		Base:     []Predicate{{SQL: "org_id = %s", Arg: orgID}},
+		PageSize: 5,
+	})
+	require.NoError(t, err)
+	assert.Equal(t,
+		"SELECT * FROM t WHERE delete_time IS NULL AND org_id = $1 ORDER BY id LIMIT $2",
+		sql)
+	assert.Equal(t, []any{orgID, int32(6)}, args)
+}
+
 func TestBuildListQuery_PageSizeClamped(t *testing.T) {
 	_, _, base := baseScope(t)
 	_, args, err := BuildListQuery(ListQuery{Resource: ConnectorFilter(), Base: base, PageSize: 100000})
