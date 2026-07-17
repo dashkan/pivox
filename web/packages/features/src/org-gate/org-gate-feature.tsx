@@ -1,10 +1,9 @@
 'use client';
 
-import { Navigate } from '@tanstack/react-router';
-
 import { useOrgGate } from './use-org-gate';
 
 import type { ApiClient } from '@pivox/client';
+import type { NavigateComponent } from '@/navigation';
 
 /**
  * Gates the authenticated app shell on the user having ≥1 organization.
@@ -23,13 +22,18 @@ import type { ApiClient } from '@pivox/client';
  * because that's literally what this gate is for. Earlier versions
  * took an `onCreateOrgRequired` callback prop; that indirection had
  * no consumer that wanted a different destination and was the source
- * of an inline-arrow `useEffect` re-fire bug.
+ * of an inline-arrow `useEffect` re-fire bug. Only the router
+ * primitive is injected (`Navigate`) so this package stays
+ * router-agnostic — the consumer adapts its router's redirect
+ * component to `NavigateComponent`.
  */
 export function OrgGateFeature({
   apiClient,
+  Navigate,
   children,
 }: {
   apiClient: ApiClient;
+  Navigate: NavigateComponent;
   children: React.ReactNode;
 }) {
   const { status, error, actions } = useOrgGate({ apiClient });

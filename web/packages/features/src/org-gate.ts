@@ -8,6 +8,7 @@
  */
 
 export { OrgGateFeature } from './org-gate/org-gate-feature';
+export type { NavigateComponent } from './navigation';
 export { useOrgGate } from './org-gate/use-org-gate';
 export type {
   OrgGateActions,
