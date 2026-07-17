@@ -21,28 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestClampPageSize(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name string
-		in   int32
-		want int32
-	}{
-		{"unset defaults to 25", 0, defaultPageSize},
-		{"negative defaults to 25", -10, defaultPageSize},
-		{"in-range passes through", 50, 50},
-		{"at ceiling passes through", 100, 100},
-		{"above ceiling clamps to 100", 1000, maxPageSize},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tc.want, clampPageSize(tc.in))
-		})
-	}
-}
-
 // TestNamePrefixPattern pins the ILIKE pattern the static ListSpacesForMCP
 // query receives. An empty prefix yields a NULL text (the query treats NULL
 // as "no filter"); a non-empty prefix yields a case-insensitive prefix

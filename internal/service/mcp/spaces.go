@@ -31,24 +31,14 @@ import (
 )
 
 const (
-	// defaultPageSize is used when a ListSpaces request omits page_size.
+	// defaultPageSize is the page size a ListSpaces request gets when it omits
+	// page_size — the MCP agent surface's own policy, distinct from the keyset
+	// List surface's 100 default. Passed to filter.ClampPageSizeWith.
 	defaultPageSize = 25
-	// maxPageSize is the hard ceiling the server clamps page_size to.
+	// maxPageSize is the hard ceiling the server clamps page_size to. Passed to
+	// filter.ClampPageSizeWith.
 	maxPageSize = 100
 )
-
-// clampPageSize applies the default/ceiling policy: unset (≤0) →
-// default, above the ceiling → ceiling.
-func clampPageSize(n int32) int32 {
-	switch {
-	case n <= 0:
-		return defaultPageSize
-	case n > maxPageSize:
-		return maxPageSize
-	default:
-		return n
-	}
-}
 
 // ListSpaces lists spaces within a single organization. `org` is
 // REQUIRED for v1: the query scopes by parent org, and expressing "spaces
@@ -96,7 +86,7 @@ func (s *McpServer) ListSpaces(ctx context.Context, req *mcpv1.ListSpacesRequest
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", err.Error()))
 	}
 
-	pageSize := clampPageSize(req.GetPageSize())
+	pageSize := filter.ClampPageSizeWith(req.GetPageSize(), defaultPageSize, maxPageSize)
 	rows, err := s.queries.ListSpacesForMCP(ctx, db.ListSpacesForMCPParams{
 		OrgID:      org.ID,
 		NamePrefix: namePrefixPattern(req.GetNamePrefix()),

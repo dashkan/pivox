@@ -9,12 +9,30 @@ const (
 	defaultMaxPageSize int32 = 1000
 )
 
-// ClampPageSize applies the server page-size policy for a keyset list: a request
-// page_size of <= 0 becomes the resource's DefaultPageSize (falling back to 100
-// when unset), and any value above the resource's MaxPageSize (falling back to
-// 1000 when unset) is capped. It replaces the per-handler clampPageSize copies
-// that each hard-coded 100/1000, routing the policy through the resource's
-// declared knobs instead.
+// ClampPageSizeWith applies an explicit page-size policy: a request page_size of
+// <= 0 becomes defaultSize, any value above maxSize is capped to maxSize, and an
+// in-range value passes through unchanged. It is the shared clamp core: callers
+// with a ResourceFilter use ClampPageSize (which supplies the resource-declared
+// bounds), while callers outside the filter engine — e.g. the MCP agent surface,
+// which deliberately avoids the dynamic engine — pass their own explicit bounds.
+func ClampPageSizeWith(n, defaultSize, maxSize int32) int32 {
+	switch {
+	case n <= 0:
+		return defaultSize
+	case n > maxSize:
+		return maxSize
+	default:
+		return n
+	}
+}
+
+// ClampPageSize applies the server page-size policy for a keyset list, driven by
+// the resource's declared knobs: a request page_size of <= 0 becomes the
+// resource's DefaultPageSize (falling back to 100 when unset), and any value
+// above the resource's MaxPageSize (falling back to 1000 when unset) is capped.
+// It resolves those bounds from rf (nil-safe) and delegates the clamp to
+// ClampPageSizeWith, replacing the per-handler clampPageSize copies that each
+// hard-coded 100/1000.
 func ClampPageSize(rf *ResourceFilter, n int32) int32 {
 	defaultSize := defaultPageSize
 	if rf != nil && rf.DefaultPageSize > 0 {
@@ -24,14 +42,7 @@ func ClampPageSize(rf *ResourceFilter, n int32) int32 {
 	if rf != nil && rf.MaxPageSize > 0 {
 		maxSize = rf.MaxPageSize
 	}
-	switch {
-	case n <= 0:
-		return defaultSize
-	case n > maxSize:
-		return maxSize
-	default:
-		return n
-	}
+	return ClampPageSizeWith(n, defaultSize, maxSize)
 }
 
 // Paginate trims an over-fetched keyset result set (queried at LIMIT
