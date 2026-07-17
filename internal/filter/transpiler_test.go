@@ -28,7 +28,7 @@ func TestTranspile_WildcardILIKE(t *testing.T) {
 	rf := SpaceFilter()
 	wc, err := Transpile(rf, `displayName = "Test*"`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, `display_name ILIKE $1`, wc.SQL)
+	assert.Equal(t, `display_name ILIKE $1 ESCAPE '\'`, wc.SQL)
 	assert.Equal(t, []any{"Test%"}, wc.Args)
 }
 
@@ -36,8 +36,37 @@ func TestTranspile_WildcardEscapesMetachars(t *testing.T) {
 	rf := SpaceFilter()
 	wc, err := Transpile(rf, `displayName = "100%_done*"`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, `display_name ILIKE $1`, wc.SQL)
+	assert.Equal(t, `display_name ILIKE $1 ESCAPE '\'`, wc.SQL)
 	assert.Equal(t, []any{`100\%\_done%`}, wc.Args)
+}
+
+// TestTranspile_WildcardEscapesBackslash pins the LIKE escaping contract for
+// the '*' wildcard operand. A caller-supplied '\' must match LITERALLY, not be
+// consumed as the LIKE escape character. The generated fragment therefore
+// escapes '\' → '\\' and carries an explicit `ESCAPE '\'` so the escaping is
+// honored regardless of the driver default. '*' still becomes a SQL '%'
+// wildcard, and '%'/'_' stay literal.
+func TestTranspile_WildcardEscapesBackslash(t *testing.T) {
+	rf := SpaceFilter()
+	// Filter source `"a\\b*"` parses (CEL unescape) to StringValue `a\b*`.
+	wc, err := Transpile(rf, `displayName = "a\\b*"`, 1)
+	require.NoError(t, err)
+	assert.Equal(t, `display_name ILIKE $1 ESCAPE '\'`, wc.SQL)
+	// `\` → `\\`, then `*` → `%`.
+	assert.Equal(t, []any{`a\\b%`}, wc.Args)
+}
+
+// TestTranspile_WildcardEscapesAllSpecials exercises the full ordering: the
+// three LIKE literals ('\', '%', '_') are escaped BEFORE the '*'→'%' wildcard
+// translation, so the wildcard '%' is not itself escaped.
+func TestTranspile_WildcardEscapesAllSpecials(t *testing.T) {
+	rf := SpaceFilter()
+	// Filter source `"\\%_*"` parses to StringValue `\%_*`.
+	wc, err := Transpile(rf, `displayName = "\\%_*"`, 1)
+	require.NoError(t, err)
+	assert.Equal(t, `display_name ILIKE $1 ESCAPE '\'`, wc.SQL)
+	// `\`→`\\`, `%`→`\%`, `_`→`\_`, then `*`→`%`.
+	assert.Equal(t, []any{`\\\%\_%`}, wc.Args)
 }
 
 func TestTranspile_NoWildcardOnNonPartialField(t *testing.T) {
@@ -53,7 +82,7 @@ func TestTranspile_AND(t *testing.T) {
 	rf := SpaceFilter()
 	wc, err := Transpile(rf, `displayName = "Test*" AND state = "ACTIVE"`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, `(display_name ILIKE $1 AND state = $2)`, wc.SQL)
+	assert.Equal(t, `(display_name ILIKE $1 ESCAPE '\' AND state = $2)`, wc.SQL)
 	assert.Equal(t, []any{"Test%", "ACTIVE"}, wc.Args)
 }
 
@@ -200,7 +229,7 @@ func TestTranspile_Complex(t *testing.T) {
 	rf := SpaceFilter()
 	wc, err := Transpile(rf, `displayName = "My*" AND (state = "ACTIVE" OR name = "proj-123")`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, `(display_name ILIKE $1 AND (state = $2 OR name = $3))`, wc.SQL)
+	assert.Equal(t, `(display_name ILIKE $1 ESCAPE '\' AND (state = $2 OR name = $3))`, wc.SQL)
 	assert.Equal(t, []any{"My%", "ACTIVE", "proj-123"}, wc.Args)
 }
 
@@ -281,6 +310,6 @@ func TestTranspile_OrganizationFilter(t *testing.T) {
 	rf := OrganizationFilter()
 	wc, err := Transpile(rf, `displayName = "Acme*" AND state = "ACTIVE"`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, `(display_name ILIKE $1 AND state = $2)`, wc.SQL)
+	assert.Equal(t, `(display_name ILIKE $1 ESCAPE '\' AND state = $2)`, wc.SQL)
 	assert.Equal(t, []any{"Acme%", "ACTIVE"}, wc.Args)
 }

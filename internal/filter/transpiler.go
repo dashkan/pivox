@@ -29,6 +29,19 @@ func (t *Transpiler) jsonbKeyParam(key string) (string, error) {
 	return t.nextParam(key), nil
 }
 
+// likeLiteralEscaper neutralizes the LIKE/ILIKE escape character and wildcards
+// so a caller-supplied literal matches itself under `ILIKE ... ESCAPE '\'`.
+// '\' is listed FIRST so it is escaped before the backslashes introduced for
+// '%' and '_'; strings.Replacer does a single left-to-right pass and never
+// re-scans its own output, so there is no double-escaping.
+//
+// NOTE: '*' is deliberately NOT handled here. The AIP-160 dynamic-filter
+// grammar treats '*' as a WILDCARD, which the transpiler translates to SQL '%'
+// AFTER this escaping runs. This is the opposite of the MCP name-prefix
+// escaper (internal/service/mcp), which treats '*' as a literal. The two must
+// NOT be unified — different wildcard semantics.
+var likeLiteralEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
 // WhereClause is the output of the transpiler.
 type WhereClause struct {
 	SQL  string // e.g. "(display_name ILIKE $1 AND state = $2)"
@@ -182,12 +195,16 @@ func (t *Transpiler) transpileComparison(call *expr.Expr_Call, op string) (strin
 	// Wildcard handling for = operator on AllowPartial fields.
 	if op == "=" && fm.AllowPartial {
 		if strVal, ok := value.(string); ok && strings.Contains(strVal, "*") {
-			// Escape existing SQL LIKE metacharacters, then replace * with %.
-			escaped := strings.ReplaceAll(strVal, "%", "\\%")
-			escaped = strings.ReplaceAll(escaped, "_", "\\_")
+			// Escape the LIKE literals ('\', '%', '_') FIRST, then translate
+			// the AIP-160 '*' wildcard to SQL '%'. Order is load-bearing:
+			// escaping after translation would escape the '%' we just produced
+			// and break the wildcard. The generated fragment carries an
+			// explicit `ESCAPE '\'` so a caller-supplied '\' matches literally
+			// instead of being consumed as the implicit LIKE escape character.
+			escaped := likeLiteralEscaper.Replace(strVal)
 			escaped = strings.ReplaceAll(escaped, "*", "%")
 			param := t.nextParam(escaped)
-			return fmt.Sprintf("%s ILIKE %s", column, param), nil
+			return fmt.Sprintf(`%s ILIKE %s ESCAPE '\'`, column, param), nil
 		}
 	}
 

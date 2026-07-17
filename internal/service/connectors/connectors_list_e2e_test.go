@@ -76,6 +76,11 @@ func TestE2E_ListConnectors_FilterByDisplayName(t *testing.T) {
 	mkConnector(t, ctx, client, parent, "a", "VizRT Hub")
 	mkConnector(t, ctx, client, parent, "b", "News Hub")
 	mkConnector(t, ctx, client, parent, "c", "Weather Service")
+	// Literal-backslash pair: `esc` contains a backslash; `noesc` is the
+	// decoy that WOULD be matched if the caller's '\' were consumed as the
+	// LIKE escape character instead of matched literally.
+	mkConnector(t, ctx, client, parent, "d", `a\b Node`)
+	mkConnector(t, ctx, client, parent, "e", "ab Node")
 
 	// Exact match.
 	resp, err := client.ListConnectors(ctx, &workflowsv1.ListConnectorsRequest{
@@ -99,6 +104,17 @@ func TestE2E_ListConnectors_FilterByDisplayName(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"Weather Service"}, listDisplayNames(resp.GetConnectors()))
+
+	// Literal backslash in the wildcard operand must match LITERALLY. The
+	// filter source `a\\b*` unescapes (CEL) to prefix `a\b`, which matches
+	// `a\b Node` and must NOT match the `ab Node` decoy — proving the '\' is
+	// escaped and the fragment carries `ESCAPE '\'` end-to-end, not consumed
+	// as the implicit LIKE escape character.
+	resp, err = client.ListConnectors(ctx, &workflowsv1.ListConnectorsRequest{
+		Parent: parent, Filter: `displayName = "a\\b*"`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{`a\b Node`}, listDisplayNames(resp.GetConnectors()))
 }
 
 func TestE2E_ListConnectors_EmptyFilterAllInScope(t *testing.T) {
