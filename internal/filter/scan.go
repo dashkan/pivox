@@ -553,6 +553,42 @@ func ScanStorageGateways(rows pgx.Rows) ([]db.StorageGateway, error) {
 	return results, rows.Err()
 }
 
+// ScanOrgMembers scans rows into db.ListOrgMembersRow structs.
+//
+// The source is the OrgMemberFilter derived table
+// (`SELECT om.*, r.name AS role_name FROM org_members om JOIN roles r …`),
+// so the destination order MUST match `org_members` column order from the
+// init migration followed by the joined `role_name`. A mismatch fails at
+// runtime with a pgx column-count/type error that aborts the RPC.
+func ScanOrgMembers(rows pgx.Rows) ([]db.ListOrgMembersRow, error) {
+	defer rows.Close()
+	var results []db.ListOrgMembersRow
+	for rows.Next() {
+		var m db.ListOrgMembersRow
+		// Order MUST match the derived table: om.* (id, org_id, role_id,
+		// user_id, group_id, etag, revision, created_by, updated_by,
+		// create_time, update_time) then role_name.
+		if err := rows.Scan(
+			&m.ID,
+			&m.OrgID,
+			&m.RoleID,
+			&m.UserID,
+			&m.GroupID,
+			&m.Etag,
+			&m.Revision,
+			&m.CreatedBy,
+			&m.UpdatedBy,
+			&m.CreateTime,
+			&m.UpdateTime,
+			&m.RoleName,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, m)
+	}
+	return results, rows.Err()
+}
+
 // ScanStorageEndpoints scans rows into db.StorageEndpoint structs.
 //
 // The destination order MUST match the `storage_endpoints` column order from the
@@ -623,6 +659,40 @@ func ScanStorageAgents(rows pgx.Rows) ([]db.StorageAgent, error) {
 			return nil, err
 		}
 		results = append(results, a)
+	}
+	return results, rows.Err()
+}
+
+// ScanSpaceMembers scans rows into db.ListSpaceMembersRow structs. Same
+// contract as ScanOrgMembers, over the SpaceMemberFilter derived table
+// (`SELECT sm.*, r.name AS role_name FROM space_members sm JOIN roles r …`):
+// the destination order MUST match `space_members` column order followed
+// by the joined `role_name`.
+func ScanSpaceMembers(rows pgx.Rows) ([]db.ListSpaceMembersRow, error) {
+	defer rows.Close()
+	var results []db.ListSpaceMembersRow
+	for rows.Next() {
+		var m db.ListSpaceMembersRow
+		// Order MUST match the derived table: sm.* (id, space_id, role_id,
+		// user_id, group_id, etag, revision, created_by, updated_by,
+		// create_time, update_time) then role_name.
+		if err := rows.Scan(
+			&m.ID,
+			&m.SpaceID,
+			&m.RoleID,
+			&m.UserID,
+			&m.GroupID,
+			&m.Etag,
+			&m.Revision,
+			&m.CreatedBy,
+			&m.UpdatedBy,
+			&m.CreateTime,
+			&m.UpdateTime,
+			&m.RoleName,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, m)
 	}
 	return results, rows.Err()
 }

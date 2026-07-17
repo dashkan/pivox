@@ -3,8 +3,6 @@ package organizations
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +13,7 @@ import (
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/permission"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -100,8 +99,14 @@ func (s *OrganizationsServer) GetMember(ctx context.Context, req *iampb.GetMembe
 	}
 }
 
-// ListMembers returns org-scope Members with offset-based AIP-132
-// pagination. Default page size: 50; max: 500.
+// ListMembers returns org-scope Members on the shared AIP-160 filtered +
+// AIP-132 sorted + compound-cursor keyset engine. The interceptor-
+// resolved org is the NON-NEGOTIABLE base scope (org_id); the request's
+// filter/order_by layer on top and can only narrow. Filterable: `role`
+// (full role resource name), `principal_kind` (user/group). Sortable:
+// `role`, `createTime` (default createTime asc). Every value is bound as
+// a $N parameter by filter.BuildListQuery — see OrgMemberFilter for the
+// joined derived table this lists over.
 func (s *OrganizationsServer) ListMembers(ctx context.Context, req *iampb.ListMembersRequest) (*iampb.ListMembersResponse, error) {
 	parentSlug, err := parseOrgMemberParent(req.GetParent())
 	if err != nil {
@@ -112,64 +117,66 @@ func (s *OrganizationsServer) ListMembers(ctx context.Context, req *iampb.ListMe
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("parent",
 			"org slug in parent does not match resolved scope"))
 	}
-	pageSize, offset, err := parseMembersPaging(req.GetPageSize(), req.GetPageToken())
+
+	rf := filter.OrgMemberFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {
-		return nil, err
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
 	}
-	rows, err := s.queries.ListOrgMembers(ctx, db.ListOrgMembersParams{
-		OrgID:  resolved.ID,
-		Offset: offset,
-		Limit:  int64(pageSize) + 1,
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "org_id = %s", Arg: resolved.ID}},
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
 	if err != nil {
-		slog.ErrorContext(ctx, "list org members failed", "org_id", resolved.ID, "error", err)
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
 		return nil, apierr.Internal(err, "list members")
 	}
-	hasMore := len(rows) > int(pageSize)
-	if hasMore {
-		rows = rows[:pageSize]
+	rows, err := filter.ScanOrgMembers(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list members")
 	}
+
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.ListOrgMembersRow) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, orgMemberSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
+	}
+
 	out := make([]*iampb.Member, len(rows))
 	for i, r := range rows {
 		out[i] = convert.OrgMemberToProto(r, resolved.Slug, nil)
 	}
-	resp := &iampb.ListMembersResponse{Members: out}
-	if hasMore {
-		resp.NextPageToken = encodeMembersPageToken(offset + int64(pageSize))
-	}
-	return resp, nil
+	return &iampb.ListMembersResponse{Members: out, NextPageToken: nextPageToken}, nil
 }
 
-const (
-	defaultMembersPageSize = 50
-	maxMembersPageSize     = 500
-)
-
-// parseMembersPaging normalizes AIP-132 page_size + page_token into
-// the SQL offset+limit. page_token is an opaque base10 offset string;
-// negative or non-integer tokens fail loud rather than silently
-// resetting to the first page.
-func parseMembersPaging(reqPageSize int32, pageToken string) (pageSize int32, offset int64, err error) {
-	pageSize = reqPageSize
-	if pageSize <= 0 {
-		pageSize = defaultMembersPageSize
+// orgMemberSortValue renders the active order_by column's value for the
+// given row as the string the compound page token carries. `role` sorts
+// by the role NAME slug (a NOT-NULL column). For the default id ordering
+// (plan.Field == "") the value is unused, so "" is returned.
+func orgMemberSortValue(plan filter.OrderByPlan, r db.ListOrgMembersRow) string {
+	switch plan.Field {
+	case "role":
+		return r.RoleName
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
 	}
-	if pageSize > maxMembersPageSize {
-		pageSize = maxMembersPageSize
-	}
-	if pageToken == "" {
-		return pageSize, 0, nil
-	}
-	off, parseErr := strconv.ParseInt(pageToken, 10, 64)
-	if parseErr != nil || off < 0 {
-		return 0, 0, apierr.InvalidArgument(apierr.FieldViolation("page_token",
-			"page_token is not a valid cursor"))
-	}
-	return pageSize, off, nil
-}
-
-func encodeMembersPageToken(off int64) string {
-	return strconv.FormatInt(off, 10)
 }
 
 // CreateMember binds a principal (user or group) to a role at org

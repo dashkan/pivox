@@ -3,8 +3,6 @@ package spaces
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +13,7 @@ import (
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/permission"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -112,8 +111,14 @@ func (s *SpacesServer) GetMember(ctx context.Context, req *iampb.GetMemberReques
 	}
 }
 
-// ListMembers returns space-scope Members. Direct bindings only —
-// see GetMember doc comment for the inheritance caveat.
+// ListMembers returns space-scope Members. Direct bindings only — see
+// GetMember doc comment for the inheritance caveat. Runs on the shared
+// AIP-160 filtered + AIP-132 sorted + compound-cursor keyset engine: the
+// interceptor-resolved space is the NON-NEGOTIABLE base scope (space_id),
+// and the request's filter/order_by can only narrow within it.
+// Filterable: `role`, `principal_kind`. Sortable: `role`, `createTime`
+// (default createTime asc). See SpaceMemberFilter for the joined derived
+// table this lists over.
 func (s *SpacesServer) ListMembers(ctx context.Context, req *iampb.ListMembersRequest) (*iampb.ListMembersResponse, error) {
 	parentOrgSlug, parentSpaceSlug, err := parseSpaceMemberParent(req.GetParent())
 	if err != nil {
@@ -125,63 +130,66 @@ func (s *SpacesServer) ListMembers(ctx context.Context, req *iampb.ListMembersRe
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("parent",
 			"slugs in parent do not match resolved scope"))
 	}
-	pageSize, offset, err := parseMembersPaging(req.GetPageSize(), req.GetPageToken())
+
+	rf := filter.SpaceMemberFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {
-		return nil, err
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
 	}
-	rows, err := s.queries.ListSpaceMembers(ctx, db.ListSpaceMembersParams{
-		SpaceID: resolvedSpace.ID,
-		Offset:  offset,
-		Limit:   int64(pageSize) + 1,
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "space_id = %s", Arg: resolvedSpace.ID}},
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
 	if err != nil {
-		slog.ErrorContext(ctx, "list space members failed", "space_id", resolvedSpace.ID, "error", err)
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
 		return nil, apierr.Internal(err, "list members")
 	}
-	hasMore := len(rows) > int(pageSize)
-	if hasMore {
-		rows = rows[:pageSize]
+	rows, err := filter.ScanSpaceMembers(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list members")
 	}
+
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.ListSpaceMembersRow) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, spaceMemberSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
+	}
+
 	out := make([]*iampb.Member, len(rows))
 	for i, r := range rows {
 		out[i] = convert.SpaceMemberToProto(r, resolvedOrg.Slug, resolvedSpace.Slug, nil)
 	}
-	resp := &iampb.ListMembersResponse{Members: out}
-	if hasMore {
-		resp.NextPageToken = encodeMembersPageToken(offset + int64(pageSize))
-	}
-	return resp, nil
+	return &iampb.ListMembersResponse{Members: out, NextPageToken: nextPageToken}, nil
 }
 
-const (
-	defaultMembersPageSize = 50
-	maxMembersPageSize     = 500
-)
-
-// parseMembersPaging mirrors the org-side helper; kept as a sibling
-// here rather than a shared package because the two services don't
-// share an internal helpers module yet and the function is small
-// enough that duplication is cheaper than introducing one.
-func parseMembersPaging(reqPageSize int32, pageToken string) (pageSize int32, offset int64, err error) {
-	pageSize = reqPageSize
-	if pageSize <= 0 {
-		pageSize = defaultMembersPageSize
+// spaceMemberSortValue renders the active order_by column's value for the
+// given row as the string the compound page token carries. Mirrors
+// orgMemberSortValue on the Organizations service.
+func spaceMemberSortValue(plan filter.OrderByPlan, r db.ListSpaceMembersRow) string {
+	switch plan.Field {
+	case "role":
+		return r.RoleName
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
 	}
-	if pageSize > maxMembersPageSize {
-		pageSize = maxMembersPageSize
-	}
-	if pageToken == "" {
-		return pageSize, 0, nil
-	}
-	off, parseErr := strconv.ParseInt(pageToken, 10, 64)
-	if parseErr != nil || off < 0 {
-		return 0, 0, apierr.InvalidArgument(apierr.FieldViolation("page_token",
-			"page_token is not a valid cursor"))
-	}
-	return pageSize, off, nil
 }
-
-func encodeMembersPageToken(off int64) string { return strconv.FormatInt(off, 10) }
 
 // CreateMember binds a principal (user or group) to a role at space
 // scope. The principal must already exist in the org that owns this

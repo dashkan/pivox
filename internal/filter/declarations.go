@@ -94,7 +94,17 @@ func SpaceFilter() *ResourceFilter {
 	}
 }
 
-// OrganizationFilter returns the filter config for organizations.
+// OrganizationFilter returns the filter config for organizations,
+// consumed by the compound-cursor keyset path (filter.BuildListQuery) in
+// ListOrganizations. The base scope ("orgs the caller is a member of")
+// is supplied by the handler via ListQuery.Base — never baked in here.
+//
+// Every Sortable column is NOT NULL in the init migration (name UNIQUE
+// NOT NULL, display_name NOT NULL DEFAULT ”, create_time NOT NULL),
+// which the compound-cursor row comparison requires. DefaultOrder is
+// "name" (name-ascending), matching the proto's documented default. Type
+// MUST be TypeTimestamp on create_time so DecodeCursor reparses the
+// page-token sort value back into a time.Time.
 func OrganizationFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -104,12 +114,13 @@ func OrganizationFilter() *ResourceFilter {
 			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Sortable: map[string]SortableField{
-			"displayName": {Column: "display_name"},
-			"name":        {Column: "name"},
-			"createTime":  {Column: "create_time"},
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			"name":        {Column: "name", Type: filtering.TypeString},
+			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Table:         "organizations",
 		SoftDelete:    true,
+		DefaultOrder:  "name",
 		DefaultFields: []string{"displayName"},
 	}
 }
@@ -649,5 +660,81 @@ func ApiKeyFilter() *ResourceFilter {
 		Table:         "api_keys",
 		SoftDelete:    true,
 		DefaultFields: []string{"displayName"},
+	}
+}
+
+// OrgMemberFilter returns the filter config for org-scope IAM Members
+// (the org ListMembers RPC), on the compound-cursor keyset path.
+//
+// Members are a JOINED resource: a role binding lives in `org_members`,
+// but its wire shape carries the role's stable NAME (from `roles`), and
+// its filter/order surface exposes the role's full RESOURCE NAME plus a
+// virtual `principal_kind`. `BuildListQuery` emits `SELECT * FROM
+// <Table>`, so Table is a server-controlled derived table that joins
+// `roles` and exposes exactly the `db.ListOrgMembersRow` columns (om.* +
+// role_name) — no extra columns, so `filter.ScanOrgMembers` matches it
+// one-to-one. The filterable/virtual columns are computed inline as SQL
+// expressions over that row (never user input):
+//
+//   - `role` — the full role resource name, reconstructed as
+//     `organizations/<org slug>/roles/<role name>` via a correlated
+//     subquery to `organizations` (the org slug is not a column of
+//     org_members). Matches the proto's "exact match on a role resource
+//     name" filter.
+//   - `principal_kind` — `user` or `group`, from the user_id/group_id
+//     XOR columns.
+//
+// Sortable exposes `role` (the role NAME slug — sorts identically to the
+// resource name within one org, and is a real NOT-NULL column so the
+// keyset row comparison is safe) and `createTime`. DefaultOrder is
+// "createTime" (proto default: createTime ascending). DefaultPageSize/
+// MaxPageSize (50/500) preserve the pre-migration members page policy.
+// No bare-literal search surface (DefaultFields nil): the proto
+// advertises only the `role` and `principal_kind` filter fields.
+func OrgMemberFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"role":           {Column: "('organizations/' || (SELECT o.name FROM organizations o WHERE o.id = m.org_id) || '/roles/' || m.role_name)", Type: filtering.TypeString},
+			"principal_kind": {Column: "(CASE WHEN m.user_id IS NOT NULL THEN 'user' ELSE 'group' END)", Type: filtering.TypeString},
+		},
+		Sortable: map[string]SortableField{
+			"role":       {Column: "m.role_name", Type: filtering.TypeString},
+			"createTime": {Column: "m.create_time", Type: filtering.TypeTimestamp},
+		},
+		Table:           "(SELECT om.*, r.name AS role_name FROM org_members om JOIN roles r ON r.id = om.role_id) AS m",
+		SoftDelete:      false, // members hard-delete; no delete_time column
+		DefaultOrder:    "createTime",
+		DefaultPageSize: 50,
+		MaxPageSize:     500,
+		// The org base scope (org_id = $) is applied by the handler via
+		// BuildListQuery.Base.
+	}
+}
+
+// SpaceMemberFilter returns the filter config for space-scope IAM
+// Members (the space ListMembers RPC). Structurally identical to
+// OrgMemberFilter, over `space_members` instead of `org_members`. The
+// `role` resource name is still org-scoped
+// (`organizations/<org slug>/roles/<role name>`), so the correlated
+// subquery reaches the org slug through spaces → organizations. The
+// derived table exposes exactly the `db.ListSpaceMembersRow` columns
+// (sm.* + role_name), matched by `filter.ScanSpaceMembers`.
+func SpaceMemberFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"role":           {Column: "('organizations/' || (SELECT o.name FROM organizations o JOIN spaces sp ON sp.org_id = o.id WHERE sp.id = m.space_id) || '/roles/' || m.role_name)", Type: filtering.TypeString},
+			"principal_kind": {Column: "(CASE WHEN m.user_id IS NOT NULL THEN 'user' ELSE 'group' END)", Type: filtering.TypeString},
+		},
+		Sortable: map[string]SortableField{
+			"role":       {Column: "m.role_name", Type: filtering.TypeString},
+			"createTime": {Column: "m.create_time", Type: filtering.TypeTimestamp},
+		},
+		Table:           "(SELECT sm.*, r.name AS role_name FROM space_members sm JOIN roles r ON r.id = sm.role_id) AS m",
+		SoftDelete:      false, // members hard-delete; no delete_time column
+		DefaultOrder:    "createTime",
+		DefaultPageSize: 50,
+		MaxPageSize:     500,
+		// The space base scope (space_id = $) is applied by the handler
+		// via BuildListQuery.Base.
 	}
 }

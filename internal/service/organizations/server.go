@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
@@ -138,25 +139,78 @@ func (s *OrganizationsServer) resolveOrgActors(ctx context.Context, orgs []db.Or
 }
 
 // ListOrganizations is the post-signin "which orgs am I in?" query.
-// Always caller-scoped: returns only orgs the authenticated user has
-// a membership row for. Memberless callers (and freshly-registered
-// users whose identity row hasn't been synced yet)
-// get an empty list, which the native client uses to detect the
-// zero-membership state and route to the org-creation screen.
+// Always caller-scoped: returns only orgs the authenticated user has a
+// membership row for (direct user binding OR via a group). Memberless
+// callers (and freshly-registered users whose identity row hasn't been
+// synced yet) get an empty list, which the native client uses to detect
+// the zero-membership state and route to the org-creation screen.
 //
-// `page_size`, `page_token`, `filter`, `order_by`, `show_deleted`
-// from the request are intentionally ignored — typical users are in
-// 1-3 orgs and we always return them all (capped at 1000 in the
-// underlying query as a defensive backstop). If a real user ever hits
-// that ceiling, something else is wrong.
+// The membership scope is the NON-NEGOTIABLE base predicate, ANDed as
+// the base of the keyset query; the request's filter/order_by layer ON
+// TOP of it and can only narrow, never widen. `show_deleted` toggles the
+// engine's soft-delete predicate (default false hides DELETE_REQUESTED
+// tombstones; true reveals them for the undelete grace-window UX). Every
+// value — the caller identity, filter operands, cursor values, page size
+// — is bound as a $N parameter by filter.BuildListQuery; only whitelisted
+// column names and the ASC/DESC direction are assembled into the SQL.
 func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.ListOrganizationsRequest) (*apiv1.ListOrganizationsResponse, error) {
-	_ = req // request fields intentionally unused; see method comment
 	identityID := server.MustUserID(ctx)
+	rf := s.filter
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
 
-	rows, err := s.queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(identityID))
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	// Base scope: the caller's membership set. A user belongs to an org
+	// through a direct org_members.user_id binding OR through a group they
+	// belong to (org_members.group_id ∈ the user's groups). The identity is
+	// bound ONCE ($N) and reused via the `me` derived value, so the whole
+	// membership test is a single Predicate (one %s / one Arg). This is the
+	// same set ListOrganizationsForIdentity computes (the membership
+	// interceptor's gate), reproduced here as a keyset base predicate.
+	base := []filter.Predicate{{
+		SQL: "id IN (" +
+			"SELECT om.org_id FROM org_members om " +
+			"CROSS JOIN (SELECT %s::uuid AS uid) me " +
+			"WHERE om.user_id = me.uid " +
+			"OR om.group_id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = me.uid))",
+		Arg: identityID,
+	}}
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource:    rf,
+		Base:        base,
+		Filter:      req.GetFilter(),
+		Order:       plan,
+		PageSize:    pageSize,
+		Cursor:      cursor,
+		ShowDeleted: req.GetShowDeleted(),
+	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter).
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "list organizations failed", "identity_id", identityID, "error", err)
 		return nil, apierr.Internal(err, "list organizations")
+	}
+	rows, err := filter.ScanOrganizations(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list organizations")
+	}
+
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.Organization) (string, error) {
+		return filter.EncodeCursor(s.codec, plan, orgSortValue(plan, last), last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	actors, err := s.resolveOrgActors(ctx, rows)
@@ -167,7 +221,28 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 	for _, o := range rows {
 		orgs = append(orgs, convert.OrganizationToProto(o, actors))
 	}
-	return &apiv1.ListOrganizationsResponse{Organizations: orgs}, nil
+	return &apiv1.ListOrganizationsResponse{
+		Organizations: orgs,
+		NextPageToken: nextPageToken,
+	}, nil
+}
+
+// orgSortValue renders the active order_by column's value for the given
+// row as the string the compound page token carries. Timestamps use
+// RFC3339Nano so filter.DecodeCursor can parse them back to an exact
+// time.Time. For the default id ordering (plan.Field == "") the value is
+// unused (EncodeCursor emits the id-only token), so "" is returned.
+func orgSortValue(plan filter.OrderByPlan, o db.Organization) string {
+	switch plan.Field {
+	case "displayName":
+		return o.DisplayName
+	case "name":
+		return o.Name
+	case "createTime":
+		return o.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*longrunningpb.Operation, error) {

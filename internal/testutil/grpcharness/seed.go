@@ -146,6 +146,20 @@ func (h *Harness) LookupOrgID(t *testing.T, slug string) uuid.UUID {
 	return org.ID
 }
 
+// LookupSpaceID resolves a (org id, space slug) pair to the space's
+// uuid. Convenience for tests that create a space via CreateSpace
+// (which returns the proto Space without exposing the uuid) and then
+// need the uuid for SeedSpaceMembership.
+func (h *Harness) LookupSpaceID(t *testing.T, orgID uuid.UUID, slug string) uuid.UUID {
+	t.Helper()
+	sp, err := h.Queries.GetSpaceByName(context.Background(), db.GetSpaceByNameParams{
+		OrgID: orgID,
+		Name:  slug,
+	})
+	require.NoError(t, err)
+	return sp.ID
+}
+
 // LookupOrgUserID returns the identity_id directly —
 // post-Phase-7 unification the per-org user uuid IS the
 // identity_id, and there's no per-org users row to look
