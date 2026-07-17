@@ -96,6 +96,39 @@ Rules:
   boundaries. See "The compound-cursor keyset" below for the mechanism and the
   nullable-column escape hatch.
 
+### The engine's per-resource defaults (`DefaultOrder` / `DefaultPageSize` / `DefaultConditions`)
+
+The `ResourceFilter` carries three optional "defaults" knobs, all consumed by
+the compound-cursor path and **all inert when unset** — a resource that declares
+none behaves exactly as it did before the knobs existed (id-ASC order, 100/1000
+page-size policy, no extra predicate). They are server-controlled declarations,
+never request input.
+
+- **`DefaultOrder string`** — the AIP-132 order applied when the client sends no
+  `order_by`. `PlanOrderBy` parses it exactly like a client order_by, with one
+  addition: the token `"id"` (or an empty/unset value) means the compact id-only
+  keyset (`Field == ""`) with the declared direction — so `DefaultOrder: "id
+  desc"` gives a newest-first list whose token is still the 16-byte id cursor
+  (`ORDER BY id DESC`, resume `id < $cursor`). Any other token must be a
+  registered `Sortable` field, in which case the default uses the compound
+  `(col, id)` cursor. Unset → historical id-ASC default. **Note:** this is
+  distinct from the legacy `OrderBy` field, which is raw-SQL and consumed ONLY by
+  the `filter.Query` path — a compound-path resource sets `DefaultOrder`, not
+  `OrderBy`. (aichat is the first DESC default: `DefaultOrder: "id desc"` keeps
+  the four AiChat lists newest-first.)
+- **`DefaultPageSize int32` / `MaxPageSize int32`** — applied by
+  `filter.ClampPageSize(rf, req.GetPageSize())`, the single shared helper that
+  replaced the per-handler `clampPageSize` copies. A `page_size <= 0` becomes
+  `DefaultPageSize` (unset → 100); anything above `MaxPageSize` (unset → 1000) is
+  capped. Call `filter.ClampPageSize(rf, req.GetPageSize())` in the handler
+  instead of hand-rolling the clamp.
+- **`DefaultConditions []Predicate`** — server-declared predicates ALWAYS ANDed
+  into the query, even with no client filter (e.g. hide archived rows by
+  default). They reuse the exact `Predicate` machinery as `ListQuery.Base` — each
+  must carry exactly one `%s` / one bound `Arg` — and `BuildListQuery` numbers
+  them alongside the base scope, so `$N` alignment holds with base + filter +
+  cursor all present. Nil → none.
+
 ## 2. Add a `Scan` helper (`internal/filter/scan.go`)
 
 `BuildListQuery` emits `SELECT *`, so you need a `ScanXxx(rows pgx.Rows)

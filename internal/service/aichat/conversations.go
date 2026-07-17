@@ -58,35 +58,56 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 		return nil, err
 	}
 
-	rows, err := filter.Query(ctx, s.pool, s.conversationFilter, filter.QueryParams{
+	pageSize := filter.ClampPageSize(s.conversationFilter, req.GetPageSize())
+
+	// Resolve order_by against the sortable whitelist. With no client order_by
+	// the resource's DefaultOrder ("id desc") applies — newest-first. The plan
+	// also tells the cursor codec whether the sort value is a timestamp.
+	plan, err := filter.PlanOrderBy(s.conversationFilter, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	// Base scope: conversations are private to their creator within the org.
+	// Both predicates are NON-NEGOTIABLE — the request's filter/order_by layer
+	// ON TOP and can only narrow, never widen. Every value (org id, user id,
+	// filter operands, cursor values, page size) is bound as a $N parameter by
+	// BuildListQuery — nothing is string-interpolated.
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: s.conversationFilter,
+		Base: []filter.Predicate{
+			{SQL: "org_id = %s", Arg: orgID},
+			{SQL: "created_by = %s", Arg: pathUser},
+		},
 		Filter:   req.GetFilter(),
-		ParentID: orgID.String(),
-		UserID:   pathUser.String(),
-		OrderBy:  req.GetOrderBy(),
-		PageSize: req.GetPageSize(),
-		Cursor:   req.GetPageToken(),
-		Codec:    s.codec,
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
 	if err != nil {
+		// The only error source is the filter transpiler (bad user filter).
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
-	results, err := filter.ScanConversations(rows)
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list conversations")
+	}
+	results, err := filter.ScanConversations(pgxRows)
 	if err != nil {
 		slog.ErrorContext(ctx, "scan conversations failed", "error", err)
 		return nil, apierr.Internal(err, "scan conversations")
 	}
 
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 50
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
-
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row via the compound cursor —
+	// encoding (sortValue, id) so the resume predicate matches the ORDER BY.
 	results, nextPageToken, err := filter.Paginate(results, int(pageSize), func(last db.AiConversation) (string, error) {
-		return filter.EncodeNextPageToken(s.codec, last.ID)
+		return filter.EncodeCursor(s.codec, plan, conversationSortValue(plan, last), last.ID)
 	})
 	if err != nil {
 		return nil, apierr.Internal(err, "encode page token")
@@ -105,6 +126,22 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 		Conversations: convs,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+// conversationSortValue renders the active order_by column's value for the given
+// row as the string the compound page token carries. Timestamps use
+// RFC3339Nano so filter.DecodeCursor can parse them back to an exact time.Time.
+// For the id-only ordering (plan.Field == "", incl. the "id desc" default) the
+// value is unused (EncodeCursor emits the id-only token), so "" is returned.
+func conversationSortValue(plan filter.OrderByPlan, r db.AiConversation) string {
+	switch plan.Field {
+	case "title":
+		return r.Title
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *Server) CreateConversation(ctx context.Context, req *aiv1.CreateConversationRequest) (*aiv1.Conversation, error) {

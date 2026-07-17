@@ -26,10 +26,14 @@ type OrderByPlan struct {
 // PlanOrderBy resolves an AIP-132 order_by string against a resource's Sortable
 // whitelist for the keyset path. Rules:
 //
-//   - "" → default id ordering (zero OrderByPlan).
-//   - exactly one field, optionally followed by "asc"/"desc".
-//   - the field MUST be in rf.Sortable; the resulting Column comes only from
-//     that whitelist entry, never from the request.
+//   - "" (no client order_by) → the resource's declared default order,
+//     parsed from rf.DefaultOrder (e.g. "id desc" → newest-first id-only
+//     keyset; an unset rf.DefaultOrder keeps the historical id-ASC default,
+//     i.e. the zero OrderByPlan). See planDefaultOrder.
+//   - a non-empty client order_by: exactly one field, optionally followed by
+//     "asc"/"desc". The field MUST be in rf.Sortable; the resulting Column
+//     comes only from that whitelist entry, never from the request. "id" is
+//     NOT a client-selectable field — it is the implicit tiebreaker.
 //   - more than one comma-separated field → error (see OrderByPlan doc).
 //
 // Column/direction are structural, not values: the column is a fixed
@@ -38,31 +42,15 @@ type OrderByPlan struct {
 func PlanOrderBy(rf *ResourceFilter, orderBy string) (OrderByPlan, error) {
 	orderBy = strings.TrimSpace(orderBy)
 	if orderBy == "" {
-		return OrderByPlan{}, nil
-	}
-	if strings.Contains(orderBy, ",") {
-		return OrderByPlan{}, fmt.Errorf("keyset order_by supports a single field, got %q", orderBy)
+		return planDefaultOrder(rf)
 	}
 
-	fields := strings.Fields(orderBy)
-	if len(fields) == 0 {
-		return OrderByPlan{}, nil
+	field, descending, err := parseOrderTerm(orderBy)
+	if err != nil {
+		return OrderByPlan{}, err
 	}
-	if len(fields) > 2 {
-		return OrderByPlan{}, fmt.Errorf("invalid order_by term %q", orderBy)
-	}
-
-	field := fields[0]
-	descending := false
-	if len(fields) == 2 {
-		switch strings.ToLower(fields[1]) {
-		case "asc":
-			descending = false
-		case "desc":
-			descending = true
-		default:
-			return OrderByPlan{}, fmt.Errorf("invalid order direction %q for field %q; must be \"asc\" or \"desc\"", fields[1], field)
-		}
+	if field == "" {
+		return planDefaultOrder(rf)
 	}
 
 	sf, ok := rf.Sortable[field]
@@ -70,6 +58,72 @@ func PlanOrderBy(rf *ResourceFilter, orderBy string) (OrderByPlan, error) {
 		return OrderByPlan{}, fmt.Errorf("invalid order_by field %q", field)
 	}
 	return OrderByPlan{Field: field, Column: sf.Column, Type: sf.Type, Descending: descending}, nil
+}
+
+// planDefaultOrder derives the keyset plan used when the client sends no
+// order_by, from the resource's declared default order (rf.DefaultOrder). This
+// is one of the engine's three per-resource default knobs (alongside
+// DefaultPageSize and DefaultConditions); it is what lets a resource default to
+// newest-first without every client having to pass order_by.
+//
+// The first token is the default sort field; "id" (or an empty/unset
+// DefaultOrder) means the simple id-only keyset — Field stays "" so
+// EncodeCursor/DecodeCursor emit the compact 16-byte id token — but the
+// declared direction still flows through to the ORDER BY clause and the keyset
+// comparison operator (DESC → "<", ORDER BY id DESC). Any other field must be
+// registered Sortable, in which case the default uses the compound (col, id)
+// cursor exactly as a client-supplied order_by would. rf.DefaultOrder is a
+// server-controlled declaration, never request input, so a bad value is a
+// startup-time programmer error surfaced as an error here rather than silently
+// ignored.
+func planDefaultOrder(rf *ResourceFilter) (OrderByPlan, error) {
+	if rf == nil || strings.TrimSpace(rf.DefaultOrder) == "" {
+		return OrderByPlan{}, nil
+	}
+	field, descending, err := parseOrderTerm(rf.DefaultOrder)
+	if err != nil {
+		return OrderByPlan{}, fmt.Errorf("resource %q has invalid DefaultOrder %q: %w", rf.Table, rf.DefaultOrder, err)
+	}
+	if field == "" || field == "id" {
+		// id-only keyset, declared direction preserved.
+		return OrderByPlan{Descending: descending}, nil
+	}
+	sf, ok := rf.Sortable[field]
+	if !ok {
+		return OrderByPlan{}, fmt.Errorf("resource %q DefaultOrder field %q is not registered Sortable", rf.Table, field)
+	}
+	return OrderByPlan{Field: field, Column: sf.Column, Type: sf.Type, Descending: descending}, nil
+}
+
+// parseOrderTerm splits a single AIP-132 order_by term into its field and
+// direction. It accepts "", "<field>", or "<field> asc|desc"; a comma (multiple
+// fields), more than two tokens, or an unrecognized direction is an error. It
+// resolves neither the column nor the whitelist — callers do, because the
+// client path and the default path differ on whether "id" is acceptable.
+func parseOrderTerm(orderBy string) (field string, descending bool, err error) {
+	orderBy = strings.TrimSpace(orderBy)
+	if strings.Contains(orderBy, ",") {
+		return "", false, fmt.Errorf("keyset order_by supports a single field, got %q", orderBy)
+	}
+	fields := strings.Fields(orderBy)
+	if len(fields) == 0 {
+		return "", false, nil
+	}
+	if len(fields) > 2 {
+		return "", false, fmt.Errorf("invalid order_by term %q", orderBy)
+	}
+	field = fields[0]
+	if len(fields) == 2 {
+		switch strings.ToLower(fields[1]) {
+		case "asc":
+			descending = false
+		case "desc":
+			descending = true
+		default:
+			return "", false, fmt.Errorf("invalid order direction %q for field %q; must be \"asc\" or \"desc\"", fields[1], field)
+		}
+	}
+	return field, descending, nil
 }
 
 // KeysetCursor is a decoded page cursor: the primary sort column's value (nil
@@ -148,6 +202,17 @@ func BuildListQuery(q ListQuery) (string, []any, error) {
 		conditions = append(conditions, fmt.Sprintf(p.SQL, fmt.Sprintf("$%d", len(args))))
 	}
 
+	// Resource-level default conditions — server-declared predicates ALWAYS
+	// applied, even when the client sends no filter (e.g. a resource that hides
+	// archived rows by default). They compose with the base scope + soft-delete +
+	// client filter as ANDed conditions; like the base scope, each carries
+	// exactly one %s / one bound Arg, so numbering stays aligned. Inert (nil) for
+	// a resource that declares none.
+	for _, p := range q.Resource.DefaultConditions {
+		args = append(args, p.Arg)
+		conditions = append(conditions, fmt.Sprintf(p.SQL, fmt.Sprintf("$%d", len(args))))
+	}
+
 	// AIP-160 filter, transpiled to a parameterized WHERE fragment. startIdx is
 	// the next free placeholder index.
 	if strings.TrimSpace(q.Filter) != "" {
@@ -184,17 +249,25 @@ func BuildListQuery(q ListQuery) (string, []any, error) {
 	}
 
 	// ORDER BY. The id tiebreaker takes the same direction as the sort column so
-	// the row-value comparison above stays a valid keyset boundary.
+	// the row-value comparison above stays a valid keyset boundary. For the
+	// id-only default the direction still applies (a DESC DefaultOrder yields
+	// "ORDER BY id DESC", paired with the `id < $cursor` keyset op above); ASC
+	// stays the bare "id" it has always been.
 	orderClause := "id"
-	if q.Order.Field != "" {
+	switch {
+	case q.Order.Field != "":
 		dir := "ASC"
 		if q.Order.Descending {
 			dir = "DESC"
 		}
 		orderClause = fmt.Sprintf("%s %s, id %s", q.Order.Column, dir, dir)
+	case q.Order.Descending:
+		orderClause = "id DESC"
 	}
 
-	// Page size + over-fetch.
+	// Page size + over-fetch. The caller is expected to have clamped PageSize via
+	// ClampPageSize (honoring the resource's DefaultPageSize/MaxPageSize); this is
+	// a defensive backstop with the same universal bounds.
 	pageSize := q.PageSize
 	if pageSize <= 0 {
 		pageSize = 100

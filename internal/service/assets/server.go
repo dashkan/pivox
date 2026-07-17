@@ -217,7 +217,7 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 	}
 
 	rf := filter.AssetFilter()
-	pageSize := clampPageSize(req.GetPageSize())
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
 
 	// Resolve order_by against the sortable whitelist (default: id). The plan
 	// also tells the cursor codec the sort value's type (timestamp / int64).
@@ -277,17 +277,6 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 		Assets:        assets,
 		NextPageToken: nextPageToken,
 	}, nil
-}
-
-// clampPageSize applies the server page-size policy: default 100, cap 1000.
-func clampPageSize(n int32) int32 {
-	if n <= 0 {
-		return 100
-	}
-	if n > 1000 {
-		return 1000
-	}
-	return n
 }
 
 // assetSortValue renders the active order_by column's value for the given row as

@@ -2,6 +2,7 @@ package aichat
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -52,33 +53,50 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 		return nil, err
 	}
 
-	rows, err := filter.Query(ctx, s.pool, s.artifactVersionFilter, filter.QueryParams{
+	pageSize := filter.ClampPageSize(s.artifactVersionFilter, req.GetPageSize())
+
+	// Resolve order_by against the sortable whitelist. With no client order_by
+	// the resource's DefaultOrder ("id desc") applies — newest version first. The
+	// plan also tells the cursor codec whether the sort value is a timestamp.
+	plan, err := filter.PlanOrderBy(s.artifactVersionFilter, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	// Base scope: versions under the caller-owned artifact (ownership already
+	// verified via resolveArtifact). Every value is bound as a $N parameter by
+	// BuildListQuery — nothing is string-interpolated.
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: s.artifactVersionFilter,
+		Base:     []filter.Predicate{{SQL: "artifact_id = %s", Arg: art.ID}},
 		Filter:   req.GetFilter(),
-		ParentID: art.ID.String(),
-		OrderBy:  req.GetOrderBy(),
-		PageSize: req.GetPageSize(),
-		Cursor:   req.GetPageToken(),
-		Codec:    s.codec,
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
 	if err != nil {
+		// The only error source is the filter transpiler (bad user filter).
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
-	results, err := filter.ScanArtifactVersions(rows)
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list artifact versions")
+	}
+	results, err := filter.ScanArtifactVersions(pgxRows)
 	if err != nil {
 		return nil, apierr.Internal(err, "database error")
 	}
 
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 50
-	}
-	if pageSize > 100 {
-		pageSize = 100
-	}
-
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row via the compound cursor —
+	// encoding (sortValue, id) so the resume predicate matches the ORDER BY.
 	results, nextPageToken, err := filter.Paginate(results, int(pageSize), func(last db.AiArtifactVersion) (string, error) {
-		return filter.EncodeNextPageToken(s.codec, last.ID)
+		return filter.EncodeCursor(s.codec, plan, artifactVersionSortValue(plan, last), last.ID)
 	})
 	if err != nil {
 		return nil, apierr.Internal(err, "encode page token")
@@ -106,6 +124,20 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 		Versions:      versions,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+// artifactVersionSortValue renders the active order_by column's value for the
+// given row as the string the compound page token carries. Timestamps use
+// RFC3339Nano so filter.DecodeCursor can parse them back to an exact time.Time.
+// For the id-only ordering (plan.Field == "", incl. the "id desc" default) the
+// value is unused, so "" is returned.
+func artifactVersionSortValue(plan filter.OrderByPlan, r db.AiArtifactVersion) string {
+	switch plan.Field {
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 // DeleteArtifactVersion removes a single version. If the deleted

@@ -259,7 +259,7 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 	}
 
 	rf := filter.RequestFilter()
-	pageSize := clampPageSize(req.GetPageSize())
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
 
 	// Resolve order_by against the sortable whitelist (default: id). The plan
 	// also tells the cursor codec whether the sort value is a timestamp.
@@ -320,17 +320,6 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 		Requests:      requests,
 		NextPageToken: nextPageToken,
 	}, nil
-}
-
-// clampPageSize applies the server page-size policy: default 100, cap 1000.
-func clampPageSize(n int32) int32 {
-	if n <= 0 {
-		return 100
-	}
-	if n > 1000 {
-		return 1000
-	}
-	return n
 }
 
 // requestSortValue renders the active order_by column's value for the given row

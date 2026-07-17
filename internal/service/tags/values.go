@@ -129,7 +129,7 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 	}
 
 	rf := s.filter
-	pageSize := clampPageSize(req.GetPageSize())
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
 
 	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {

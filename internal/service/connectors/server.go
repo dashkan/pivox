@@ -158,7 +158,7 @@ func marshalConfig(in *workflowsv1.Connector) (json.RawMessage, error) {
 func (s *ConnectorsServer) ListConnectors(ctx context.Context, req *workflowsv1.ListConnectorsRequest) (*workflowsv1.ListConnectorsResponse, error) {
 	orgID, spaceID, prefix := s.scope(ctx)
 	rf := filter.ConnectorFilter()
-	pageSize := clampPageSize(req.GetPageSize())
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
 
 	// Resolve order_by against the sortable whitelist (default: id). The plan
 	// also tells the cursor codec whether the sort value is a timestamp.
@@ -328,17 +328,6 @@ func (s *ConnectorsServer) resolveSpaceSlugs(ctx context.Context, orgID uuid.UUI
 		slugByID[sr.ID] = sr.Name
 	}
 	return slugByID, nil
-}
-
-// clampPageSize applies the server page-size policy: default 100, cap 1000.
-func clampPageSize(n int32) int32 {
-	if n <= 0 {
-		return 100
-	}
-	if n > 1000 {
-		return 1000
-	}
-	return n
 }
 
 // connectorSortValue renders the primary order_by column's value for the given

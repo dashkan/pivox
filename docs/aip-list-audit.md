@@ -176,10 +176,10 @@ keyset); **broken** = token emitted but never consumed (offset hardcoded
 | ListTagValues | tags/values.go:112 | nested (tagKey) | low value | **DONE** (AIP-160) | **DONE** (AIP-132) | **keyset✓** (compound cursor) |
 | ListTagBindings | tags/bindings.go:87 | resource-parent | n/a | **DONE** (AIP-160) | **DONE** (AIP-132) | **keyset✓** (compound cursor) |
 | ListEffectiveTags | tags/bindings.go:229 | resource-parent | n/a | n/a (no proto field) | n/a | none |
-| ListConversations | aichat/conversations.go:43 | nested (org+user) | maybe (`users/-`, gated) | **yes** | **yes** | keyset✗ :90 |
-| ListMessages | aichat/messages.go:41 | nested (conversation) | low value | **yes** | **yes** | keyset✗ :79 |
-| ListArtifacts | aichat/artifacts.go:44 | nested (conversation) | low value | **yes** | **yes** | keyset✗ :82 |
-| ListArtifactVersions | aichat/artifact_versions.go:44 | nested (artifact) | low value | **yes** | **yes** | keyset✗ :82 |
+| ListConversations | aichat/conversations.go:43 | nested (org+user) | maybe (`users/-`, gated) | **DONE** (AIP-160) | **DONE** (AIP-132) | **keyset✓** (compound cursor, `DefaultOrder: id desc`) |
+| ListMessages | aichat/messages.go:41 | nested (conversation) | low value | **DONE** (AIP-160) | **DONE** (AIP-132) | **keyset✓** (compound cursor, `DefaultOrder: id desc`) |
+| ListArtifacts | aichat/artifacts.go:44 | nested (conversation) | low value | **DONE** (AIP-160) | **DONE** (AIP-132) | **keyset✓** (compound cursor, `DefaultOrder: id desc`) |
+| ListArtifactVersions | aichat/artifact_versions.go:44 | nested (artifact) | low value | **DONE** (AIP-160) | **DONE** (AIP-132) | **keyset✓** (compound cursor, `DefaultOrder: id desc`) |
 | ListRequests | requests/server.go | space | (space→org possible) | **yes** | **yes** | **keyset✓** |
 | ListAssets | assets/server.go | space | (space→org possible) | **yes** | **yes** | **keyset✓** |
 | ListRoles | iam/server.go:168 | org | n/a | no (proto has) | no (proto has) | none (+ N+1) |

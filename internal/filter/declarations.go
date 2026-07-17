@@ -31,11 +31,35 @@ type SortableField struct {
 // independently: a field may be filterable only, sortable only, both, or
 // neither. No implicit coupling.
 type ResourceFilter struct {
-	Filterable      map[string]FilterableField
-	Sortable        map[string]SortableField
-	Table           string   // SQL table name
-	SoftDelete      bool     // if true, adds "delete_time IS NULL"
-	OrderBy         string   // default ORDER BY (e.g. "id ASC")
+	Filterable map[string]FilterableField
+	Sortable   map[string]SortableField
+	Table      string // SQL table name
+	SoftDelete bool   // if true, adds "delete_time IS NULL"
+	OrderBy    string // legacy default ORDER BY as raw SQL (e.g. "id ASC"), consumed ONLY by the filter.Query path; the compound-cursor path uses DefaultOrder instead
+
+	// The engine's three per-resource "defaults" knobs, all consumed by the
+	// compound-cursor path (PlanOrderBy / ClampPageSize / BuildListQuery). Each
+	// is inert when unset, so a resource that declares none behaves exactly as
+	// before the knobs existed.
+
+	// DefaultOrder is the AIP-132 order applied when the client sends no
+	// order_by (e.g. "id desc" for newest-first, or "createTime desc" for a
+	// compound default). Parsed by planDefaultOrder; "id"/empty means the
+	// id-only keyset with the declared direction, any other token must be a
+	// registered Sortable field. Unset → historical id-ASC default.
+	DefaultOrder string
+	// DefaultPageSize is the page size used when the client omits page_size
+	// (<= 0). Unset (0) → 100. Applied by ClampPageSize.
+	DefaultPageSize int32
+	// MaxPageSize caps the client-requested page_size. Unset (0) → 1000.
+	// Applied by ClampPageSize.
+	MaxPageSize int32
+	// DefaultConditions are server-declared predicates ALWAYS ANDed into the
+	// query (even with no client filter), reusing the same Predicate machinery
+	// as ListQuery.Base — each must carry exactly one %s / one bound Arg.
+	// Applied by BuildListQuery. Nil → none.
+	DefaultConditions []Predicate
+
 	CursorColumn    string   // column used for cursor pagination (e.g. "id")
 	CursorDirection string   // "ASC" (default) or "DESC" — must match the direction of CursorColumn in OrderBy
 	DefaultFields   []string // filter fields searched when bare literals have no field qualifier
@@ -183,13 +207,24 @@ func TagBindingFilter() *ResourceFilter {
 	}
 }
 
-// ConversationFilter returns the filter config for AI chat
-// conversations. Access-controlled by (org_id, created_by) —
-// conversations are private to their creator
-// (`identities.id` post-Phase-7). The handler decides
-// whether to filter by the caller's own user-uuid (regular path) or
-// by an arbitrary user-uuid (admin/`*All` path) before calling
-// filter.Query.
+// ConversationFilter returns the filter config for AI chat conversations.
+// Access-controlled by (org_id, created_by) — conversations are private to
+// their creator (`identities.id` post-Phase-7). ListConversations uses the
+// compound-cursor keyset path (filter.BuildListQuery): the base scope
+// (org_id = $ AND created_by = $) is supplied by the handler via
+// ListQuery.Base, so ParentColumn/UserColumn/OrderBy/CursorColumn are inert on
+// that path (no filter.Query consumer remains) — kept only to document the
+// scope columns.
+//
+// DefaultOrder is "id desc" (newest-first): with no client order_by the list
+// defaults to the id-only DESC keyset, restoring the pre-migration UX. Every
+// Sortable column below is NOT NULL in the init migration (title, create_time),
+// which the compound-cursor row comparison requires: a nullable sort column
+// goes UNKNOWN on NULLs and drops/duplicates rows across page boundaries.
+// `last_message_time` IS nullable, so it is registered filterable-only (DEMOTED
+// from the legacy Sortable set) — a client that tries order_by=lastMessageTime
+// now gets InvalidArgument from PlanOrderBy rather than a silently broken
+// keyset. DefaultPageSize is 50 (the pre-migration default).
 func ConversationFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -200,12 +235,17 @@ func ConversationFilter() *ResourceFilter {
 			"lastMessageTime": {Column: "last_message_time", Type: filtering.TypeTimestamp},
 		},
 		Sortable: map[string]SortableField{
-			"title":           {Column: "title"},
-			"createTime":      {Column: "create_time"},
-			"lastMessageTime": {Column: "last_message_time"},
+			"title": {Column: "title", Type: filtering.TypeString},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+			// lastMessageTime is DEMOTED to filterable-only: last_message_time is
+			// nullable, so it cannot be a compound-cursor sort column.
 		},
 		Table:           "ai_conversations",
 		SoftDelete:      false, // AI resources don't soft-delete
+		DefaultOrder:    "id desc",
+		DefaultPageSize: 50,
 		OrderBy:         "id DESC",
 		CursorColumn:    "id",
 		CursorDirection: "DESC",
@@ -215,10 +255,14 @@ func ConversationFilter() *ResourceFilter {
 	}
 }
 
-// MessageFilter returns the filter config for AI chat messages. Scoped to a
-// parent conversation; the handler must verify the authenticated user owns
-// that conversation before calling filter.Query (access control happens at
-// the parent layer, not via UserColumn here).
+// MessageFilter returns the filter config for AI chat messages. ListMessages
+// uses the compound-cursor keyset path (filter.BuildListQuery): the base scope
+// (conversation_id = $) is supplied by the handler via ListQuery.Base after it
+// verifies the authenticated user owns that conversation (access control
+// happens at the parent layer, not via UserColumn here), so
+// ParentColumn/OrderBy/CursorColumn are inert on that path. DefaultOrder is
+// "id desc" (newest-first). The lone Sortable column (create_time) is NOT NULL
+// in the init migration, as the compound-cursor row comparison requires.
 func MessageFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -226,9 +270,12 @@ func MessageFilter() *ResourceFilter {
 			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Sortable: map[string]SortableField{
-			"createTime": {Column: "create_time"},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Table:           "ai_messages",
+		DefaultOrder:    "id desc",
 		OrderBy:         "id DESC",
 		CursorColumn:    "id",
 		CursorDirection: "DESC",
@@ -236,7 +283,12 @@ func MessageFilter() *ResourceFilter {
 	}
 }
 
-// ArtifactFilter returns the filter config for AI chat artifacts.
+// ArtifactFilter returns the filter config for AI chat artifacts. ListArtifacts
+// uses the compound-cursor keyset path (filter.BuildListQuery): the base scope
+// (conversation_id = $) is supplied by the handler via ListQuery.Base, so
+// ParentColumn/OrderBy/CursorColumn are inert on that path. DefaultOrder is
+// "id desc" (newest-first). Both Sortable columns (title, create_time) are NOT
+// NULL in the init migration, as the compound-cursor row comparison requires.
 func ArtifactFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -245,10 +297,13 @@ func ArtifactFilter() *ResourceFilter {
 			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Sortable: map[string]SortableField{
-			"title":      {Column: "title"},
-			"createTime": {Column: "create_time"},
+			"title": {Column: "title", Type: filtering.TypeString},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Table:           "ai_artifacts",
+		DefaultOrder:    "id desc",
 		OrderBy:         "id DESC",
 		CursorColumn:    "id",
 		CursorDirection: "DESC",
@@ -258,17 +313,27 @@ func ArtifactFilter() *ResourceFilter {
 }
 
 // ArtifactVersionFilter returns the filter config for AI chat artifact versions.
-// Sorted newest version first (id DESC, which matches sequence DESC under
-// uuidv7).
+// ListArtifactVersions uses the compound-cursor keyset path
+// (filter.BuildListQuery): the base scope (artifact_id = $) is supplied by the
+// handler via ListQuery.Base, so ParentColumn/OrderBy/CursorColumn are inert on
+// that path. DefaultOrder is "id desc" (newest version first, matching sequence
+// DESC under uuidv7). The lone Sortable column (create_time) is NOT NULL in the
+// init migration, as the compound-cursor row comparison requires. DefaultPageSize
+// is 50 and MaxPageSize 100 (the pre-migration page-size policy for versions).
 func ArtifactVersionFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
 			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Sortable: map[string]SortableField{
-			"createTime": {Column: "create_time"},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Table:           "ai_artifact_versions",
+		DefaultOrder:    "id desc",
+		DefaultPageSize: 50,
+		MaxPageSize:     100,
 		OrderBy:         "id DESC",
 		CursorColumn:    "id",
 		CursorDirection: "DESC",

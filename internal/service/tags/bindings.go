@@ -96,7 +96,7 @@ func (s *TagBindingsServer) resolveTagBindingActors(ctx context.Context, rows []
 // boundaries. See docs/aip-list-transpiler-procedure.md.
 func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.ListTagBindingsRequest) (*apiv1.ListTagBindingsResponse, error) {
 	rf := s.filter
-	pageSize := clampPageSize(req.GetPageSize())
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
 
 	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
 	if err != nil {

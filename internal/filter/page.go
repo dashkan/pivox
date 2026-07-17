@@ -1,5 +1,39 @@
 package filter
 
+// defaultPageSize / defaultMaxPageSize are the universal fallbacks applied by
+// ClampPageSize when a resource declares neither DefaultPageSize nor
+// MaxPageSize — preserving the 100/1000 policy every keyset handler hard-coded
+// before the per-resource knobs existed.
+const (
+	defaultPageSize    int32 = 100
+	defaultMaxPageSize int32 = 1000
+)
+
+// ClampPageSize applies the server page-size policy for a keyset list: a request
+// page_size of <= 0 becomes the resource's DefaultPageSize (falling back to 100
+// when unset), and any value above the resource's MaxPageSize (falling back to
+// 1000 when unset) is capped. It replaces the per-handler clampPageSize copies
+// that each hard-coded 100/1000, routing the policy through the resource's
+// declared knobs instead.
+func ClampPageSize(rf *ResourceFilter, n int32) int32 {
+	defaultSize := defaultPageSize
+	if rf != nil && rf.DefaultPageSize > 0 {
+		defaultSize = rf.DefaultPageSize
+	}
+	maxSize := defaultMaxPageSize
+	if rf != nil && rf.MaxPageSize > 0 {
+		maxSize = rf.MaxPageSize
+	}
+	switch {
+	case n <= 0:
+		return defaultSize
+	case n > maxSize:
+		return maxSize
+	default:
+		return n
+	}
+}
+
 // Paginate trims an over-fetched keyset result set (queried at LIMIT
 // pageSize+1) to pageSize and derives the next-page token from the LAST
 // RETURNED row.
