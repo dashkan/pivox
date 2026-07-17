@@ -333,13 +333,11 @@ func (s *WorkflowsServer) ListWorkflows(ctx context.Context, req *workflowsv1.Li
 		return nil, apierr.Internal(err, "list workflows")
 	}
 
-	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize].ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
-		rows = rows[:pageSize]
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.Workflow) (string, error) {
+		return filter.EncodeNextPageToken(s.codec, last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	actors := resolveActors(ctx, s.audit, workflowActorIDs(rows))
@@ -737,13 +735,11 @@ func (s *WorkflowVersionsServer) ListWorkflowVersions(ctx context.Context, req *
 		return nil, apierr.Internal(err, "list workflow versions")
 	}
 
-	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		nextPageToken, err = filter.EncodeNextPageToken(s.codec, rows[pageSize].ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
-		rows = rows[:pageSize]
+	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.WorkflowVersion) (string, error) {
+		return filter.EncodeNextPageToken(s.codec, last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	workflowName := prefix + "/workflows/" + wfSlug
