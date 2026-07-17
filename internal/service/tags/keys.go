@@ -3,6 +3,7 @@ package tags
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
@@ -89,39 +90,67 @@ func (s *TagKeysServer) resolveTagKeyActors(ctx context.Context, rows []db.TagKe
 	return actors, nil
 }
 
+// ListTagKeys is a dynamic AIP-160 filtered + AIP-132 sorted + compound-cursor
+// keyset list. The parent org is the NON-NEGOTIABLE base scope (org_id = $),
+// applied as the base of the query; the request's filter/order_by layer ON TOP
+// of it and can only narrow, never widen. Every value (org id, filter operands,
+// cursor values, page size) is bound as a $N parameter by filter.BuildListQuery
+// — nothing is string-interpolated — and column/direction come only from
+// TagKeyFilter's whitelist.
+//
+// This replaced the legacy id-only filter.Query path, which paired an id-only
+// cursor with NON-id sortable columns (shortName/namespacedName/createTime): an
+// order_by=shortName produced `ORDER BY short_name` but resumed on `id > cursor`,
+// so sort and keyset disagreed and rows dropped/duplicated across page
+// boundaries. The compound (sortCol, id) cursor fixes that. See
+// docs/aip-list-transpiler-procedure.md.
 func (s *TagKeysServer) ListTagKeys(ctx context.Context, req *apiv1.ListTagKeysRequest) (*apiv1.ListTagKeysResponse, error) {
 	orgID, err := resource.ResolveOrgParent(ctx, s.queries, req.GetParent())
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := filter.Query(ctx, s.pool, s.filter, filter.QueryParams{
+	rf := s.filter
+	pageSize := clampPageSize(req.GetPageSize())
+
+	// Resolve order_by against the sortable whitelist (default: id). The plan
+	// also tells the cursor codec whether the sort value is a timestamp.
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "org_id = %s", Arg: orgID}},
 		Filter:   req.GetFilter(),
-		ParentID: orgID.String(),
-		OrderBy:  req.GetOrderBy(),
-		PageSize: req.GetPageSize(),
-		Cursor:   req.GetPageToken(),
-		Codec:    s.codec,
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
 	if err != nil {
+		// The only error source is the filter transpiler (bad user filter).
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
-	results, err := filter.ScanTagKeys(rows)
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
-		return nil, apierr.Internal(err, "database error")
+		return nil, apierr.Internal(err, "list tag keys")
+	}
+	results, err := filter.ScanTagKeys(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list tag keys")
 	}
 
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
-
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row via the compound cursor —
+	// encoding (sortValue, id) so the resume predicate matches the ORDER BY.
 	results, nextPageToken, err := filter.Paginate(results, int(pageSize), func(last db.TagKey) (string, error) {
-		return filter.EncodeNextPageToken(s.codec, last.ID)
+		return filter.EncodeCursor(s.codec, plan, tagKeySortValue(plan, last), last.ID)
 	})
 	if err != nil {
 		return nil, apierr.Internal(err, "encode page token")
@@ -140,6 +169,36 @@ func (s *TagKeysServer) ListTagKeys(ctx context.Context, req *apiv1.ListTagKeysR
 		TagKeys:       tagKeys,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+// clampPageSize applies the server page-size policy: default 100, cap 1000.
+// Shared across the TagKeys/TagValues/TagBindings list handlers.
+func clampPageSize(n int32) int32 {
+	if n <= 0 {
+		return 100
+	}
+	if n > 1000 {
+		return 1000
+	}
+	return n
+}
+
+// tagKeySortValue renders the active order_by column's value for the given row
+// as the string the compound page token carries. Timestamps use RFC3339Nano so
+// filter.DecodeCursor can parse them back to an exact time.Time. For the default
+// id ordering (plan.Field == "") the value is unused (EncodeCursor emits the
+// id-only token), so "" is returned.
+func tagKeySortValue(plan filter.OrderByPlan, r db.TagKey) string {
+	switch plan.Field {
+	case "shortName":
+		return r.ShortName
+	case "namespacedName":
+		return r.NamespacedName
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *TagKeysServer) GetTagKey(ctx context.Context, req *apiv1.GetTagKeyRequest) (*apiv1.TagKey, error) {

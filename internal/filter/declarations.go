@@ -100,7 +100,15 @@ func OrganizationFilter() *ResourceFilter {
 	}
 }
 
-// TagKeyFilter returns the filter config for tag keys.
+// TagKeyFilter returns the filter config for tag keys. Consumed by the
+// compound-cursor keyset path (filter.BuildListQuery) in ListTagKeys — the base
+// scope (org_id = $) is supplied by the handler via ListQuery.Base. Every
+// Sortable column is NOT NULL in the init migration (short_name, namespaced_name,
+// create_time), which the compound-cursor row comparison requires (a nullable
+// sort column would go UNKNOWN on NULLs and drop/duplicate rows across page
+// boundaries). No nullable sortables here, so none are demoted. Type MUST be set
+// on every sortable: TypeTimestamp on create_time so DecodeCursor reparses the
+// page-token sort value into a time.Time; TypeString otherwise.
 func TagKeyFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -109,9 +117,9 @@ func TagKeyFilter() *ResourceFilter {
 			"createTime":     {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Sortable: map[string]SortableField{
-			"shortName":      {Column: "short_name"},
-			"namespacedName": {Column: "namespaced_name"},
-			"createTime":     {Column: "create_time"},
+			"shortName":      {Column: "short_name", Type: filtering.TypeString},
+			"namespacedName": {Column: "namespaced_name", Type: filtering.TypeString},
+			"createTime":     {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Table:         "tag_keys",
 		SoftDelete:    false,
@@ -122,7 +130,12 @@ func TagKeyFilter() *ResourceFilter {
 	}
 }
 
-// TagValueFilter returns the filter config for tag values.
+// TagValueFilter returns the filter config for tag values. Consumed by the
+// compound-cursor keyset path (filter.BuildListQuery) in ListTagValues — the base
+// scope (tag_key_id = $) is supplied by the handler via ListQuery.Base. Every
+// Sortable column is NOT NULL in the init migration (short_name, namespaced_name,
+// create_time), so none are demoted. Type MUST be set on every sortable (see
+// TagKeyFilter).
 func TagValueFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -131,9 +144,9 @@ func TagValueFilter() *ResourceFilter {
 			"createTime":     {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Sortable: map[string]SortableField{
-			"shortName":      {Column: "short_name"},
-			"namespacedName": {Column: "namespaced_name"},
-			"createTime":     {Column: "create_time"},
+			"shortName":      {Column: "short_name", Type: filtering.TypeString},
+			"namespacedName": {Column: "namespaced_name", Type: filtering.TypeString},
+			"createTime":     {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Table:         "tag_values",
 		SoftDelete:    false,
@@ -144,14 +157,22 @@ func TagValueFilter() *ResourceFilter {
 	}
 }
 
-// TagBindingFilter returns the filter config for tag bindings.
+// TagBindingFilter returns the filter config for tag bindings. Consumed by the
+// compound-cursor keyset path (filter.BuildListQuery) in ListTagBindings — the
+// base scope (parent_resource = $) is supplied by the handler via ListQuery.Base.
+// parent_resource is NOT NULL in the init migration, so it is a safe sortable.
+// Note that within any single reachable list it is CONSTANT (it is also the base
+// scope predicate), so an order_by=parentResource falls through to the id
+// tiebreaker — which is precisely why the compound (parent_resource, id) cursor
+// matters: the legacy ORDER BY had no tiebreaker and resumed on an id-only token.
+// Type MUST be set on the sortable (TypeString here).
 func TagBindingFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
 			"parentResource": {Column: "parent_resource", Type: filtering.TypeString},
 		},
 		Sortable: map[string]SortableField{
-			"parentResource": {Column: "parent_resource"},
+			"parentResource": {Column: "parent_resource", Type: filtering.TypeString},
 		},
 		Table:         "tag_bindings",
 		SoftDelete:    false,

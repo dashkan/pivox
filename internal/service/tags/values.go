@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
@@ -109,6 +110,14 @@ func parseTagValueName(name string) (uuid.UUID, error) {
 	return uuid.Parse(parts[3])
 }
 
+// ListTagValues is a dynamic AIP-160 filtered + AIP-132 sorted + compound-cursor
+// keyset list. The parent tag key is the NON-NEGOTIABLE base scope
+// (tag_key_id = $); the request's filter/order_by layer ON TOP of it and can
+// only narrow. Every value is bound as a $N parameter by filter.BuildListQuery,
+// and column/direction come only from TagValueFilter's whitelist. This replaced
+// the legacy id-only filter.Query path (id-only cursor + non-id sortable columns
+// → drop/dup across page boundaries under a custom order_by). See
+// docs/aip-list-transpiler-procedure.md.
 func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagValuesRequest) (*apiv1.ListTagValuesResponse, error) {
 	tagKeyID, err := parseTagKeyParent(req.GetParent())
 	if err != nil {
@@ -119,33 +128,41 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 		return nil, apierr.HandleResourceError(err, "TagKey", req.GetParent())
 	}
 
-	rows, err := filter.Query(ctx, s.pool, s.filter, filter.QueryParams{
+	rf := s.filter
+	pageSize := clampPageSize(req.GetPageSize())
+
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "tag_key_id = %s", Arg: tagKeyID}},
 		Filter:   req.GetFilter(),
-		ParentID: tagKeyID.String(),
-		OrderBy:  req.GetOrderBy(),
-		PageSize: req.GetPageSize(),
-		Cursor:   req.GetPageToken(),
-		Codec:    s.codec,
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
 	if err != nil {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
-	results, err := filter.ScanTagValues(rows)
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
-		return nil, apierr.Internal(err, "database error")
+		return nil, apierr.Internal(err, "list tag values")
 	}
-
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
+	results, err := filter.ScanTagValues(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list tag values")
 	}
 
 	results, nextPageToken, err := filter.Paginate(results, int(pageSize), func(last db.TagValue) (string, error) {
-		return filter.EncodeNextPageToken(s.codec, last.ID)
+		return filter.EncodeCursor(s.codec, plan, tagValueSortValue(plan, last), last.ID)
 	})
 	if err != nil {
 		return nil, apierr.Internal(err, "encode page token")
@@ -164,6 +181,23 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 		TagValues:     tagValues,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+// tagValueSortValue renders the active order_by column's value for the given row
+// as the string the compound page token carries (timestamps as RFC3339Nano). For
+// the default id ordering (plan.Field == "") the value is unused, so "" is
+// returned.
+func tagValueSortValue(plan filter.OrderByPlan, r db.TagValue) string {
+	switch plan.Field {
+	case "shortName":
+		return r.ShortName
+	case "namespacedName":
+		return r.NamespacedName
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
 }
 
 func (s *TagValuesServer) GetTagValue(ctx context.Context, req *apiv1.GetTagValueRequest) (*apiv1.TagValue, error) {

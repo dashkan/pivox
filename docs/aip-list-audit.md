@@ -172,9 +172,9 @@ keyset); **broken** = token emitted but never consumed (offset hardcoded
 | ListOrganizations | organizations/server.go:152 | caller | n/a | **ignored** (`_ = req`) | **ignored** | none |
 | ListDomains | organizations/domains.go:188 | org | n/a | n/a (no proto field) | n/a | none (proto has page_size/token, unwired) |
 | ListDashboards | dashboards/dashboards.go:113 | org / space | n/a | rejected (space branch) | rejected (space branch) | offset (space) / none (org) |
-| ListTagKeys | tags/keys.go:92 | org | n/a | **yes** | **yes** | keyset✗ :125 |
-| ListTagValues | tags/values.go:112 | nested (tagKey) | low value | **yes** | **yes** | keyset✗ :149 |
-| ListTagBindings | tags/bindings.go:87 | resource-parent | n/a | **yes** | **yes** | keyset✗ :115 |
+| ListTagKeys | tags/keys.go:92 | org | n/a | **DONE** (AIP-160) | **DONE** (AIP-132) | **keyset✓** (compound cursor) |
+| ListTagValues | tags/values.go:112 | nested (tagKey) | low value | **DONE** (AIP-160) | **DONE** (AIP-132) | **keyset✓** (compound cursor) |
+| ListTagBindings | tags/bindings.go:87 | resource-parent | n/a | **DONE** (AIP-160) | **DONE** (AIP-132) | **keyset✓** (compound cursor) |
 | ListEffectiveTags | tags/bindings.go:229 | resource-parent | n/a | n/a (no proto field) | n/a | none |
 | ListConversations | aichat/conversations.go:43 | nested (org+user) | maybe (`users/-`, gated) | **yes** | **yes** | keyset✗ :90 |
 | ListMessages | aichat/messages.go:41 | nested (conversation) | low value | **yes** | **yes** | keyset✗ :79 |
@@ -200,13 +200,13 @@ keyset); **broken** = token emitted but never consumed (offset hardcoded
 `Unimplemented*Server` returning `codes.Unimplemented`).
 
 Gap counts across the 31 implemented:
-- **Pagination off-by-one (keyset✗):** 11 —
+- **Pagination off-by-one (keyset✗):** 8 —
   ListWorkflows, ListWorkflowVersions, ListSecrets,
-  ListKeys, ListSpaces(api), ListTagKeys, ListTagValues, ListTagBindings,
+  ListKeys, ListSpaces(api),
   ListConversations, ListMessages, ListArtifacts, ListArtifactVersions.
-  (12 handler sites; ListArtifacts + ListArtifactVersions counted
-  separately gives 12.) ListConnectors is DONE — the compound-cursor
-  keyset pilot (see section D).
+  ListConnectors is DONE — the compound-cursor keyset pilot (see section D).
+  ListTagKeys, ListTagValues, ListTagBindings are DONE — migrated to the
+  compound-cursor keyset engine (the tags fan-out).
 - **Pagination broken (token never consumed):** 2 — ListRequests, ListAssets.
 - **Filter present in proto but not wired (or ignored):** 11 —
   ListWorkflows, ListConnectors, ListSecrets, ListStorageGateways,
