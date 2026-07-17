@@ -3,8 +3,9 @@
 import { Button } from '@pivox/primitives/button';
 import { cn } from '@pivox/primitives/utils';
 import { storage, THEME, type Theme } from '@pivox/storage';
-import { useStorageValue } from '@pivox/storage/react';
 import { useEffect } from 'react';
+
+import { useTheme } from './use-theme';
 
 const themes: Array<Theme> = ['light', 'system', 'dark'];
 
@@ -43,7 +44,7 @@ export function ThemeSwitcher({
   // No custom event, no useSyncExternalStore boilerplate. The SSR
   // server snapshot uses `initialTheme` so the first paint matches
   // server-rendered HTML.
-  const theme = useStorageValue(THEME, initialTheme) ?? 'system';
+  const theme = useTheme(initialTheme);
 
   // Apply theme to the document whenever it changes.
   useEffect(() => {

@@ -11,7 +11,9 @@ import {
   type NodeTypes,
   type ProOptions,
 } from '@xyflow/react';
-import { type MouseEvent, useCallback, useMemo, type ReactNode } from 'react';
+import { type CSSProperties, type MouseEvent, useCallback, useMemo, type ReactNode } from 'react';
+
+import { useTheme } from '@/theme-switcher/use-theme';
 
 import { ConfigPanel } from './config-panel';
 import type { WorkflowEdge, WorkflowNode } from './graph-types';
@@ -50,6 +52,36 @@ const MIN_ZOOM = 0.1;
 // grid-aligned positions, so read-only nodes are on-grid regardless.
 const snapGrid: [number, number] = [GRID, GRID];
 
+// Re-skin the React Flow *chrome* (Background dots, Controls, MiniMap, edges,
+// handles) with the app's shadcn design tokens instead of React Flow's stock
+// palette. These NON-`-default` `--xy-*` variables are the ones React Flow's
+// stylesheet reads first (`var(--xy-x, var(--xy-x-default))`) and never sets
+// itself, so assigning them here always wins over the built-in light/dark
+// defaults regardless of stylesheet order. Because every token
+// (`var(--muted-foreground)` …) resolves against the document's `.dark` class,
+// the chrome tracks light/dark automatically; `colorMode` keeps React Flow's
+// own internal switch in agreement. Applied via a wrapper element so the
+// overrides stay scoped to this canvas and never leak to other React Flow
+// instances. The custom nodes/edge/panel are already tokenized (Tailwind
+// `dark:`-aware shadcn classes), so only the chrome needs this.
+const chromeTheme: CSSProperties & Record<`--${string}`, string> = {
+  '--xy-background-pattern-color': 'var(--border)',
+  '--xy-edge-stroke': 'var(--muted-foreground)',
+  '--xy-edge-stroke-selected': 'var(--primary)',
+  '--xy-connectionline-stroke': 'var(--muted-foreground)',
+  '--xy-handle-background-color': 'var(--muted-foreground)',
+  '--xy-handle-border-color': 'var(--background)',
+  '--xy-controls-button-background-color': 'var(--card)',
+  '--xy-controls-button-background-color-hover': 'var(--accent)',
+  '--xy-controls-button-color': 'var(--card-foreground)',
+  '--xy-controls-button-color-hover': 'var(--accent-foreground)',
+  '--xy-controls-button-border-color': 'var(--border)',
+  '--xy-minimap-background-color': 'var(--card)',
+  '--xy-minimap-mask-background-color':
+    'color-mix(in oklab, var(--background) 60%, transparent)',
+  '--xy-minimap-node-background-color': 'var(--muted-foreground)',
+};
+
 export type WorkflowCanvasProps = {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
@@ -71,6 +103,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps): ReactNode {
 
 function CanvasInner({ nodes, edges, onNodeSelect }: WorkflowCanvasProps): ReactNode {
   const { select } = useSelection();
+
+  // Follow the app's theme choice (light/dark/system) — sourced from the
+  // ThemeSwitcher's stored selection, NOT React Flow reading the OS directly,
+  // so an explicit light/dark pick always wins. Both `system` values resolve
+  // via matchMedia and therefore agree.
+  const colorMode = useTheme();
 
   // Open centered on the Start node at 1:1 rather than fitting the whole graph
   // (a big workflow would zoom out too far to read). Falls back to fit-all only
@@ -95,26 +133,29 @@ function CanvasInner({ nodes, edges, onNodeSelect }: WorkflowCanvasProps): React
   }, [select, onNodeSelect]);
 
   return (
-    <Canvas
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      fitView
-      fitViewOptions={fitViewOptions}
-      minZoom={MIN_ZOOM}
-      snapToGrid
-      snapGrid={snapGrid}
-      defaultEdgeOptions={defaultEdgeOptions}
-      proOptions={proOptions}
-      onNodeClick={handleNodeClick}
-      onPaneClick={handlePaneClick}
-    >
-      <Controls showInteractive={false} />
-      <MiniMap pannable zoomable />
-      <ConfigPanel />
-    </Canvas>
+    <div className="size-full" style={chromeTheme}>
+      <Canvas
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        colorMode={colorMode}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        fitView
+        fitViewOptions={fitViewOptions}
+        minZoom={MIN_ZOOM}
+        snapToGrid
+        snapGrid={snapGrid}
+        defaultEdgeOptions={defaultEdgeOptions}
+        proOptions={proOptions}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
+      >
+        <Controls showInteractive={false} />
+        <MiniMap pannable zoomable />
+        <ConfigPanel />
+      </Canvas>
+    </div>
   );
 }
