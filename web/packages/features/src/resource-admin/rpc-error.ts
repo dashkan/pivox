@@ -19,6 +19,20 @@ export function describeRpcError(error: ApiError, fallback: string): string {
 }
 
 /**
+ * Error text for a THROWN failure (a rejected promise), as opposed to the
+ * openapi-fetch `{ error }` result arm. openapi-fetch resolves `{ error }` for
+ * an HTTP error status, but a transport-level failure — network down, DNS,
+ * TLS, or an aborted/cancelled request — REJECTS the promise instead. Those
+ * rejections carry no server `rpcStatus`, only a JS `Error` whose message
+ * ("Failed to fetch", "The user aborted a request") is not user-facing, so we
+ * surface `fallback`. The point is that a caught throw must still produce a
+ * visible, readable message — never a silent failure with a stuck spinner.
+ */
+export function describeCaughtError(_error: unknown, fallback: string): string {
+  return fallback;
+}
+
+/**
  * Delete-path error text. A `FAILED_PRECONDITION` from a resource with
  * references (a secret still bound to a connector) carries a message that
  * already names the referrers — surface it verbatim rather than a generic

@@ -297,6 +297,41 @@ func ScanConnectors(rows pgx.Rows) ([]db.Connector, error) {
 	return results, rows.Err()
 }
 
+// ScanSecrets scans rows into db.Secret structs.
+//
+// The destination order MUST match the `secrets` column order from the init
+// migration exactly — this scans `SELECT *` from BuildListQuery, so adding a
+// column to the table without adding a destination here fails with a pgx
+// column-count mismatch that aborts the RPC.
+func ScanSecrets(rows pgx.Rows) ([]db.Secret, error) {
+	defer rows.Close()
+	var results []db.Secret
+	for rows.Next() {
+		var s db.Secret
+		// Order MUST match `secrets`: id, org_id, space_id, slug, display_name,
+		// value_ciphertext, annotations, etag, created_by, updated_by,
+		// create_time, update_time.
+		if err := rows.Scan(
+			&s.ID,
+			&s.OrgID,
+			&s.SpaceID,
+			&s.Slug,
+			&s.DisplayName,
+			&s.ValueCiphertext,
+			&s.Annotations,
+			&s.Etag,
+			&s.CreatedBy,
+			&s.UpdatedBy,
+			&s.CreateTime,
+			&s.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, s)
+	}
+	return results, rows.Err()
+}
+
 // ScanRequests scans rows into db.AssetRequest structs.
 //
 // The destination order MUST match the `asset_requests` column order from the

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -143,51 +144,169 @@ func marshalAnnotations(m map[string]string) (json.RawMessage, error) {
 	return json.Marshal(m)
 }
 
+// ListSecrets is a dynamic AIP-160 filtered + AIP-132 sorted + compound-cursor
+// keyset list, structurally identical to ListConnectors. The interceptor-
+// resolved (org, space) is the NON-NEGOTIABLE base scope, ANDed as the base of
+// the query; the request's filter/order_by layer ON TOP of it and can only
+// narrow, never widen. Every value (scope ids, filter operands, cursor values,
+// page size) is bound as a $N parameter by filter.BuildListQuery — nothing is
+// string-interpolated — and column/direction come only from SecretFilter's
+// whitelist. The value column is never selected here (SELECT * excludes nothing,
+// but convert.SecretToProto never emits it). See
+// docs/aip-list-transpiler-procedure.md.
 func (s *SecretsServer) ListSecrets(ctx context.Context, req *secretsv1.ListSecretsRequest) (*secretsv1.ListSecretsResponse, error) {
 	orgID, spaceID, prefix := s.scope(ctx)
+	rf := filter.SecretFilter()
+	pageSize := filter.ClampPageSize(rf, req.GetPageSize())
 
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
-
-	var cursor pgtype.UUID
-	if tok := req.GetPageToken(); tok != "" {
-		raw, err := s.codec.Decrypt(tok)
-		if err != nil || len(raw) != 16 {
-			return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
-		}
-		var id uuid.UUID
-		copy(id[:], raw)
-		cursor = convert.PgUUID(id)
+	// Resolve order_by against the sortable whitelist (default: id). The plan
+	// also tells the cursor codec whether the sort value is a timestamp.
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
 	}
 
-	rows, err := s.queries.ListSecretsByParent(ctx, db.ListSecretsByParentParams{
-		OrgID:     orgID,
-		SpaceID:   spaceID,
-		Cursor:    cursor,
-		PageLimit: pageSize + 1,
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	// Base scope: the interceptor-resolved org (always) + a space predicate that
+	// depends on the parent's scope. The AIP filter is layered on top — it can
+	// only narrow within the scope.
+	//
+	//   - Space-scoped parent (spaceID.Valid): narrow to that one space.
+	//   - Org-level parent (!spaceID.Valid): the ROLLUP — org-direct rows
+	//     (space_id NULL) PLUS every space's rows. No space_id predicate, so the
+	//     org scope alone bounds the list. The permission interceptor already
+	//     gated secrets.read at the org scope, which covers the whole org
+	//     (org-direct + all spaces). Mirrors ListConnectors.
+	base := []filter.Predicate{{SQL: "org_id = %s", Arg: orgID}}
+	if spaceID.Valid {
+		base = append(base, filter.Predicate{SQL: "space_id = %s", Arg: spaceID})
+	}
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     base,
+		Filter:   req.GetFilter(),
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
+	if err != nil {
+		// The only error source is the filter transpiler (bad user filter, e.g.
+		// an unknown field) — surface it as InvalidArgument on "filter".
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
+	}
+
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apierr.Internal(err, "list secrets")
+	}
+	rows, err := filter.ScanSecrets(pgxRows)
 	if err != nil {
 		return nil, apierr.Internal(err, "list secrets")
 	}
 
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row (see the connectors comment for
+	// the off-by-one this closes).
 	rows, nextPageToken, err := filter.Paginate(rows, int(pageSize), func(last db.Secret) (string, error) {
-		return filter.EncodeNextPageToken(s.codec, last.ID)
+		return filter.EncodeCursor(s.codec, plan, secretSortValue(plan, last), last.ID)
 	})
 	if err != nil {
 		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	actors := s.resolveActors(ctx, rows)
+	// Per-row name prefix. A space-scoped list shares the single `prefix` (which
+	// already carries /spaces/{space}) across every row. The org-level rollup
+	// names each row by its actual location: an org-direct row (space_id NULL)
+	// keeps the bare org prefix, while a space-scoped row gets its space segment,
+	// with the page's distinct space slugs resolved in one batched lookup (no
+	// N+1). Mirrors ListConnectors.
+	var spaceSlugs map[uuid.UUID]string
+	if !spaceID.Valid {
+		// FAIL CLOSED: naming a space row without its /spaces/{slug} segment would
+		// emit a well-formed org-direct name that mis-routes a later
+		// Get/Update/Delete into the wrong scope, so surface the failure instead.
+		spaceSlugs, err = s.resolveSpaceSlugs(ctx, orgID, rows)
+		if err != nil {
+			return nil, apierr.Internal(err, "resolve space slugs")
+		}
+	}
 	out := make([]*secretsv1.Secret, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, convert.SecretToProto(r, prefix, actors))
+		p := prefix
+		if !spaceID.Valid && r.SpaceID.Valid {
+			slug, ok := spaceSlugs[uuid.UUID(r.SpaceID.Bytes)]
+			if !ok {
+				// Cross-org anomaly (no same-org FK enforces a secret's space
+				// belongs to its org). Unreachable via the API today. OMIT the row
+				// rather than emit a mis-addressable org-direct name.
+				slog.WarnContext(ctx, "secrets: space slug missing for rolled-up secret; omitting from response",
+					"secret_id", r.ID, "space_id", uuid.UUID(r.SpaceID.Bytes))
+				continue
+			}
+			p = prefix + "/spaces/" + slug
+		}
+		out = append(out, convert.SecretToProto(r, p, actors))
 	}
 	return &secretsv1.ListSecretsResponse{Secrets: out, NextPageToken: nextPageToken}, nil
+}
+
+// secretSortValue renders the primary order_by column's value for the given row
+// as the string the compound page token carries. Timestamps use RFC3339Nano so
+// filter.DecodeCursor can parse them back to an exact time.Time. For the default
+// id ordering (plan.Field == "") the value is unused (EncodeCursor emits the
+// id-only token), so "" is returned. Mirrors connectorSortValue.
+func secretSortValue(plan filter.OrderByPlan, r db.Secret) string {
+	switch plan.Field {
+	case "displayName":
+		return r.DisplayName
+	case "createTime":
+		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	default:
+		return ""
+	}
+}
+
+// resolveSpaceSlugs maps the distinct valid space ids across an org-level rollup
+// page to their slug (spaces.name), scoped to orgID so a foreign org's space
+// slug can never be resolved. One batched read (no N+1); a single autocommit
+// statement needs no tx. The query error is PROPAGATED (fail closed): the caller
+// must not render a page of space rows without their space segment, as the
+// resulting org-direct names would mis-route later mutations. Mirrors the
+// connectors helper of the same name.
+func (s *SecretsServer) resolveSpaceSlugs(ctx context.Context, orgID uuid.UUID, rows []db.Secret) (map[uuid.UUID]string, error) {
+	var ids []uuid.UUID
+	seen := make(map[uuid.UUID]struct{})
+	for _, r := range rows {
+		if !r.SpaceID.Valid {
+			continue
+		}
+		id := uuid.UUID(r.SpaceID.Bytes)
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	slugByID := make(map[uuid.UUID]string, len(ids))
+	if len(ids) == 0 {
+		return slugByID, nil
+	}
+	got, err := s.queries.GetSpaceSlugsByIDs(ctx, db.GetSpaceSlugsByIDsParams{
+		Ids:   ids,
+		OrgID: orgID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, sr := range got {
+		slugByID[sr.ID] = sr.Name
+	}
+	return slugByID, nil
 }
 
 func (s *SecretsServer) GetSecret(ctx context.Context, req *secretsv1.GetSecretRequest) (*secretsv1.Secret, error) {

@@ -43,12 +43,7 @@ RETURNING *;
 -- name: DeleteSecret :exec
 DELETE FROM secrets WHERE id = $1;
 
--- name: ListSecretsByParent :many
--- Keyset pagination on id. Fetch page_limit+1 to detect a next page.
--- (AIP-160 filter / order_by are not yet wired — ordered by id.)
-SELECT * FROM secrets
-WHERE org_id = @org_id
-  AND space_id IS NOT DISTINCT FROM sqlc.narg('space_id')
-  AND (sqlc.narg('cursor')::uuid IS NULL OR id > sqlc.narg('cursor'))
-ORDER BY id
-LIMIT @page_limit;
+-- ListSecrets is NOT a sqlc query: it is built dynamically by
+-- filter.BuildListQuery (AIP-160 filter + AIP-132 order_by + compound-cursor
+-- keyset), scanned by filter.ScanSecrets, exactly like ListConnectors. See
+-- internal/service/secrets/server.go.

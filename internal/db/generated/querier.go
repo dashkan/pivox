@@ -708,9 +708,6 @@ type Querier interface {
 	// full set in one call without paging.
 	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
-	// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
-	// (AIP-160 filter / order_by are not yet wired — ordered by id.)
-	ListSecretsByParent(ctx context.Context, arg ListSecretsByParentParams) ([]Secret, error)
 	// ListSoleOwnerOrgsForIdentity returns active orgs where the given
 	// identity is the ONLY owner. Used by DeleteAccount's VALIDATING
 	// phase to refuse deletion when the caller would leave any org
@@ -743,12 +740,14 @@ type Querier interface {
 	// The MCP surface is a deliberately narrow, agent-facing read, so it rides a
 	// hand-written query instead of the dynamic internal/filter engine. Scoped to
 	// one org, excludes soft-deleted rows, applies an optional case-insensitive
-	// prefix match on display_name (the handler pre-builds the escaped ILIKE
-	// pattern with a trailing '%'; NULL = no filter), and keyset-paginates on id
-	// (strict id > cursor; NULL cursor = first page). The handler passes
-	// page_limit = page_size + 1 so an extra row signals a further page. Served by
-	// idx_spaces_org (org_id WHERE delete_time IS NULL), the same access path the
-	// filter engine used.
+	// LITERAL prefix match on display_name (the handler pre-builds the pattern:
+	// LIKE metacharacters escaped, a trailing '%' anchor appended; NULL = no
+	// filter), and keyset-paginates on id (strict id > cursor; NULL cursor = first
+	// page). The ILIKE uses an explicit ESCAPE '\' so the handler's backslash
+	// escapes of '%'/'_'/'\' are honored and the caller's input matches literally.
+	// The handler passes page_limit = page_size + 1 so an extra row signals a
+	// further page. Served by idx_spaces_org (org_id WHERE delete_time IS NULL),
+	// the same access path the filter engine used.
 	ListSpacesForMCP(ctx context.Context, arg ListSpacesForMCPParams) ([]Space, error)
 	// ListSpacesPastPurgeTime returns soft-deleted spaces whose
 	// purge_time has elapsed. Used by SpacePurgeWorker to drive the

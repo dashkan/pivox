@@ -27,11 +27,16 @@ import {
   buildConnectorsListRequest,
   fetchAgentOptions,
 } from '@pivox/features/connectors';
+import { buildSecretsListRequest } from '@pivox/features/secrets';
 import { ACTIVE_ORG } from '@pivox/storage';
 import { createServerFn } from '@tanstack/react-start';
 import { getCookie } from '@tanstack/react-start/server';
 
 import { searchToValue, type ConnectorsSearch } from '../lib/connectors-search';
+import {
+  searchToValue as secretsSearchToValue,
+  type SecretsSearch,
+} from '../lib/secrets-search';
 
 import { getSsrAccessToken } from './oidc/ssr-token';
 import { createServerApiClient } from './pivox-server-api';
@@ -40,6 +45,10 @@ import type {
   ConnectorsListQuery,
   ConnectorsListRequest,
 } from '@pivox/features/connectors';
+import type {
+  SecretsListQuery,
+  SecretsListRequest,
+} from '@pivox/features/secrets';
 import type { AgentOption } from '@pivox/ui/resource-admin';
 import type { components } from '@pivox/client/types';
 
@@ -284,6 +293,190 @@ export const prefetchConnectorAgents = createServerFn({
     return null;
   }
 });
+
+/** Slim wire-shape of the secrets list responses (org rollup + space). */
+export type ListSecretsResponse =
+  components['schemas']['v1ListSecretsResponse'];
+
+const SECRETS_PATH = '/v1/organizations/{organization}/secrets' as const;
+const SPACE_SECRETS_PATH =
+  '/v1/organizations/{organization}/spaces/{space}/secrets' as const;
+const SECRET_PATH =
+  '/v1/organizations/{organization}/secrets/{secret}' as const;
+const SPACE_SECRET_PATH =
+  '/v1/organizations/{organization}/spaces/{space}/secrets/{secret}' as const;
+
+/**
+ * Result of prefetchSecrets. Carries the built request so the loader can
+ * reproduce the exact react-query key (via `$api.queryOptions`) the client hook
+ * uses — the secret twin of PrefetchedConnectors. Null whenever SSR can't fetch.
+ */
+export type PrefetchedSecrets = SecretsListRequest & {
+  orgSlug: string;
+  query: SecretsListQuery;
+  secrets: ListSecretsResponse;
+};
+
+/**
+ * prefetchSecrets server-fn: reads the active-org cookie, builds the SAME list
+ * request the client hook builds (via the shared `buildSecretsListRequest`), and
+ * GETs the org-rollup or space-scoped secrets path per the URL scope. Returns
+ * null on any failure — SSR must never throw; the client useQuery retries on
+ * hydration.
+ */
+export const prefetchSecrets = createServerFn({ method: 'GET' })
+  .validator((search: SecretsSearch): SecretsSearch => search)
+  .handler(async ({ data }): Promise<PrefetchedSecrets | null> => {
+    const accessToken = await getSsrAccessToken();
+    if (!accessToken) return null;
+
+    const activeOrg = getCookie(ACTIVE_ORG.name);
+    if (!activeOrg) return null;
+
+    try {
+      const orgSlug = organizationId(activeOrg);
+      if (!orgSlug) return null;
+
+      const req = buildSecretsListRequest(orgSlug, secretsSearchToValue(data));
+      const client = createServerApiClient(accessToken);
+
+      if (req.isSpaceScoped) {
+        const { data: body, response } = await client.GET(SPACE_SECRETS_PATH, {
+          params: { path: req.pathParams, query: req.query },
+        });
+        if (!body) {
+          console.warn('[ssr-prefetch] secrets: space non-2xx or empty', {
+            status: response.status,
+            orgSlug,
+          });
+          return null;
+        }
+        return {
+          orgSlug,
+          isSpaceScoped: true,
+          pathParams: req.pathParams,
+          query: req.query,
+          secrets: body,
+        };
+      }
+
+      const { data: body, response } = await client.GET(SECRETS_PATH, {
+        params: { path: { organization: orgSlug }, query: req.query },
+      });
+      if (!body) {
+        console.warn('[ssr-prefetch] secrets: org non-2xx or empty', {
+          status: response.status,
+          orgSlug,
+        });
+        return null;
+      }
+      return {
+        orgSlug,
+        isSpaceScoped: false,
+        pathParams: req.pathParams,
+        query: req.query,
+        secrets: body,
+      };
+    } catch (err) {
+      console.warn('[ssr-prefetch] secrets: threw', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  });
+
+/** Wire-shape of a single secret, primed for the routed edit page. */
+export type SecretRecord = components['schemas']['v1Secret'];
+
+/** Which secret the edit route wants: its leaf id + optional space slug. */
+export interface PrefetchSecretInput {
+  secretId: string;
+  /** Space slug for a space-scoped secret; absent = org-direct. */
+  space?: string;
+}
+
+/**
+ * Result of prefetchSecret. Carries `orgSlug` + `space` + `secretId` so the edit
+ * loader can reproduce the exact `$api.queryOptions` key the client hook
+ * (`useSecretForm`) reads. Null on any failure — the secret twin of
+ * PrefetchedConnector.
+ */
+export type PrefetchedSecret = {
+  orgSlug: string;
+  space: string | undefined;
+  secretId: string;
+  secret: SecretRecord;
+} | null;
+
+/**
+ * prefetchSecret server-fn: reads the active-org cookie, then GETs the single
+ * secret (org-direct or space-scoped per `space`) as the user, mirroring
+ * prefetchConnector. The value is INPUT_ONLY and never returned, so the primed
+ * record is metadata only. Returns null on any failure.
+ */
+export const prefetchSecret = createServerFn({ method: 'GET' })
+  .validator((input: PrefetchSecretInput): PrefetchSecretInput => input)
+  .handler(async ({ data }): Promise<PrefetchedSecret> => {
+    const accessToken = await getSsrAccessToken();
+    if (!accessToken) return null;
+
+    const activeOrg = getCookie(ACTIVE_ORG.name);
+    if (!activeOrg) return null;
+
+    try {
+      const orgSlug = organizationId(activeOrg);
+      if (!orgSlug) return null;
+
+      const client = createServerApiClient(accessToken);
+
+      if (data.space) {
+        const { data: body, response } = await client.GET(SPACE_SECRET_PATH, {
+          params: {
+            path: {
+              organization: orgSlug,
+              space: data.space,
+              secret: data.secretId,
+            },
+          },
+        });
+        if (!body) {
+          console.warn('[ssr-prefetch] secret: space non-2xx or empty', {
+            status: response.status,
+            orgSlug,
+          });
+          return null;
+        }
+        return {
+          orgSlug,
+          space: data.space,
+          secretId: data.secretId,
+          secret: body,
+        };
+      }
+
+      const { data: body, response } = await client.GET(SECRET_PATH, {
+        params: { path: { organization: orgSlug, secret: data.secretId } },
+      });
+      if (!body) {
+        console.warn('[ssr-prefetch] secret: org non-2xx or empty', {
+          status: response.status,
+          orgSlug,
+        });
+        return null;
+      }
+      return {
+        orgSlug,
+        space: undefined,
+        secretId: data.secretId,
+        secret: body,
+      };
+    } catch (err) {
+      console.warn('[ssr-prefetch] secret: threw', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  });
 
 /**
  * getActiveOrgCookie server-fn: returns the SSR-time value of the

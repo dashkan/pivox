@@ -20,12 +20,25 @@ function appOrigin(): string {
 }
 
 /**
- * Sanitize the `?from=` value to a safe same-app path, falling back to the
- * connectors list. This is the open-redirect defense: an attacker-supplied
- * external / protocol-relative / backslash `from` is rejected and the user lands
- * on the list instead. `FormPage` never runs this — the route does, then injects
- * `cancel` / `onSubmitSuccess` that navigate to the result.
+ * Sanitize the `?from=` value to a safe same-app path, falling back to a given
+ * resource-list route. This is the open-redirect defense shared by every routed
+ * resource form (connectors, secrets, …): an attacker-supplied external /
+ * protocol-relative / backslash `from` is rejected and the user lands on the
+ * resource's list instead. `FormPage` never runs this — the route's nav hook
+ * does, then injects `cancel` / `onSubmitSuccess` that navigate to the result.
+ */
+export function resolveReturnTo(
+  from: string | undefined,
+  fallback: string,
+): string {
+  return safeInternalPath(from, appOrigin()) ?? fallback;
+}
+
+/**
+ * Connectors-specific `resolveReturnTo`, kept as a thin wrapper so existing
+ * connector call sites (and their tests) stay unchanged while the generic
+ * resolver backs both consumers.
  */
 export function resolveConnectorReturn(from: string | undefined): string {
-  return safeInternalPath(from, appOrigin()) ?? CONNECTORS_LIST_ROUTE;
+  return resolveReturnTo(from, CONNECTORS_LIST_ROUTE);
 }

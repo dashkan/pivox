@@ -13,6 +13,7 @@ const base: SecretFormValues = {
   annotations: [],
   value: 's3cr3t',
   rotate: false,
+  scope: '',
 };
 
 describe('buildSecretCreateBody', () => {

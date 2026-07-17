@@ -167,62 +167,6 @@ func (q *Queries) GetSecretByParentForUpdate(ctx context.Context, arg GetSecretB
 	return i, err
 }
 
-const listSecretsByParent = `-- name: ListSecretsByParent :many
-SELECT id, org_id, space_id, slug, display_name, value_ciphertext, annotations, etag, created_by, updated_by, create_time, update_time FROM secrets
-WHERE org_id = $1
-  AND space_id IS NOT DISTINCT FROM $2
-  AND ($3::uuid IS NULL OR id > $3)
-ORDER BY id
-LIMIT $4
-`
-
-type ListSecretsByParentParams struct {
-	OrgID     uuid.UUID   `json:"org_id"`
-	SpaceID   pgtype.UUID `json:"space_id"`
-	Cursor    pgtype.UUID `json:"cursor"`
-	PageLimit int32       `json:"page_limit"`
-}
-
-// Keyset pagination on id. Fetch page_limit+1 to detect a next page.
-// (AIP-160 filter / order_by are not yet wired — ordered by id.)
-func (q *Queries) ListSecretsByParent(ctx context.Context, arg ListSecretsByParentParams) ([]Secret, error) {
-	rows, err := q.db.Query(ctx, listSecretsByParent,
-		arg.OrgID,
-		arg.SpaceID,
-		arg.Cursor,
-		arg.PageLimit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Secret{}
-	for rows.Next() {
-		var i Secret
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.SpaceID,
-			&i.Slug,
-			&i.DisplayName,
-			&i.ValueCiphertext,
-			&i.Annotations,
-			&i.Etag,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateSecret = `-- name: UpdateSecret :one
 UPDATE secrets
 SET display_name = COALESCE($3, display_name),

@@ -421,6 +421,39 @@ func AssetFilter() *ResourceFilter {
 	}
 }
 
+// SecretFilter returns the filter config for vault Secrets.
+//
+// Secrets are an org+space *leveled* resource, exactly like connectors: a row
+// lives directly under an org (space_id NULL) or under a space (space_id set).
+// That two-column partition is supplied by the handler as a BuildListQuery base
+// scope; this declaration supplies only the filterable + sortable surface.
+//
+// Only `displayName` is filterable and only `displayName`/`createTime` are
+// sortable — matching the proto's declared filter/order_by surface. The
+// write-only `value` is never filterable/sortable, and `updateTime` is
+// deliberately NOT sortable (the admin "Updated" column is display-only). Both
+// Sortable columns are NOT NULL in the init migration (display_name TEXT NOT
+// NULL DEFAULT ”, create_time TIMESTAMPTZ NOT NULL), which the compound-cursor
+// row comparison requires. See docs/aip-list-transpiler-procedure.md.
+func SecretFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString, AllowPartial: true},
+			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Sortable: map[string]SortableField{
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Table:         "secrets",
+		SoftDelete:    false, // secrets hard-delete; no delete_time column
+		DefaultFields: []string{"displayName"},
+		// The org+space base scope is applied by the handler via BuildListQuery.Base.
+	}
+}
+
 // ApiKeyFilter returns the filter config for API keys. Consumed by the
 // compound-cursor keyset path (filter.BuildListQuery) in ListKeys — the base
 // scope (org_id = $) is supplied by the handler via ListQuery.Base. Both

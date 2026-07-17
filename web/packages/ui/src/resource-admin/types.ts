@@ -118,6 +118,12 @@ export interface SecretFormValues {
   value: string;
   /** Edit-only: whether to rotate `value`. Ignored on create (always set). */
   rotate: boolean;
+  /**
+   * Target scope: empty creates an org-direct secret; a space slug creates it
+   * under that space. Create-only (a secret can't move scope), mirroring
+   * connectors.
+   */
+  scope: string;
 }
 
 /** Transient dialog state shared by both resource admins. */
@@ -167,18 +173,23 @@ export interface ConnectorsAdminContextValue {
 }
 
 export interface SecretsAdminContextValue {
-  state: {
+  state: ListControlsState & {
     secrets: Secret[];
     isLoading: boolean;
     loadError: string | null;
-    dialog: DialogState<Secret>;
+    /** Spaces to scope by (filter) or create into; empty = org-only. */
+    spaceOptions: SpaceOption[];
+    /** Row-delete confirmation state (the quick list action; the edit page has its own). */
     remove: RemoveState<Secret>;
   };
-  actions: {
+  actions: ListControlsActions & {
+    /**
+     * Create / edit are ROUTED pages, not a dialog. These NAVIGATE (the feature
+     * wires them to the route's navigate, setting `?from=<origin>`); the list
+     * never opens a modal. Mirrors the connectors admin.
+     */
     openCreate: () => void;
     openEdit: (secret: Secret) => void;
-    closeDialog: () => void;
-    submit: (values: SecretFormValues) => void;
     openRemove: (secret: Secret) => void;
     closeRemove: () => void;
     confirmRemove: () => void;

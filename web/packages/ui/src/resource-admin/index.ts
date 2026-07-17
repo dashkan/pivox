@@ -39,6 +39,19 @@ export { KeyValueEditor } from './key-value-editor';
 export { actorLabel, formatTimestamp } from './meta-cells';
 export { RowActions } from './row-actions';
 export { ScopeSelect } from './scope-select';
+export { SecretCreateFields, SecretEditFields } from './secret-fields';
+export {
+  SecretFormContext,
+  useSecretForm,
+} from './secret-form.context';
+export type { SecretFormContextValue } from './secret-form.context';
+export { SecretFormProvider } from './secret-form-provider';
+export {
+  annotationsToEntries,
+  secretLeafId,
+  secretSpaceSlug,
+  seedSecretValues,
+} from './secret-shared';
 export { isValidIdentifier, slugify } from './slug';
 export { SuggestCombobox } from './suggest-combobox';
 export type { Suggestion } from './suggest-combobox';

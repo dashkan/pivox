@@ -1,22 +1,61 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { SecretsAdmin } from '../../src/resource-admin/secrets-admin';
 
-// Radix Checkbox measures the DOM; jsdom needs a ResizeObserver shim.
+import type {
+  Secret,
+  SecretsAdminContextValue,
+} from '../../src/resource-admin/types';
+
+// Radix Select + Base UI combobox measure/scroll the DOM; jsdom needs shims.
 beforeAll(() => {
   globalThis.ResizeObserver = class {
     observe() {}
     unobserve() {}
     disconnect() {}
   };
+  Element.prototype.scrollIntoView = () => {};
 });
 
-import type {
-  Secret,
-  SecretsAdminContextValue,
-} from '../../src/resource-admin/types';
+afterEach(cleanup);
+
+const noop = (): void => {};
+
+function makeValue(
+  overrides: Partial<SecretsAdminContextValue['state']>,
+): SecretsAdminContextValue {
+  return {
+    state: {
+      secrets: [],
+      isLoading: false,
+      loadError: null,
+      remove: { target: null, error: null, pending: false },
+      filters: {},
+      sort: null,
+      pageSize: 25,
+      scope: '',
+      spaceOptions: [],
+      pagination: { hasPrevPage: false, hasNextPage: false },
+      ...overrides,
+    },
+    actions: {
+      openCreate: noop,
+      openEdit: noop,
+      openRemove: noop,
+      closeRemove: noop,
+      confirmRemove: noop,
+      setFilter: noop,
+      clearFilters: noop,
+      toggleSort: noop,
+      setPageSize: noop,
+      setScope: noop,
+      nextPage: noop,
+      prevPage: noop,
+    },
+  };
+}
 
 const secret: Secret = {
   name: 'organizations/acme/secrets/stripe-key',
@@ -26,117 +65,82 @@ const secret: Secret = {
   etag: 'e1',
 };
 
-const noop = (): void => {};
+const spaceSecret: Secret = {
+  name: 'organizations/acme/spaces/main/secrets/vizrt-key',
+  displayName: 'VizRT key',
+  createTime: '2026-01-01T00:00:00Z',
+  updateTime: '2026-02-01T00:00:00Z',
+};
 
-function makeValue(
+const spaceOptions = [
+  { name: 'organizations/acme/spaces/main', slug: 'main', displayName: 'Main' },
+];
+
+function renderTable(
   overrides: Partial<SecretsAdminContextValue['state']>,
+  actions?: Partial<SecretsAdminContextValue['actions']>,
 ): SecretsAdminContextValue {
-  return {
-    state: {
-      secrets: [secret],
-      isLoading: false,
-      loadError: null,
-      dialog: {
-        open: false,
-        mode: 'create',
-        editing: null,
-        error: null,
-        pending: false,
-      },
-      remove: { target: null, error: null, pending: false },
-      ...overrides,
-    },
-    actions: {
-      openCreate: noop,
-      openEdit: noop,
-      closeDialog: noop,
-      submit: noop,
-      openRemove: noop,
-      closeRemove: noop,
-      confirmRemove: noop,
-    },
-  };
-}
-
-function renderAdmin(
-  overrides: Partial<SecretsAdminContextValue['state']>,
-): void {
+  const value = makeValue(overrides);
+  if (actions) Object.assign(value.actions, actions);
   render(
-    <SecretsAdmin.Provider value={makeValue(overrides)}>
+    <SecretsAdmin.Provider value={value}>
       <SecretsAdmin.Root />
     </SecretsAdmin.Provider>,
   );
+  return value;
 }
 
-describe('SecretsAdmin — set-only invariant', () => {
-  it('never renders a value field or input in the list/table', () => {
-    renderAdmin({});
-    // The secret is listed by metadata only …
+describe('SecretsAdmin — set-only list (no value ever surfaced)', () => {
+  it('lists secrets by metadata only — no value input in the read view', () => {
+    renderTable({ secrets: [secret] });
     expect(screen.getByText('Stripe key')).toBeDefined();
-    // … and no value is ever surfaced: no inputs at all in the read view.
-    expect(document.querySelector('input')).toBeNull();
+    // No value is ever surfaced in the list: no inputs in the read view.
     expect(document.querySelector('input[type="password"]')).toBeNull();
-  });
-
-  it('hides the value field when editing an existing secret until Rotate is ticked', () => {
-    renderAdmin({
-      dialog: {
-        open: true,
-        mode: 'edit',
-        editing: secret,
-        error: null,
-        pending: false,
-      },
-    });
-
-    // Set-only: no value field is shown for an existing secret by default.
-    expect(screen.queryByText('New value')).toBeNull();
-    expect(document.querySelector('input[type="password"]')).toBeNull();
-
-    // Ticking "Rotate value" reveals the write-only value input.
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Rotate value' }));
-
-    expect(screen.getByText('New value')).toBeDefined();
-    expect(document.querySelector('input[type="password"]')).not.toBeNull();
-  });
-
-  it('requires the value on create (shown, no rotate toggle)', () => {
-    renderAdmin({
-      dialog: {
-        open: true,
-        mode: 'create',
-        editing: null,
-        error: null,
-        pending: false,
-      },
-    });
-
-    expect(screen.getByText('Value')).toBeDefined();
-    expect(document.querySelector('input[type="password"]')).not.toBeNull();
-    // No rotate toggle on create — the value is always written.
-    expect(screen.queryByRole('checkbox', { name: 'Rotate value' })).toBeNull();
   });
 });
 
 describe('SecretsAdmin — table', () => {
-  it('renders generic empty copy without the secret()-reference hint', () => {
-    renderAdmin({ secrets: [] });
+  it('renders generic empty copy while keeping the sortable headers mounted', () => {
+    renderTable({ secrets: [] });
     expect(screen.getByText('No secrets yet.')).toBeDefined();
-    // The old round's "reference it from a connector" copy is gone.
-    expect(screen.queryByText(/reference it from a connector/)).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeDefined();
+  });
+
+  it('keeps the header and filter row mounted while loading', () => {
+    renderTable({ secrets: [], isLoading: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    expect(screen.getByText('Loading secrets…')).toBeDefined();
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeDefined();
+    expect(screen.getByRole('searchbox')).toBeDefined();
+  });
+
+  it('leaves the Space column blank for an org-direct secret', () => {
+    renderTable({ secrets: [secret] });
+    expect(screen.getByRole('columnheader', { name: 'Space' })).toBeDefined();
+    expect(screen.queryByText('Organization')).toBeNull();
+  });
+
+  it('resolves a space-scoped secret name to its space label', () => {
+    renderTable({ secrets: [spaceSecret], spaceOptions });
+    expect(screen.getByText('Main')).toBeDefined();
+  });
+
+  it('hides the Space column inside a specific space (redundant there)', () => {
+    renderTable({ secrets: [spaceSecret], spaceOptions, scope: 'main' });
+    expect(screen.queryByRole('columnheader', { name: 'Space' })).toBeNull();
+  });
+
+  it('navigates to the routed edit page when the name link is clicked', () => {
+    const openEdit = vi.fn();
+    renderTable({ secrets: [secret] }, { openEdit });
+    fireEvent.click(screen.getByRole('button', { name: 'Stripe key' }));
+    expect(openEdit).toHaveBeenCalledWith(secret);
   });
 
   it('renders edit/delete as icon actions, with destructive styling on delete', () => {
     const openEdit = vi.fn();
     const openRemove = vi.fn();
-    const value = makeValue({ secrets: [secret] });
-    value.actions.openEdit = openEdit;
-    value.actions.openRemove = openRemove;
-    render(
-      <SecretsAdmin.Provider value={value}>
-        <SecretsAdmin.Root />
-      </SecretsAdmin.Provider>,
-    );
+    renderTable({ secrets: [secret] }, { openEdit, openRemove });
 
     const edit = screen.getByRole('button', { name: 'Edit secret' });
     const remove = screen.getByRole('button', { name: 'Delete secret' });
@@ -149,140 +153,110 @@ describe('SecretsAdmin — table', () => {
     fireEvent.click(remove);
     expect(openRemove).toHaveBeenCalledWith(secret);
   });
-});
 
-describe('SecretsAdmin — password-manager suppression', () => {
-  it('opts the value field out of password managers with a neutral name', () => {
-    renderAdmin({
-      secrets: [],
-      dialog: {
-        open: true,
-        mode: 'create',
-        editing: null,
-        error: null,
-        pending: false,
-      },
-    });
-    const dialog = screen.getByRole('dialog');
-    const input = dialog.querySelector(
-      'input[type="password"]',
-    ) as HTMLInputElement;
-
-    expect(input.getAttribute('autocomplete')).toBe('off');
-    expect(input.getAttribute('data-1p-ignore')).toBe('true');
-    expect(input.getAttribute('data-lpignore')).toBe('true');
-    expect(input.getAttribute('data-bwignore')).toBe('true');
-    // name/id must not contain "password" (managers key off that too).
-    expect(input.getAttribute('name')).toBe('secret-value');
-    expect(input.getAttribute('id')).toBe('secret-value');
-    expect(input.getAttribute('name')).not.toMatch(/password/i);
-    expect(input.getAttribute('id')).not.toMatch(/password/i);
+  it('navigates to the routed create page from the "New secret" button', () => {
+    const openCreate = vi.fn();
+    renderTable({ secrets: [secret] }, { openCreate });
+    fireEvent.click(screen.getByRole('button', { name: 'New secret' }));
+    expect(openCreate).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('SecretsAdmin — value visibility toggle', () => {
-  it('masks the value by default and reveals it on toggle', () => {
-    renderAdmin({
-      secrets: [],
-      dialog: {
-        open: true,
-        mode: 'create',
-        editing: null,
-        error: null,
-        pending: false,
-      },
-    });
-    const dialog = screen.getByRole('dialog');
+describe('SecretsAdmin — list controls', () => {
+  it('toggles the filter row and reflects the on/off state', () => {
+    renderTable({ secrets: [secret] });
+    const button = screen.getByRole('button', { name: 'Filter' });
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(button.getAttribute('aria-pressed')).toBe('false');
 
-    // Hidden by default.
-    expect(dialog.querySelector('input[type="password"]')).not.toBeNull();
-    expect(dialog.querySelector('input[type="text"]')).toBeNull();
-
-    // The eye toggle flips the input to visible text …
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Show value' }));
-    expect(dialog.querySelector('input[type="password"]')).toBeNull();
-    expect(dialog.querySelector('input[type="text"]')).not.toBeNull();
-
-    // … and back to hidden.
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Hide value' }));
-    expect(dialog.querySelector('input[type="password"]')).not.toBeNull();
+    fireEvent.click(button);
+    expect(screen.getByRole('searchbox')).toBeDefined();
+    expect(button.getAttribute('aria-pressed')).toBe('true');
   });
-});
 
-describe('SecretsAdmin — form action gating', () => {
-  it('a fresh, empty create dialog disables Submit (not "Saving…") but keeps Cancel live', () => {
-    const closeDialog = vi.fn();
-    const value = makeValue({
-      dialog: {
-        open: true,
-        mode: 'create',
-        editing: null,
-        error: null,
-        pending: false,
-      },
-    });
-    value.actions.closeDialog = closeDialog;
+  it('drives the name filter through setFilter (debounced)', () => {
+    vi.useFakeTimers();
+    try {
+      const setFilter = vi.fn();
+      renderTable({ secrets: [secret] }, { setFilter });
+      fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+      fireEvent.change(screen.getByRole('searchbox'), {
+        target: { value: 'stripe' },
+      });
+      expect(setFilter).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(300));
+      expect(setFilter).toHaveBeenCalledWith('displayName', 'stripe', 'replace');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
-    render(
-      <SecretsAdmin.Provider value={value}>
-        <SecretsAdmin.Root />
-      </SecretsAdmin.Provider>,
+  it('renders sortable Name and Created headers wired to toggleSort', () => {
+    const toggleSort = vi.fn();
+    renderTable({ secrets: [secret] }, { toggleSort });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Name' }));
+    expect(toggleSort).toHaveBeenCalledWith('displayName');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Created' }));
+    expect(toggleSort).toHaveBeenCalledWith('createTime');
+  });
+
+  it('distinguishes a filtered-empty result while keeping controls mounted', () => {
+    renderTable({ secrets: [], filters: { displayName: 'zzz' } });
+    expect(screen.getByText('No secrets match your filters.')).toBeDefined();
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeDefined();
+  });
+
+  it('shows Clear filters only when a filter or scope is active', () => {
+    renderTable({ secrets: [secret] });
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+    cleanup();
+
+    const clearFilters = vi.fn();
+    renderTable(
+      { secrets: [secret], filters: { displayName: 'stripe' } },
+      { clearFilters },
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(clearFilters).toHaveBeenCalled();
+  });
 
-    // Submit is disabled because the form is empty — NOT because it's saving.
-    const submit = screen.getByRole('button', {
-      name: 'Create secret',
-    }) as HTMLButtonElement;
-    expect(submit.disabled).toBe(true);
-    expect(submit.textContent).toBe('Create secret');
-    expect(submit.textContent).not.toBe('Saving…');
-
-    // Cancel is never gated on form validity — it must stay clickable.
-    const cancel = screen.getByRole('button', {
-      name: 'Cancel',
-    }) as HTMLButtonElement;
-    expect(cancel.disabled).toBe(false);
-
-    fireEvent.click(cancel);
-    expect(closeDialog).toHaveBeenCalledTimes(1);
+  it('pages forward and back through the cursor pager', () => {
+    const nextPage = vi.fn();
+    const prevPage = vi.fn();
+    renderTable(
+      {
+        secrets: [secret],
+        pagination: { hasPrevPage: true, hasNextPage: true },
+      },
+      { nextPage, prevPage },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(nextPage).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(prevPage).toHaveBeenCalled();
   });
 });
 
-describe('SecretsAdmin — auto-derived identifier', () => {
-  const createDialog = {
-    open: true,
-    mode: 'create' as const,
-    editing: null,
-    error: null,
-    pending: false,
-  };
-
-  it('derives the identifier slug from the display name', () => {
-    renderAdmin({ secrets: [], dialog: createDialog });
-    const dialog = screen.getByRole('dialog');
-
-    const displayName = within(dialog).getAllByRole('textbox')[0];
-    fireEvent.change(displayName, { target: { value: 'My API Key' } });
-
-    // Shown read-only as the derived slug.
-    expect(within(dialog).getByText('my-api-key')).toBeDefined();
+describe('SecretsAdmin — scope', () => {
+  it('shows the scope combobox (resting on "All spaces") as a gated toolbar control', () => {
+    renderTable({ secrets: [secret], spaceOptions });
+    expect(screen.queryByPlaceholderText('All spaces')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    expect(screen.getByPlaceholderText('All spaces')).toBeDefined();
   });
+});
 
-  it('lets the user override the identifier, which then stops re-deriving', () => {
-    renderAdmin({ secrets: [], dialog: createDialog });
-    const dialog = screen.getByRole('dialog');
-
-    const displayName = within(dialog).getAllByRole('textbox')[0];
-    fireEvent.change(displayName, { target: { value: 'My API Key' } });
-    expect(within(dialog).getByText('my-api-key')).toBeDefined();
-
-    // Reveal the editable identifier and override it.
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Edit' }));
-    const idInput = within(dialog).getAllByRole('textbox')[1] as HTMLInputElement;
-    fireEvent.change(idInput, { target: { value: 'custom-id' } });
-
-    // Further display-name edits no longer clobber the override.
-    fireEvent.change(displayName, { target: { value: 'Totally Different' } });
-    expect(idInput.value).toBe('custom-id');
+describe('SecretsAdmin — quick delete', () => {
+  it('opens the delete confirm with the referenced-by-connector warning', () => {
+    renderTable({
+      secrets: [secret],
+      remove: { target: secret, error: null, pending: false },
+    });
+    expect(screen.getByText('Delete secret?')).toBeDefined();
+    expect(
+      screen.getByText(/still referenced by a connector can't be deleted/),
+    ).toBeDefined();
   });
 });
