@@ -8,6 +8,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestClampPageSizeWith exercises the explicit-policy clamp core: a non-positive
+// request falls back to defaultSize, a value above maxSize is capped to maxSize,
+// and an in-range value (including exactly maxSize) passes through. This is the
+// shared arithmetic ClampPageSize and the MCP agent surface both route through.
+func TestClampPageSizeWith(t *testing.T) {
+	t.Parallel()
+
+	const (
+		defSize = int32(25)
+		maxSize = int32(100)
+	)
+	tests := []struct {
+		name string
+		in   int32
+		want int32
+	}{
+		{"zero falls back to default", 0, defSize},
+		{"negative falls back to default", -10, defSize},
+		{"in-range passes through", 50, 50},
+		{"at ceiling passes through", maxSize, maxSize},
+		{"above ceiling caps to max", 1000, maxSize},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, ClampPageSizeWith(tt.in, defSize, maxSize))
+		})
+	}
+}
+
 // TestPaginate exercises the trim-and-encode contract. The crux case is
 // len(rows) == pageSize (an exact page fill): it MUST NOT emit a token, because
 // there is no further page — emitting one here is precisely the off-by-one the
