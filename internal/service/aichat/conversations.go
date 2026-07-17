@@ -61,8 +61,9 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 	pageSize := filter.ClampPageSize(s.conversationFilter, req.GetPageSize())
 
 	// Resolve order_by against the sortable whitelist. With no client order_by
-	// the resource's DefaultOrder ("id desc") applies — newest-first. The plan
-	// also tells the cursor codec whether the sort value is a timestamp.
+	// the resource's DefaultOrder ("lastMessageTime desc") applies —
+	// recent-activity-first. The plan also tells the cursor codec whether the
+	// sort value is a timestamp.
 	plan, err := filter.PlanOrderBy(s.conversationFilter, req.GetOrderBy())
 	if err != nil {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
@@ -131,14 +132,17 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 // conversationSortValue renders the active order_by column's value for the given
 // row as the string the compound page token carries. Timestamps use
 // RFC3339Nano so filter.DecodeCursor can parse them back to an exact time.Time.
-// For the id-only ordering (plan.Field == "", incl. the "id desc" default) the
-// value is unused (EncodeCursor emits the id-only token), so "" is returned.
+// For the id-only ordering (plan.Field == "") the value is unused (EncodeCursor
+// emits the id-only token), so "" is returned. The default sort is
+// "lastMessageTime desc", so that case must be handled here.
 func conversationSortValue(plan filter.OrderByPlan, r db.AiConversation) string {
 	switch plan.Field {
 	case "title":
 		return r.Title
 	case "createTime":
 		return r.CreateTime.UTC().Format(time.RFC3339Nano)
+	case "lastMessageTime":
+		return r.LastMessageTime.UTC().Format(time.RFC3339Nano)
 	default:
 		return ""
 	}

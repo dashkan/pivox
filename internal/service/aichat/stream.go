@@ -79,15 +79,25 @@ const (
 func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream grpc.ServerStreamingServer[aiv1.ServerEvent]) error {
 	ctx := stream.Context()
 
+	// autoCreated is true only when this call minted the conversation
+	// (empty `conversation`) — it tells runGenerate to skip its
+	// inbound-persist step, since createConversationWithFirstMessage already
+	// persisted the first message atomically with the conversation.
+	autoCreated := false
 	if req.GetConversation() == "" {
-		convName, err := s.ensureConversationForStream(ctx, req.GetParent())
+		convName, err := s.createConversationWithFirstMessage(ctx, req.GetParent(), lastInboundMessage(req))
 		if err != nil {
 			return err
 		}
 		req.Conversation = convName
+		autoCreated = true
 	}
 
-	_, _, _, err := s.runGenerate(ctx, req, func(ev *aiv1.ServerEvent) error {
+	// A generation failure leaves the conversation persisted with the user's
+	// first message and no assistant reply — the same state as a failed turn
+	// on a pre-existing conversation. The user's message stays put; the client
+	// surfaces the error and retries in place. Nothing is discarded.
+	_, _, _, err := s.runGenerate(ctx, req, autoCreated, func(ev *aiv1.ServerEvent) error {
 		return stream.Send(ev)
 	})
 	if err != nil {
@@ -102,21 +112,39 @@ func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream 
 	})
 }
 
-// ensureConversationForStream creates a fresh Conversation row under
-// the caller's user-in-org parent and returns its resource name. The
-// permission interceptor (registered via the proto's
+// createConversationWithFirstMessage mints a fresh Conversation under
+// the caller's user-in-org parent AND persists its first (user) message
+// in the SAME transaction, returning the conversation's resource name.
+// This is the whole point of the lifecycle rework: a conversation is
+// never committed empty — it and its first message land atomically, so a
+// failure anywhere in the tx leaves no row at all (no orphaned empty
+// conversation, which the old two-tx design produced when generation
+// failed between committing the empty conversation and persisting the
+// first message).
+//
+// Once committed, the conversation is durable regardless of what the
+// subsequent generation does. A generation failure leaves it persisted
+// with just the user's first message and no assistant reply — the same
+// state as a failed turn on a pre-existing conversation. The user's
+// message stays put; the client shows the error and retries in place.
+// Nothing reaps it.
+//
+// The permission interceptor (registered via the proto's
 // `pivox.permission.v1.required_permission = "ai.chat.stream"` option;
 // see internal/server/generated_registry.go) has already gated on the
 // parent, so by the time this runs the caller is authorized to create
 // conversations under this user.
 //
-// Org resolution + conversation insert run inside a single transaction
-// per CLAUDE.md's tx rule — both touch `qtx`, and the FK from
-// `ai_conversations.org_id` to `organizations.id` would surface a
-// TOCTOU delete-then-insert as a 23503 mapped to NotFound rather than
-// the typed `apierr.HandleResourceError` for Organization that the
-// closure produces explicitly.
-func (s *Server) ensureConversationForStream(ctx context.Context, parent string) (string, error) {
+// Org resolution + conversation insert + first-message insert run inside
+// a single transaction per CLAUDE.md's tx rule — all touch `qtx`, and the
+// FK from `ai_conversations.org_id` to `organizations.id` would surface a
+// TOCTOU delete-then-insert as a 23503 mapped to NotFound rather than the
+// typed `apierr.HandleResourceError` for Organization the closure produces
+// explicitly. The closure is DB-only; message-part marshaling (the one
+// pure, replay-unsafe-to-repeat-for-effect step) happens outside via
+// buildInputMessageParams so its role/marshal errors surface before the tx
+// opens.
+func (s *Server) createConversationWithFirstMessage(ctx context.Context, parent string, firstMsg *aiv1.InputMessage) (string, error) {
 	orgName, pathUser, err := parseConversationParent(parent)
 	if err != nil {
 		return "", apierr.InvalidArgument(apierr.FieldViolation("parent", err.Error()))
@@ -125,25 +153,58 @@ func (s *Server) ensureConversationForStream(ctx context.Context, parent string)
 	if pathUser != callerUserID {
 		return "", apierr.PermissionDenied("conversations may only be created under the caller's own user-uuid")
 	}
-	convSlug, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (string, error) {
+	if firstMsg == nil {
+		// Unreachable under the validator chain (messages.min_items=1); a
+		// loud Internal beats minting an empty conversation.
+		return "", apierr.Internal(nil, "invariant: create conversation called with no first message")
+	}
+	// ConversationID is filled in inside the tx once CreateConversation
+	// returns the new row's id (persistMessageOnQtx then computes Sequence).
+	msgParams, err := buildInputMessageParams(uuid.Nil, firstMsg)
+	if err != nil {
+		return "", err
+	}
+	row, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.AiConversation, error) {
 		org, err := qtx.GetOrganizationByName(ctx, orgName)
 		if err != nil {
-			return "", apierr.HandleResourceError(err, "Organization", fmt.Sprintf("organizations/%s", orgName))
+			return db.AiConversation{}, apierr.HandleResourceError(err, "Organization", fmt.Sprintf("organizations/%s", orgName))
 		}
-		row, err := qtx.CreateConversation(ctx, db.CreateConversationParams{
+		conv, err := qtx.CreateConversation(ctx, db.CreateConversationParams{
 			OrgID:     org.ID,
 			Name:      uuid.New().String()[:12],
 			CreatedBy: callerUserID,
 		})
 		if err != nil {
-			return "", apierr.HandleResourceError(err, "Conversation", "")
+			return db.AiConversation{}, apierr.HandleResourceError(err, "Conversation", "")
 		}
-		return row.Name, nil
+		// The conversation row is brand-new and uncommitted, so no other tx
+		// can see or persist against it — persistMessageOnQtx's usual
+		// FOR-UPDATE-lock precondition is trivially satisfied (there is no
+		// concurrent persist to serialize against). Sequence resolves to 1.
+		msgParams.ConversationID = conv.ID
+		if err := persistMessageOnQtx(ctx, qtx, conv.ID, msgParams); err != nil {
+			return db.AiConversation{}, err
+		}
+		return conv, nil
 	})
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, pathUser, convSlug), nil
+	return fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, pathUser, row.Name), nil
+}
+
+// lastInboundMessage returns the last message in the request — the turn
+// being submitted. useChat resends the whole UI history each turn, but the
+// Pivox transport strips it once `conversation` is set, so on the
+// auto-create path (empty `conversation`) this is the single first message.
+// Returns nil only when messages is empty (unreachable under the
+// min_items=1 validator); createConversationWithFirstMessage rejects nil.
+func lastInboundMessage(req *aiv1.GenerateContentRequest) *aiv1.InputMessage {
+	msgs := req.GetMessages()
+	if len(msgs) == 0 {
+		return nil
+	}
+	return msgs[len(msgs)-1]
 }
 
 // GenerateContent is the unary counterpart to `StreamGenerateContent`.
@@ -158,14 +219,19 @@ func (s *Server) ensureConversationForStream(ctx context.Context, parent string)
 // `summarizeTranscript` for the pattern — rather than go through
 // this RPC and discard the auto-created row.
 func (s *Server) GenerateContent(ctx context.Context, req *aiv1.GenerateContentRequest) (*aiv1.GenerateContentResponse, error) {
+	autoCreated := false
 	if req.GetConversation() == "" {
-		convName, err := s.ensureConversationForStream(ctx, req.GetParent())
+		convName, err := s.createConversationWithFirstMessage(ctx, req.GetParent(), lastInboundMessage(req))
 		if err != nil {
 			return nil, err
 		}
 		req.Conversation = convName
+		autoCreated = true
 	}
-	msg, usage, modelName, err := s.runGenerate(ctx, req, nil)
+	// On failure the conversation is left persisted with the user's first
+	// message and no assistant reply — symmetric with a failed turn on a
+	// pre-existing conversation. Nothing is discarded.
+	msg, usage, modelName, err := s.runGenerate(ctx, req, autoCreated, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -183,10 +249,16 @@ func (s *Server) GenerateContent(ctx context.Context, req *aiv1.GenerateContentR
 // text into the returned `Message` directly).
 //
 // `req.GetConversation()` is always non-empty by the time this runs
-// — both callers auto-create via `ensureConversationForStream` when
-// the client doesn't supply one (see Commit C). Stateless internal
-// one-shots (title summarization, etc.) call `s.model.Stream`
-// directly via `summarizeTranscript` rather than enter this path.
+// — both callers auto-create via `createConversationWithFirstMessage`
+// when the client doesn't supply one. Stateless internal one-shots
+// (title summarization, etc.) call `s.model.Stream` directly via
+// `summarizeTranscript` rather than enter this path.
+//
+// `skipInboundPersist` is true on the auto-create path: the first
+// user message was already persisted atomically with the conversation
+// in `createConversationWithFirstMessage`, so Tx A is skipped to avoid
+// double-persisting it. On the resume path (existing conversation) it
+// is false and Tx A persists the inbound turn as before.
 //
 // Flow:
 //
@@ -194,8 +266,9 @@ func (s *Server) GenerateContent(ctx context.Context, req *aiv1.GenerateContentR
 //  2. Acquire the per-conversation lease (Postgres advisory-ish
 //     UPDATE; sliding TTL extended by a heartbeat goroutine until
 //     the stream finishes).
-//  3. Persist the inbound user/tool turn and load the full prior
-//     transcript (lease-guarded inside Tx A).
+//  3. Persist the inbound user/tool turn (Tx A; skipped when the
+//     caller already persisted it during auto-create) and load the
+//     full prior transcript.
 //  4. Call the language model with the assembled context.
 //  5. Stream the response: emit events via `emit` (when set) and
 //     accumulate text into the returned `Message`.
@@ -206,6 +279,7 @@ func (s *Server) GenerateContent(ctx context.Context, req *aiv1.GenerateContentR
 func (s *Server) runGenerate(
 	ctx context.Context,
 	req *aiv1.GenerateContentRequest,
+	skipInboundPersist bool,
 	emit func(*aiv1.ServerEvent) error,
 ) (*aiv1.Message, *aiv1.TokenUsage, string, error) {
 	// Field-shape validation (parent non-empty, messages.min_items=1,
@@ -234,8 +308,8 @@ func (s *Server) runGenerate(
 
 	// Conversation is always non-empty by the time runGenerate runs —
 	// both GenerateContent and StreamGenerateContent auto-create via
-	// ensureConversationForStream when the caller doesn't supply one.
-	// Stateless one-shots bypass this path entirely (they call
+	// createConversationWithFirstMessage when the caller doesn't supply
+	// one. Stateless one-shots bypass this path entirely (they call
 	// s.model.Stream directly; see summarizeTranscript).
 	convOrgName, convPathUser, convName, err := parseConversationName(req.GetConversation())
 	if err != nil {
@@ -313,58 +387,12 @@ func (s *Server) runGenerate(
 	defer hbCancel()
 	go s.runConversationLeaseHeartbeat(hbCtx, streamCancel, conv.ID, sessionUID, &lastEventNanos)
 
-	// Persist only the LAST inbound message. useChat sends the entire
-	// UI conversation history on every turn (its default transport
-	// behavior); the server already has every prior turn via prior
-	// calls' persistence. Looping over all inbound messages would
-	// re-insert duplicates of the prior turns and explode the
-	// conversation by N every round. The Pivox transport strips
-	// history client-side once `conversation` is set so len(inbound)==1
-	// in practice; this branch is defense in depth.
-	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
-		row, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID)
-		if err != nil {
-			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
-			return apierr.Internal(err, "lock conversation")
+	// Persist the inbound user/tool turn (Tx A) unless it was already
+	// persisted atomically with the conversation on the auto-create path.
+	if !skipInboundPersist {
+		if err := s.persistInboundTurn(ctx, req, conv.ID, sessionUID); err != nil {
+			return nil, nil, "", err
 		}
-		// Invariant check. Acquire happened microseconds ago so the
-		// holder MUST be us. The model permits exactly one active
-		// lease per conversation at any moment — acquire rejects
-		// overlapping sessions outright (ACTIVE_STREAM Aborted). If
-		// this row doesn't match our sessionUID, something has
-		// violated the schema invariant (heartbeat goroutine died
-		// without aborting the stream, manual SQL, replication
-		// anomaly). Internal, not Aborted: this is a bug to file,
-		// not a retryable race.
-		if !row.LockHolder.Valid || row.LockHolder.Bytes != sessionUID {
-			slog.ErrorContext(ctx, "INVARIANT: Tx A reached without holding lease",
-				"conversation_id", conv.ID,
-				"session_uid", sessionUID,
-				"row_holder_valid", row.LockHolder.Valid,
-				"row_holder", uuid.UUID(row.LockHolder.Bytes).String(),
-				"row_expires_at", row.LockExpiresAt)
-			return apierr.Internal(nil, "lease invariant violation")
-		}
-		inbound := req.GetMessages()
-		if len(inbound) == 0 {
-			// Unreachable under the validator chain (the proto's
-			// `repeated.min_items=1` on GenerateContentRequest.messages
-			// + the unary/stream validation interceptors). If it
-			// fires anyway — interceptor bypassed, internal caller,
-			// validator drift — surface loudly. Silent return-nil
-			// would commit the tx as a no-op and let the assistant
-			// persist alone (a "user said nothing → assistant
-			// replied" row pair).
-			return apierr.Internal(nil, "invariant: runGenerate called with no inbound messages")
-		}
-		last := inbound[len(inbound)-1]
-		params, err := buildInputMessageParams(conv.ID, last)
-		if err != nil {
-			return err
-		}
-		return persistMessageOnQtx(ctx, qtx, conv.ID, params)
-	}); err != nil {
-		return nil, nil, "", err
 	}
 
 	// History always loads from DB now (state-of-conversation is the
@@ -563,6 +591,66 @@ func (s *Server) runGenerate(
 		OutputTokens: int32(estimateTokens(assistantText.String())),
 	}
 	return assistantMsg, usage, s.model.Name(), nil
+}
+
+// persistInboundTurn persists the LAST inbound message (the submitted
+// turn) under the conversation's row lock in its own transaction (Tx A).
+// useChat sends the entire UI conversation history on every turn (its
+// default transport behavior); the server already has every prior turn
+// via prior calls' persistence. Looping over all inbound messages would
+// re-insert duplicates of the prior turns and explode the conversation by
+// N every round. The Pivox transport strips history client-side once
+// `conversation` is set so len(inbound)==1 in practice; taking the last is
+// defense in depth.
+//
+// Only the resume path (existing conversation) calls this. The auto-create
+// path persists its single first message inside
+// createConversationWithFirstMessage instead, and passes
+// skipInboundPersist=true so runGenerate does not call this.
+func (s *Server) persistInboundTurn(ctx context.Context, req *aiv1.GenerateContentRequest, convID, sessionUID uuid.UUID) error {
+	return db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
+		row, err := qtx.GetConversationByIDForUpdate(ctx, convID)
+		if err != nil {
+			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", convID, "error", err)
+			return apierr.Internal(err, "lock conversation")
+		}
+		// Invariant check. Acquire happened microseconds ago so the
+		// holder MUST be us. The model permits exactly one active
+		// lease per conversation at any moment — acquire rejects
+		// overlapping sessions outright (ACTIVE_STREAM Aborted). If
+		// this row doesn't match our sessionUID, something has
+		// violated the schema invariant (heartbeat goroutine died
+		// without aborting the stream, manual SQL, replication
+		// anomaly). Internal, not Aborted: this is a bug to file,
+		// not a retryable race.
+		if !row.LockHolder.Valid || row.LockHolder.Bytes != sessionUID {
+			slog.ErrorContext(ctx, "INVARIANT: Tx A reached without holding lease",
+				"conversation_id", convID,
+				"session_uid", sessionUID,
+				"row_holder_valid", row.LockHolder.Valid,
+				"row_holder", uuid.UUID(row.LockHolder.Bytes).String(),
+				"row_expires_at", row.LockExpiresAt)
+			return apierr.Internal(nil, "lease invariant violation")
+		}
+		inbound := req.GetMessages()
+		if len(inbound) == 0 {
+			// Unreachable under the validator chain (the proto's
+			// `repeated.min_items=1` on GenerateContentRequest.messages
+			// + the unary/stream validation interceptors). If it
+			// fires anyway — interceptor bypassed, internal caller,
+			// validator drift — surface loudly. Silent return-nil
+			// would commit the tx as a no-op and let the assistant
+			// persist alone (a "user said nothing → assistant
+			// replied" row pair).
+			return apierr.Internal(nil, "invariant: runGenerate called with no inbound messages")
+		}
+		last := inbound[len(inbound)-1]
+		params, err := buildInputMessageParams(convID, last)
+		if err != nil {
+			return err
+		}
+		return persistMessageOnQtx(ctx, qtx, convID, params)
+	})
 }
 
 // buildInputMessageParams converts an InputMessage proto into the

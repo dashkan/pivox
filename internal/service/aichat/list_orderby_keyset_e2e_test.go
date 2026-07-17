@@ -183,12 +183,14 @@ func TestE2E_ListConversations_OrderByTitleKeysetBoundary(t *testing.T) {
 	assertUnique(t, got, len(titles))
 }
 
-// TestE2E_ListConversations_DefaultOrderNewestFirst is the DefaultOrder ("id
-// desc") regression guard: with NO order_by, conversations seeded in creation
-// order come back newest-first (reverse of seed order), and pagination across a
-// boundary returns every row exactly once. A regression to an id-ASC default
-// (oldest-first) — which an intermediate migration once shipped — flips this
-// red.
+// TestE2E_ListConversations_DefaultOrderNewestFirst is the DefaultOrder
+// ("lastMessageTime desc") regression guard: with NO order_by, conversations
+// come back most-recently-active first, and pagination across a boundary
+// returns every row exactly once. Here no messages are posted, so each row's
+// last_message_time is its DEFAULT-now() birth time — monotonic with creation
+// (id) order — and newest-first equals reverse-of-seed. The
+// *DefaultSortRecentActivity* tests cover the case where activity diverges from
+// creation order. A regression to an ASC default (oldest-first) flips this red.
 func TestE2E_ListConversations_DefaultOrderNewestFirst(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -207,7 +209,7 @@ func TestE2E_ListConversations_DefaultOrderNewestFirst(t *testing.T) {
 
 	got := drainConvTitles(t, ctx, client, &aiv1.ListConversationsRequest{Parent: parent, PageSize: pageSize})
 	assert.Equal(t, reversed(titles), got,
-		"no order_by defaults to newest-first (id desc), every row once across boundaries")
+		"no order_by defaults to most-recently-active first, every row once across boundaries")
 	assertUnique(t, got, len(titles))
 }
 
@@ -532,11 +534,9 @@ func TestE2E_ListConversations_RejectsBadOrderByAndPageToken(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err), "unknown order_by field → InvalidArgument")
 
-	// lastMessageTime is filterable-only now (nullable column, demoted from
-	// Sortable) — sorting on it must be rejected, not silently broken.
-	_, err = client.ListConversations(ctx, &aiv1.ListConversationsRequest{Parent: parent, OrderBy: "lastMessageTime"})
-	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err), "demoted nullable sortable → InvalidArgument")
+	// lastMessageTime is now a valid Sortable (last_message_time is NOT NULL),
+	// so ordering on it is accepted — see
+	// TestE2E_ListConversations_OrderByLastMessageTime for the positive case.
 
 	_, err = client.ListConversations(ctx, &aiv1.ListConversationsRequest{Parent: parent, PageToken: "not-a-real-token"})
 	require.Error(t, err)

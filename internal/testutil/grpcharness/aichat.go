@@ -27,11 +27,26 @@ import (
 // never call the model, so any invocation is a test bug and fails loud.
 func WithAiChatServer() Option {
 	return func(c *config) {
-		c.registerServices = append(c.registerServices, registerAiChatServer)
+		c.registerServices = append(c.registerServices, func(h *Harness, s *grpc.Server) {
+			registerAiChatServerWithModel(h, s, noopModel{})
+		})
 	}
 }
 
-func registerAiChatServer(h *Harness, s *grpc.Server) {
+// WithAiChatServerModel is WithAiChatServer with a caller-supplied language
+// model, for tests that exercise the generate path (StreamGenerateContent /
+// GenerateContent) end-to-end against a real DB — e.g. a model that errors to
+// prove failed generations leave no auto-created conversation, or a scripted
+// model that streams text to prove the persistence + activity-clock flow.
+func WithAiChatServerModel(m model.LanguageModel) Option {
+	return func(c *config) {
+		c.registerServices = append(c.registerServices, func(h *Harness, s *grpc.Server) {
+			registerAiChatServerWithModel(h, s, m)
+		})
+	}
+}
+
+func registerAiChatServerWithModel(h *Harness, s *grpc.Server, m model.LanguageModel) {
 	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
 	if err != nil {
 		panic("grpcharness: hard-coded test app key is malformed: " + err.Error())
@@ -39,7 +54,7 @@ func registerAiChatServer(h *Harness, s *grpc.Server) {
 	aiv1.RegisterAiChatServer(s, aichat.NewServer(aichat.Config{
 		Pool:     h.Pool,
 		Queries:  h.Queries,
-		Model:    noopModel{},
+		Model:    m,
 		Codec:    codec,
 		Resolver: permission.NewResolver(h.Queries),
 		Logger:   SilentLogger(),
@@ -76,6 +91,12 @@ func (h *Harness) SeedConversation(t *testing.T, orgID uuid.UUID, owner *Caller,
 // SeedMessage inserts an ai_messages row under conversationID. Parts is
 // left empty ("[]") — the boundary tests care about row identity and
 // count, not content.
+//
+// NOTE: this inserts the message row directly and does NOT bump the parent
+// conversation's message_count / last_message_time (unlike the production
+// persist path, which calls IncrementConversationMessageCount). Tests that
+// seed messages and then order conversations by lastMessageTime must set
+// last_message_time explicitly (see the lifecycle tests' setLastMessageTime).
 func (h *Harness) SeedMessage(t *testing.T, conversationID uuid.UUID, sequence int64) db.AiMessage {
 	t.Helper()
 	row, err := h.Queries.CreateMessage(context.Background(), db.CreateMessageParams{
