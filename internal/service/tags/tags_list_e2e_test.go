@@ -26,14 +26,11 @@ import (
 // keyset. (The tags filters accept order_by on non-id columns while resuming on
 // an id-only token — a distinct, deeper keyset bug that is out of scope here.)
 //
-// ListTagValues has no boundary test here: its RPC is currently unreachable
-// through the interceptor chain — the permission registry's ScopeFromPath
-// requires an `organizations/{org}/...` parent while the handler's
-// parseTagKeyParent requires a bare `tagKeys/{uuid}` parent, and no single value
-// satisfies both. ListTagBindings is reached with an org-scoped parent (which
-// the handler treats as an opaque parent_resource filter), so its rows are
-// seeded directly through the DB rather than the (equally unreachable)
-// CreateTagValue/CreateTagBinding RPCs.
+// ListTagValues has no dedicated boundary test here; its create+list
+// reachability is pinned in tags_reachability_e2e_test.go. These keyset-boundary
+// tests seed rows directly through the DB (not the Create* RPCs) so the
+// off-by-one assertion is isolated from create-path validation and needs only a
+// single parent's worth of rows.
 
 const (
 	pageSize   = 3

@@ -2,7 +2,9 @@ package tags
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strings"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
@@ -16,7 +18,6 @@ import (
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
-	"github.com/dashkan/pivox/internal/resource"
 	"github.com/dashkan/pivox/internal/server"
 )
 
@@ -139,13 +140,14 @@ func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.List
 	if err != nil {
 		return nil, err
 	}
+	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
 	tagBindings := make([]*apiv1.TagBinding, 0, len(results))
 	for _, tb := range results {
 		tv, err := s.queries.GetTagValue(ctx, tb.TagValueID)
 		if err != nil {
 			continue
 		}
-		tagBindings = append(tagBindings, convert.TagBindingToProto(tb, tv, actors))
+		tagBindings = append(tagBindings, convert.TagBindingToProto(tb, tv, orgSlug, actors))
 	}
 
 	return &apiv1.ListTagBindingsResponse{
@@ -167,12 +169,23 @@ func tagBindingSortValue(plan filter.OrderByPlan, r db.TagBinding) string {
 	}
 }
 
-func (s *TagBindingsServer) GetTagBinding(ctx context.Context, req *apiv1.GetTagBindingRequest) (*apiv1.TagBinding, error) {
-	segment, err := resource.ParseSegment(req.GetName())
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
+// parseTagBindingName extracts the tag binding UUID from an org-scoped binding
+// name — "organizations/{org}/tagBindings/{uuid}",
+// ".../spaces/{space}/tagBindings/{uuid}", or
+// ".../assets/{asset}/tagBindings/{uuid}". The binding id is always the leaf,
+// preceded by the "tagBindings" collection; the ancestor scope is resolved by
+// the permission interceptor.
+func parseTagBindingName(name string) (uuid.UUID, error) {
+	parts := strings.Split(name, "/")
+	n := len(parts)
+	if n < 4 || parts[0] != "organizations" || parts[n-2] != "tagBindings" || parts[n-1] == "" {
+		return uuid.Nil, fmt.Errorf("invalid tag binding name %q: expected organizations/*/.../tagBindings/*", name)
 	}
-	id, err := uuid.Parse(segment)
+	return uuid.Parse(parts[n-1])
+}
+
+func (s *TagBindingsServer) GetTagBinding(ctx context.Context, req *apiv1.GetTagBindingRequest) (*apiv1.TagBinding, error) {
+	id, err := parseTagBindingName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
@@ -188,13 +201,14 @@ func (s *TagBindingsServer) GetTagBinding(ctx context.Context, req *apiv1.GetTag
 	if err != nil {
 		return nil, err
 	}
-	return convert.TagBindingToProto(tb, tv, actors), nil
+	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
+	return convert.TagBindingToProto(tb, tv, orgSlug, actors), nil
 }
 
 func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.CreateTagBindingRequest) (*longrunningpb.Operation, error) {
 	tb := req.GetTagBinding()
 
-	// Parse tag value name: "tagKeys/{uuid}/tagValues/{uuid}"
+	// Parse tag value name: "organizations/{org}/tagKeys/{uuid}/tagValues/{uuid}"
 	tvID, err := parseTagValueName(tb.GetTagValue())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", tb.GetTagValue())
@@ -224,15 +238,12 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 			"tag_binding_id", created.ID, "error", resolveErr)
 		actors = nil
 	}
-	return lro.DoneOperation(convert.TagBindingToProto(created, tagValue, actors))
+	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
+	return lro.DoneOperation(convert.TagBindingToProto(created, tagValue, orgSlug, actors))
 }
 
 func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.DeleteTagBindingRequest) (*longrunningpb.Operation, error) {
-	segment, err := resource.ParseSegment(req.GetName())
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
-	}
-	id, err := uuid.Parse(segment)
+	id, err := parseTagBindingName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
@@ -261,9 +272,10 @@ func (s *TagBindingsServer) ListEffectiveTags(ctx context.Context, req *apiv1.Li
 		return nil, apierr.Internal(err, "database error")
 	}
 
+	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
 	effectiveTags := make([]*apiv1.EffectiveTag, 0, len(rows))
 	for _, row := range rows {
-		effectiveTags = append(effectiveTags, convert.EffectiveTagToProto(row))
+		effectiveTags = append(effectiveTags, convert.EffectiveTagToProto(row, orgSlug))
 	}
 
 	return &apiv1.ListEffectiveTagsResponse{

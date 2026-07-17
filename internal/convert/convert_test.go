@@ -1464,8 +1464,8 @@ func TestTagValueToProto(t *testing.T) {
 	}
 
 	t.Run("all fields mapped", func(t *testing.T) {
-		proto := TagValueToProto(tv, nil)
-		assert.Equal(t, "tagKeys/0192a000-0004-7000-8000-000000410001/tagValues/0192a000-0005-7000-8000-000000510001", proto.Name)
+		proto := TagValueToProto(tv, "meridian", nil)
+		assert.Equal(t, "organizations/meridian/tagKeys/0192a000-0004-7000-8000-000000410001/tagValues/0192a000-0005-7000-8000-000000510001", proto.Name)
 		assert.Equal(t, "Production environment", proto.Description)
 	})
 }
@@ -1479,7 +1479,7 @@ func TestTagBindingToProto(t *testing.T) {
 
 	tb := db.TagBinding{
 		ID:             tbID,
-		ParentResource: "//pivox.api/organizations/meridian/spaces/corp-site",
+		ParentResource: "organizations/meridian/spaces/corp-site",
 		TagValueID:     tvID,
 		Etag:           "etag-tb",
 		CreateTime:     now,
@@ -1490,9 +1490,9 @@ func TestTagBindingToProto(t *testing.T) {
 	}
 
 	t.Run("resource names formed correctly", func(t *testing.T) {
-		proto := TagBindingToProto(tb, tv, nil)
-		assert.Equal(t, "tagBindings/0192a000-0006-7000-8000-000000610001", proto.Name)
-		assert.Equal(t, "tagKeys/0192a000-0004-7000-8000-000000410001/tagValues/0192a000-0005-7000-8000-000000510001", proto.TagValue)
+		proto := TagBindingToProto(tb, tv, "meridian", nil)
+		assert.Equal(t, "organizations/meridian/spaces/corp-site/tagBindings/0192a000-0006-7000-8000-000000610001", proto.Name)
+		assert.Equal(t, "organizations/meridian/tagKeys/0192a000-0004-7000-8000-000000410001/tagValues/0192a000-0005-7000-8000-000000510001", proto.TagValue)
 	})
 }
 
@@ -1508,9 +1508,9 @@ func TestEffectiveTagToProto(t *testing.T) {
 	}
 
 	t.Run("resource names formed correctly", func(t *testing.T) {
-		proto := EffectiveTagToProto(row)
-		assert.Equal(t, "tagKeys/0192a000-0004-7000-8000-000000410001/tagValues/0192a000-0005-7000-8000-000000510001", proto.TagValue)
-		assert.Equal(t, "tagKeys/0192a000-0004-7000-8000-000000410001", proto.TagKey)
+		proto := EffectiveTagToProto(row, "meridian")
+		assert.Equal(t, "organizations/meridian/tagKeys/0192a000-0004-7000-8000-000000410001/tagValues/0192a000-0005-7000-8000-000000510001", proto.TagValue)
+		assert.Equal(t, "organizations/meridian/tagKeys/0192a000-0004-7000-8000-000000410001", proto.TagKey)
 		assert.False(t, proto.Inherited)
 	})
 }

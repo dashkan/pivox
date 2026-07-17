@@ -92,22 +92,26 @@ func (s *TagValuesServer) resolveTagValueActors(ctx context.Context, rows []db.T
 	return actors, nil
 }
 
-// parseTagKeyParent parses "tagKeys/{uuid}" and returns the tag key UUID.
+// parseTagKeyParent parses "organizations/{org}/tagKeys/{uuid}" and returns the
+// tag key UUID. The name is org-scoped so it round-trips through the permission
+// interceptor's scope extractor; the org segment is resolved by the interceptor,
+// so here we only need the leaf tag key id.
 func parseTagKeyParent(parent string) (uuid.UUID, error) {
-	parts := strings.SplitN(parent, "/", 2)
-	if len(parts) != 2 || parts[0] != "tagKeys" {
-		return uuid.Nil, fmt.Errorf("invalid tag key parent %q: expected tagKeys/*", parent)
-	}
-	return uuid.Parse(parts[1])
-}
-
-// parseTagValueName parses "tagKeys/{uuid}/tagValues/{uuid}" and returns the tag value UUID.
-func parseTagValueName(name string) (uuid.UUID, error) {
-	parts := strings.Split(name, "/")
-	if len(parts) != 4 || parts[0] != "tagKeys" || parts[2] != "tagValues" {
-		return uuid.Nil, fmt.Errorf("invalid tag value name %q: expected tagKeys/*/tagValues/*", name)
+	parts := strings.Split(parent, "/")
+	if len(parts) != 4 || parts[0] != "organizations" || parts[1] == "" || parts[2] != "tagKeys" {
+		return uuid.Nil, fmt.Errorf("invalid tag key parent %q: expected organizations/*/tagKeys/*", parent)
 	}
 	return uuid.Parse(parts[3])
+}
+
+// parseTagValueName parses "organizations/{org}/tagKeys/{uuid}/tagValues/{uuid}"
+// and returns the tag value UUID.
+func parseTagValueName(name string) (uuid.UUID, error) {
+	parts := strings.Split(name, "/")
+	if len(parts) != 6 || parts[0] != "organizations" || parts[1] == "" || parts[2] != "tagKeys" || parts[4] != "tagValues" {
+		return uuid.Nil, fmt.Errorf("invalid tag value name %q: expected organizations/*/tagKeys/*/tagValues/*", name)
+	}
+	return uuid.Parse(parts[5])
 }
 
 // ListTagValues is a dynamic AIP-160 filtered + AIP-132 sorted + compound-cursor
@@ -172,9 +176,10 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 	if err != nil {
 		return nil, err
 	}
+	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
 	tagValues := make([]*apiv1.TagValue, 0, len(results))
 	for _, r := range results {
-		tagValues = append(tagValues, convert.TagValueToProto(r, actors))
+		tagValues = append(tagValues, convert.TagValueToProto(r, orgSlug, actors))
 	}
 
 	return &apiv1.ListTagValuesResponse{
@@ -213,7 +218,8 @@ func (s *TagValuesServer) GetTagValue(ctx context.Context, req *apiv1.GetTagValu
 	if err != nil {
 		return nil, err
 	}
-	return convert.TagValueToProto(tagValue, actors), nil
+	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
+	return convert.TagValueToProto(tagValue, orgSlug, actors), nil
 }
 
 func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateTagValueRequest) (*longrunningpb.Operation, error) {
@@ -262,7 +268,8 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 			"tag_value_id", result.ID, "error", resolveErr)
 		actors = nil
 	}
-	return lro.DoneOperation(convert.TagValueToProto(result, actors))
+	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
+	return lro.DoneOperation(convert.TagValueToProto(result, orgSlug, actors))
 }
 
 func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateTagValueRequest) (*longrunningpb.Operation, error) {
@@ -310,7 +317,8 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 			"tag_value_id", result.ID, "error", resolveErr)
 		actors = nil
 	}
-	return lro.DoneOperation(convert.TagValueToProto(result, actors))
+	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
+	return lro.DoneOperation(convert.TagValueToProto(result, orgSlug, actors))
 }
 
 // DeleteTagValue removes an unbound tag value. Refuses with
