@@ -544,7 +544,6 @@ func serve(cmd *cobra.Command, args []string) error {
 	// bufconn dial; it does not rely on transport isolation for authz.
 	if mcpVerifier != nil {
 		mcpv1.RegisterMcpServiceServer(grpcServer, mcpservice.NewMcpServer(mcpservice.Config{
-			Pool:    pool,
 			Queries: queries,
 			Codec:   appCodec,
 		}))

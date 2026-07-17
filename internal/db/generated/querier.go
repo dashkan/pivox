@@ -730,6 +730,17 @@ type Querier interface {
 	// That's the intentional #27-phase-2 scope; org-role inheritance is
 	// a follow-up.
 	ListSpaceMembershipsForIdentityInOrg(ctx context.Context, arg ListSpaceMembershipsForIdentityInOrgParams) ([]ListSpaceMembershipsForIdentityInOrgRow, error)
+	// ListSpacesForMCP is the STATIC keyset listing behind McpService.ListSpaces.
+	// The MCP surface is a deliberately narrow, agent-facing read, so it rides a
+	// hand-written query instead of the dynamic internal/filter engine. Scoped to
+	// one org, excludes soft-deleted rows, applies an optional case-insensitive
+	// prefix match on display_name (the handler pre-builds the escaped ILIKE
+	// pattern with a trailing '%'; NULL = no filter), and keyset-paginates on id
+	// (strict id > cursor; NULL cursor = first page). The handler passes
+	// page_limit = page_size + 1 so an extra row signals a further page. Served by
+	// idx_spaces_org (org_id WHERE delete_time IS NULL), the same access path the
+	// filter engine used.
+	ListSpacesForMCP(ctx context.Context, arg ListSpacesForMCPParams) ([]Space, error)
 	// ListSpacesPastPurgeTime returns soft-deleted spaces whose
 	// purge_time has elapsed. Used by SpacePurgeWorker to drive the
 	// final cascade for spaces that finished their 30-day grace window

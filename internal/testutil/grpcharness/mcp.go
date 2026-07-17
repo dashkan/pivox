@@ -26,7 +26,6 @@ func registerMcpServer(h *Harness, s *grpc.Server) {
 		panic("grpcharness: hard-coded test app key is malformed: " + err.Error())
 	}
 	mcpv1.RegisterMcpServiceServer(s, mcp.NewMcpServer(mcp.Config{
-		Pool:    h.Pool,
 		Queries: h.Queries,
 		Codec:   codec,
 	}))

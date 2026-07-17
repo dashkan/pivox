@@ -17,10 +17,8 @@ package mcp
 import (
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/dashkan/pivox/internal/filter"
 )
 
 func TestClampPageSize(t *testing.T) {
@@ -45,37 +43,27 @@ func TestClampPageSize(t *testing.T) {
 	}
 }
 
-func TestNamePrefixFilter(t *testing.T) {
+// TestNamePrefixPattern pins the ILIKE pattern the static ListSpacesForMCP
+// query receives. An empty prefix yields a NULL text (the query treats NULL
+// as "no filter"); a non-empty prefix yields a case-insensitive prefix
+// pattern with LIKE metacharacters neutralized. The mapping is preserved
+// byte-for-byte from the removed filter-engine transpiler, so behaviour is
+// unchanged across the migration.
+func TestNamePrefixPattern(t *testing.T) {
 	t.Parallel()
 
-	// Empty prefix means "no filter".
-	assert.Empty(t, namePrefixFilter(""))
+	// Empty prefix means "no filter" — a NULL text bound parameter.
+	assert.Equal(t, pgtype.Text{}, namePrefixPattern(""))
 
-	// A prefix becomes a partial-match filter expression whose value is
-	// strconv.Quote'd, so the trailing `*` is the engine's ILIKE wildcard
-	// and metacharacters in the input can't break the filter grammar.
 	cases := map[string]string{
-		"prod": `displayName = "prod*"`,
-		`a"b`:  `displayName = "a\"b*"`, // double quote → escaped, grammar intact
-		`a\b`:  `displayName = "a\\b*"`, // backslash → escaped
-		`p*d`:  `displayName = "p*d*"`,  // literal * carried into the value
+		"prod": `prod%`, // plain prefix + trailing wildcard
+		`a%b`:  `a\%b%`, // '%' escaped so it matches literally
+		`a_b`:  `a\_b%`, // '_' escaped so it matches literally
+		`p*d`:  `p%d%`,  // AIP-160 '*' carried through as a wildcard
 	}
 	for in, want := range cases {
-		assert.Equal(t, want, namePrefixFilter(in), "namePrefixFilter(%q)", in)
-	}
-}
-
-// TestNamePrefixFilter_ParsesThroughEngine proves the escaped expression
-// is accepted by the real filter transpiler for metacharacter inputs —
-// i.e. quoting keeps the grammar well-formed rather than producing a
-// string the engine rejects (which would surface as InvalidArgument to
-// the caller). Values are bound params, so this is grammar-safety, not
-// SQLi.
-func TestNamePrefixFilter_ParsesThroughEngine(t *testing.T) {
-	t.Parallel()
-	for _, in := range []string{"prod", `a"b`, `a\b`, `p*d`, `'; DROP`} {
-		expr := namePrefixFilter(in)
-		_, err := filter.Transpile(filter.SpaceFilter(), expr, 1)
-		require.NoErrorf(t, err, "engine must parse escaped filter %q for input %q", expr, in)
+		got := namePrefixPattern(in)
+		assert.True(t, got.Valid, "namePrefixPattern(%q) must be non-NULL", in)
+		assert.Equal(t, want, got.String, "namePrefixPattern(%q)", in)
 	}
 }

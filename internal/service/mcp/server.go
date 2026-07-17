@@ -14,10 +14,14 @@
 
 // Package mcp implements the McpService gRPC handlers — the curated,
 // non-AIP surface backing the Model Context Protocol server
-// (internal/mcp). Handlers are thin: the list surfaces are adapters
-// over the shared internal/filter engine (the same configs the AIP
-// Spaces service uses), and the single-gets reuse the existing queries.
-// No MCP-specific SQL or pagination code.
+// (internal/mcp). Handlers are thin and deliberately STATIC: this
+// agent-facing surface must NOT use the dynamic internal/filter engine
+// (AIP-160 filter + order_by). ListOrgs rides the caller-scoped
+// membership query with an in-process slug prefix filter; ListSpaces
+// rides a dedicated hand-written keyset query (ListSpacesForMCP) with a
+// fixed display-name prefix match; the single-gets reuse existing
+// queries. Pagination uses the shared codec-encrypted page tokens
+// (filter.Paginate is a generic keyset trim helper, not the engine).
 //
 // TRANSPORT vs. SECURITY BOUNDARY. McpService is registered on the
 // shared gRPC server, so it is reachable on the public TCP listener as
@@ -42,7 +46,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -54,19 +57,16 @@ import (
 // McpServer implements mcpv1.McpServiceServer.
 type McpServer struct {
 	mcpv1.UnimplementedMcpServiceServer
-	pool    *pgxpool.Pool
 	queries db.Querier
 	codec   *appkey.Codec
 }
 
 // Config is the constructor input for McpServer.
 type Config struct {
-	// Pool backs the internal/filter engine used by ListSpaces. Required.
-	Pool *pgxpool.Pool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
-	// Codec encodes/decodes the filter engine's opaque page tokens.
-	// Required.
+	// Codec encodes/decodes the opaque, codec-encrypted page tokens the
+	// list surface issues. Required.
 	Codec *appkey.Codec
 }
 
@@ -74,16 +74,13 @@ type Config struct {
 // required field — a startup-time programmer error rather than a
 // runtime nil-deref mid-RPC.
 func NewMcpServer(cfg Config) *McpServer {
-	if cfg.Pool == nil {
-		panic("mcp: Config.Pool is required")
-	}
 	if cfg.Queries == nil {
 		panic("mcp: Config.Queries is required")
 	}
 	if cfg.Codec == nil {
 		panic("mcp: Config.Codec is required")
 	}
-	return &McpServer{pool: cfg.Pool, queries: cfg.Queries, codec: cfg.Codec}
+	return &McpServer{queries: cfg.Queries, codec: cfg.Codec}
 }
 
 // callerActiveOrgs returns the caller's active (org, role) memberships.

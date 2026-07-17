@@ -173,9 +173,10 @@ func TestE2E_Mcp_GetOrg(t *testing.T) {
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
-// TestE2E_Mcp_ListSpaces exercises the filter-engine adapter: the
-// required org param, membership gating, and the page_token round-trip
-// that comes straight from filter.Query's pagination.
+// TestE2E_Mcp_ListSpaces exercises the static ListSpacesForMCP keyset
+// query: the required org param, membership gating, and the keyset page
+// boundary. Seeding pageSize+1 spaces and paging fully asserts the strict
+// `id > cursor` resume neither drops nor duplicates the boundary row.
 func TestE2E_Mcp_ListSpaces(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -184,6 +185,8 @@ func TestE2E_Mcp_ListSpaces(t *testing.T) {
 	client := mcpv1.NewMcpServiceClient(h.Conn())
 
 	h.SeedOwnedOrg(t, "acme", "Acme Inc", "mcp-ls") // caller = acme owner
+	// Seed pageSize+1 (3 spaces at page size 2) so page 1 fills and page 2
+	// carries exactly the boundary row.
 	h.SeedOwnedSpace(t, "acme", "sp-a", "Space A")
 	h.SeedOwnedSpace(t, "acme", "sp-b", "Space B")
 	h.SeedOwnedSpace(t, "acme", "sp-c", "Space C")
@@ -192,8 +195,8 @@ func TestE2E_Mcp_ListSpaces(t *testing.T) {
 	_, err := client.ListSpaces(context.Background(), &mcpv1.ListSpacesRequest{})
 	assert.Equal(t, codes.InvalidArgument, status.Code(err), "org is required for v1 list_spaces")
 
-	// Page 1 (size 2) + page 2 (size 2) must cover all three spaces via
-	// the filter engine's opaque page token.
+	// Page 1 (size 2) + page 2 must together cover all three spaces via the
+	// opaque keyset page token, with no drop or duplicate at the boundary.
 	p1, err := client.ListSpaces(context.Background(), &mcpv1.ListSpacesRequest{Org: "acme", PageSize: 2})
 	require.NoError(t, err)
 	require.Len(t, p1.GetSpaces(), 2)
@@ -206,12 +209,13 @@ func TestE2E_Mcp_ListSpaces(t *testing.T) {
 	require.Len(t, p2.GetSpaces(), 1)
 	assert.Empty(t, p2.GetNextPageToken(), "last page has no token")
 
-	seen := map[string]bool{}
+	gotSlugs := make([]string, 0, 3)
 	for _, sp := range append(p1.GetSpaces(), p2.GetSpaces()...) {
 		assert.Equal(t, "acme", sp.GetOrg())
-		seen[sp.GetSlug()] = true
+		gotSlugs = append(gotSlugs, sp.GetSlug())
 	}
-	assert.Equal(t, map[string]bool{"sp-a": true, "sp-b": true, "sp-c": true}, seen,
+	// ElementsMatch fails on either a dropped or a duplicated row.
+	assert.ElementsMatch(t, []string{"sp-a", "sp-b", "sp-c"}, gotSlugs,
 		"the two pages together cover every space exactly once")
 
 	// A non-member org fails closed with NotFound.
@@ -220,8 +224,8 @@ func TestE2E_Mcp_ListSpaces(t *testing.T) {
 	assert.Equal(t, codes.NotFound, status.Code(err))
 }
 
-// TestE2E_Mcp_ListSpaces_NamePrefix pins the display-name partial
-// filter mapping.
+// TestE2E_Mcp_ListSpaces_NamePrefix pins the case-insensitive display-name
+// prefix match of the static query.
 func TestE2E_Mcp_ListSpaces_NamePrefix(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -234,14 +238,18 @@ func TestE2E_Mcp_ListSpaces_NamePrefix(t *testing.T) {
 	h.SeedOwnedSpace(t, "acme", "sp-prod-2", "Prod Two")
 	h.SeedOwnedSpace(t, "acme", "sp-stage", "Stage")
 
+	// Lowercase query against capitalized display names proves the match is
+	// case-insensitive (ILIKE), a prefix (Stage is excluded), and anchored.
 	resp, err := client.ListSpaces(context.Background(), &mcpv1.ListSpacesRequest{
-		Org: "acme", NamePrefix: "Prod",
+		Org: "acme", NamePrefix: "prod",
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.GetSpaces(), 2, "name_prefix filters on display-name prefix")
+	gotSlugs := make([]string, 0, 2)
 	for _, sp := range resp.GetSpaces() {
-		assert.Contains(t, sp.GetDisplayName(), "Prod")
+		gotSlugs = append(gotSlugs, sp.GetSlug())
 	}
+	assert.ElementsMatch(t, []string{"sp-prod-1", "sp-prod-2"}, gotSlugs,
+		"name_prefix is a case-insensitive display-name prefix; non-matches excluded")
 }
 
 // TestE2E_Mcp_GetSpace pins the space membership gate and its uniform

@@ -219,6 +219,74 @@ func (q *Queries) GetSpaceSlugsByIDs(ctx context.Context, arg GetSpaceSlugsByIDs
 	return items, nil
 }
 
+const listSpacesForMCP = `-- name: ListSpacesForMCP :many
+SELECT id, org_id, name, display_name, labels, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM spaces
+WHERE org_id = $1
+  AND delete_time IS NULL
+  AND ($2::text IS NULL OR display_name ILIKE $2::text)
+  AND ($3::uuid IS NULL OR id > $3)
+ORDER BY id
+LIMIT $4
+`
+
+type ListSpacesForMCPParams struct {
+	OrgID      uuid.UUID   `json:"org_id"`
+	NamePrefix pgtype.Text `json:"name_prefix"`
+	Cursor     pgtype.UUID `json:"cursor"`
+	PageLimit  int32       `json:"page_limit"`
+}
+
+// ListSpacesForMCP is the STATIC keyset listing behind McpService.ListSpaces.
+// The MCP surface is a deliberately narrow, agent-facing read, so it rides a
+// hand-written query instead of the dynamic internal/filter engine. Scoped to
+// one org, excludes soft-deleted rows, applies an optional case-insensitive
+// prefix match on display_name (the handler pre-builds the escaped ILIKE
+// pattern with a trailing '%'; NULL = no filter), and keyset-paginates on id
+// (strict id > cursor; NULL cursor = first page). The handler passes
+// page_limit = page_size + 1 so an extra row signals a further page. Served by
+// idx_spaces_org (org_id WHERE delete_time IS NULL), the same access path the
+// filter engine used.
+func (q *Queries) ListSpacesForMCP(ctx context.Context, arg ListSpacesForMCPParams) ([]Space, error) {
+	rows, err := q.db.Query(ctx, listSpacesForMCP,
+		arg.OrgID,
+		arg.NamePrefix,
+		arg.Cursor,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Space{}
+	for rows.Next() {
+		var i Space
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.Name,
+			&i.DisplayName,
+			&i.Labels,
+			&i.State,
+			&i.Etag,
+			&i.Revision,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.DeletedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.DeleteTime,
+			&i.PurgeTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSpacesPastPurgeTime = `-- name: ListSpacesPastPurgeTime :many
 SELECT id, org_id, name, display_name, labels, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM spaces
  WHERE delete_time IS NOT NULL
