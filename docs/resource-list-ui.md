@@ -343,15 +343,21 @@ the values.
    Shared fields (display name, headers/annotations editor) extract to a
    `ConnectorCommonFields` both variants compose.
 
-3. **Scoped tier is thin — flagged, not inflated.** See the tiering section.
+3. **No scoped tier — scope stays out of the shell.** Scope is a route +
+   consumer concern carried in the resource-owned form values, not a shell tier.
+   See [§ Scope is a consumer/route concern](#scope-is-a-consumerroute-concern-not-a-tier).
 
 ## Tiering (explicit variants, no `mode` union) — parallel to Grid
 
 ```
-FormPage<T>  →  ResourceFormPage<T>  →  (ScopedResourceFormPage<T>?)
-generic shell   AIP create/edit         scope-on-create
+FormPage<T>  →  ResourceFormPage<T>
+generic shell   AIP create/edit
 ```
 
+**Two tiers, not three.** There is deliberately *no*
+`ScopedResourceFormPage` — the Grid's third tier has no form-side twin. Scope is
+a route + consumer concern, not a form-shell tier
+([§ Scope is a consumer/route concern](#scope-is-a-consumerroute-concern-not-a-tier)).
 Each tier is an *explicit component set*, not a delta toggled by a prop
 (`patterns-explicit-variants`).
 
@@ -374,35 +380,78 @@ every AIP resource repeats, as **two explicit variant components**:
   standard delete-confirm (the existing `DeleteDialog`, unchanged — it's a
   confirm, not a form).
 
-Value: the CRUD-page shell every resource reuses; the semantic base a scoped
-tier would extend. This tier is required for the same reason `ResourceGrid` is:
-it carries the standard labels + delete-confirm + load-state conventions
-regardless of how small each is.
+Value: the CRUD-page shell every resource reuses. This tier is required for the
+same reason `ResourceGrid` is: it carries the standard labels + delete-confirm +
+load-state conventions regardless of how small each is. It is the **last** tier
+— there is no scoped tier above it (below).
 
-### 3. `ScopedResourceFormPage<T>` — scope-on-create (candidate tier)
+### No third tier — scope does not extend `ResourceFormPage`
 
-**Honest assessment: this tier barely earns its keep, unlike `ScopedResourceGrid`.**
-For the list, scope is a live, ongoing dimension (selector + scope state +
-org-rollup-vs-space request-path switch + a Space column). For the **form**,
-scope matters at exactly one moment — **create**, choosing which space to create
-into — and is **immutable on edit** (a connector can't move scope; today's
-`ConnectorForm` already renders scope read-only in edit).
-
-So the entire tier reduces to: on the *create* variant, compose a `<ScopeField>`
-child and default the mutation's parent path from it. That is composition, not a
-tier. **Recommendation:** do **not** introduce a `ScopedResourceFormPage` tier;
-instead let `ResourceFormPage.Create` accept a `<ScopeField>` in its Body
-(composition), and the resource's create mutation reads scope from its own form
-values (where `ConnectorFormValues.scope` already lives). If a second scoped
-resource later shows real shared create-time scope logic (e.g. permission-gated
-space lists), promote it then. This mirrors the Grid doc's own honesty test
-("if it doesn't fit, that tier collapses back into helpers — which is fine").
+The Grid stack has a third tier (`ScopedResourceGrid`) because, for a *list*,
+scope is a live ongoing dimension: a selector, scope state, an
+org-rollup-vs-space request-path switch, and a Space column. **The form has none
+of that.** Scope matters at exactly one moment — **create**, choosing which
+parent to create into — and is **immutable on edit** (today's `ConnectorForm`
+already renders scope read-only when editing). One create-time value is not a
+tier. **Decision (confirmed): there is no `ScopedResourceFormPage`.** Scope is
+handled entirely below the shell, per the next subsection.
 
 | Resource | Tier |
 |---|---|
 | Generic / non-resource page form | `FormPage<T>` |
 | Flat CRUD AIP resource (tags, api-keys, storage-gateways) | `ResourceFormPage.{Create,Edit}` |
-| Scoped AIP resource (connectors, secrets, …) | `ResourceFormPage.{Create,Edit}` + a composed `<ScopeField>` on Create |
+| Scoped AIP resource (connectors, secrets, …) | `ResourceFormPage.{Create,Edit}` (scope handled by the consumer, not a tier) |
+
+## Scope is a consumer/route concern, not a tier
+
+Dropping the scoped tier isn't a size judgement — it's a *correctness* one.
+Scope for the form belongs to the route and the resource's own create-fields, and
+the shell must stay blind to it.
+
+**Scope is resource-specific and consumer-owned — not an org/space-only
+concept.** A grid's scope happens to be org-or-space, but that is not universal.
+A **tag**'s scope can be several dimensions beyond org/space (the tag key, the
+bound resource type, the binding target). Baking an org/space scope into
+`FormPage` / `ResourceFormPage` would be wrong for the next resource, not just
+over-built for this one. So both tiers stay **completely scope-blind**: the
+consumer's create-fields component decides *whether* there is a scope field at
+all and *what* that scope is.
+
+**The route is scope's source of truth.** Two entry routes drive the *same* form
+component; the create-fields read the route to decide what to render:
+
+- **Pinned** — `/organizations/{org}/spaces/{space}/connectors/new`. The
+  create-fields read scope from the route params, use it, and render **no
+  picker** (the parent is already decided).
+- **Rollup** — `/organizations/{org}/connectors/new` (no space segment). No
+  scope param, so the create-fields render the resource's scope **picker**.
+
+**Scope reaches `submit()` identically either way, because it's just another
+value in the resource-owned form-values context** (`ConnectorFormValues.scope`
+already exists) — never in `FormPage`'s generic `{ state, actions, meta }`.
+Whether it arrived from a route param or a picker selection, the create mutation
+reads it from the same field and the shell never learns it existed. *This is
+precisely why the scoped tier is unnecessary:* a tier would have to thread scope
+through the shell; the form-values context already carries it end-to-end without
+the shell participating.
+
+**Symmetry with the list's launching route.** The per-scope list's "New" link
+carries scope forward — `/spaces/{space}/connectors` → its "New" points at
+`/spaces/{space}/connectors/new`; the org-rollup list's "New" points at the
+scopeless `/connectors/new`. That launching route is exactly what the `?from=`
+return-to mechanism captures, so create-scope and return-target come from **one**
+consistent source: the route the user launched from.
+
+**Refinements are the consumer's call, never the shell's:**
+
+- When scope is route-pinned, the create-fields *may* show it read-only as
+  context ("Creating in space: Marketing") or omit it entirely — a rendering
+  choice inside the resource's fields, invisible to `FormPage`.
+- The picker's options (which spaces, or which tag dimensions) are
+  **consumer-fetched data injected into that field** — exactly as connectors
+  already injects `spaceOptions` today. The shell fetches nothing.
+- A resource with a richer scope simply has **more route segments its consumer
+  maps** into its form values. Zero change to `FormPage` or `ResourceFormPage`.
 
 ## Return to the launching route
 
@@ -574,11 +623,10 @@ resource layer — `FormPage` never sees it.
    the API. Delete `FormDialog`; retarget the grid edit actions to navigate.
 4. Wire the `from` param + `safeInternalPath` + dirty-guard split in the routes.
 
-## Open questions
+Settled decisions (not open): no `ScopedResourceFormPage` tier; scope is a
+route + consumer concern; both pinned and rollup create routes are supported and
+map into the resource form-values context.
 
-- **Scoped form tier.** Recommendation is *no* `ScopedResourceFormPage` tier
-  (scope-on-create is a composed `<ScopeField>`); confirm before a second scoped
-  resource forces the question.
 - **Dirty→route signal.** `meta.onDirtyChange` + the one sanctioned effect vs.
   an alternative that avoids the effect entirely — flagged above; decide at
   implementation.
@@ -586,6 +634,3 @@ resource layer — `FormPage` never sees it.
   exact key the client hook reads (the list route already does this for lists);
   confirm the single-record query key helper exists or add it alongside the list
   one.
-- **Create entry for scoped resources.** Whether scope is always chosen in-form
-  (`/connectors/new`) or a space can deep-link a pre-scoped create
-  (`/spaces/{space}/connectors/new`); the `from` mechanism supports both.
