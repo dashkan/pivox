@@ -8,28 +8,21 @@ import type { ReactQueryApi } from '@pivox/client/react-query';
 import type {
   AgentOption,
   Connector,
-  ConnectorFormValues,
   ConnectorsAdminContextValue,
-  DialogMode,
-  DialogState,
   ListControlsChange,
   ListControlsValue,
   RemoveState,
 } from '@pivox/ui/resource-admin';
 
-import { buildConnectorBody } from '@/connectors/build-connector-body';
 import { buildConnectorsListRequest } from '@/connectors/build-connectors-request';
+import { deleteConnector } from '@/connectors/save-connector';
 import { describeRpcError, mapDeleteError } from '@/resource-admin/rpc-error';
 import { useSpaces } from '@/spaces/use-spaces';
 import { resourcePathParams } from '@/workflows/resource-paths';
 
 const CONNECTORS_PATH = '/v1/organizations/{organization}/connectors' as const;
-const CONNECTOR_PATH =
-  '/v1/organizations/{organization}/connectors/{connector}' as const;
 const SPACE_CONNECTORS_PATH =
   '/v1/organizations/{organization}/spaces/{space}/connectors' as const;
-const SPACE_CONNECTOR_PATH =
-  '/v1/organizations/{organization}/spaces/{space}/connectors/{connector}' as const;
 
 /**
  * react-query `placeholderData` that keeps the previous page rendered while a
@@ -41,14 +34,6 @@ function keepPrevious<T>(previous: T): T {
   return previous;
 }
 
-const initialDialog: DialogState<Connector> = {
-  open: false,
-  mode: 'create',
-  editing: null,
-  error: null,
-  pending: false,
-};
-
 const initialRemove: RemoveState<Connector> = {
   target: null,
   error: null,
@@ -56,77 +41,16 @@ const initialRemove: RemoveState<Connector> = {
 };
 
 /**
- * Item-route params for a connector name. `space` is present when the name is
- * space-scoped (`organizations/*​/spaces/*​/connectors/*`), selecting the
- * space-scoped item path; absent selects the org-direct item path.
- */
-function connectorItemParams(name: string): {
-  organization: string;
-  space?: string;
-  connector: string;
-} {
-  const p = resourcePathParams(name);
-  return {
-    organization: p.organization ?? '',
-    space: p.space,
-    connector: p.connector ?? '',
-  };
-}
-
-/**
- * Creates or updates a connector on the path its scope dictates. Create targets
- * the org or the selected space (`values.scope`); update derives the scope from
- * the connector's name (edit can't move scope).
- */
-function saveConnector(input: {
-  apiClient: ApiClient;
-  mode: DialogMode;
-  editing: Connector | null;
-  organization: string;
-  values: ConnectorFormValues;
-  body: ReturnType<typeof buildConnectorBody>;
-}) {
-  const { apiClient, mode, editing, organization, values, body } = input;
-
-  if (mode === 'create') {
-    const query = { connectorId: values.connectorId };
-    return values.scope
-      ? apiClient.POST(SPACE_CONNECTORS_PATH, {
-          params: { path: { organization, space: values.scope }, query },
-          body,
-        })
-      : apiClient.POST(CONNECTORS_PATH, {
-          params: { path: { organization }, query },
-          body,
-        });
-  }
-
-  const item = connectorItemParams(editing?.name ?? '');
-  return item.space
-    ? apiClient.PATCH(SPACE_CONNECTOR_PATH, {
-        params: {
-          path: {
-            organization: item.organization,
-            space: item.space,
-            connector: item.connector,
-          },
-        },
-        body,
-      })
-    : apiClient.PATCH(CONNECTOR_PATH, {
-        params: {
-          path: { organization: item.organization, connector: item.connector },
-        },
-        body,
-      });
-}
-
-/**
- * Drives the Connectors admin surface. Reads via the injected `$api`
+ * Drives the Connectors admin LIST surface. Reads via the injected `$api`
  * (openapi-react-query) and writes via the injected `apiClient` (openapi-fetch)
  * — the app-shell / create-org precedent. `parent` is the org resource name
  * (`organizations/{slug}`); its path params flow to both the list and item
  * routes.
+ *
+ * Create/edit are now ROUTED pages, not a dialog: `onCreate` / `onEdit`
+ * (route-injected navigation, setting `?from=<origin>`) become the list's
+ * `openCreate` / `openEdit`. The quick row-delete confirm stays here; the edit
+ * page has its own `FormPage.Delete`.
  */
 export function useConnectors(input: {
   $api: ReactQueryApi;
@@ -135,11 +59,23 @@ export function useConnectors(input: {
   /** List-controls state (route-owned, e.g. URL search params). */
   listState: ListControlsValue;
   onListStateChange: ListControlsChange;
-  /** All assignable agents (route-owned, SSR-prefetched); the create form uses these. */
+  /** All assignable agents (route-owned, SSR-prefetched); passed to the form pages. */
   agentOptions: AgentOption[];
+  /** Navigate to the routed create page (route-owned; sets `?from=`). */
+  onCreate: () => void;
+  /** Navigate to the routed edit page for a connector (route-owned; sets `?from=`). */
+  onEdit: (connector: Connector) => void;
 }): ConnectorsAdminContextValue {
-  const { $api, apiClient, parent, listState, onListStateChange, agentOptions } =
-    input;
+  const {
+    $api,
+    apiClient,
+    parent,
+    listState,
+    onListStateChange,
+    agentOptions,
+    onCreate,
+    onEdit,
+  } = input;
   // `parent` is an org resource name; the tested helper yields `{ organization }`.
   const path = useMemo(
     () => ({ organization: resourcePathParams(parent).organization ?? '' }),
@@ -184,50 +120,9 @@ export function useConnectors(input: {
     [listQuery.data],
   );
 
-  const [dialog, setDialog] = useState<DialogState<Connector>>(initialDialog);
   const [remove, setRemove] = useState<RemoveState<Connector>>(initialRemove);
 
   const { refetch } = listQuery;
-
-  const openCreate = useCallback(() => {
-    setDialog({ ...initialDialog, open: true, mode: 'create' });
-  }, []);
-
-  const openEdit = useCallback((connector: Connector) => {
-    setDialog({ ...initialDialog, open: true, mode: 'edit', editing: connector });
-  }, []);
-
-  const closeDialog = useCallback(() => {
-    setDialog((d) => ({ ...d, open: false }));
-  }, []);
-
-  const submit = useCallback(
-    (values: ConnectorFormValues) => {
-      setDialog((d) => ({ ...d, pending: true, error: null }));
-      void (async () => {
-        const body = buildConnectorBody(values);
-        const resp = await saveConnector({
-          apiClient,
-          mode: dialog.mode,
-          editing: dialog.editing,
-          organization: path.organization,
-          values,
-          body,
-        });
-        if (resp.error) {
-          setDialog((d) => ({
-            ...d,
-            pending: false,
-            error: describeRpcError(resp.error, "Couldn't save the connector."),
-          }));
-          return;
-        }
-        setDialog((d) => ({ ...d, open: false, pending: false }));
-        await refetch();
-      })();
-    },
-    [apiClient, dialog.mode, dialog.editing, path, refetch],
-  );
 
   const openRemove = useCallback((connector: Connector) => {
     setRemove({ ...initialRemove, target: connector });
@@ -242,28 +137,7 @@ export function useConnectors(input: {
     if (!target?.name) return;
     setRemove((r) => ({ ...r, pending: true, error: null }));
     void (async () => {
-      const item = connectorItemParams(target.name ?? '');
-      const etagQuery = target.etag ? { etag: target.etag } : {};
-      const resp = item.space
-        ? await apiClient.DELETE(SPACE_CONNECTOR_PATH, {
-            params: {
-              path: {
-                organization: item.organization,
-                space: item.space,
-                connector: item.connector,
-              },
-              query: etagQuery,
-            },
-          })
-        : await apiClient.DELETE(CONNECTOR_PATH, {
-            params: {
-              path: {
-                organization: item.organization,
-                connector: item.connector,
-              },
-              query: etagQuery,
-            },
-          });
+      const resp = await deleteConnector({ apiClient, connector: target });
       if (resp.error) {
         setRemove((r) => ({
           ...r,
@@ -293,7 +167,6 @@ export function useConnectors(input: {
       agentOptions,
       agentsInUse,
       spaceOptions: spaces,
-      dialog,
       remove,
       filters: controls.filters,
       sort: controls.sort,
@@ -305,10 +178,8 @@ export function useConnectors(input: {
       },
     },
     actions: {
-      openCreate,
-      openEdit,
-      closeDialog,
-      submit,
+      openCreate: onCreate,
+      openEdit: onEdit,
       openRemove,
       closeRemove,
       confirmRemove,

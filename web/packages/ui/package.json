@@ -79,6 +79,10 @@
       "types": "./dist/esm/grid.d.ts",
       "import": "./dist/esm/grid.js"
     },
+    "./form-page": {
+      "types": "./dist/esm/form-page.d.ts",
+      "import": "./dist/esm/form-page.js"
+    },
     "./colors.css": "./src/colors.css"
   },
   "files": [

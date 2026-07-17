@@ -68,6 +68,8 @@ describe('connectors SSR priming', () => {
           listState={listState}
           onListStateChange={() => {}}
           agentOptions={[]}
+          onCreate={() => {}}
+          onEdit={() => {}}
         />
       </QueryClientProvider>,
     );

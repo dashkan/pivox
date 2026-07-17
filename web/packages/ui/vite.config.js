@@ -64,6 +64,7 @@ export default mergeConfig(
       './src/workflow.ts',
       './src/resource-admin.ts',
       './src/grid.ts',
+      './src/form-page.ts',
     ],
     srcDir: './src',
   }),

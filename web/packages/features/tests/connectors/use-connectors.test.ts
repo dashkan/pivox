@@ -6,10 +6,7 @@ import { AGENT_FILTER_CLOUD } from '@pivox/ui/resource-admin';
 
 import type { ApiClient } from '@pivox/client';
 import type { ReactQueryApi } from '@pivox/client/react-query';
-import type {
-  ConnectorFormValues,
-  ListControlsValue,
-} from '@pivox/ui/resource-admin';
+import type { ListControlsValue } from '@pivox/ui/resource-admin';
 
 import { useConnectors } from '@/connectors/use-connectors';
 
@@ -79,16 +76,6 @@ const baseState: ListControlsValue = {
   pageToken: undefined,
 };
 
-const formValues: ConnectorFormValues = {
-  connectorId: 'stripe',
-  displayName: 'Stripe',
-  description: '',
-  baseUrl: 'https://api.stripe.com',
-  headers: [],
-  agent: '',
-  scope: '',
-};
-
 function renderConnectors(
   listState: ListControlsValue,
   response: QueryResult = { data: { connectors: [] } },
@@ -96,6 +83,8 @@ function renderConnectors(
   const onListStateChange = vi.fn();
   const api = makeApi(response);
   const client = makeApiClient();
+  const onCreate = vi.fn();
+  const onEdit = vi.fn();
   const { result } = renderHook(() =>
     useConnectors({
       $api: api.$api,
@@ -104,11 +93,15 @@ function renderConnectors(
       listState,
       onListStateChange,
       agentOptions: [],
+      onCreate,
+      onEdit,
     }),
   );
   return {
     result,
     onListStateChange,
+    onCreate,
+    onEdit,
     ...api,
     GET: client.GET,
     POST: client.POST,
@@ -253,34 +246,22 @@ describe('useConnectors — actions commit through onListStateChange', () => {
   });
 });
 
-describe('useConnectors — create scope', () => {
-  it('creates on the org path when scope is empty', async () => {
-    const { result, POST } = renderConnectors(baseState);
+describe('useConnectors — routed create/edit navigation', () => {
+  // Create/edit are routed pages now: the list delegates to the route-injected
+  // navigation callbacks (the create-scope RPC moved to `saveConnector`, tested
+  // in save-connector.test.ts).
+  it('openCreate delegates to the injected onCreate navigation', async () => {
+    const { result, onCreate } = renderConnectors(baseState);
     await settle();
     act(() => result.current.actions.openCreate());
-    await act(async () => {
-      result.current.actions.submit({ ...formValues, scope: '' });
-    });
-    expect(POST).toHaveBeenCalledTimes(1);
-    const [path0, init0] = POST.mock.calls[0] ?? [];
-    expect(path0).toBe(ORG_LIST);
-    expect(
-      (init0 as { params: { path: Record<string, string> } }).params.path.space,
-    ).toBeUndefined();
+    expect(onCreate).toHaveBeenCalledTimes(1);
   });
 
-  it('creates on the space path when a space scope is selected', async () => {
-    const { result, POST } = renderConnectors(baseState);
+  it('openEdit delegates to the injected onEdit navigation with the connector', async () => {
+    const { result, onEdit } = renderConnectors(baseState);
     await settle();
-    act(() => result.current.actions.openCreate());
-    await act(async () => {
-      result.current.actions.submit({ ...formValues, scope: 'main' });
-    });
-    expect(POST).toHaveBeenCalledTimes(1);
-    const [path0, init0] = POST.mock.calls[0] ?? [];
-    expect(path0).toBe(SPACE_LIST);
-    expect(
-      (init0 as { params: { path: Record<string, string> } }).params.path.space,
-    ).toBe('main');
+    const connector = { name: 'organizations/acme/connectors/stripe' };
+    act(() => result.current.actions.openEdit(connector));
+    expect(onEdit).toHaveBeenCalledWith(connector);
   });
 });
