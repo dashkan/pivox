@@ -20,12 +20,6 @@ SELECT * FROM asset_requests WHERE space_id = $1 AND name = $2;
 -- name: GetRequestByNameForUpdate :one
 SELECT * FROM asset_requests WHERE space_id = $1 AND name = $2 FOR UPDATE;
 
--- name: ListRequestsBySpace :many
-SELECT * FROM asset_requests
-WHERE space_id = $1
-ORDER BY create_time DESC
-LIMIT $2 OFFSET $3;
-
 -- name: CountRequestsBySpace :one
 SELECT count(*) FROM asset_requests WHERE space_id = $1;
 

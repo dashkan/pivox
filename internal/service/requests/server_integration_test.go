@@ -31,7 +31,7 @@ func newRequestsHarness(t *testing.T, orgSlug, spaceSlug string) (*grpcharness.H
 		grpcharness.WithSpacesServer(),
 		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 			assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{
-				Pool: h.Pool, Queries: h.Queries,
+				Pool: h.Pool, Queries: h.Queries, Codec: grpcharness.TestAppCodec(),
 			}))
 		}))
 	h.SeedOwnedOrg(t, orgSlug, "Acme", "requests")

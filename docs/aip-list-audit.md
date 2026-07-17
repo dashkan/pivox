@@ -180,8 +180,8 @@ keyset); **broken** = token emitted but never consumed (offset hardcoded
 | ListMessages | aichat/messages.go:41 | nested (conversation) | low value | **yes** | **yes** | keyset✗ :79 |
 | ListArtifacts | aichat/artifacts.go:44 | nested (conversation) | low value | **yes** | **yes** | keyset✗ :82 |
 | ListArtifactVersions | aichat/artifact_versions.go:44 | nested (artifact) | low value | **yes** | **yes** | keyset✗ :82 |
-| ListRequests | requests/server.go:228 | space | (space→org possible) | no (proto has) | no (proto has) | **broken** :259 |
-| ListAssets | assets/server.go:180 | space | (space→org possible) | no (proto has) | no (proto has) | **broken** :232 |
+| ListRequests | requests/server.go | space | (space→org possible) | **yes** | **yes** | **keyset✓** |
+| ListAssets | assets/server.go | space | (space→org possible) | **yes** | **yes** | **keyset✓** |
 | ListRoles | iam/server.go:168 | org | n/a | no (proto has) | no (proto has) | none (+ N+1) |
 | ListPermissions | iam/server.go:126 | global | n/a | n/a | n/a | none (by design) |
 | ListAccountOrganizations | iam/server.go:102 | caller (`accounts/me`) | n/a | n/a | n/a | none (AIP-158 disabled) |
@@ -204,10 +204,12 @@ Gap counts across the 31 implemented:
   ListWorkflows, ListWorkflowVersions, ListSecrets,
   ListKeys, ListSpaces(api),
   ListConversations, ListMessages, ListArtifacts, ListArtifactVersions.
-  ListConnectors is DONE — the compound-cursor keyset pilot (see section D).
-  ListTagKeys, ListTagValues, ListTagBindings are DONE — migrated to the
-  compound-cursor keyset engine (the tags fan-out).
-- **Pagination broken (token never consumed):** 2 — ListRequests, ListAssets.
+  ListConnectors, ListSpaces(api), ListKeys, ListTagKeys, ListTagValues,
+  ListTagBindings are DONE — migrated to the compound-cursor keyset engine
+  (the pilot + the sweep fan-out); see section D.
+- **Pagination broken (token never consumed):** 0 — ListRequests and
+  ListAssets were the last two; both are now compound-cursor keyset lists
+  (RequestFilter / AssetFilter, see section C).
 - **Filter present in proto but not wired (or ignored):** 11 —
   ListWorkflows, ListConnectors, ListSecrets, ListStorageGateways,
   ListEndpoints, ListAgents, ListMembers(org), ListMembers(space),
@@ -260,28 +262,32 @@ inserts `pageSize+1` rows, reads page 1, follows the token, and asserts
 no row is dropped at the boundary. The bug is invisible unless the test
 crosses a page boundary with an exact multiple.
 
-### C. Pagination broken (rewrite to keyset) — ListRequests, ListAssets
+### C. Pagination broken (rewrite to keyset) — ListRequests, ListAssets — **DONE**
 
-These are worse than an off-by-one: the query is
+These were worse than an off-by-one: the query was
 `LIMIT pageSize+1 OFFSET 0` with the offset **hardcoded to 0**, and the
-emitted `nextPageToken` (`requests/server.go:259`,
-`assets/server.go:232` — `rows[pageSize].ID.String()`) is **never
-consumed** — no `page_token` decode exists. Every "next page" re-returns
+emitted `nextPageToken` (`rows[pageSize].ID.String()`) was **never
+consumed** — no `page_token` decode existed. Every "next page" re-returned
 page 1.
 
-Fix: convert to keyset like connectors/secrets.
-- Queries: `internal/db/queries/asset_requests.sql`
-  (`ListRequestsBySpace`) and `internal/db/queries/assets.sql`
-  (`ListAssetsBySpace` / `ListAssetsBySpaceWithDeleted`). Replace
-  `LIMIT/OFFSET` params with a `Cursor pgtype.UUID` +
-  `WHERE … AND ($cursor IS NULL OR id > $cursor) ORDER BY id LIMIT $n`
-  (mirror `internal/db/queries/secrets.sql:46`).
-- Handlers: decode `page_token` (copy `secrets/server.go:157-166`), pass
-  the cursor, and encode `rows[pageSize-1].ID` via
-  `filter.EncodeNextPageToken`.
-- `ListAssets` note: the non-deleted path already unwraps
-  `ListAssetsBySpaceRow → db.Asset` (`assets/server.go:220-224`); keep
-  that when adding the cursor.
+Both are now fully dynamic AIP-160 filtered + AIP-132 sorted +
+**compound-cursor** keyset lists built on `internal/filter.BuildListQuery`
+(base scope `space_id = $`), matching the connectors/spaces pilots. See
+`filter.RequestFilter` / `filter.AssetFilter`, `filter.ScanRequests` /
+`filter.ScanAssets`, and the handler assembly in `requests/server.go`
+(ListRequests) and `assets/server.go` (ListAssets).
+
+- The static `ListRequestsBySpace` and `ListAssetsBySpaceWithDeleted`
+  queries were deleted; `show_deleted` on assets now flows through
+  `ListQuery.ShowDeleted` (asset_requests has no `delete_time`, so its
+  flag is inert). The JOINED `ListAssetsBySpace` / `ListAssetsByOrg`
+  stay — the dashboards synthesizer still uses them; ListAssets was
+  repointed onto the PLAIN `assets` table.
+- `AssetFilter.sizeBytes` is the first BIGINT sortable, which added a
+  `filtering.TypeInt` cursor branch to `filter.DecodeCursor` (a Go string
+  bound against a bigint column fails pgx encoding). Nullable columns the
+  protos advertise for order_by (`dueTime`, `expireTime`) are registered
+  filterable-only, per the compound-cursor NOT-NULL rule.
 
 ### D. Filter + order_by wiring, keyset-partitioned (leveled) resources
 
@@ -397,8 +403,8 @@ bespoke filter/sort), and `-` rollup where the resource is leveled. Note
 ## Recommended order of work
 
 1. **Pagination first — it's a data-correctness bug.**
-   1a. Section C (ListRequests, ListAssets) — broken paging returns
-   duplicate pages; highest severity. Rewrite to keyset.
+   1a. Section C (ListRequests, ListAssets) — **DONE**: both rewritten to
+   the compound-cursor keyset engine (see section C).
    1b. Section B — the 13 off-by-one one-liners. Mechanical; one commit
    per service package with a boundary-crossing integration test each.
 2. **Filter + order_by** (sections D, E, F) — wire per resource, TDD a
