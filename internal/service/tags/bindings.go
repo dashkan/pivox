@@ -84,34 +84,52 @@ func (s *TagBindingsServer) resolveTagBindingActors(ctx context.Context, rows []
 	return actors, nil
 }
 
+// ListTagBindings is a dynamic AIP-160 filtered + AIP-132 sorted +
+// compound-cursor keyset list. The parent_resource is the NON-NEGOTIABLE base
+// scope (parent_resource = $); the request's filter/order_by layer ON TOP of it
+// and can only narrow. Every value is bound as a $N parameter by
+// filter.BuildListQuery, and column/direction come only from TagBindingFilter's
+// whitelist. This replaced the legacy id-only filter.Query path. Because
+// parent_resource is constant within a single list scope, an order_by on it
+// falls through to the id tiebreaker the compound cursor adds — the legacy ORDER
+// BY had none and resumed on an id-only token, dropping/duplicating rows across
+// boundaries. See docs/aip-list-transpiler-procedure.md.
 func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.ListTagBindingsRequest) (*apiv1.ListTagBindingsResponse, error) {
-	rows, err := filter.Query(ctx, s.pool, s.filter, filter.QueryParams{
+	rf := s.filter
+	pageSize := clampPageSize(req.GetPageSize())
+
+	plan, err := filter.PlanOrderBy(rf, req.GetOrderBy())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("order_by", err.Error()))
+	}
+	cursor, err := filter.DecodeCursor(s.codec, plan, req.GetPageToken())
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", "invalid or malformed"))
+	}
+
+	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+		Resource: rf,
+		Base:     []filter.Predicate{{SQL: "parent_resource = %s", Arg: req.GetParent()}},
 		Filter:   req.GetFilter(),
-		ParentID: req.GetParent(),
-		OrderBy:  req.GetOrderBy(),
-		PageSize: req.GetPageSize(),
-		Cursor:   req.GetPageToken(),
-		Codec:    s.codec,
+		Order:    plan,
+		PageSize: pageSize,
+		Cursor:   cursor,
 	})
 	if err != nil {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
-	results, err := filter.ScanTagBindings(rows)
+	pgxRows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
-		return nil, apierr.Internal(err, "database error")
+		return nil, apierr.Internal(err, "list tag bindings")
 	}
-
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
+	results, err := filter.ScanTagBindings(pgxRows)
+	if err != nil {
+		return nil, apierr.Internal(err, "list tag bindings")
 	}
 
 	results, nextPageToken, err := filter.Paginate(results, int(pageSize), func(last db.TagBinding) (string, error) {
-		return filter.EncodeNextPageToken(s.codec, last.ID)
+		return filter.EncodeCursor(s.codec, plan, tagBindingSortValue(plan, last), last.ID)
 	})
 	if err != nil {
 		return nil, apierr.Internal(err, "encode page token")
@@ -134,6 +152,19 @@ func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.List
 		TagBindings:   tagBindings,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+// tagBindingSortValue renders the active order_by column's value for the given
+// row as the string the compound page token carries. parentResource is the only
+// sortable and is a plain string; for the default id ordering (plan.Field == "")
+// the value is unused, so "" is returned.
+func tagBindingSortValue(plan filter.OrderByPlan, r db.TagBinding) string {
+	switch plan.Field {
+	case "parentResource":
+		return r.ParentResource
+	default:
+		return ""
+	}
 }
 
 func (s *TagBindingsServer) GetTagBinding(ctx context.Context, req *apiv1.GetTagBindingRequest) (*apiv1.TagBinding, error) {
