@@ -122,6 +122,43 @@ func (q *Queries) GetTagKeyByNamespacedName(ctx context.Context, namespacedName 
 	return i, err
 }
 
+const getTagKeyByOrgAndID = `-- name: GetTagKeyByOrgAndID :one
+SELECT id, org_id, short_name, namespaced_name, description, annotations, etag, revision, created_by, updated_by, create_time, update_time FROM tag_keys WHERE id = $1 AND org_id = $2
+`
+
+type GetTagKeyByOrgAndIDParams struct {
+	ID    uuid.UUID `json:"id"`
+	OrgID uuid.UUID `json:"org_id"`
+}
+
+// GetTagKeyByOrgAndID is the org-scoped fetch used by every tag
+// value/binding handler to authorize the parent tag key against the
+// caller's resolved org. The permission interceptor authorizes the
+// caller-attested org SLUG in the request path, but a leaf tag-key
+// UUID in that path could belong to a DIFFERENT org; filtering by
+// org_id here closes that cross-org IDOR at the query, so a mismatch
+// returns pgx.ErrNoRows (mapped to NotFound) rather than the other
+// org's row.
+func (q *Queries) GetTagKeyByOrgAndID(ctx context.Context, arg GetTagKeyByOrgAndIDParams) (TagKey, error) {
+	row := q.db.QueryRow(ctx, getTagKeyByOrgAndID, arg.ID, arg.OrgID)
+	var i TagKey
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.ShortName,
+		&i.NamespacedName,
+		&i.Description,
+		&i.Annotations,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
 const getTagKeyForUpdate = `-- name: GetTagKeyForUpdate :one
 SELECT id, org_id, short_name, namespaced_name, description, annotations, etag, revision, created_by, updated_by, create_time, update_time FROM tag_keys WHERE id = $1 FOR UPDATE
 `

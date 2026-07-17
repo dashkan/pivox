@@ -127,8 +127,15 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagKey", req.GetParent())
 	}
-	// Verify the tag key exists.
-	if _, err := s.queries.GetTagKey(ctx, tagKeyID); err != nil {
+	// Authorize the parent tag key against the caller's resolved org before
+	// listing its values. The interceptor authorized the org SLUG in the path,
+	// but the tag-key UUID could belong to another org; an org mismatch here is
+	// NotFound (pgx.ErrNoRows via HandleResourceError), not a cross-org leak.
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	if _, err := s.queries.GetTagKeyByOrgAndID(ctx, db.GetTagKeyByOrgAndIDParams{
+		ID:    tagKeyID,
+		OrgID: resolvedOrg.ID,
+	}); err != nil {
 		return nil, apierr.HandleResourceError(err, "TagKey", req.GetParent())
 	}
 
@@ -176,10 +183,9 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 	if err != nil {
 		return nil, err
 	}
-	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
 	tagValues := make([]*apiv1.TagValue, 0, len(results))
 	for _, r := range results {
-		tagValues = append(tagValues, convert.TagValueToProto(r, orgSlug, actors))
+		tagValues = append(tagValues, convert.TagValueToProto(r, resolvedOrg.Slug, actors))
 	}
 
 	return &apiv1.ListTagValuesResponse{
@@ -214,12 +220,20 @@ func (s *TagValuesServer) GetTagValue(ctx context.Context, req *apiv1.GetTagValu
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
+	// A tag value's org is its tag key's org. Authorize that key against the
+	// caller's resolved org; a mismatch is NotFound, not a cross-org leak.
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	if _, err := s.queries.GetTagKeyByOrgAndID(ctx, db.GetTagKeyByOrgAndIDParams{
+		ID:    tagValue.TagKeyID,
+		OrgID: resolvedOrg.ID,
+	}); err != nil {
+		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
+	}
 	actors, err := s.resolveTagValueActors(ctx, []db.TagValue{tagValue})
 	if err != nil {
 		return nil, err
 	}
-	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
-	return convert.TagValueToProto(tagValue, orgSlug, actors), nil
+	return convert.TagValueToProto(tagValue, resolvedOrg.Slug, actors), nil
 }
 
 func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateTagValueRequest) (*longrunningpb.Operation, error) {
@@ -231,7 +245,15 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 		return nil, apierr.HandleResourceError(err, "TagKey", parent)
 	}
 
-	parentKey, err := s.queries.GetTagKey(ctx, tagKeyID)
+	// Authorize the parent tag key against the caller's resolved org: the
+	// interceptor authorized the org SLUG in the path, but this tag-key UUID
+	// could belong to another org. An org mismatch is NotFound — never a
+	// cross-org write under the other org's key.
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	parentKey, err := s.queries.GetTagKeyByOrgAndID(ctx, db.GetTagKeyByOrgAndIDParams{
+		ID:    tagKeyID,
+		OrgID: resolvedOrg.ID,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.NotFound("TagKey", parent)
@@ -268,8 +290,7 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 			"tag_value_id", result.ID, "error", resolveErr)
 		actors = nil
 	}
-	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
-	return lro.DoneOperation(convert.TagValueToProto(result, orgSlug, actors))
+	return lro.DoneOperation(convert.TagValueToProto(result, resolvedOrg.Slug, actors))
 }
 
 func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateTagValueRequest) (*longrunningpb.Operation, error) {
@@ -281,6 +302,16 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 
 	existing, err := s.queries.GetTagValue(ctx, id)
 	if err != nil {
+		return nil, apierr.HandleResourceError(err, "TagValue", tagValue.GetName())
+	}
+	// Authorize the value's tag key against the caller's resolved org before
+	// mutating; a cross-org mismatch is NotFound, not an update of another
+	// org's value.
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	if _, err := s.queries.GetTagKeyByOrgAndID(ctx, db.GetTagKeyByOrgAndIDParams{
+		ID:    existing.TagKeyID,
+		OrgID: resolvedOrg.ID,
+	}); err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", tagValue.GetName())
 	}
 
@@ -317,8 +348,7 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 			"tag_value_id", result.ID, "error", resolveErr)
 		actors = nil
 	}
-	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
-	return lro.DoneOperation(convert.TagValueToProto(result, orgSlug, actors))
+	return lro.DoneOperation(convert.TagValueToProto(result, resolvedOrg.Slug, actors))
 }
 
 // DeleteTagValue removes an unbound tag value. Refuses with
@@ -335,13 +365,23 @@ func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteT
 		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
 
-	// validate_only runs the whole delete tx (row lock, binding count,
-	// DELETE) against real state and rolls it back, so a would-fail request
-	// (e.g. the value still has bindings) returns the same error a live one
-	// would while persisting nothing.
+	// Authorize the value's tag key against the caller's resolved org; a
+	// cross-org mismatch is NotFound, never a delete of another org's value.
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+
+	// validate_only runs the whole delete tx (row lock, org check, binding
+	// count, DELETE) against real state and rolls it back, so a would-fail
+	// request (e.g. the value still has bindings) returns the same error a live
+	// one would while persisting nothing.
 	if err := db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
 		existing, err := qtx.GetTagValueForUpdate(ctx, id)
 		if err != nil {
+			return apierr.HandleResourceError(err, "TagValue", req.GetName())
+		}
+		if _, err := qtx.GetTagKeyByOrgAndID(ctx, db.GetTagKeyByOrgAndIDParams{
+			ID:    existing.TagKeyID,
+			OrgID: resolvedOrg.ID,
+		}); err != nil {
 			return apierr.HandleResourceError(err, "TagValue", req.GetName())
 		}
 		bindingCount, err := qtx.CountTagBindingsByTagValue(ctx, existing.ID)

@@ -472,6 +472,15 @@ type Querier interface {
 	GetTagBinding(ctx context.Context, id uuid.UUID) (TagBinding, error)
 	GetTagKey(ctx context.Context, id uuid.UUID) (TagKey, error)
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
+	// GetTagKeyByOrgAndID is the org-scoped fetch used by every tag
+	// value/binding handler to authorize the parent tag key against the
+	// caller's resolved org. The permission interceptor authorizes the
+	// caller-attested org SLUG in the request path, but a leaf tag-key
+	// UUID in that path could belong to a DIFFERENT org; filtering by
+	// org_id here closes that cross-org IDOR at the query, so a mismatch
+	// returns pgx.ErrNoRows (mapped to NotFound) rather than the other
+	// org's row.
+	GetTagKeyByOrgAndID(ctx context.Context, arg GetTagKeyByOrgAndIDParams) (TagKey, error)
 	// GetTagKeyForUpdate is the locking variant used by DeleteTagKey
 	// inside its tx to serialize the empty-check + DELETE against
 	// concurrent CreateTagValue inserts. The FOR UPDATE row lock

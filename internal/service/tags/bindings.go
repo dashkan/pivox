@@ -184,6 +184,22 @@ func parseTagBindingName(name string) (uuid.UUID, error) {
 	return uuid.Parse(parts[n-1])
 }
 
+// bindingInOrg reports whether the binding belongs to orgSlug, by comparing the
+// org slug embedded in its stored parent_resource ("organizations/{slug}[/...]")
+// against the caller's resolved org slug. An org slug is unique and immutable
+// for the org's lifetime (no rename RPC), so this is an exact ownership check.
+// The permission interceptor authorizes the org slug in the request NAME, but
+// the binding is fetched by leaf UUID — this closes the cross-org IDOR by
+// rejecting a binding whose real org differs.
+//
+// A slug is only freed for reuse once org purge completes, which cascades away
+// that org's tag bindings first, so no live binding can match a slug later
+// reclaimed by a different org.
+func bindingInOrg(tb db.TagBinding, orgSlug string) bool {
+	parts := strings.Split(tb.ParentResource, "/")
+	return len(parts) >= 2 && parts[0] == "organizations" && parts[1] == orgSlug
+}
+
 func (s *TagBindingsServer) GetTagBinding(ctx context.Context, req *apiv1.GetTagBindingRequest) (*apiv1.TagBinding, error) {
 	id, err := parseTagBindingName(req.GetName())
 	if err != nil {
@@ -193,16 +209,28 @@ func (s *TagBindingsServer) GetTagBinding(ctx context.Context, req *apiv1.GetTag
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
+	// Authorize against the caller's resolved org: both the binding itself (its
+	// parent_resource) and its referenced tag value must belong to the caller's
+	// org. A mismatch is NotFound, never a cross-org leak.
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	if !bindingInOrg(tb, resolvedOrg.Slug) {
+		return nil, apierr.NotFound("TagBinding", req.GetName())
+	}
 	tv, err := s.queries.GetTagValue(ctx, tb.TagValueID)
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", "")
+	}
+	if _, err := s.queries.GetTagKeyByOrgAndID(ctx, db.GetTagKeyByOrgAndIDParams{
+		ID:    tv.TagKeyID,
+		OrgID: resolvedOrg.ID,
+	}); err != nil {
+		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 	actors, err := s.resolveTagBindingActors(ctx, []db.TagBinding{tb})
 	if err != nil {
 		return nil, err
 	}
-	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
-	return convert.TagBindingToProto(tb, tv, orgSlug, actors), nil
+	return convert.TagBindingToProto(tb, tv, resolvedOrg.Slug, actors), nil
 }
 
 func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.CreateTagBindingRequest) (*longrunningpb.Operation, error) {
@@ -215,6 +243,18 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 	}
 	tagValue, err := s.queries.GetTagValue(ctx, tvID)
 	if err != nil {
+		return nil, apierr.HandleResourceError(err, "TagValue", tb.GetTagValue())
+	}
+	// Authorize the referenced tag value against the caller's resolved org (its
+	// org is its tag key's org). The binding's own parent is the interceptor-
+	// authorized request parent; without this check a caller could bind ANOTHER
+	// org's tag value to their resource. A mismatch is NotFound — no cross-org
+	// binding is written.
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	if _, err := s.queries.GetTagKeyByOrgAndID(ctx, db.GetTagKeyByOrgAndIDParams{
+		ID:    tagValue.TagKeyID,
+		OrgID: resolvedOrg.ID,
+	}); err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", tb.GetTagValue())
 	}
 
@@ -238,8 +278,7 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 			"tag_binding_id", created.ID, "error", resolveErr)
 		actors = nil
 	}
-	orgSlug := server.MustResolvedOrgFromContext(ctx).Slug
-	return lro.DoneOperation(convert.TagBindingToProto(created, tagValue, orgSlug, actors))
+	return lro.DoneOperation(convert.TagBindingToProto(created, tagValue, resolvedOrg.Slug, actors))
 }
 
 func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.DeleteTagBindingRequest) (*longrunningpb.Operation, error) {
@@ -248,13 +287,20 @@ func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.Del
 		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 
-	// validate_only runs the existence check + DELETE against real state
-	// and rolls it back, so a would-fail request (e.g. missing binding)
+	// Authorize the binding against the caller's resolved org; a cross-org
+	// mismatch is NotFound, never a delete of another org's binding.
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+
+	// validate_only runs the existence check + org check + DELETE against real
+	// state and rolls it back, so a would-fail request (e.g. missing binding)
 	// returns the same error a live one would while persisting nothing.
 	if err := db.RunInTxVoidValidate(ctx, s.pool, req.GetValidateOnly(), func(qtx db.Querier) error {
 		existing, err := qtx.GetTagBinding(ctx, id)
 		if err != nil {
 			return apierr.HandleResourceError(err, "TagBinding", req.GetName())
+		}
+		if !bindingInOrg(existing, resolvedOrg.Slug) {
+			return apierr.NotFound("TagBinding", req.GetName())
 		}
 		if err := qtx.DeleteTagBinding(ctx, existing.ID); err != nil {
 			return apierr.HandleResourceError(err, "TagBinding", req.GetName())
