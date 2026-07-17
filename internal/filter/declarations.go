@@ -290,7 +290,16 @@ func ConnectorFilter() *ResourceFilter {
 	}
 }
 
-// ApiKeyFilter returns the filter config for API keys.
+// ApiKeyFilter returns the filter config for API keys. Consumed by the
+// compound-cursor keyset path (filter.BuildListQuery) in ListKeys — the base
+// scope (org_id = $) is supplied by the handler via ListQuery.Base, so
+// ParentColumn is unused on that path (kept for documentation of the scope
+// column). Both Sortable columns below are NOT NULL in the init migration
+// (display_name TEXT NOT NULL, create_time TIMESTAMPTZ NOT NULL), which the
+// compound-cursor row comparison requires: a nullable sort column would go
+// UNKNOWN on NULLs and drop/duplicate rows across page boundaries, so such a
+// column must be registered filterable-only, never Sortable. API keys has no
+// nullable sortable columns, so none are demoted.
 func ApiKeyFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -298,8 +307,10 @@ func ApiKeyFilter() *ResourceFilter {
 			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Sortable: map[string]SortableField{
-			"displayName": {Column: "display_name"},
-			"createTime":  {Column: "create_time"},
+			"displayName": {Column: "display_name", Type: filtering.TypeString},
+			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
+			// sort value back into a time.Time (RFC3339Nano round-trip).
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
 		Table:         "api_keys",
 		SoftDelete:    true,
