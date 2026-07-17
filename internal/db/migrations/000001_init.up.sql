@@ -1266,7 +1266,14 @@ CREATE TABLE ai_conversations (
     archived        BOOLEAN NOT NULL DEFAULT FALSE,
     pinned          BOOLEAN NOT NULL DEFAULT FALSE,
     message_count   INTEGER NOT NULL DEFAULT 0,
-    last_message_time TIMESTAMPTZ,
+    -- Activity clock. NOT NULL so it can serve as the default keyset sort
+    -- (`lastMessageTime desc`, recent-activity-first): a nullable sort column
+    -- goes UNKNOWN on NULLs and drops/duplicates rows across page boundaries.
+    -- DEFAULT now() seeds it at birth — a conversation is only ever created
+    -- alongside its first message (CreateConversation + first message run in
+    -- one tx), so it immediately reads that message's time, and
+    -- IncrementConversationMessageCount bumps it on every subsequent turn.
+    last_message_time TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- etag/revision
     etag            TEXT NOT NULL DEFAULT md5(now()::text),
     revision        INTEGER NOT NULL DEFAULT 1,

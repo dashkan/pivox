@@ -717,7 +717,7 @@ type AiConversation struct {
 	Archived        bool               `json:"archived"`
 	Pinned          bool               `json:"pinned"`
 	MessageCount    int32              `json:"message_count"`
-	LastMessageTime pgtype.Timestamptz `json:"last_message_time"`
+	LastMessageTime time.Time          `json:"last_message_time"`
 	Etag            string             `json:"etag"`
 	Revision        int32              `json:"revision"`
 	CreatedBy       uuid.UUID          `json:"created_by"`

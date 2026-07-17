@@ -216,15 +216,16 @@ func TagBindingFilter() *ResourceFilter {
 // that path (no filter.Query consumer remains) — kept only to document the
 // scope columns.
 //
-// DefaultOrder is "id desc" (newest-first): with no client order_by the list
-// defaults to the id-only DESC keyset, restoring the pre-migration UX. Every
-// Sortable column below is NOT NULL in the init migration (title, create_time),
-// which the compound-cursor row comparison requires: a nullable sort column
-// goes UNKNOWN on NULLs and drops/duplicates rows across page boundaries.
-// `last_message_time` IS nullable, so it is registered filterable-only (DEMOTED
-// from the legacy Sortable set) — a client that tries order_by=lastMessageTime
-// now gets InvalidArgument from PlanOrderBy rather than a silently broken
-// keyset. DefaultPageSize is 50 (the pre-migration default).
+// DefaultOrder is "lastMessageTime desc" (recent-activity-first): with no
+// client order_by the list surfaces the conversations the user most recently
+// interacted with, which is the chat-sidebar default. It resolves to the
+// compound (last_message_time, id) keyset. Every Sortable column below is NOT
+// NULL in the init migration (title, create_time, last_message_time), which the
+// compound-cursor row comparison requires: a nullable sort column goes UNKNOWN
+// on NULLs and drops/duplicates rows across page boundaries. `last_message_time`
+// became NOT NULL (DEFAULT now(), bumped on every message) precisely so it can
+// serve as this default keyset column. DefaultPageSize is 50 (the pre-migration
+// default).
 func ConversationFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -239,12 +240,13 @@ func ConversationFilter() *ResourceFilter {
 			// Type MUST be TypeTimestamp so DecodeCursor reparses the page-token
 			// sort value back into a time.Time (RFC3339Nano round-trip).
 			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
-			// lastMessageTime is DEMOTED to filterable-only: last_message_time is
-			// nullable, so it cannot be a compound-cursor sort column.
+			// last_message_time is NOT NULL now, so it's a valid compound-cursor
+			// sort column — and it's the default sort (recent-activity-first).
+			"lastMessageTime": {Column: "last_message_time", Type: filtering.TypeTimestamp},
 		},
 		Table:           "ai_conversations",
 		SoftDelete:      false, // AI resources don't soft-delete
-		DefaultOrder:    "id desc",
+		DefaultOrder:    "lastMessageTime desc",
 		DefaultPageSize: 50,
 		OrderBy:         "id DESC",
 		CursorColumn:    "id",

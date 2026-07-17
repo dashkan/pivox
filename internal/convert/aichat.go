@@ -39,9 +39,9 @@ func ConversationToProto(row db.AiConversation, orgName string, actors map[uuid.
 		pb.CreatedBy = actors[row.CreatedBy]
 		pb.UpdatedBy = actorOrNil(actors, row.UpdatedBy)
 	}
-	if row.LastMessageTime.Valid {
-		pb.LastMessageTime = timestamppb.New(row.LastMessageTime.Time)
-	}
+	// last_message_time is NOT NULL (DEFAULT now(), then bumped by every
+	// message persist), so it's always present — no Valid check.
+	pb.LastMessageTime = timestamppb.New(row.LastMessageTime)
 	return pb
 }
 
