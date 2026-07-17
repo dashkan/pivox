@@ -63,6 +63,7 @@ export default mergeConfig(
       './src/chat.ts',
       './src/workflow.ts',
       './src/resource-admin.ts',
+      './src/grid.ts',
     ],
     srcDir: './src',
   }),

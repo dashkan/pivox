@@ -1,19 +1,15 @@
 import type { components } from '@pivox/client/types';
+// The generic list-control types are owned by the lower `grid` tier; re-export
+// them here so resource-admin consumers keep a single import surface.
+import type { HistoryMode, SortState } from '../grid/types';
+
+export type { HistoryMode, SortDirection, SortState } from '../grid/types';
 
 export type Connector = components['schemas']['v1Connector'];
 export type Secret = components['schemas']['v1Secret'];
 export type Actor = components['schemas']['typesActor'];
 
 export type DialogMode = 'create' | 'edit';
-
-export type SortDirection = 'asc' | 'desc';
-
-/** The active column sort for a server-driven list. */
-export interface SortState {
-  /** The order_by field (e.g. `displayName`, `updateTime`). */
-  field: string;
-  direction: SortDirection;
-}
 
 /**
  * Serializable list-controls state. The route owns this (URL search params) and
@@ -31,13 +27,6 @@ export interface ListControlsValue {
   /** Opaque page cursor; undefined is the first page. */
   pageToken: string | undefined;
 }
-
-/**
- * How the route should record a controls change in history. Discrete changes
- * (page, scope, sort, page size, clear) `push` a new entry so Back works;
- * debounced search text uses `replace` so typing doesn't spam history.
- */
-export type HistoryMode = 'push' | 'replace';
 
 /** Commits a new controls value, telling the route how to record it in history. */
 export type ListControlsChange = (

@@ -227,6 +227,13 @@ describe('ConnectorsAdmin — table', () => {
     expect(screen.getByText('main')).toBeDefined();
   });
 
+  it('hides the Space column inside a specific space (redundant there)', () => {
+    // Org rollup (scope '') shows Space; a specific-space scope drops the column
+    // since every row shares that space.
+    renderTable({ connectors: [spaceConnector], spaceOptions, scope: 'main' });
+    expect(screen.queryByRole('columnheader', { name: 'Space' })).toBeNull();
+  });
+
   it('opens the edit dialog when the name link is clicked', () => {
     const openEdit = vi.fn();
     renderTable({ connectors: [connector] }, { openEdit });
@@ -374,9 +381,10 @@ describe('ConnectorsAdmin — list controls', () => {
 });
 
 describe('ConnectorsAdmin — scope', () => {
-  it('shows the scope combobox (resting on "All spaces") in the filter row', () => {
+  it('shows the scope combobox (resting on "All spaces") as a gated toolbar control', () => {
     renderTable({ connectors: [connector], spaceOptions });
-    // Hidden until the filter row is revealed.
+    // Scope is a toolbar control the connectors consumer wires (the grid knows
+    // nothing about scope); it's gated by the same filter toggle as the row.
     expect(screen.queryByPlaceholderText('All spaces')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
     // The combobox input rests on the "All spaces" placeholder when empty.

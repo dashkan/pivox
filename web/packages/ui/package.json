@@ -75,6 +75,10 @@
       "types": "./dist/esm/resource-admin.d.ts",
       "import": "./dist/esm/resource-admin.js"
     },
+    "./grid": {
+      "types": "./dist/esm/grid.d.ts",
+      "import": "./dist/esm/grid.js"
+    },
     "./colors.css": "./src/colors.css"
   },
   "files": [

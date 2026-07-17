@@ -10,9 +10,9 @@ import type {
   SortState,
 } from './types';
 
-/** Selectable page sizes for the list pager. */
-export const PAGE_SIZES = [10, 25, 50, 100] as const;
-export const DEFAULT_PAGE_SIZE = 25;
+// Page-size constants live in the generic `grid` tier; re-export so existing
+// `@pivox/ui/resource-admin` consumers keep importing them from here.
+export { DEFAULT_PAGE_SIZE, PAGE_SIZES } from '../grid/page-sizes';
 
 /** `field` → AIP-160 `order_by`; descending gets the ` desc` suffix. */
 export function orderByParam(sort: SortState | null): string | undefined {

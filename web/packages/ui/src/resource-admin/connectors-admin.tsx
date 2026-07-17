@@ -11,18 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@pivox/primitives/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@pivox/primitives/table';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
-import { AdminFrame, AdminNoticeRow } from './admin-frame';
-import { AdminPagination } from './admin-pagination';
+import { Grid, useGrid } from '../grid';
+
+import { AdminFrame } from './admin-frame';
 import { AdminSearch } from './admin-search';
 import { AGENT_FILTER_ANY, AgentFilterSelect } from './agent-filter';
 import { AgentSelect } from './agent-select';
@@ -40,7 +33,8 @@ import { actorLabel, formatTimestamp } from './meta-cells';
 import { RowActions } from './row-actions';
 import { ScopeSelect } from './scope-select';
 import { isValidIdentifier, slugify } from './slug';
-import { SortableHeader } from './sortable-header';
+
+import type { GridColumn, GridContextValue } from '../grid';
 
 import type { Suggestion } from './suggest-combobox';
 
@@ -285,7 +279,7 @@ function ConnectorForm() {
           disabled={dialog.pending}
         />
       </Field>
-      {isCreate && (
+      {isCreate ? (
         <IdentifierField
           label="Identifier"
           value={values.connectorId}
@@ -300,7 +294,7 @@ function ConnectorForm() {
           }}
           disabled={dialog.pending}
         />
-      )}
+      ) : null}
       <Field>
         <FieldLabel>Scope</FieldLabel>
         {isCreate ? (
@@ -372,203 +366,235 @@ function ConnectorForm() {
   );
 }
 
-function ConnectorFilterRow() {
+/**
+ * Bridges the connectors domain context into the generic `Grid` interface
+ * (state-decouple-implementation): the only place that maps connectors list
+ * state/actions onto `GridContextValue<Connector>`. Every `Grid.*` part below
+ * reads that injected interface — the grid never sees a connector concept.
+ */
+function ConnectorsGridProvider({ children }: { children: React.ReactNode }) {
   const { state, actions } = useConnectorsAdmin();
-  const { filters, agentOptions, agentsInUse, spaceOptions, scope } = state;
-
-  // The agent facet lists only agents actually in scope, resolved to labels via
-  // the full agent list (leaf fallback). Hidden entirely when every connector in
-  // scope runs on the cloud (no agents in use).
-  const inUseAgentOptions = agentsInUse.map((name) => ({
-    value: name,
-    label: agentLabel(name, agentOptions),
-  }));
-
-  return (
-    <TableRow>
-      <TableHead>
-        <AdminSearch
-          value={filters.displayName ?? ''}
-          // Debounced text: replace history so keystrokes don't stack entries.
-          onChange={(value) => actions.setFilter('displayName', value, 'replace')}
-          placeholder="Filter by name"
-          debounceMs={300}
-        />
-      </TableHead>
-      <TableHead>
-        <ScopeSelect
-          value={scope}
-          spaces={spaceOptions}
-          onChange={actions.setScope}
-          allLabel="All spaces"
-        />
-      </TableHead>
-      <TableHead />
-      <TableHead>
-        {inUseAgentOptions.length > 0 && (
-          <AgentFilterSelect
-            value={filters.agent ?? AGENT_FILTER_ANY}
-            // Discrete selection: push history so Back returns to the prior facet.
-            onChange={(value) => actions.setFilter('agent', value, 'push')}
-            options={inUseAgentOptions}
-          />
-        )}
-      </TableHead>
-      <TableHead />
-      <TableHead className="w-0" />
-    </TableRow>
+  const value = useMemo<GridContextValue<Connector>>(
+    () => ({
+      state: {
+        rows: state.connectors,
+        isLoading: state.isLoading,
+        loadError: state.loadError,
+        filters: state.filters,
+        sort: state.sort,
+        pageSize: state.pageSize,
+        pagination: {
+          hasPrev: state.pagination.hasPrevPage,
+          hasNext: state.pagination.hasNextPage,
+        },
+      },
+      actions: {
+        setFilter: actions.setFilter,
+        toggleSort: actions.toggleSort,
+        setPageSize: actions.setPageSize,
+        clearFilters: actions.clearFilters,
+        nextPage: actions.nextPage,
+        prevPage: actions.prevPage,
+      },
+      // Scope is NOT a grid concept — it stays in the connectors domain context.
+      meta: { rowKey: (connector) => connector.name ?? '' },
+    }),
+    [state, actions],
   );
+  return <Grid.Provider value={value}>{children}</Grid.Provider>;
 }
-
-// One data column for each header (Name, Space, Type, Agent, Updated, actions).
-const CONNECTOR_COLSPAN = 6;
 
 /**
- * Body rows for the connectors table. Loading / error / empty each render a
- * single notice row so the header + filter row above never unmount (which would
- * drop focus from the filter inputs and hide the controls when there is no data).
+ * Name filter control for the Name column's filter cell. Reads the grid context
+ * (not the domain context) so it demonstrates the DI interface. Debounced text
+ * commits with `replace` history so keystrokes don't stack entries.
  */
-function ConnectorsTableBody() {
-  const { state, actions } = useConnectorsAdmin();
-  const { connectors, filters, scope, agentOptions, spaceOptions } = state;
-
-  if (state.isLoading) {
-    return (
-      <AdminNoticeRow colSpan={CONNECTOR_COLSPAN}>
-        Loading connectors…
-      </AdminNoticeRow>
-    );
-  }
-  if (state.loadError) {
-    return (
-      <AdminNoticeRow colSpan={CONNECTOR_COLSPAN}>
-        {state.loadError}
-      </AdminNoticeRow>
-    );
-  }
-  if (connectors.length === 0) {
-    return (
-      <AdminNoticeRow colSpan={CONNECTOR_COLSPAN}>
-        {hasActiveFilters(filters, scope)
-          ? 'No connectors match your filters.'
-          : 'No connectors yet.'}
-      </AdminNoticeRow>
-    );
-  }
-
+function ConnectorNameFilter() {
+  const { state, actions } = useGrid<Connector>();
   return (
-    <>
-      {connectors.map((connector: Connector) => {
-        const type = connectorType(connector);
-        const spaceSlug = connectorSpaceSlug(connector.name);
-        return (
-          <TableRow key={connector.name}>
-            <TableCell className="font-medium">
-              <button
-                type="button"
-                className="text-left hover:underline"
-                onClick={() => actions.openEdit(connector)}
-              >
-                {connector.displayName || leafId(connector.name)}
-              </button>
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {spaceSlug ? spaceLabel(connector.name, spaceOptions) : ''}
-            </TableCell>
-            <TableCell>
-              {type ? <Badge variant="secondary">{type}</Badge> : '—'}
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {agentLabel(connector.agent, agentOptions)}
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {formatTimestamp(connector.updateTime)} ·{' '}
-              {actorLabel(connector.updatedBy)}
-            </TableCell>
-            <TableCell>
-              <RowActions
-                editLabel="Edit connector"
-                removeLabel="Delete connector"
-                onEdit={() => actions.openEdit(connector)}
-                onRemove={() => actions.openRemove(connector)}
-              />
-            </TableCell>
-          </TableRow>
-        );
-      })}
-    </>
+    <AdminSearch
+      value={state.filters.displayName ?? ''}
+      onChange={(value) => actions.setFilter('displayName', value, 'replace')}
+      placeholder="Filter by name"
+      debounceMs={300}
+    />
   );
 }
 
-function ConnectorsTable({ showFilters }: { showFilters: boolean }) {
-  const { state, actions } = useConnectorsAdmin();
-  const { sort } = state;
-
+/**
+ * Agent facet control for the Agent column's filter cell. `options` (agents in
+ * the base scope, label-resolved) come from the connectors consumer — the grid
+ * has no agent concept; the setFilter wiring comes from the grid context.
+ */
+function ConnectorAgentFilter({ options }: { options: AgentOption[] }) {
+  const { state, actions } = useGrid<Connector>();
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <SortableHeader
-            field="displayName"
-            sort={sort}
-            onToggle={actions.toggleSort}
-          >
-            Name
-          </SortableHeader>
-          <TableHead>Space</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Agent</TableHead>
-          <SortableHeader
-            field="updateTime"
-            sort={sort}
-            onToggle={actions.toggleSort}
-          >
-            Updated
-          </SortableHeader>
-          <TableHead className="w-0" />
-        </TableRow>
-        {showFilters && <ConnectorFilterRow />}
-      </TableHeader>
-      <TableBody>
-        <ConnectorsTableBody />
-      </TableBody>
-    </Table>
+    <AgentFilterSelect
+      value={state.filters.agent ?? AGENT_FILTER_ANY}
+      // Discrete selection: push history so Back returns to the prior facet.
+      onChange={(value) => actions.setFilter('agent', value, 'push')}
+      options={options}
+    />
   );
+}
+
+/**
+ * Builds the connector columns for `Grid.Table`. The Space column is spread in
+ * only at the org rollup (`orgLevel`) — inside a specific space every row shares
+ * that space, so the column is redundant. Filter controls are supplied only when
+ * `showFilters` is on; their presence is what makes the grid render the filter
+ * row (composition, not a boolean grid prop).
+ */
+function connectorColumns(params: {
+  orgLevel: boolean;
+  showFilters: boolean;
+  agentOptions: AgentOption[];
+  spaceOptions: SpaceOption[];
+  inUseAgentOptions: AgentOption[];
+  onEdit: (connector: Connector) => void;
+  onRemove: (connector: Connector) => void;
+}): GridColumn<Connector>[] {
+  const {
+    orgLevel,
+    showFilters,
+    agentOptions,
+    spaceOptions,
+    inUseAgentOptions,
+    onEdit,
+    onRemove,
+  } = params;
+  return [
+    {
+      field: 'displayName',
+      header: 'Name',
+      sortable: true,
+      cellClassName: 'font-medium',
+      filter: showFilters ? <ConnectorNameFilter /> : undefined,
+      cell: (connector) => (
+        <button
+          type="button"
+          className="text-left hover:underline"
+          onClick={() => onEdit(connector)}
+        >
+          {connector.displayName || leafId(connector.name)}
+        </button>
+      ),
+    },
+    ...(orgLevel
+      ? ([
+          {
+            header: 'Space',
+            cellClassName: 'text-muted-foreground',
+            cell: (connector) =>
+              connectorSpaceSlug(connector.name)
+                ? spaceLabel(connector.name, spaceOptions)
+                : '',
+          },
+        ] satisfies GridColumn<Connector>[])
+      : []),
+    {
+      header: 'Type',
+      cell: (connector) => {
+        const type = connectorType(connector);
+        return type ? <Badge variant="secondary">{type}</Badge> : '—';
+      },
+    },
+    {
+      header: 'Agent',
+      cellClassName: 'text-muted-foreground',
+      filter:
+        showFilters && inUseAgentOptions.length > 0 ? (
+          <ConnectorAgentFilter options={inUseAgentOptions} />
+        ) : undefined,
+      cell: (connector) => agentLabel(connector.agent, agentOptions),
+    },
+    {
+      field: 'updateTime',
+      header: 'Updated',
+      sortable: true,
+      cellClassName: 'text-muted-foreground',
+      cell: (connector) => (
+        <>
+          {formatTimestamp(connector.updateTime)} ·{' '}
+          {actorLabel(connector.updatedBy)}
+        </>
+      ),
+    },
+    {
+      header: '',
+      className: 'w-0',
+      cell: (connector) => (
+        <RowActions
+          editLabel="Edit connector"
+          removeLabel="Delete connector"
+          onEdit={() => onEdit(connector)}
+          onRemove={() => onRemove(connector)}
+        />
+      ),
+    },
+  ];
 }
 
 function ConnectorsAdminRoot() {
   const { state, actions } = useConnectorsAdmin();
-  const { dialog, remove, pageSize, pagination, filters, scope } = state;
+  const { dialog, remove, agentOptions, spaceOptions, filters, scope } = state;
   const [showFilters, setShowFilters] = useState(false);
   const filtersActive = hasActiveFilters(filters, scope);
+  // The agent facet lists only agents actually in scope, resolved to labels via
+  // the full agent list (leaf fallback). Hidden when every connector in scope
+  // runs on the cloud (no agents in use).
+  const inUseAgentOptions = state.agentsInUse.map((name) => ({
+    value: name,
+    label: agentLabel(name, agentOptions),
+  }));
+  const emptyLabel = filtersActive
+    ? 'No connectors match your filters.'
+    : 'No connectors yet.';
 
   return (
     <>
-      <AdminFrame
-        title="Connectors"
-        description="Reusable, credentialed connections to external systems, used by workflow activities."
-        newLabel="New connector"
-        onNew={actions.openCreate}
-      >
-        <div className="flex items-center gap-2">
-          <FilterToggleButton
-            active={showFilters}
-            onToggle={() => setShowFilters((v) => !v)}
+      <ConnectorsGridProvider>
+        <AdminFrame
+          title="Connectors"
+          description="Reusable, credentialed connections to external systems, used by workflow activities."
+          newLabel="New connector"
+          onNew={actions.openCreate}
+        >
+          <Grid.Toolbar>
+            <FilterToggleButton
+              active={showFilters}
+              onToggle={() => setShowFilters((v) => !v)}
+            />
+            {/* Scope is a connectors control the consumer wires into the toolbar,
+                gated by the same filter toggle. The grid knows nothing about it. */}
+            {showFilters ? (
+              <ScopeSelect
+                value={scope}
+                spaces={spaceOptions}
+                onChange={actions.setScope}
+                allLabel="All spaces"
+              />
+            ) : null}
+            {filtersActive ? (
+              <ClearFiltersButton onClear={actions.clearFilters} />
+            ) : null}
+          </Grid.Toolbar>
+          <Grid.Table
+            columns={connectorColumns({
+              orgLevel: scope === '',
+              showFilters,
+              agentOptions,
+              spaceOptions,
+              inUseAgentOptions,
+              onEdit: actions.openEdit,
+              onRemove: actions.openRemove,
+            })}
+            emptyLabel={emptyLabel}
+            loadingLabel="Loading connectors…"
           />
-          {filtersActive && (
-            <ClearFiltersButton onClear={actions.clearFilters} />
-          )}
-        </div>
-        <ConnectorsTable showFilters={showFilters} />
-        <AdminPagination
-          pageSize={pageSize}
-          onPageSizeChange={actions.setPageSize}
-          hasPrevPage={pagination.hasPrevPage}
-          hasNextPage={pagination.hasNextPage}
-          onPrev={actions.prevPage}
-          onNext={actions.nextPage}
-        />
-      </AdminFrame>
+          <Grid.CursorPagination />
+        </AdminFrame>
+      </ConnectorsGridProvider>
 
       <FormDialog
         open={dialog.open}
