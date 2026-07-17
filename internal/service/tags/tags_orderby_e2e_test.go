@@ -4,18 +4,15 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	"github.com/dashkan/pivox/internal/service/tags"
 )
 
 // These tests pin the compound-cursor keyset migration for the tags List
@@ -34,13 +31,10 @@ import (
 // Reachability note (documented once here for all three handlers):
 //   - ListTagKeys is org-scoped and fully reachable through the interceptor
 //     chain, so its order_by boundary is driven end-to-end through the RPC.
-//   - ListTagValues is UNREACHABLE through the interceptor chain: the permission
-//     registry's ScopeFromPath requires an `organizations/{org}/...` parent while
-//     the handler's parseTagKeyParent requires a bare `tagKeys/{uuid}` parent, and
-//     no single value satisfies both (a pre-existing naming bug tracked
-//     separately). The handler reads nothing from the interceptor-populated
-//     context, so its keyset logic is exercised by constructing the server and
-//     calling ListTagValues directly, with rows seeded through the DB.
+//   - ListTagValues is org-scoped too (parent
+//     `organizations/{org}/tagKeys/{key}`) and fully reachable, so its order_by
+//     boundary is likewise driven end-to-end through the RPC. Rows are seeded
+//     through the DB to control the id↔short_name mapping the keyset must sort by.
 //   - ListTagBindings is reached with an org-scoped parent (the handler treats it
 //     as an opaque parent_resource filter). Its only sortable, parentResource, is
 //     constant within any single reachable list scope, so its order_by boundary
@@ -132,21 +126,10 @@ func TestE2E_ListTagKeys_OrderByShortNameKeysetBoundary(t *testing.T) {
 	assert.Len(t, uniq, n, "no tag key dropped or duplicated across the order_by boundary")
 }
 
-// newTagValuesServerForDirectCall builds a TagValuesServer for direct handler
-// invocation (see the reachability note at the top of the file — the RPC cannot
-// be dialed through the interceptor chain). The handler reads only from the
-// request and the DB, never the interceptor-populated context.
-func newTagValuesServerForDirectCall(t *testing.T, pool db.RWPool, queries *db.Queries) *tags.TagValuesServer {
-	t.Helper()
-	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
-	require.NoError(t, err)
-	return tags.NewTagValuesServer(tags.TagValuesConfig{Pool: pool, Queries: queries, Codec: codec})
-}
-
 // seedTagValuesReverseID mirrors seedTagKeysReverseID for tag values under one
-// tag key. Returns the expected resource names in short_name-ascending
-// (= id-descending) order.
-func seedTagValuesReverseID(t *testing.T, ctx context.Context, q *db.Queries, tagKey db.TagKey, createdBy uuid.UUID, n int) []string {
+// tag key. orgSlug scopes the expected resource names. Returns the expected
+// names in short_name-ascending (= id-descending) order.
+func seedTagValuesReverseID(t *testing.T, ctx context.Context, q *db.Queries, tagKey db.TagKey, orgSlug string, createdBy uuid.UUID, n int) []string {
 	t.Helper()
 	idsDesc := reverseIDNames(n)
 	want := make([]string, n)
@@ -162,19 +145,19 @@ func seedTagValuesReverseID(t *testing.T, ctx context.Context, q *db.Queries, ta
 			CreatedBy:      convert.PgUUID(createdBy),
 		})
 		require.NoError(t, err)
-		want[i] = "tagKeys/" + tagKey.ID.String() + "/tagValues/" + id.String()
+		want[i] = "organizations/" + orgSlug + "/tagKeys/" + tagKey.ID.String() + "/tagValues/" + id.String()
 	}
 	return want
 }
 
-// drainTagValueNames drains ListTagValues (called directly) to completion.
-func drainTagValueNames(t *testing.T, ctx context.Context, s *tags.TagValuesServer, req *apiv1.ListTagValuesRequest) []string {
+// drainTagValueNames drains ListTagValues through the RPC to completion.
+func drainTagValueNames(t *testing.T, ctx context.Context, client apiv1.TagValuesClient, req *apiv1.ListTagValuesRequest) []string {
 	t.Helper()
 	var got []string
 	token := ""
 	for range 100 {
 		req.PageToken = token
-		resp, err := s.ListTagValues(ctx, req)
+		resp, err := client.ListTagValues(ctx, req)
 		require.NoError(t, err)
 		for _, v := range resp.GetTagValues() {
 			got = append(got, v.GetName())
@@ -188,15 +171,14 @@ func drainTagValueNames(t *testing.T, ctx context.Context, s *tags.TagValuesServ
 }
 
 // TestE2E_ListTagValues_OrderByShortNameKeysetBoundary pins the TagValues
-// migration. Same shape as the TagKeys boundary test, but driven by a direct
-// handler call because the RPC is unreachable through the interceptor chain.
+// migration, driven end-to-end through the RPC (org-scoped parent).
 func TestE2E_ListTagValues_OrderByShortNameKeysetBoundary(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 	h, owned := newTagsHarness(t, "tags-values-ob")
 	ctx := context.Background()
-	s := newTagValuesServerForDirectCall(t, h.Pool, h.Queries)
+	client := apiv1.NewTagValuesClient(h.Conn())
 
 	tagKey, err := h.Queries.CreateTagKey(ctx, db.CreateTagKeyParams{
 		ID:             uuid.New(),
@@ -209,10 +191,10 @@ func TestE2E_ListTagValues_OrderByShortNameKeysetBoundary(t *testing.T) {
 	require.NoError(t, err)
 
 	const n = 7
-	want := seedTagValuesReverseID(t, ctx, h.Queries, tagKey, owned.Owner.IdentityID, n)
+	want := seedTagValuesReverseID(t, ctx, h.Queries, tagKey, owned.Slug, owned.Owner.IdentityID, n)
 
-	got := drainTagValueNames(t, ctx, s, &apiv1.ListTagValuesRequest{
-		Parent:   "tagKeys/" + tagKey.ID.String(),
+	got := drainTagValueNames(t, ctx, client, &apiv1.ListTagValuesRequest{
+		Parent:   "organizations/" + owned.Slug + "/tagKeys/" + tagKey.ID.String(),
 		OrderBy:  "shortName",
 		PageSize: 3,
 	})
@@ -227,15 +209,14 @@ func TestE2E_ListTagValues_OrderByShortNameKeysetBoundary(t *testing.T) {
 }
 
 // TestE2E_ListTagValues_KeysetBoundary pins the default-id keyset off-by-one for
-// TagValues (no order_by), driven by a direct handler call for the same
-// reachability reason.
+// TagValues (no order_by), driven end-to-end through the RPC.
 func TestE2E_ListTagValues_KeysetBoundary(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 	h, owned := newTagsHarness(t, "tags-values-page")
 	ctx := context.Background()
-	s := newTagValuesServerForDirectCall(t, h.Pool, h.Queries)
+	client := apiv1.NewTagValuesClient(h.Conn())
 
 	tagKey, err := h.Queries.CreateTagKey(ctx, db.CreateTagKeyParams{
 		ID:             uuid.New(),
@@ -260,8 +241,8 @@ func TestE2E_ListTagValues_KeysetBoundary(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	got := drainTagValueNames(t, ctx, s, &apiv1.ListTagValuesRequest{
-		Parent:   "tagKeys/" + tagKey.ID.String(),
+	got := drainTagValueNames(t, ctx, client, &apiv1.ListTagValuesRequest{
+		Parent:   "organizations/" + owned.Slug + "/tagKeys/" + tagKey.ID.String(),
 		PageSize: pageSize,
 	})
 	assert.Len(t, got, total, "every tag value returned exactly once across the page boundary (no drop)")
