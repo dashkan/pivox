@@ -148,14 +148,18 @@ export interface ConnectorsAdminContextValue {
     agentsInUse: string[];
     /** Spaces to scope by (filter) or create into; empty = org-only. */
     spaceOptions: SpaceOption[];
-    dialog: DialogState<Connector>;
+    /** Row-delete confirmation state (the quick list action; the edit page has its own). */
     remove: RemoveState<Connector>;
   };
   actions: ListControlsActions & {
+    /**
+     * Create / edit are now ROUTED pages, not a dialog. These NAVIGATE (the
+     * feature wires them to the route's navigate, setting `?from=<origin>`); the
+     * list never opens a modal. Names kept so the table row + "New" button are
+     * unchanged.
+     */
     openCreate: () => void;
     openEdit: (connector: Connector) => void;
-    closeDialog: () => void;
-    submit: (values: ConnectorFormValues) => void;
     openRemove: (connector: Connector) => void;
     closeRemove: () => void;
     confirmRemove: () => void;

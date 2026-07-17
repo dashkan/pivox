@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ConnectorsAdmin } from '../../src/resource-admin/connectors-admin';
 
@@ -30,13 +30,6 @@ function makeValue(
       isLoading: false,
       loadError: null,
       agentOptions: [],
-      dialog: {
-        open: false,
-        mode: 'create',
-        editing: null,
-        error: null,
-        pending: false,
-      },
       remove: { target: null, error: null, pending: false },
       filters: {},
       sort: null,
@@ -50,8 +43,6 @@ function makeValue(
     actions: {
       openCreate: noop,
       openEdit: noop,
-      closeDialog: noop,
-      submit: noop,
       openRemove: noop,
       closeRemove: noop,
       confirmRemove: noop,
@@ -97,64 +88,6 @@ function renderTable(
   );
   return value;
 }
-
-function renderCreate(): HTMLElement {
-  render(
-    <ConnectorsAdmin.Provider
-      value={makeValue({
-        connectors: [],
-        dialog: {
-          open: true,
-          mode: 'create',
-          editing: null,
-          error: null,
-          pending: false,
-        },
-      })}
-    >
-      <ConnectorsAdmin.Root />
-    </ConnectorsAdmin.Provider>,
-  );
-  return screen.getByRole('dialog');
-}
-
-function renderEdit(editing: Connector): HTMLElement {
-  render(
-    <ConnectorsAdmin.Provider
-      value={makeValue({
-        connectors: [],
-        spaceOptions,
-        dialog: { open: true, mode: 'edit', editing, error: null, pending: false },
-      })}
-    >
-      <ConnectorsAdmin.Root />
-    </ConnectorsAdmin.Provider>,
-  );
-  return screen.getByRole('dialog');
-}
-
-describe('ConnectorsAdmin — type selector', () => {
-  it('defaults the Type to HTTP and renders the HTTP variant fields', () => {
-    const dialog = renderCreate();
-    expect(within(dialog).getByText('Type')).toBeDefined();
-    // The Type trigger reflects the HTTP default (found by content, since Scope
-    // and Run-on-Agent are also comboboxes in the form).
-    const combos = within(dialog).getAllByRole('combobox');
-    expect(combos.some((c) => c.textContent?.includes('HTTP'))).toBe(true);
-    // The HTTP variant contributes Base URL + Headers.
-    expect(within(dialog).getByText('Base URL')).toBeDefined();
-    expect(within(dialog).getByText('Headers')).toBeDefined();
-  });
-});
-
-describe('ConnectorsAdmin — auto-derived identifier', () => {
-  it('derives the identifier slug from the display name', () => {
-    const dialog = renderCreate();
-    const displayName = within(dialog).getAllByRole('textbox')[0];
-    fireEvent.change(displayName, { target: { value: 'Stripe Payments' } });
-    expect(within(dialog).getByText('stripe-payments')).toBeDefined();
-  });
-});
 
 describe('ConnectorsAdmin — table', () => {
   it('describes connectors without implying HTTP-only', () => {
@@ -213,7 +146,7 @@ describe('ConnectorsAdmin — table', () => {
   it('leaves the Space column blank for an org-direct connector', () => {
     renderTable({ connectors: [connector] });
     expect(screen.getByRole('columnheader', { name: 'Space' })).toBeDefined();
-    // The column cell is blank for org-direct rows (form still labels it).
+    // The column cell is blank for org-direct rows.
     expect(screen.queryByText('Organization')).toBeNull();
   });
 
@@ -234,7 +167,7 @@ describe('ConnectorsAdmin — table', () => {
     expect(screen.queryByRole('columnheader', { name: 'Space' })).toBeNull();
   });
 
-  it('opens the edit dialog when the name link is clicked', () => {
+  it('navigates to the routed edit page when the name link is clicked', () => {
     const openEdit = vi.fn();
     renderTable({ connectors: [connector] }, { openEdit });
     fireEvent.click(screen.getByRole('button', { name: 'Stripe' }));
@@ -258,6 +191,13 @@ describe('ConnectorsAdmin — table', () => {
     expect(openEdit).toHaveBeenCalledWith(connector);
     fireEvent.click(remove);
     expect(openRemove).toHaveBeenCalledWith(connector);
+  });
+
+  it('navigates to the routed create page from the "New connector" button', () => {
+    const openCreate = vi.fn();
+    renderTable({ connectors: [connector] }, { openCreate });
+    fireEvent.click(screen.getByRole('button', { name: 'New connector' }));
+    expect(openCreate).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -390,23 +330,6 @@ describe('ConnectorsAdmin — scope', () => {
     // The combobox input rests on the "All spaces" placeholder when empty.
     expect(screen.getByPlaceholderText('All spaces')).toBeDefined();
   });
-
-  it('shows an unset placeholder for org-direct scope in the create form', () => {
-    const dialog = renderCreate();
-    expect(within(dialog).getByText('Scope')).toBeDefined();
-    // Org-direct (scope === '') reads as unset — the combobox rests on its
-    // placeholder, not a selected "Organization" value.
-    expect(
-      within(dialog).getByPlaceholderText('No space — organization'),
-    ).toBeDefined();
-  });
-
-  it('shows the scope read-only (not a control) when editing', () => {
-    const dialog = renderEdit(spaceConnector);
-    // The space label renders in a disabled input, not an editable select.
-    const scope = within(dialog).getByDisplayValue('Main');
-    expect(scope.hasAttribute('disabled')).toBe(true);
-  });
 });
 
 describe('ConnectorsAdmin — agent filter facet', () => {
@@ -429,40 +352,5 @@ describe('ConnectorsAdmin — agent filter facet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
     // The agent combobox rests on the "Any agent" placeholder.
     expect(screen.getByPlaceholderText('Any agent')).toBeDefined();
-  });
-});
-
-describe('ConnectorsAdmin — Run on Agent dropdown', () => {
-  const createDialog = {
-    open: true,
-    mode: 'create' as const,
-    editing: null,
-    error: null,
-    pending: false,
-  };
-
-  it('relabels the field to "Run on Agent" and defaults to none in the form', () => {
-    render(
-      <ConnectorsAdmin.Provider
-        value={makeValue({
-          connectors: [],
-          agentOptions: [
-            {
-              value: 'organizations/acme/storageGateways/gw1/agents/a1',
-              label: 'edge-01',
-            },
-          ],
-          dialog: createDialog,
-        })}
-      >
-        <ConnectorsAdmin.Root />
-      </ConnectorsAdmin.Provider>,
-    );
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Run on Agent')).toBeDefined();
-    // The agent combobox rests on the "None (runs in cloud)" placeholder.
-    expect(
-      within(dialog).getByPlaceholderText('None (runs in cloud)'),
-    ).toBeDefined();
   });
 });

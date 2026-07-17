@@ -68,6 +68,10 @@ export type ListConnectorsResponse =
 const CONNECTORS_PATH = '/v1/organizations/{organization}/connectors' as const;
 const SPACE_CONNECTORS_PATH =
   '/v1/organizations/{organization}/spaces/{space}/connectors' as const;
+const CONNECTOR_PATH =
+  '/v1/organizations/{organization}/connectors/{connector}' as const;
+const SPACE_CONNECTOR_PATH =
+  '/v1/organizations/{organization}/spaces/{space}/connectors/{connector}' as const;
 
 /**
  * Result of prefetchConnectors. Carries the built request so the loader can
@@ -143,6 +147,99 @@ export const prefetchConnectors = createServerFn({ method: 'GET' })
       };
     } catch (err) {
       console.warn('[ssr-prefetch] connectors: threw', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  });
+
+/** Wire-shape of a single connector, primed for the routed edit page. */
+export type ConnectorRecord = components['schemas']['v1Connector'];
+
+/** Which connector the edit route wants: its leaf id + optional space slug. */
+export interface PrefetchConnectorInput {
+  connectorId: string;
+  /** Space slug for a space-scoped connector; absent = org-direct. */
+  space?: string;
+}
+
+/**
+ * Result of prefetchConnector. Carries `orgSlug` + `space` + `connectorId` so
+ * the edit loader can reproduce the exact `$api.queryOptions` key the client
+ * hook (`useConnectorForm`) reads — the byte-identical key is what makes the
+ * primed record hydrate instead of firing an XHR on load. Null on any failure.
+ */
+export type PrefetchedConnector = {
+  orgSlug: string;
+  space: string | undefined;
+  connectorId: string;
+  connector: ConnectorRecord;
+} | null;
+
+/**
+ * prefetchConnector server-fn: reads the active-org cookie, then GETs the single
+ * connector (org-direct or space-scoped per `space`) as the user, mirroring
+ * prefetchConnectors for the list. Returns null on any failure — SSR must never
+ * throw; the client `useConnectorForm` query retries on hydration.
+ */
+export const prefetchConnector = createServerFn({ method: 'GET' })
+  .validator((input: PrefetchConnectorInput): PrefetchConnectorInput => input)
+  .handler(async ({ data }): Promise<PrefetchedConnector> => {
+    const accessToken = await getSsrAccessToken();
+    if (!accessToken) return null;
+
+    const activeOrg = getCookie(ACTIVE_ORG.name);
+    if (!activeOrg) return null;
+
+    try {
+      const orgSlug = organizationId(activeOrg);
+      if (!orgSlug) return null;
+
+      const client = createServerApiClient(accessToken);
+
+      if (data.space) {
+        const { data: body, response } = await client.GET(SPACE_CONNECTOR_PATH, {
+          params: {
+            path: {
+              organization: orgSlug,
+              space: data.space,
+              connector: data.connectorId,
+            },
+          },
+        });
+        if (!body) {
+          console.warn('[ssr-prefetch] connector: space non-2xx or empty', {
+            status: response.status,
+            orgSlug,
+          });
+          return null;
+        }
+        return {
+          orgSlug,
+          space: data.space,
+          connectorId: data.connectorId,
+          connector: body,
+        };
+      }
+
+      const { data: body, response } = await client.GET(CONNECTOR_PATH, {
+        params: { path: { organization: orgSlug, connector: data.connectorId } },
+      });
+      if (!body) {
+        console.warn('[ssr-prefetch] connector: org non-2xx or empty', {
+          status: response.status,
+          orgSlug,
+        });
+        return null;
+      }
+      return {
+        orgSlug,
+        space: undefined,
+        connectorId: data.connectorId,
+        connector: body,
+      };
+    } catch (err) {
+      console.warn('[ssr-prefetch] connector: threw', {
         message: err instanceof Error ? err.message : String(err),
       });
       return null;

@@ -10,12 +10,28 @@ export {
 } from './agent-filter';
 export { AgentSelect } from './agent-select';
 export { ClearFiltersButton } from './clear-filters-button';
+export { ConnectorCreateFields, ConnectorEditFields } from './connector-fields';
+export {
+  ConnectorFormContext,
+  useConnectorForm,
+} from './connector-form.context';
+export type { ConnectorFormContextValue } from './connector-form.context';
+export { ConnectorFormProvider } from './connector-form-provider';
+export {
+  agentLabel,
+  connectorSpaceSlug,
+  connectorType,
+  leafId,
+  seedConnectorValues,
+  spaceLabel,
+} from './connector-shared';
 export { ConnectorsAdmin } from './connectors-admin';
 export {
   ConnectorsAdminContext,
   useConnectorsAdmin,
 } from './connectors-admin.context';
 export { DeleteDialog } from './delete-dialog';
+export { ResourceFormPage } from './resource-form-page';
 export { FilterToggleButton } from './filter-toggle-button';
 export { FormActions, FormDialog } from './form-dialog';
 export { IdentifierField } from './identifier-field';

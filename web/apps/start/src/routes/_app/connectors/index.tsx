@@ -1,12 +1,16 @@
 import { organizationId } from '@pivox/client';
 import { ConnectorsFeature, fetchAgentOptions } from '@pivox/features/connectors';
 import { useAppShellContext } from '@pivox/ui/app-shell';
-import { AdminNotice } from '@pivox/ui/resource-admin';
-import { createFileRoute } from '@tanstack/react-router';
+import {
+  AdminNotice,
+  connectorSpaceSlug,
+  leafId,
+} from '@pivox/ui/resource-admin';
+import { createFileRoute, useRouterState } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
-import type { ListControlsChange } from '@pivox/ui/resource-admin';
+import type { Connector, ListControlsChange } from '@pivox/ui/resource-admin';
 
 import { $api, apiClient } from '@/lib/api-client';
 import { connectorAgentsQueryKey } from '@/lib/connector-agents-query';
@@ -107,6 +111,27 @@ function ConnectorsPage() {
     [navigate],
   );
 
+  // Capture THIS list view's exact URL so the form pages can return to it
+  // (filters/scope/page/scroll are already encoded here). The `?from=` param is
+  // the single source both create-scope and return-target flow from.
+  const currentHref = useRouterState({
+    select: (s) => s.location.pathname + s.location.searchStr,
+  });
+  const onCreate = useCallback(() => {
+    void navigate({ to: '/connectors/new', search: { from: currentHref } });
+  }, [navigate, currentHref]);
+  const onEdit = useCallback(
+    (connector: Connector) => {
+      const space = connectorSpaceSlug(connector.name);
+      void navigate({
+        to: '/connectors/$connectorId/edit',
+        params: { connectorId: leafId(connector.name) },
+        search: { from: currentHref, ...(space ? { space } : {}) },
+      });
+    },
+    [navigate, currentHref],
+  );
+
   if (!parent) {
     return (
       <div className="flex flex-1 flex-col p-6">
@@ -123,6 +148,8 @@ function ConnectorsPage() {
       listState={listState}
       onListStateChange={onListStateChange}
       agentOptions={agentOptions}
+      onCreate={onCreate}
+      onEdit={onEdit}
     />
   );
 }
