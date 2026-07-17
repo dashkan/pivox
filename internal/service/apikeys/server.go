@@ -190,13 +190,16 @@ func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest
 		pageSize = 1000
 	}
 
-	var nextPageToken string
-	if int32(len(results)) > pageSize {
-		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
-		results = results[:pageSize]
+	// filter.Paginate trims the over-fetched result to pageSize and derives the
+	// next-page token from the LAST RETURNED row — never the first un-returned
+	// row (the resume predicate is a strict `>`, so results[pageSize] would be
+	// silently dropped next page). Owning both the trim and the token here makes
+	// that off-by-one unrepresentable at the call site.
+	results, nextPageToken, err := filter.Paginate(results, int(pageSize), func(last db.ApiKey) (string, error) {
+		return filter.EncodeNextPageToken(s.codec, last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	actors, err := s.resolveApiKeyActors(ctx, results)
