@@ -96,7 +96,7 @@ func ScanConversations(rows pgx.Rows) ([]db.AiConversation, error) {
 		// init migration: id, org_id, name, title, title_user_set,
 		// description, archived, pinned, message_count,
 		// last_message_time, etag, revision, created_by, updated_by,
-		// create_time, update_time.
+		// lock_holder, lock_expires_at, create_time, update_time.
 		if err := rows.Scan(
 			&c.ID,
 			&c.OrgID,
@@ -112,6 +112,8 @@ func ScanConversations(rows pgx.Rows) ([]db.AiConversation, error) {
 			&c.Revision,
 			&c.CreatedBy,
 			&c.UpdatedBy,
+			&c.LockHolder,
+			&c.LockExpiresAt,
 			&c.CreateTime,
 			&c.UpdateTime,
 		); err != nil {
