@@ -120,13 +120,11 @@ func (s *TagKeysServer) ListTagKeys(ctx context.Context, req *apiv1.ListTagKeysR
 		pageSize = 1000
 	}
 
-	var nextPageToken string
-	if int32(len(results)) > pageSize {
-		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
-		results = results[:pageSize]
+	results, nextPageToken, err := filter.Paginate(results, int(pageSize), func(last db.TagKey) (string, error) {
+		return filter.EncodeNextPageToken(s.codec, last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	actors, err := s.resolveTagKeyActors(ctx, results)
