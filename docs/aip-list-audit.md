@@ -1,8 +1,17 @@
 # AIP `List` RPC audit + implementation guidance
 
-Status: audit only (2026-07). No code was changed in producing this
-document. It is a work-order for a future session to bring every List
-RPC in the Cloud Controller up to a consistent AIP-132/159/160 standard.
+Status: **HISTORICAL** (audit 2026-07). This began as a work-order to
+bring every List RPC up to a consistent AIP-132/159/160 standard. That
+migration is now complete: every dynamic-list handler runs on the
+compound-cursor keyset engine (`filter.BuildListQuery` + `PlanOrderBy` +
+`DecodeCursor`), and the **legacy `filter.Query` engine (`query.go`,
+`QueryParams`, `ParseOrderBy`) has been deleted**. References below to
+`filter.Query` / `QueryParams` / `ParseOrderBy` / the `OrderBy` /
+`CursorColumn` / `CursorDirection` / `ParentColumn` / `UserColumn`
+`ResourceFilter` fields describe the retired path and are kept only for
+historical context — see `docs/aip-list-transpiler-procedure.md` for the
+current (and only) path. The "helper toolbox" section has been updated to
+point at the surviving engine.
 
 ## Why this exists
 
@@ -62,52 +71,54 @@ meaningful.
 
 ### `internal/filter` (the generic AIP-160/132 engine)
 
-Files: `query.go`, `transpiler.go`, `orderby.go`, `declarations.go`,
-`scan.go`, `token.go`.
+Files: `keyset.go`, `transpiler.go`, `declarations.go`, `scan.go`,
+`token.go`, `page.go`. (The legacy `query.go` + `orderby.go` were
+deleted once every handler moved onto the compound-cursor path.)
 
-- **`filter.Query(ctx, dbtx, rf, params)`** (`query.go:27`) — builds and
-  runs `SELECT * FROM <rf.Table> WHERE … ORDER BY … LIMIT pageSize+1`.
-  `QueryParams` (`query.go:14`) carries `Filter`, `OrderBy`, `ParentID`,
-  `UserID`, `PageSize`, `Cursor` (opaque page_token), `ShowDeleted`,
-  `Codec`. It wires filter + order_by + parent + soft-delete + cursor in
-  one call. It over-fetches by one (`LIMIT pageSize+1`) so the caller can
-  detect a further page.
-- **`ResourceFilter`** (`declarations.go:27`) — per-resource metadata:
+- **`filter.BuildListQuery(q ListQuery)`** (`keyset.go`) — assembles the
+  parameterized `SELECT * FROM <rf.Table> WHERE … ORDER BY … LIMIT
+  pageSize+1` for a keyset list. `ListQuery` carries `Resource`, `Base`
+  (handler-supplied scope predicates), `Filter` (AIP-160), `Order`
+  (resolved `OrderByPlan`), `PageSize`, `Cursor` (`*KeysetCursor`), and
+  `ShowDeleted`. It over-fetches by one so the caller can detect a
+  further page. The caller runs it via `pool.Query` + a `Scan*` helper.
+- **`filter.PlanOrderBy(rf, orderBy)`** (`keyset.go`) — resolves an
+  AIP-132 order_by against `rf.Sortable` into an `OrderByPlan`
+  (single field + id tiebreaker). Empty order_by falls back to
+  `rf.DefaultOrder`. Unknown/multi-field/bad-direction → error.
+- **`ResourceFilter`** (`declarations.go`) — per-resource metadata:
   `Filterable` map (field → SQL column + CEL type + `AllowPartial` for
-  ILIKE + `JSONB`), `Sortable` map (field → column), `Table`,
-  `SoftDelete`, default `OrderBy`, `CursorColumn`/`CursorDirection`,
-  `ParentColumn`, `UserColumn` (implicit access-control predicate).
+  ILIKE + `JSONB`), `Sortable` map (field → column + CEL type), `Table`,
+  `SoftDelete`, and the compound-path defaults `DefaultOrder`,
+  `DefaultPageSize`, `MaxPageSize`, `DefaultConditions`, `DefaultFields`.
   Existing declarations: `SpaceFilter`, `OrganizationFilter`,
   `TagKeyFilter`, `TagValueFilter`, `TagBindingFilter`,
   `ConversationFilter`, `MessageFilter`, `ArtifactFilter`,
-  `ArtifactVersionFilter`, `ApiKeyFilter`.
-- **`ParseOrderBy(rf, orderBy)`** (`orderby.go:17`) — AIP-132 string →
-  SQL `ORDER BY`. `"name"` always allowed; other fields must be in
-  `rf.Sortable`. Unknown field/direction → error.
+  `ArtifactVersionFilter`, `ApiKeyFilter`, `ConnectorFilter`,
+  `RequestFilter`, `AssetFilter`.
 - **`Transpile(rf, filter, paramIdx)`** (`transpiler.go`) — AIP-160
   expression → parameterized SQL `WHERE` fragment, using `rf.Filterable`.
-- **`Scan*` helpers** (`scan.go`) — `filter.Query` returns raw
-  `pgx.Rows`; each resource has a `ScanXxx(rows)` that maps to
-  `[]db.Xxx`. A resource newly adopting `filter.Query` needs a matching
-  Scan helper.
+- **`Scan*` helpers** (`scan.go`) — `BuildListQuery` selects `*`; each
+  resource has a `ScanXxx(rows)` that maps `pgx.Rows` to `[]db.Xxx`. A
+  resource newly adopting the engine needs a matching Scan helper.
 
-**Caveat for leveled resources.** `filter.Query` supports exactly one
-`ParentColumn` with an `=` predicate. It does **not** express the
-`space_id IS NOT DISTINCT FROM narg('space_id')` partition that the
-org-or-space resources use (connectors/secrets/workflows), nor the `-`
-rollup. For those, the cleaner path is to keep the bespoke sqlc query and
-add filter/order_by fragments to it (or add a `…ByOrg` rollup variant),
-rather than force-fit `filter.Query`. Flat single-parent resources
-(gateways, requests, assets, members, roles) can migrate to
-`filter.Query` directly.
+**Scope for leveled resources.** The base scope is always
+handler-supplied via `ListQuery.Base` — an ANDed list of `Predicate`
+fragments. This expresses both the single-parent `col = $` case and the
+org-or-space `space_id IS NOT DISTINCT FROM $` partition
+(connectors/secrets/workflows). The `-` rollup and any bespoke join
+still keep their hand-rolled sqlc query and add filter/order_by fragments
+to it rather than routing through `BuildListQuery`.
 
 ### `internal/filter/token.go` — pagination tokens
 
-- `filter.EncodeNextPageToken(codec, id)` (`token.go:14`) — encrypts a
-  UUID into an opaque token.
-- Decode happens inside `filter.Query` via the `Cursor` param; bespoke
-  handlers decode manually (`s.codec.Decrypt`, e.g.
-  `secrets/server.go:159`).
+- `filter.EncodeNextPageToken(codec, id)` — encrypts a UUID into an
+  opaque id-only token. `filter.EncodeCursor(codec, plan, sortValue, id)`
+  emits either the id-only token (default order) or a compound token
+  (custom order_by). `filter.DecodeCursor(codec, plan, token)` /
+  `filter.DecodePageToken(codec, token)` are the inverses. Bespoke
+  handlers may still decode manually (`s.codec.Decrypt`, e.g.
+  `secrets/server.go`).
 
 ### The pagination one-liner fix
 

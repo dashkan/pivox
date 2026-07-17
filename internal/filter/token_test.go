@@ -30,9 +30,9 @@ func TestEncodeNextPageToken_RoundTripsThroughDecode(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, tok)
 
-	got, err := decodeCursor(c, tok)
+	got, err := DecodePageToken(c, tok)
 	require.NoError(t, err)
-	assert.Equal(t, id.String(), got)
+	assert.Equal(t, id, got)
 }
 
 func TestEncodeNextPageToken_NilCodec(t *testing.T) {
@@ -40,42 +40,42 @@ func TestEncodeNextPageToken_NilCodec(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestDecodeCursor_Empty(t *testing.T) {
+func TestDecodePageToken_Empty(t *testing.T) {
 	c := newTestCodec(t)
-	got, err := decodeCursor(c, "")
+	got, err := DecodePageToken(c, "")
 	require.NoError(t, err)
-	assert.Empty(t, got)
+	assert.Equal(t, uuid.Nil, got)
 }
 
-func TestDecodeCursor_NilCodec(t *testing.T) {
-	_, err := decodeCursor(nil, "some-token")
+func TestDecodePageToken_NilCodec(t *testing.T) {
+	_, err := DecodePageToken(nil, "some-token")
 	require.Error(t, err)
 }
 
-func TestDecodeCursor_Tampered(t *testing.T) {
+func TestDecodePageToken_Tampered(t *testing.T) {
 	c := newTestCodec(t)
 	tok, _ := EncodeNextPageToken(c, uuid.New())
 	// Flip final byte.
 	bad := tok[:len(tok)-1] + string([]byte{tok[len(tok)-1] ^ 0x01})
-	_, err := decodeCursor(c, bad)
+	_, err := DecodePageToken(c, bad)
 	require.Error(t, err)
 }
 
-func TestDecodeCursor_WrongKey(t *testing.T) {
+func TestDecodePageToken_WrongKey(t *testing.T) {
 	c1 := newTestCodec(t)
 	c2, _ := appkey.NewFromHex(strings.Repeat("cd", 32))
 
 	tok, _ := EncodeNextPageToken(c1, uuid.New())
-	_, err := decodeCursor(c2, tok)
+	_, err := DecodePageToken(c2, tok)
 	require.Error(t, err)
 }
 
-func TestDecodeCursor_PlainUUIDRejected(t *testing.T) {
+func TestDecodePageToken_PlainUUIDRejected(t *testing.T) {
 	// Client sending a plain UUID (pre-migration token or hand-crafted) must
 	// fail — we never want to accept non-encrypted cursors once the codec is
 	// wired.
 	c := newTestCodec(t)
-	_, err := decodeCursor(c, uuid.New().String())
+	_, err := DecodePageToken(c, uuid.New().String())
 	require.Error(t, err)
 }
 

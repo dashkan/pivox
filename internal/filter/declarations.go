@@ -18,11 +18,10 @@ type FilterableField struct {
 // Kept deliberately narrow — ordering has fewer semantic knobs than filtering.
 type SortableField struct {
 	Column string
-	// Type is the CEL type of the column, used ONLY by the compound-cursor
-	// keyset path (BuildListQuery) to know whether a page-token's encoded sort
-	// value must be re-parsed into a time.Time (TypeTimestamp) before it is
-	// bound as a parameter. nil is treated as TypeString. It does not affect
-	// the simpler filter.Query / ParseOrderBy path.
+	// Type is the CEL type of the column, used by the compound-cursor keyset
+	// path (BuildListQuery) to know whether a page-token's encoded sort value
+	// must be re-parsed into a time.Time (TypeTimestamp) before it is bound as a
+	// parameter. nil is treated as TypeString.
 	Type *expr.Type
 }
 
@@ -35,7 +34,6 @@ type ResourceFilter struct {
 	Sortable   map[string]SortableField
 	Table      string // SQL table name
 	SoftDelete bool   // if true, adds "delete_time IS NULL"
-	OrderBy    string // legacy default ORDER BY as raw SQL (e.g. "id ASC"), consumed ONLY by the filter.Query path; the compound-cursor path uses DefaultOrder instead
 
 	// The engine's three per-resource "defaults" knobs, all consumed by the
 	// compound-cursor path (PlanOrderBy / ClampPageSize / BuildListQuery). Each
@@ -60,18 +58,15 @@ type ResourceFilter struct {
 	// Applied by BuildListQuery. Nil → none.
 	DefaultConditions []Predicate
 
-	CursorColumn    string   // column used for cursor pagination (e.g. "id")
-	CursorDirection string   // "ASC" (default) or "DESC" — must match the direction of CursorColumn in OrderBy
-	DefaultFields   []string // filter fields searched when bare literals have no field qualifier
-	ParentColumn    string   // column name for parent filtering (default: "parent_id")
-	UserColumn      string   // column name for implicit user-scoped access control (e.g. "created_by"); QueryParams.UserID is required when set
+	// DefaultFields are the filter fields searched when a bare literal in an
+	// AIP-160 filter has no field qualifier. Consumed by the transpiler.
+	DefaultFields []string
 }
 
 // SpaceFilter returns the filter config for spaces. Consumed by the
 // compound-cursor keyset path (filter.BuildListQuery) in ListSpaces — the base
-// scope (org_id = $) is supplied by the handler via ListQuery.Base, so
-// ParentColumn is unused on that path (kept for documentation of the scope
-// column). Every Sortable column below is NOT NULL in the init migration
+// scope (org_id = $) is supplied by the handler via ListQuery.Base. Every
+// Sortable column below is NOT NULL in the init migration
 // (name, display_name, create_time), which the compound-cursor row comparison
 // requires: a nullable sort column would go UNKNOWN on NULLs and drop/duplicate
 // rows across page boundaries, so such a column must be registered
@@ -95,10 +90,7 @@ func SpaceFilter() *ResourceFilter {
 		},
 		Table:         "spaces",
 		SoftDelete:    true,
-		OrderBy:       "id ASC",
-		CursorColumn:  "id",
 		DefaultFields: []string{"displayName"},
-		ParentColumn:  "org_id",
 	}
 }
 
@@ -118,8 +110,6 @@ func OrganizationFilter() *ResourceFilter {
 		},
 		Table:         "organizations",
 		SoftDelete:    true,
-		OrderBy:       "id ASC",
-		CursorColumn:  "id",
 		DefaultFields: []string{"displayName"},
 	}
 }
@@ -147,10 +137,7 @@ func TagKeyFilter() *ResourceFilter {
 		},
 		Table:         "tag_keys",
 		SoftDelete:    false,
-		OrderBy:       "id ASC",
-		CursorColumn:  "id",
 		DefaultFields: []string{"shortName"},
-		ParentColumn:  "org_id",
 	}
 }
 
@@ -174,10 +161,7 @@ func TagValueFilter() *ResourceFilter {
 		},
 		Table:         "tag_values",
 		SoftDelete:    false,
-		OrderBy:       "id ASC",
-		CursorColumn:  "id",
 		DefaultFields: []string{"shortName"},
-		ParentColumn:  "tag_key_id",
 	}
 }
 
@@ -200,10 +184,7 @@ func TagBindingFilter() *ResourceFilter {
 		},
 		Table:         "tag_bindings",
 		SoftDelete:    false,
-		OrderBy:       "id ASC",
-		CursorColumn:  "id",
 		DefaultFields: []string{"parentResource"},
-		ParentColumn:  "parent_resource",
 	}
 }
 
@@ -212,9 +193,7 @@ func TagBindingFilter() *ResourceFilter {
 // their creator (`identities.id` post-Phase-7). ListConversations uses the
 // compound-cursor keyset path (filter.BuildListQuery): the base scope
 // (org_id = $ AND created_by = $) is supplied by the handler via
-// ListQuery.Base, so ParentColumn/UserColumn/OrderBy/CursorColumn are inert on
-// that path (no filter.Query consumer remains) — kept only to document the
-// scope columns.
+// ListQuery.Base.
 //
 // DefaultOrder is "lastMessageTime desc" (recent-activity-first): with no
 // client order_by the list surfaces the conversations the user most recently
@@ -248,12 +227,7 @@ func ConversationFilter() *ResourceFilter {
 		SoftDelete:      false, // AI resources don't soft-delete
 		DefaultOrder:    "lastMessageTime desc",
 		DefaultPageSize: 50,
-		OrderBy:         "id DESC",
-		CursorColumn:    "id",
-		CursorDirection: "DESC",
 		DefaultFields:   []string{"title"},
-		ParentColumn:    "org_id",
-		UserColumn:      "created_by",
 	}
 }
 
@@ -261,8 +235,7 @@ func ConversationFilter() *ResourceFilter {
 // uses the compound-cursor keyset path (filter.BuildListQuery): the base scope
 // (conversation_id = $) is supplied by the handler via ListQuery.Base after it
 // verifies the authenticated user owns that conversation (access control
-// happens at the parent layer, not via UserColumn here), so
-// ParentColumn/OrderBy/CursorColumn are inert on that path. DefaultOrder is
+// happens at the parent layer). DefaultOrder is
 // "id desc" (newest-first). The lone Sortable column (create_time) is NOT NULL
 // in the init migration, as the compound-cursor row comparison requires.
 func MessageFilter() *ResourceFilter {
@@ -276,21 +249,17 @@ func MessageFilter() *ResourceFilter {
 			// sort value back into a time.Time (RFC3339Nano round-trip).
 			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
-		Table:           "ai_messages",
-		DefaultOrder:    "id desc",
-		OrderBy:         "id DESC",
-		CursorColumn:    "id",
-		CursorDirection: "DESC",
-		ParentColumn:    "conversation_id",
+		Table:        "ai_messages",
+		DefaultOrder: "id desc",
 	}
 }
 
 // ArtifactFilter returns the filter config for AI chat artifacts. ListArtifacts
 // uses the compound-cursor keyset path (filter.BuildListQuery): the base scope
-// (conversation_id = $) is supplied by the handler via ListQuery.Base, so
-// ParentColumn/OrderBy/CursorColumn are inert on that path. DefaultOrder is
-// "id desc" (newest-first). Both Sortable columns (title, create_time) are NOT
-// NULL in the init migration, as the compound-cursor row comparison requires.
+// (conversation_id = $) is supplied by the handler via ListQuery.Base.
+// DefaultOrder is "id desc" (newest-first). Both Sortable columns (title,
+// create_time) are NOT NULL in the init migration, as the compound-cursor row
+// comparison requires.
 func ArtifactFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -304,21 +273,16 @@ func ArtifactFilter() *ResourceFilter {
 			// sort value back into a time.Time (RFC3339Nano round-trip).
 			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
 		},
-		Table:           "ai_artifacts",
-		DefaultOrder:    "id desc",
-		OrderBy:         "id DESC",
-		CursorColumn:    "id",
-		CursorDirection: "DESC",
-		DefaultFields:   []string{"title"},
-		ParentColumn:    "conversation_id",
+		Table:         "ai_artifacts",
+		DefaultOrder:  "id desc",
+		DefaultFields: []string{"title"},
 	}
 }
 
 // ArtifactVersionFilter returns the filter config for AI chat artifact versions.
 // ListArtifactVersions uses the compound-cursor keyset path
 // (filter.BuildListQuery): the base scope (artifact_id = $) is supplied by the
-// handler via ListQuery.Base, so ParentColumn/OrderBy/CursorColumn are inert on
-// that path. DefaultOrder is "id desc" (newest version first, matching sequence
+// handler via ListQuery.Base. DefaultOrder is "id desc" (newest version first, matching sequence
 // DESC under uuidv7). The lone Sortable column (create_time) is NOT NULL in the
 // init migration, as the compound-cursor row comparison requires. DefaultPageSize
 // is 50 and MaxPageSize 100 (the pre-migration page-size policy for versions).
@@ -336,10 +300,6 @@ func ArtifactVersionFilter() *ResourceFilter {
 		DefaultOrder:    "id desc",
 		DefaultPageSize: 50,
 		MaxPageSize:     100,
-		OrderBy:         "id DESC",
-		CursorColumn:    "id",
-		CursorDirection: "DESC",
-		ParentColumn:    "artifact_id",
 	}
 }
 
@@ -347,11 +307,9 @@ func ArtifactVersionFilter() *ResourceFilter {
 //
 // Connectors are an org+space *leveled* resource: a row lives directly under an
 // org (space_id NULL) or under a space (space_id set). That two-column
-// partition — `org_id = … AND space_id IS NOT DISTINCT FROM …` — is NOT
-// expressible via ResourceFilter.ParentColumn (a single `col = $` predicate),
-// so ListConnectors does NOT use filter.Query. It uses BuildListQuery with a
-// handler-supplied base scope; this declaration supplies only the filterable +
-// sortable surface (the transpiler + order_by whitelist). See
+// partition — `org_id = … AND space_id IS NOT DISTINCT FROM …` — is supplied by
+// the handler as a BuildListQuery base scope; this declaration supplies only the
+// filterable + sortable surface (the transpiler + order_by whitelist). See
 // docs/aip-list-transpiler-procedure.md.
 func ConnectorFilter() *ResourceFilter {
 	return &ResourceFilter{
@@ -370,11 +328,8 @@ func ConnectorFilter() *ResourceFilter {
 		},
 		Table:         "connectors",
 		SoftDelete:    false, // connectors hard-delete; no delete_time column
-		OrderBy:       "id ASC",
-		CursorColumn:  "id",
 		DefaultFields: []string{"displayName"},
-		// ParentColumn intentionally unset — the org+space base scope is applied
-		// by the handler via BuildListQuery.Base, not by filter.Query.
+		// The org+space base scope is applied by the handler via BuildListQuery.Base.
 	}
 }
 
@@ -383,10 +338,9 @@ func ConnectorFilter() *ResourceFilter {
 //
 // A request is a flat, single-parent resource: every row lives under exactly
 // one space (space_id NOT NULL). ListRequests supplies that scope as a
-// BuildListQuery base predicate (space_id = $) rather than via ParentColumn, so
-// this declaration provides only the filter/sort surface — matching the
-// compound-cursor path connectors/spaces use. See
-// docs/aip-list-transpiler-procedure.md.
+// BuildListQuery base predicate (space_id = $), so this declaration provides
+// only the filter/sort surface — matching the compound-cursor path
+// connectors/spaces use. See docs/aip-list-transpiler-procedure.md.
 //
 // asset_requests has NO delete_time column (SoftDelete: false); the RPC's
 // show_deleted flag is therefore inert. Every Sortable column is NOT NULL in the
@@ -417,11 +371,8 @@ func RequestFilter() *ResourceFilter {
 		},
 		Table:         "asset_requests",
 		SoftDelete:    false, // asset_requests has no delete_time column
-		OrderBy:       "id ASC",
-		CursorColumn:  "id",
 		DefaultFields: []string{"displayName"},
-		// ParentColumn intentionally unset — the space base scope is applied by
-		// the handler via BuildListQuery.Base.
+		// The space base scope is applied by the handler via BuildListQuery.Base.
 	}
 }
 
@@ -465,19 +416,15 @@ func AssetFilter() *ResourceFilter {
 		},
 		Table:         "assets",
 		SoftDelete:    true,
-		OrderBy:       "id ASC",
-		CursorColumn:  "id",
 		DefaultFields: []string{"displayName"},
-		// ParentColumn intentionally unset — the space base scope is applied by
-		// the handler via BuildListQuery.Base.
+		// The space base scope is applied by the handler via BuildListQuery.Base.
 	}
 }
 
 // ApiKeyFilter returns the filter config for API keys. Consumed by the
 // compound-cursor keyset path (filter.BuildListQuery) in ListKeys — the base
-// scope (org_id = $) is supplied by the handler via ListQuery.Base, so
-// ParentColumn is unused on that path (kept for documentation of the scope
-// column). Both Sortable columns below are NOT NULL in the init migration
+// scope (org_id = $) is supplied by the handler via ListQuery.Base. Both
+// Sortable columns below are NOT NULL in the init migration
 // (display_name TEXT NOT NULL, create_time TIMESTAMPTZ NOT NULL), which the
 // compound-cursor row comparison requires: a nullable sort column would go
 // UNKNOWN on NULLs and drop/duplicate rows across page boundaries, so such a
@@ -497,9 +444,6 @@ func ApiKeyFilter() *ResourceFilter {
 		},
 		Table:         "api_keys",
 		SoftDelete:    true,
-		OrderBy:       "id ASC",
-		CursorColumn:  "id",
 		DefaultFields: []string{"displayName"},
-		ParentColumn:  "org_id",
 	}
 }
