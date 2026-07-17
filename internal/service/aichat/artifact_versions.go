@@ -77,13 +77,11 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 		pageSize = 100
 	}
 
-	var nextPageToken string
-	if int32(len(results)) > pageSize {
-		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
-		results = results[:pageSize]
+	results, nextPageToken, err := filter.Paginate(results, int(pageSize), func(last db.AiArtifactVersion) (string, error) {
+		return filter.EncodeNextPageToken(s.codec, last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
 	actors, err := s.resolveArtifactVersionActors(ctx, results)
