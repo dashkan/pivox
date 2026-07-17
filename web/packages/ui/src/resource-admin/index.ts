@@ -1,5 +1,7 @@
 export { AdminFrame, AdminNotice, AdminNoticeRow } from './admin-frame';
-export { AdminPagination } from './admin-pagination';
+// Pagination primitives + SortableHeader live in the generic `grid` tier;
+// re-export so existing `@pivox/ui/resource-admin` imports keep resolving.
+export { CursorPager, PageSizeSelect, SortableHeader } from '../grid';
 export { AdminSearch } from './admin-search';
 export {
   AGENT_FILTER_ANY,
@@ -22,7 +24,6 @@ export { actorLabel, formatTimestamp } from './meta-cells';
 export { RowActions } from './row-actions';
 export { ScopeSelect } from './scope-select';
 export { isValidIdentifier, slugify } from './slug';
-export { SortableHeader } from './sortable-header';
 export { SuggestCombobox } from './suggest-combobox';
 export type { Suggestion } from './suggest-combobox';
 export { useDebouncedValue } from './use-debounced-value';

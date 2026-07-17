@@ -3,9 +3,9 @@ import { Table, TableBody, TableHeader, TableRow } from '@pivox/primitives/table
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { SortableHeader } from '../../src/resource-admin/sortable-header';
+import { SortableHeader } from '../../src/grid/sortable-header';
 
-import type { SortState } from '../../src/resource-admin/types';
+import type { SortState } from '../../src/grid/types';
 
 function wrap(sort: SortState | null, onToggle: () => void) {
   return (
