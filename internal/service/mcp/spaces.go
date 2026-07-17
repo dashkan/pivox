@@ -17,11 +17,13 @@ package mcp
 import (
 	"context"
 	"errors"
-	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	mcpv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/mcp/v1"
@@ -49,14 +51,15 @@ func clampPageSize(n int32) int32 {
 }
 
 // ListSpaces lists spaces within a single organization. `org` is
-// REQUIRED for v1: the shared filter engine scopes by parent org, and
-// expressing "spaces across the caller's orgs" would need cross-org
-// iteration the engine can't do in one call — deferred rather than
-// hand-rolled. The handler membership-gates on the parent org, then
-// rides the SAME filter.Query path (config, pagination, ordering) the
-// AIP Spaces.ListSpaces uses, so page tokens and page_size behave
-// identically. name_prefix maps to a partial-match filter expression on
-// the space's display name (the filter config's partial-capable field).
+// REQUIRED for v1: the query scopes by parent org, and expressing "spaces
+// across the caller's orgs" would need cross-org iteration deferred rather
+// than hand-rolled. The handler membership-gates on the parent org, then
+// runs a STATIC keyset query (ListSpacesForMCP) — deliberately NOT the
+// dynamic internal/filter engine, which the MCP surface must not use.
+// name_prefix is a case-insensitive prefix match on the space's display
+// name; pagination is keyset-on-id with the same opaque, codec-encrypted
+// page tokens the rest of the List surface uses, so tokens issued before
+// this migration keep resolving.
 func (s *McpServer) ListSpaces(ctx context.Context, req *mcpv1.ListSpacesRequest) (*mcpv1.ListSpacesResponse, error) {
 	orgSlug := req.GetOrg()
 	if orgSlug == "" {
@@ -85,55 +88,59 @@ func (s *McpServer) ListSpaces(ctx context.Context, req *mcpv1.ListSpacesRequest
 		return nil, apierr.NotFound("organization", orgSlug)
 	}
 
-	pageSize := clampPageSize(req.GetPageSize())
-	rows, err := filter.Query(ctx, s.pool, filter.SpaceFilter(), filter.QueryParams{
-		Filter:   namePrefixFilter(req.GetNamePrefix()),
-		ParentID: org.ID.String(),
-		PageSize: pageSize,
-		Cursor:   req.GetPageToken(),
-		Codec:    s.codec,
-	})
+	// Decode the opaque page token to its keyset anchor. Empty token → first
+	// page (uuid.Nil → NULL cursor); a tampered token is a caller error on
+	// page_token.
+	cursor, err := filter.DecodePageToken(s.codec, req.GetPageToken())
 	if err != nil {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("page_token", err.Error()))
 	}
-	results, err := filter.ScanSpaces(rows)
+
+	pageSize := clampPageSize(req.GetPageSize())
+	rows, err := s.queries.ListSpacesForMCP(ctx, db.ListSpacesForMCPParams{
+		OrgID:      org.ID,
+		NamePrefix: namePrefixPattern(req.GetNamePrefix()),
+		Cursor:     convert.PgUUID(cursor),
+		PageLimit:  pageSize + 1, // over-fetch one to detect a further page
+	})
 	if err != nil {
-		return nil, apierr.Internal(err, "database error")
+		return nil, apierr.Internal(err, "list spaces")
 	}
 
-	// The engine over-fetches by one to detect a further page. If we got
-	// more than pageSize rows, trim to pageSize and anchor the next
-	// token at the LAST RETURNED row: the cursor query is `id > token`
-	// (strict), so encoding the last returned id makes the next page
-	// resume at the first trimmed row. (NB: the AIP SpacesServer.ListSpaces
-	// anchors at results[pageSize] instead, which strictly skips that
-	// boundary row — a pre-existing off-by-one; not replicated here.)
-	var nextToken string
-	if len(results) > int(pageSize) {
-		results = results[:pageSize]
-		nextToken, err = filter.EncodeNextPageToken(s.codec, results[len(results)-1].ID)
-		if err != nil {
-			return nil, apierr.Internal(err, "encode page token")
-		}
+	// Trim the over-fetched row and derive the next token from the LAST
+	// RETURNED row — filter.Paginate owns both the trim and the encode, so
+	// the strict `id > cursor` resume can't drop the boundary row. Paginate
+	// is a generic keyset trim helper, NOT the dynamic filter engine.
+	page, nextToken, err := filter.Paginate(rows, int(pageSize), func(last db.Space) (string, error) {
+		return filter.EncodeNextPageToken(s.codec, last.ID)
+	})
+	if err != nil {
+		return nil, apierr.Internal(err, "encode page token")
 	}
 
-	spaces := make([]*mcpv1.Space, 0, len(results))
-	for _, r := range results {
+	spaces := make([]*mcpv1.Space, 0, len(page))
+	for _, r := range page {
 		spaces = append(spaces, &mcpv1.Space{Org: orgSlug, Slug: r.Name, DisplayName: r.DisplayName})
 	}
 	return &mcpv1.ListSpacesResponse{Spaces: spaces, NextPageToken: nextToken}, nil
 }
 
-// namePrefixFilter renders an AIP-160 filter expression that
-// prefix-matches the space display name, or "" when no prefix was
-// given. The value is quoted so arbitrary client input can't break the
-// filter grammar; the engine converts the trailing `*` to an ILIKE
-// prefix on the partial-capable displayName field.
-func namePrefixFilter(prefix string) string {
+// namePrefixPattern builds the ILIKE pattern for the optional display-name
+// prefix filter, or a NULL text (no filter) when prefix is empty. It
+// preserves EXACTLY the match the removed filter-engine path produced: LIKE
+// metacharacters in the caller's input are escaped so '%' and '_' match
+// literally, an AIP-160 '*' is treated as a wildcard, and a trailing '*' is
+// always appended to anchor a case-insensitive prefix match. The result is
+// bound as a query parameter, so caller input can never alter query structure.
+func namePrefixPattern(prefix string) pgtype.Text {
 	if prefix == "" {
-		return ""
+		return pgtype.Text{}
 	}
-	return "displayName = " + strconv.Quote(prefix+"*")
+	pattern := prefix + "*"
+	pattern = strings.ReplaceAll(pattern, "%", `\%`)
+	pattern = strings.ReplaceAll(pattern, "_", `\_`)
+	pattern = strings.ReplaceAll(pattern, "*", "%")
+	return pgtype.Text{String: pattern, Valid: true}
 }
 
 // GetSpace returns a single space by (org, slug), gated on the caller's
