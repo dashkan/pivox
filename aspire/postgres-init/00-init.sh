@@ -37,10 +37,16 @@ migrate -path /migrations \
 
 # Public host for dev seed URLs (storage-gateway /files/ origins). PIVOX_HOSTNAME
 # (e.g. pivox.app) is forwarded by the apphost; default to localhost:8081 so a bare
-# checkout still seeds. Passed to psql as :public_host, consumed by the seeds.
+# checkout still seeds. Injected as the `pivox.public_host` runtime setting (below),
+# which 10_storage_gateways.sql reads via current_setting(). We use a session GUC
+# rather than a psql `-v` variable because the seed files must stay free of psql
+# `\`-meta-commands: the dashboards seed tests load them programmatically via pgx,
+# which rejects a `:'var'` interpolation the same way it rejects `\set`.
 public_host="${PIVOX_HOSTNAME:-localhost:8081}"
 
 # seed.sql does `\i scripts/seeds/*.sql` (paths relative to the working dir), so
-# run it from / where the mounted scripts dir lives at /scripts.
+# run it from / where the mounted scripts dir lives at /scripts. PGOPTIONS carries
+# the setting into the connection; the seed normalizes an empty value to the default.
 cd /
-psql -v ON_ERROR_STOP=1 -v public_host="$public_host" --username "$POSTGRES_USER" --dbname pivox -f /scripts/seed.sql
+PGOPTIONS="-c pivox.public_host=$public_host" \
+	psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname pivox -f /scripts/seed.sql

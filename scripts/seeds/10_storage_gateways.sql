@@ -3,27 +3,37 @@
 --
 -- hostname values are dev-only, all pointing at the shared public host so the
 -- dashboards composer emits /files/ URLs reachable through the tunnel → the gateway
--- pipeline. The host comes from :public_host (psql -v), set by the apphost init
--- from PIVOX_HOSTNAME; a default is set just below so standalone runs (e.g.
--- `make db-seed`) still work. Production gateway provisioning sets real
--- per-gateway hostnames like meridian-hq.storage.pivox.app via the
--- gateway-creation RPC (when that ships). Same composer code path either way;
--- only the data differs. Composer hardcodes the https:// scheme — column stores
--- host (or host:port) only, no scheme.
-\if :{?public_host}
-\else
-\set public_host 'localhost:8081'
-\endif
+-- pipeline. The host comes from the `pivox.public_host` runtime setting, injected
+-- by the apphost init from PIVOX_HOSTNAME (psql PGOPTIONS `-c pivox.public_host=…`);
+-- the normalization below defaults it to localhost:8081 so runs that inject nothing
+-- still work: `make db-seed` (plain `psql -f`) and the programmatic seed loader in
+-- the dashboards tests (pgx Exec). Production gateway provisioning sets real
+-- per-gateway hostnames like meridian-hq.storage.pivox.app via the gateway-creation
+-- RPC (when that ships). Same composer code path either way; only the data differs.
+-- Composer hardcodes the https:// scheme — column stores host (or host:port) only,
+-- no scheme.
+--
+-- Plain SQL only — no psql `\set`/`\if` meta-commands. This file is executed both
+-- by the psql CLI and by pgx.Exec (the dashboards seed tests load it programmatically),
+-- and pgx rejects a leading `\` with a syntax error. Normalize the injected value (or
+-- its absence) into the session setting once, then read it back per row.
+DO $$
+BEGIN
+  PERFORM set_config(
+    'pivox.public_host',
+    coalesce(nullif(current_setting('pivox.public_host', true), ''), 'localhost:8081'),
+    false);
+END $$;
 INSERT INTO storage_gateways (id, org_id, name, display_name, ip_addresses, registration_token, hostname, state, created_by, create_time, update_time) VALUES
     -- Meridian Broadcasting: 2 gateways (HQ + West Coast facility)
-    ('0192a000-0010-7000-8000-000000100001', '0192a000-0001-7000-8000-000000000001', 'meridian-hq',       'Meridian HQ',          '{127.0.0.1}', 'dev-token-meridian-hq',       :'public_host', 'ACTIVE', NULL,    '2025-06-01 08:00:00+00', '2025-06-01 08:00:00+00'),
-    ('0192a000-0010-7000-8000-000000100002', '0192a000-0001-7000-8000-000000000001', 'meridian-west',     'Meridian West Coast',  '{127.0.0.1}', 'dev-token-meridian-west',     :'public_host', 'PROVISIONING', NULL, '2025-07-15 10:00:00+00', '2025-07-15 10:00:00+00'),
+    ('0192a000-0010-7000-8000-000000100001', '0192a000-0001-7000-8000-000000000001', 'meridian-hq',       'Meridian HQ',          '{127.0.0.1}', 'dev-token-meridian-hq',       current_setting('pivox.public_host'), 'ACTIVE', NULL,    '2025-06-01 08:00:00+00', '2025-06-01 08:00:00+00'),
+    ('0192a000-0010-7000-8000-000000100002', '0192a000-0001-7000-8000-000000000001', 'meridian-west',     'Meridian West Coast',  '{127.0.0.1}', 'dev-token-meridian-west',     current_setting('pivox.public_host'), 'PROVISIONING', NULL, '2025-07-15 10:00:00+00', '2025-07-15 10:00:00+00'),
     -- Pacific Coast Networks: 1 gateway
-    ('0192a000-0010-7000-8000-000000100003', '0192a000-0001-7000-8000-000000000002', 'pacific-main',      'Pacific Main Facility', '{127.0.0.1}', 'dev-token-pacific-main',     :'public_host', 'ACTIVE', NULL,    '2025-06-20 09:00:00+00', '2025-06-20 09:00:00+00'),
+    ('0192a000-0010-7000-8000-000000100003', '0192a000-0001-7000-8000-000000000002', 'pacific-main',      'Pacific Main Facility', '{127.0.0.1}', 'dev-token-pacific-main',     current_setting('pivox.public_host'), 'ACTIVE', NULL,    '2025-06-20 09:00:00+00', '2025-06-20 09:00:00+00'),
     -- Heartland Media: 1 gateway
-    ('0192a000-0010-7000-8000-000000100004', '0192a000-0001-7000-8000-000000000003', 'heartland-dc',      'Heartland Data Center', '{127.0.0.1}', 'dev-token-heartland-dc',     :'public_host', 'ACTIVE', NULL,  '2025-07-01 08:00:00+00', '2025-07-01 08:00:00+00'),
+    ('0192a000-0010-7000-8000-000000100004', '0192a000-0001-7000-8000-000000000003', 'heartland-dc',      'Heartland Data Center', '{127.0.0.1}', 'dev-token-heartland-dc',     current_setting('pivox.public_host'), 'ACTIVE', NULL,  '2025-07-01 08:00:00+00', '2025-07-01 08:00:00+00'),
     -- Summit Sports: 1 gateway (offline for testing)
-    ('0192a000-0010-7000-8000-000000100005', '0192a000-0001-7000-8000-000000000005', 'summit-studio',     'Summit Studio',         '{127.0.0.1}', 'dev-token-summit-studio',    :'public_host', 'OFFLINE', NULL,     '2025-08-01 12:00:00+00', '2025-08-01 12:00:00+00');
+    ('0192a000-0010-7000-8000-000000100005', '0192a000-0001-7000-8000-000000000005', 'summit-studio',     'Summit Studio',         '{127.0.0.1}', 'dev-token-summit-studio',    current_setting('pivox.public_host'), 'OFFLINE', NULL,     '2025-08-01 12:00:00+00', '2025-08-01 12:00:00+00');
 
 -- Agents (connected servers for active gateways)
 INSERT INTO storage_agents (id, gateway_id, ip_address, hostname, version, state, cache_used_gb, join_time, last_seen_time) VALUES
