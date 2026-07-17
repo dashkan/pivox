@@ -57,7 +57,8 @@ function ConnectorNewPage() {
 
   // The route (not FormPage) owns the return target + the soft-navigation dirty
   // guard. FormPage stays router-free — we inject navigate + onDirtyChange.
-  const { returnTo, goBack, onDirtyChange } = useConnectorFormNav(search.from);
+  const { returnTo, goBack, goBackAndRefresh, onDirtyChange } =
+    useConnectorFormNav(search.from);
 
   const orgSlug = parent ? organizationId(parent) : '';
   const agentsQuery = useQuery({
@@ -95,7 +96,7 @@ function ConnectorNewPage() {
         </a>
       }
       onCancel={goBack}
-      onSubmitSuccess={goBack}
+      onSubmitSuccess={goBackAndRefresh}
       onDirtyChange={onDirtyChange}
     />
   );

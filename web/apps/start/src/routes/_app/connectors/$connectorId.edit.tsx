@@ -97,7 +97,8 @@ function ConnectorEditPage() {
   const { connectorId } = Route.useParams();
   const search = Route.useSearch();
 
-  const { returnTo, goBack, onDirtyChange } = useConnectorFormNav(search.from);
+  const { returnTo, goBack, goBackAndRefresh, onDirtyChange } =
+    useConnectorFormNav(search.from);
 
   const orgSlug = parent ? organizationId(parent) : '';
   const agentsQuery = useQuery({
@@ -137,7 +138,7 @@ function ConnectorEditPage() {
         </a>
       }
       onCancel={goBack}
-      onSubmitSuccess={goBack}
+      onSubmitSuccess={goBackAndRefresh}
       onDirtyChange={onDirtyChange}
     />
   );

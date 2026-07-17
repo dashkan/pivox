@@ -44,9 +44,12 @@ export function DeleteDialog({
         {error && <FieldError>{error}</FieldError>}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-          {/* Keep the dialog open on click so a failed delete can show its
-              reason; the parent closes it on success. */}
+          {/* Destructive CTA (this is a permanent delete) — stock shadcn
+              `destructive` Button variant, no custom classes. Keep the dialog
+              open on click so a failed delete can show its reason; the parent
+              closes it on success. */}
           <AlertDialogAction
+            variant="destructive"
             onClick={(e) => {
               e.preventDefault();
               onConfirm();
