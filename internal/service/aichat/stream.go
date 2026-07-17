@@ -79,30 +79,28 @@ const (
 func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream grpc.ServerStreamingServer[aiv1.ServerEvent]) error {
 	ctx := stream.Context()
 
-	// autoCreatedID is set only when this call minted the conversation
-	// (empty `conversation`) — it drives both the skip of runGenerate's
-	// inbound-persist step (the first message is already persisted) and the
-	// compensating cleanup on generation failure (see runGenerate error path).
-	autoCreatedID := uuid.Nil
+	// autoCreated is true only when this call minted the conversation
+	// (empty `conversation`) — it tells runGenerate to skip its
+	// inbound-persist step, since createConversationWithFirstMessage already
+	// persisted the first message atomically with the conversation.
+	autoCreated := false
 	if req.GetConversation() == "" {
-		convName, convID, err := s.createConversationWithFirstMessage(ctx, req.GetParent(), lastInboundMessage(req))
+		convName, err := s.createConversationWithFirstMessage(ctx, req.GetParent(), lastInboundMessage(req))
 		if err != nil {
 			return err
 		}
 		req.Conversation = convName
-		autoCreatedID = convID
+		autoCreated = true
 	}
 
-	_, _, _, err := s.runGenerate(ctx, req, autoCreatedID != uuid.Nil, func(ev *aiv1.ServerEvent) error {
+	// A generation failure leaves the conversation persisted with the user's
+	// first message and no assistant reply — the same state as a failed turn
+	// on a pre-existing conversation. The user's message stays put; the client
+	// surfaces the error and retries in place. Nothing is discarded.
+	_, _, _, err := s.runGenerate(ctx, req, autoCreated, func(ev *aiv1.ServerEvent) error {
 		return stream.Send(ev)
 	})
 	if err != nil {
-		if autoCreatedID != uuid.Nil {
-			// The conversation was created (with its first user message) for
-			// this call, then generation failed — remove it so a failed first
-			// turn never persists. Existing conversations are never touched.
-			s.deleteAutoCreatedConversation(ctx, autoCreatedID)
-		}
 		return err
 	}
 	// Emit `finish` as the terminal lifecycle event. `finishReason`
@@ -116,13 +114,20 @@ func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream 
 
 // createConversationWithFirstMessage mints a fresh Conversation under
 // the caller's user-in-org parent AND persists its first (user) message
-// in the SAME transaction, returning the conversation's resource name and
-// id. This is the whole point of the lifecycle rework: a conversation is
+// in the SAME transaction, returning the conversation's resource name.
+// This is the whole point of the lifecycle rework: a conversation is
 // never committed empty — it and its first message land atomically, so a
 // failure anywhere in the tx leaves no row at all (no orphaned empty
 // conversation, which the old two-tx design produced when generation
 // failed between committing the empty conversation and persisting the
 // first message).
+//
+// Once committed, the conversation is durable regardless of what the
+// subsequent generation does. A generation failure leaves it persisted
+// with just the user's first message and no assistant reply — the same
+// state as a failed turn on a pre-existing conversation. The user's
+// message stays put; the client shows the error and retries in place.
+// Nothing reaps it.
 //
 // The permission interceptor (registered via the proto's
 // `pivox.permission.v1.required_permission = "ai.chat.stream"` option;
@@ -139,25 +144,25 @@ func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream 
 // pure, replay-unsafe-to-repeat-for-effect step) happens outside via
 // buildInputMessageParams so its role/marshal errors surface before the tx
 // opens.
-func (s *Server) createConversationWithFirstMessage(ctx context.Context, parent string, firstMsg *aiv1.InputMessage) (string, uuid.UUID, error) {
+func (s *Server) createConversationWithFirstMessage(ctx context.Context, parent string, firstMsg *aiv1.InputMessage) (string, error) {
 	orgName, pathUser, err := parseConversationParent(parent)
 	if err != nil {
-		return "", uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("parent", err.Error()))
+		return "", apierr.InvalidArgument(apierr.FieldViolation("parent", err.Error()))
 	}
 	callerUserID := server.MustUserID(ctx)
 	if pathUser != callerUserID {
-		return "", uuid.Nil, apierr.PermissionDenied("conversations may only be created under the caller's own user-uuid")
+		return "", apierr.PermissionDenied("conversations may only be created under the caller's own user-uuid")
 	}
 	if firstMsg == nil {
 		// Unreachable under the validator chain (messages.min_items=1); a
 		// loud Internal beats minting an empty conversation.
-		return "", uuid.Nil, apierr.Internal(nil, "invariant: create conversation called with no first message")
+		return "", apierr.Internal(nil, "invariant: create conversation called with no first message")
 	}
 	// ConversationID is filled in inside the tx once CreateConversation
 	// returns the new row's id (persistMessageOnQtx then computes Sequence).
 	msgParams, err := buildInputMessageParams(uuid.Nil, firstMsg)
 	if err != nil {
-		return "", uuid.Nil, err
+		return "", err
 	}
 	row, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.AiConversation, error) {
 		org, err := qtx.GetOrganizationByName(ctx, orgName)
@@ -183,10 +188,9 @@ func (s *Server) createConversationWithFirstMessage(ctx context.Context, parent 
 		return conv, nil
 	})
 	if err != nil {
-		return "", uuid.Nil, err
+		return "", err
 	}
-	name := fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, pathUser, row.Name)
-	return name, row.ID, nil
+	return fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, pathUser, row.Name), nil
 }
 
 // lastInboundMessage returns the last message in the request — the turn
@@ -203,51 +207,6 @@ func lastInboundMessage(req *aiv1.GenerateContentRequest) *aiv1.InputMessage {
 	return msgs[len(msgs)-1]
 }
 
-// deleteAutoCreatedConversation is the compensating cleanup for a
-// conversation minted by this call whose first generation then failed. It
-// runs a guarded delete: skip if the row already picked up an active stream
-// lease or additional messages (a client that retried on the name we streamed
-// in the Start event and got far enough to acquire the lease or persist a
-// turn), else DELETE it (cascade removes the first user message).
-//
-// Residual race: a retry still in resolveOrg/resolveConversation when this
-// cleanup takes the FOR UPDATE lock has neither acquired the lease nor bumped
-// the count, so the row is deleted out from under it and its subsequent
-// AcquireConversationLease returns Aborted("ACTIVE_STREAM"). That's a
-// mildly misleading code for a benign retry-after-failure, but no data is
-// corrupted and the client's correct move (start a fresh conversation) is
-// unaffected. Widening the guard to hold the lock across the retry would
-// serialize unrelated calls for no real benefit.
-//
-// Best-effort — a failure here (incl. a failed lease release upstream leaving
-// our own lease live, which the isLeaseActive guard then treats as "in use")
-// degrades to the old "conversation lingers with its first message" state,
-// which is logged, not fatal. Runs on a detached ctx because the request ctx
-// is typically already Done (client disconnect / stall abort).
-func (s *Server) deleteAutoCreatedConversation(ctx context.Context, convID uuid.UUID) {
-	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), leaseReleaseTimeout)
-	defer cancel()
-	err := db.RunInTxVoid(bgCtx, s.pool, func(qtx db.Querier) error {
-		row, err := qtx.GetConversationByIDForUpdate(bgCtx, convID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil // already gone — nothing to clean up
-			}
-			return err
-		}
-		if isLeaseActive(row) || row.MessageCount > 1 {
-			// A concurrent stream took the conversation over, or another turn
-			// landed — leave the now-live conversation alone.
-			return nil
-		}
-		return qtx.DeleteConversation(bgCtx, convID)
-	})
-	if err != nil {
-		slog.ErrorContext(bgCtx, "cleanup auto-created conversation after generation failure",
-			"conversation_id", convID, "error", err)
-	}
-}
-
 // GenerateContent is the unary counterpart to `StreamGenerateContent`.
 // Runs the same generation flow but accumulates the response into a
 // single `Message` and returns it. Always stateful: like
@@ -260,20 +219,20 @@ func (s *Server) deleteAutoCreatedConversation(ctx context.Context, convID uuid.
 // `summarizeTranscript` for the pattern — rather than go through
 // this RPC and discard the auto-created row.
 func (s *Server) GenerateContent(ctx context.Context, req *aiv1.GenerateContentRequest) (*aiv1.GenerateContentResponse, error) {
-	autoCreatedID := uuid.Nil
+	autoCreated := false
 	if req.GetConversation() == "" {
-		convName, convID, err := s.createConversationWithFirstMessage(ctx, req.GetParent(), lastInboundMessage(req))
+		convName, err := s.createConversationWithFirstMessage(ctx, req.GetParent(), lastInboundMessage(req))
 		if err != nil {
 			return nil, err
 		}
 		req.Conversation = convName
-		autoCreatedID = convID
+		autoCreated = true
 	}
-	msg, usage, modelName, err := s.runGenerate(ctx, req, autoCreatedID != uuid.Nil, nil)
+	// On failure the conversation is left persisted with the user's first
+	// message and no assistant reply — symmetric with a failed turn on a
+	// pre-existing conversation. Nothing is discarded.
+	msg, usage, modelName, err := s.runGenerate(ctx, req, autoCreated, nil)
 	if err != nil {
-		if autoCreatedID != uuid.Nil {
-			s.deleteAutoCreatedConversation(ctx, autoCreatedID)
-		}
 		return nil, err
 	}
 	return &aiv1.GenerateContentResponse{

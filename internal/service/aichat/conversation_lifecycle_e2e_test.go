@@ -93,20 +93,48 @@ func drainStream(t *testing.T, stream aiv1.AiChat_StreamGenerateContentClient) e
 	}
 }
 
-// TestE2E_StreamGenerateContent_FailedFirstGenerationLeavesNoConversation is the
-// no-orphan guard for the streaming path: an empty `conversation` triggers
-// atomic create-with-first-message, then the model errors. Because generation
-// failed on a freshly auto-created conversation, the conversation (and its first
-// user message) must be removed — the user's sidebar is left with nothing, not
-// an orphaned conversation with a dangling user turn and no reply.
-func TestE2E_StreamGenerateContent_FailedFirstGenerationLeavesNoConversation(t *testing.T) {
+// assertSurvivedWithOnlyUserMessage asserts the given parent has exactly one
+// conversation, and that conversation holds exactly its first user message
+// (message_count == 1, last_message_time set = the user turn's time, no
+// assistant reply). This is the KEEP behavior for a failed first generation:
+// atomic create-with-first-message committed the conversation + user turn up
+// front, and the failure simply left it without a reply — never empty, never
+// reaped.
+func assertSurvivedWithOnlyUserMessage(t *testing.T, h *grpcharness.Harness, ctx context.Context, client aiv1.AiChatClient, orgID uuid.UUID, parent string) {
+	t.Helper()
+	list, err := client.ListConversations(ctx, &aiv1.ListConversationsRequest{Parent: parent})
+	require.NoError(t, err)
+	require.Len(t, list.GetConversations(), 1,
+		"the auto-created conversation survives a failed first generation")
+	conv := list.GetConversations()[0]
+	assert.EqualValues(t, 1, conv.GetMessageCount(), "only the user's first message persisted")
+	require.NotNil(t, conv.GetLastMessageTime(), "last_message_time is set even without a reply")
+
+	convID := conversationIDFromName(t, h, orgID, conv.GetName())
+	rows, err := h.Queries.ListMessagesNewestFirst(ctx, db.ListMessagesNewestFirstParams{
+		ConversationID: convID,
+		Limit:          10,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1, "exactly the one user message — no assistant reply")
+	assert.Equal(t, "user", rows[0].Role)
+	assert.WithinDuration(t, rows[0].CreateTime, conv.GetLastMessageTime().AsTime(), time.Millisecond,
+		"last_message_time equals the user message's time")
+}
+
+// TestE2E_StreamGenerateContent_FailedFirstGenerationKeepsConversation pins the
+// KEEP behavior for the streaming path: an empty `conversation` triggers atomic
+// create-with-first-message, then the model errors. The conversation stays put
+// with the user's first message and no assistant reply — exactly how a chat
+// assistant behaves (your message stays, the error is shown, retry in place).
+func TestE2E_StreamGenerateContent_FailedFirstGenerationKeepsConversation(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 	h := grpcharness.New(t,
 		grpcharness.WithOrganizationsServer(),
 		grpcharness.WithAiChatServerModel(erroringModel{}))
-	owned := h.SeedOwnedOrg(t, "cv-orphan-s", "Cv Orphan Stream", "aichat")
+	owned := h.SeedOwnedOrg(t, "cv-keep-s", "Cv Keep Stream", "aichat")
 	ctx := context.Background()
 	client := aiv1.NewAiChatClient(h.Conn())
 	parent := "organizations/" + owned.Slug + "/users/" + owned.Owner.IdentityID.String()
@@ -116,25 +144,19 @@ func TestE2E_StreamGenerateContent_FailedFirstGenerationLeavesNoConversation(t *
 	err = drainStream(t, stream)
 	require.Error(t, err, "generation must fail (the model errors)")
 
-	// No conversation row survived the failed first generation.
-	list, err := client.ListConversations(ctx, &aiv1.ListConversationsRequest{Parent: parent})
-	require.NoError(t, err)
-	assert.Empty(t, list.GetConversations(),
-		"a failed first generation must leave no auto-created conversation")
+	assertSurvivedWithOnlyUserMessage(t, h, ctx, client, owned.Row.ID, parent)
 }
 
-// TestE2E_GenerateContent_FailedFirstGenerationLeavesNoConversation mirrors the
-// no-orphan guard for the unary path — same lifecycle, different RPC — since
-// both auto-create via createConversationWithFirstMessage and clean up on
-// failure.
-func TestE2E_GenerateContent_FailedFirstGenerationLeavesNoConversation(t *testing.T) {
+// TestE2E_GenerateContent_FailedFirstGenerationKeepsConversation mirrors the
+// KEEP behavior for the unary path — same lifecycle, different RPC.
+func TestE2E_GenerateContent_FailedFirstGenerationKeepsConversation(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 	h := grpcharness.New(t,
 		grpcharness.WithOrganizationsServer(),
 		grpcharness.WithAiChatServerModel(erroringModel{}))
-	owned := h.SeedOwnedOrg(t, "cv-orphan-u", "Cv Orphan Unary", "aichat")
+	owned := h.SeedOwnedOrg(t, "cv-keep-u", "Cv Keep Unary", "aichat")
 	ctx := context.Background()
 	client := aiv1.NewAiChatClient(h.Conn())
 	parent := "organizations/" + owned.Slug + "/users/" + owned.Owner.IdentityID.String()
@@ -142,10 +164,7 @@ func TestE2E_GenerateContent_FailedFirstGenerationLeavesNoConversation(t *testin
 	_, err := client.GenerateContent(ctx, userTurn(parent, "hello"))
 	require.Error(t, err, "generation must fail (the model errors)")
 
-	list, err := client.ListConversations(ctx, &aiv1.ListConversationsRequest{Parent: parent})
-	require.NoError(t, err)
-	assert.Empty(t, list.GetConversations(),
-		"a failed first generation must leave no auto-created conversation")
+	assertSurvivedWithOnlyUserMessage(t, h, ctx, client, owned.Row.ID, parent)
 }
 
 // TestE2E_GenerateContent_ConversationAlwaysHasLastMessageTime pins the schema
@@ -353,10 +372,10 @@ func TestE2E_GenerateContent_ResumePersistsInboundOnce(t *testing.T) {
 }
 
 // TestE2E_GenerateContent_FailureOnExistingConversationKeepsIt pins the
-// caller-level guard: the compensating delete fires ONLY for a conversation
-// auto-created by the failing call. A generation that fails on a pre-existing
-// conversation must leave it (and its history) intact — only the new user turn
-// is persisted, no reply, and the conversation survives.
+// resume-path failure behavior, symmetric with the auto-create KEEP tests: a
+// generation that fails on a pre-existing conversation leaves it (and its
+// history) intact — the new user turn is persisted, no reply, and the
+// conversation survives.
 func TestE2E_GenerateContent_FailureOnExistingConversationKeepsIt(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -383,8 +402,7 @@ func TestE2E_GenerateContent_FailureOnExistingConversationKeepsIt(t *testing.T) 
 	})
 	require.Error(t, err, "generation must fail (the model errors)")
 
-	// The conversation survives — the compensating delete is scoped to
-	// auto-created conversations only.
+	// The conversation survives a failed turn — nothing reaps it.
 	list, err := client.ListConversations(ctx, &aiv1.ListConversationsRequest{Parent: parent})
 	require.NoError(t, err)
 	require.Len(t, list.GetConversations(), 1, "the pre-existing conversation must survive a failed turn")
