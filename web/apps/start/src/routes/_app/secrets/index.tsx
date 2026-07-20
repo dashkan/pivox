@@ -24,34 +24,20 @@ const SPACE_SECRETS_PATH =
 
 export const Route = createFileRoute('/_app/secrets/')({
   validateSearch: validateSecretsSearch,
-  // Re-run the loader when the list controls change, so SSR loads (and links)
-  // for a filtered/sorted/paged URL are prefetched for that exact query.
   loaderDeps: ({ search }) => search,
-  /**
-   * SSR-only prefetch. On the server pass, build the same secrets request the
-   * client hook will (shared `buildSecretsListRequest`), fetch it as the user,
-   * and prime the QueryClient under the byte-identical react-query key so the
-   * rows are in the server-rendered HTML. Client navigations skip this.
-   */
+  // SSR-only: prefetch this exact query + prime the client's react-query key so
+  // rows are in the server HTML. Client navs skip it.
   loader: async ({ context, deps }) => {
     if (typeof window !== 'undefined') return;
     const prefetched = await prefetchSecrets({ data: deps });
     if (prefetched) {
-      // `isSpaceScoped` discriminates the union, narrowing `pathParams`.
-      if (prefetched.isSpaceScoped) {
-        const { queryKey } = $api.queryOptions('get', SPACE_SECRETS_PATH, {
-          params: { path: prefetched.pathParams, query: prefetched.query },
-        });
-        context.queryClient.setQueryData(queryKey, prefetched.secrets);
-      } else {
-        const { queryKey } = $api.queryOptions('get', SECRETS_PATH, {
-          params: {
-            path: { organization: prefetched.orgSlug },
-            query: prefetched.query,
-          },
-        });
-        context.queryClient.setQueryData(queryKey, prefetched.secrets);
-      }
+      const connectionPath = prefetched.isSpaceScoped
+        ? SPACE_SECRETS_PATH
+        : SECRETS_PATH;
+      const { queryKey } = $api.queryOptions('get', connectionPath, {
+        params: { path: prefetched.pathParams, query: prefetched.query },
+      });
+      context.queryClient.setQueryData(queryKey, prefetched.secrets);
     }
   },
   component: SecretsPage,
@@ -74,9 +60,7 @@ function SecretsPage() {
     [navigate],
   );
 
-  // Capture THIS list view's exact URL so the form pages can return to it
-  // (filters/scope/page are already encoded here). The `?from=` param is the
-  // single source both create-scope and return-target flow from.
+  // This view's exact URL (filters/scope/page encoded) → the form pages' `?from=` return target.
   const currentHref = useRouterState({
     select: (s) => s.location.pathname + s.location.searchStr,
   });

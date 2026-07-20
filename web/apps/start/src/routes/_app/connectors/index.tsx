@@ -1,5 +1,8 @@
 import { organizationId } from '@pivox/client';
-import { ConnectorsFeature, fetchAgentOptions } from '@pivox/features/connectors';
+import {
+  ConnectorsFeature,
+  fetchAgentOptions,
+} from '@pivox/features/connectors';
 import { useAppShellContext } from '@pivox/ui/app-shell';
 import {
   AdminNotice,
@@ -54,21 +57,19 @@ export const Route = createFileRoute('/_app/connectors/')({
     ]);
 
     if (prefetched) {
-      // `isSpaceScoped` discriminates the union, narrowing `pathParams`.
-      if (prefetched.isSpaceScoped) {
-        const { queryKey } = $api.queryOptions('get', SPACE_CONNECTORS_PATH, {
-          params: { path: prefetched.pathParams, query: prefetched.query },
-        });
-        context.queryClient.setQueryData(queryKey, prefetched.connectors);
-      } else {
-        const { queryKey } = $api.queryOptions('get', CONNECTORS_PATH, {
-          params: {
-            path: { organization: prefetched.orgSlug },
-            query: prefetched.query,
-          },
-        });
-        context.queryClient.setQueryData(queryKey, prefetched.connectors);
-      }
+      const connectionPath = prefetched.isSpaceScoped
+        ? SPACE_CONNECTORS_PATH
+        : CONNECTORS_PATH;
+      const pathParams = prefetched.isSpaceScoped
+        ? prefetched.pathParams
+        : { organization: prefetched.orgSlug };
+      const { queryKey } = $api.queryOptions('get', connectionPath, {
+        params: {
+          path: pathParams,
+          query: prefetched.query,
+        },
+      });
+      context.queryClient.setQueryData(queryKey, prefetched.connectors);
     }
 
     if (agents) {
@@ -96,7 +97,10 @@ function ConnectorsPage() {
     enabled: Boolean(orgSlug),
     staleTime: AGENTS_STALE_TIME,
   });
-  const agentOptions = useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
+  const agentOptions = useMemo(
+    () => agentsQuery.data ?? [],
+    [agentsQuery.data],
+  );
 
   const listState = useMemo(() => searchToValue(search), [search]);
   const onListStateChange = useCallback<ListControlsChange>(
