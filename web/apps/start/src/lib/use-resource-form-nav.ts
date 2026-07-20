@@ -71,17 +71,26 @@ export function useResourceFormNav(
     router.history.push(returnTo);
   }, [router, returnTo]);
 
-  // Used on a mutating success (create / edit / delete): invalidate the list
-  // families so the changed row shows on return, and the detail families so a
-  // reopened edit form refetches, THEN navigate back. This is a CSR refetch
-  // through the BFF proxy — the SSR prefetch is server-only and skipped on this
-  // client transition. Cancel uses plain `goBack` (no refetch — nothing changed).
+  // Used on a mutating success (create / edit / delete): mark the list families
+  // stale so the changed row shows on return, and the detail families so a
+  // reopened edit form refetches, THEN navigate back.
+  //
+  // `refetchType: 'none'` is load-bearing. The default ('active') EAGERLY
+  // refetches every matching observed query the instant we invalidate. For the
+  // list that races the destination list route, which fires its own fetch on
+  // mount (staleTime 0) — react-query then cancels one in favour of the other,
+  // and the Network tab shows a doubled request (`…/connectors` canceled, then
+  // 200). 'none' invalidates WITHOUT an eager refetch: the query is left stale,
+  // so the list refetches exactly ONCE, on mount, with fresh post-save data.
+  // The detail families are inactive on the list (and, on edit, about to unmount
+  // — an 'active' refetch there would be started only to be canceled), so 'none'
+  // is right for them too: they refetch on the next edit-open, not now.
   const goBackAndRefresh = useCallback(() => {
     for (const queryKey of listKeys) {
-      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({ queryKey, refetchType: 'none' });
     }
     for (const queryKey of detailKeys) {
-      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({ queryKey, refetchType: 'none' });
     }
     goBack();
   }, [queryClient, listKeys, detailKeys, goBack]);
