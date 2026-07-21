@@ -39,43 +39,51 @@ function setup() {
     defaultOptions: { queries: { retry: false } },
   });
   const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+  const removeSpy = vi.spyOn(queryClient, 'removeQueries');
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
   const { result } = renderHook(() => useResourceFormNav(undefined, config), {
     wrapper,
   });
-  return { result, invalidateSpy };
+  return { result, invalidateSpy, removeSpy };
 }
 
-describe('useResourceFormNav — goBackAndRefresh invalidation shape', () => {
-  it('invalidates every list + detail family with refetchType "none"', () => {
-    const { result, invalidateSpy } = setup();
+describe('useResourceFormNav — goBackAndRefresh cache handling', () => {
+  it('invalidates each LIST family (refetchType "none") and REMOVES each DETAIL family', () => {
+    const { result, invalidateSpy, removeSpy } = setup();
 
     act(() => {
       result.current.goBackAndRefresh();
     });
 
-    // One invalidate per list + detail family, and no others.
-    expect(invalidateSpy).toHaveBeenCalledTimes(
-      config.listKeys.length + config.detailKeys.length,
-    );
-
-    // CRITICAL: every invalidation must use refetchType 'none'. The default
-    // ('active') eagerly refetches, which — for the list — races the fetch the
-    // destination list route fires on mount, so react-query cancels one and the
-    // Network tab shows a doubled (canceled + 200) request. 'none' marks the
-    // families stale WITHOUT an eager refetch; the list refetches exactly once,
-    // on mount, because it is now invalidated (and staleTime 0).
-    for (const [args] of invalidateSpy.mock.calls) {
-      expect(args).toMatchObject({ refetchType: 'none' });
-    }
-
-    // Behavior preserved: both list families are invalidated (so the saved row
-    // shows on return) and both detail families (so a reopened edit refetches).
-    for (const queryKey of [...config.listKeys, ...config.detailKeys]) {
+    // LIST: one invalidate per list family, none others. `refetchType: 'none'`
+    // marks them stale WITHOUT an eager refetch — the default ('active') would
+    // race the destination list route's own on-mount fetch, and react-query
+    // cancels one, surfacing a doubled (canceled + 200) request. 'none' lets the
+    // list refetch exactly once, on mount, because it is invalidated + stale.
+    expect(invalidateSpy).toHaveBeenCalledTimes(config.listKeys.length);
+    for (const queryKey of config.listKeys) {
       expect(invalidateSpy).toHaveBeenCalledWith(
         expect.objectContaining({ queryKey, refetchType: 'none' }),
+      );
+    }
+
+    // DETAIL: one remove per detail family. Invalidate is NOT enough — on reopen
+    // the stale record is served synchronously and the form provider seeds its
+    // inputs once (keyed on record.name), so a same-identity background refetch
+    // never re-seeds. Removing forces a cold reopen that re-seeds from fresh data
+    // (regression: "edit form shows pre-edit values after save").
+    expect(removeSpy).toHaveBeenCalledTimes(config.detailKeys.length);
+    for (const queryKey of config.detailKeys) {
+      expect(removeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey }),
+      );
+    }
+    // Detail families are removed, never invalidated.
+    for (const queryKey of config.detailKeys) {
+      expect(invalidateSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey }),
       );
     }
 
@@ -83,14 +91,15 @@ describe('useResourceFormNav — goBackAndRefresh invalidation shape', () => {
     expect(pushMock).toHaveBeenCalledWith('/connectors');
   });
 
-  it('plain goBack (cancel) invalidates nothing — nothing changed', () => {
-    const { result, invalidateSpy } = setup();
+  it('plain goBack (cancel) touches no cache — nothing changed', () => {
+    const { result, invalidateSpy, removeSpy } = setup();
 
     act(() => {
       result.current.goBack();
     });
 
     expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(removeSpy).not.toHaveBeenCalled();
     expect(pushMock).toHaveBeenCalledWith('/connectors');
   });
 });

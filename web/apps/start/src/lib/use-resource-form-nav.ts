@@ -71,26 +71,35 @@ export function useResourceFormNav(
     router.history.push(returnTo);
   }, [router, returnTo]);
 
-  // Used on a mutating success (create / edit / delete): mark the list families
-  // stale so the changed row shows on return, and the detail families so a
-  // reopened edit form refetches, THEN navigate back.
+  // Used on a mutating success (create / edit / delete): refresh the list so the
+  // changed row shows on return, drop the stale single-record cache so a reopened
+  // edit form seeds fresh, THEN navigate back.
   //
-  // `refetchType: 'none'` is load-bearing. The default ('active') EAGERLY
-  // refetches every matching observed query the instant we invalidate. For the
-  // list that races the destination list route, which fires its own fetch on
-  // mount (staleTime 0) — react-query then cancels one in favour of the other,
+  // LIST → `invalidateQueries({ refetchType: 'none' })`. The default ('active')
+  // EAGERLY refetches every matching observed query the instant we invalidate.
+  // For the list that races the destination list route, which fires its own fetch
+  // on mount (staleTime 0) — react-query then cancels one in favour of the other,
   // and the Network tab shows a doubled request (`…/connectors` canceled, then
   // 200). 'none' invalidates WITHOUT an eager refetch: the query is left stale,
   // so the list refetches exactly ONCE, on mount, with fresh post-save data.
-  // The detail families are inactive on the list (and, on edit, about to unmount
-  // — an 'active' refetch there would be started only to be canceled), so 'none'
-  // is right for them too: they refetch on the next edit-open, not now.
+  //
+  // DETAIL → `removeQueries` (NOT invalidate). Invalidating the detail is not
+  // enough: on reopen the stale record is served synchronously from cache, and
+  // the form provider seeds its editable inputs ONCE from that record
+  // (`useState(() => seed(record))`, remounted by `key={record.name ?? id}`). The
+  // background refetch then replaces the cache with fresh data, but `record.name`
+  // is unchanged, so the provider never remounts and the inputs keep the stale
+  // seed — the "edit form shows pre-edit values" bug. Removing the entry forces a
+  // COLD reopen: `record` starts null (key = id), and when fresh data arrives the
+  // key flips to `record.name`, triggering the one remount that re-seeds from
+  // fresh data. (The single in-flight detail fetch this cancels at save time is
+  // harmless — we are navigating away.)
   const goBackAndRefresh = useCallback(() => {
     for (const queryKey of listKeys) {
       void queryClient.invalidateQueries({ queryKey, refetchType: 'none' });
     }
     for (const queryKey of detailKeys) {
-      void queryClient.invalidateQueries({ queryKey, refetchType: 'none' });
+      queryClient.removeQueries({ queryKey });
     }
     goBack();
   }, [queryClient, listKeys, detailKeys, goBack]);
