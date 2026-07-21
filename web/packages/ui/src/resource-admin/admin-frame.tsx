@@ -6,7 +6,9 @@ import { PlusIcon } from 'lucide-react';
 
 /**
  * Page chrome shared by the resource admin surfaces: a title/description header
- * with a primary "New" action, over a content slot (the table).
+ * with an optional primary "New" action, over a content slot (the table). The
+ * "New" button renders only when `newLabel` is supplied — a create-less resource
+ * (workflows) omits it and gets a header with no create affordance.
  */
 export function AdminFrame({
   title,
@@ -17,8 +19,8 @@ export function AdminFrame({
 }: {
   title: string;
   description: string;
-  newLabel: string;
-  onNew: () => void;
+  newLabel?: string;
+  onNew?: () => void;
   children: React.ReactNode;
 }) {
   return (
@@ -28,10 +30,12 @@ export function AdminFrame({
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        <Button onClick={onNew}>
-          <PlusIcon />
-          {newLabel}
-        </Button>
+        {newLabel ? (
+          <Button onClick={onNew}>
+            <PlusIcon />
+            {newLabel}
+          </Button>
+        ) : null}
       </div>
       {children}
     </div>

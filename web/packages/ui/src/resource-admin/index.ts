@@ -65,6 +65,8 @@ export {
   seedSecretValues,
 } from './secret-shared';
 export { secretsListView } from './secrets-list-view';
+export { workflowLeafId, workflowVersionLabel } from './workflow-shared';
+export { workflowsListView } from './workflows-list-view';
 export { isValidIdentifier, slugify } from './slug';
 export { SuggestCombobox } from './suggest-combobox';
 export type { Suggestion } from './suggest-combobox';
@@ -99,4 +101,7 @@ export type {
   SortDirection,
   SortState,
   SpaceOption,
+  Workflow,
+  WorkflowListExtras,
+  WorkflowOrigin,
 } from './types';

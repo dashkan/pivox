@@ -88,8 +88,13 @@ export interface ResourceToolbarContext<Extras> {
 export interface ResourceListView<Row, Extras> {
   title: string;
   description: string;
-  /** "New connector" — the create-button label + the routed-create affordance. */
-  newLabel: string;
+  /**
+   * "New connector" — the create-button label. OPTIONAL: a create-less resource
+   * (workflows, whose creation is a bespoke canvas concern, not a list action)
+   * omits it and the shared frame renders no "New" button. Present for every
+   * form-backed resource.
+   */
+  newLabel?: string;
   loadingLabel: string;
   /** Body copy for a zero-row result; `filtersActive` distinguishes filtered-empty. */
   emptyLabel: (filtersActive: boolean) => string;

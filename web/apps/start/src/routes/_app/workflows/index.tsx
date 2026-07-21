@@ -1,33 +1,71 @@
-import { organizationId, parseResourceName } from '@pivox/client';
-import { Badge } from '@pivox/primitives/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@pivox/primitives/table';
+import { WorkflowsFeature } from '@pivox/features/workflows';
 import { useAppShellContext } from '@pivox/ui/app-shell';
-import { actorLabel, AdminNotice, formatTimestamp } from '@pivox/ui/resource-admin';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { AdminNotice, workflowLeafId } from '@pivox/ui/resource-admin';
+import { createFileRoute } from '@tanstack/react-router';
+import { useCallback, useMemo } from 'react';
 
-import type { components } from '@pivox/client';
-import type { ReactQueryApi } from '@pivox/client/react-query';
+import type { ListControlsChange, Workflow } from '@pivox/ui/resource-admin';
 
-import { $api } from '@/lib/api-client';
-
-type Workflow = components['schemas']['v1Workflow'];
+import { $api, apiClient } from '@/lib/api-client';
+import {
+  searchToValue,
+  validateWorkflowsSearch,
+  valueToSearch,
+} from '@/lib/workflows-search';
+import { prefetchWorkflows } from '@/server/prefetch';
 
 const WORKFLOWS_PATH = '/v1/organizations/{organization}/workflows' as const;
 
 export const Route = createFileRoute('/_app/workflows/')({
-  component: WorkflowsRoute,
+  validateSearch: validateWorkflowsSearch,
+  loaderDeps: ({ search }) => search,
+  // SSR-only: prefetch this exact query + prime the client's react-query key so
+  // rows are in the server HTML. Client navs skip it.
+  loader: async ({ context, deps }) => {
+    if (typeof window !== 'undefined') return;
+    const prefetched = await prefetchWorkflows({ data: deps });
+    if (prefetched) {
+      const { queryKey } = $api.queryOptions('get', WORKFLOWS_PATH, {
+        params: {
+          path: { organization: prefetched.orgSlug },
+          query: prefetched.query,
+        },
+      });
+      context.queryClient.setQueryData(queryKey, prefetched.workflows);
+    }
+  },
+  component: WorkflowsPage,
 });
 
-function WorkflowsRoute() {
+function WorkflowsPage() {
   const { state } = useAppShellContext();
   const parent = state.activeOrganization;
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+
+  const listState = useMemo(() => searchToValue(search), [search]);
+  const onListStateChange = useCallback<ListControlsChange>(
+    (next, opts) => {
+      void navigate({
+        search: valueToSearch(next),
+        replace: opts.history === 'replace',
+      });
+    },
+    [navigate],
+  );
+
+  // The row action navigates to the bespoke React Flow canvas — NOT a form. This
+  // is the "different row action" the resource-admin design calls out: the List
+  // abstraction's injected `onEdit` just repoints here.
+  const onEdit = useCallback(
+    (workflow: Workflow) => {
+      void navigate({
+        to: '/workflows/$workflowId',
+        params: { workflowId: workflowLeafId(workflow.name) },
+      });
+    },
+    [navigate],
+  );
 
   if (!parent) {
     return (
@@ -37,93 +75,14 @@ function WorkflowsRoute() {
     );
   }
 
-  return <WorkflowsList $api={$api} parent={parent} />;
-}
-
-/** Origin badge: MANAGED workflows are Pivox-owned, OWNED are the customer's. */
-function OriginBadge({ origin }: { origin?: Workflow['origin'] }) {
-  return origin === 'MANAGED' ? (
-    <Badge variant="secondary">Managed</Badge>
-  ) : (
-    <Badge variant="outline">Owned</Badge>
-  );
-}
-
-function versionLabel(version: string | undefined): string {
-  if (!version) return '—';
-  return parseResourceName(version).versions ?? '—';
-}
-
-export function WorkflowsList({
-  $api: api,
-  parent,
-}: {
-  $api: ReactQueryApi;
-  parent: string;
-}) {
-  const listQuery = api.useQuery('get', WORKFLOWS_PATH, {
-    params: { path: { organization: organizationId(parent) } },
-  });
-
-  const workflows = listQuery.data?.workflows ?? [];
-
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Workflows</h1>
-        <p className="text-sm text-muted-foreground">
-          Authored and Pivox-managed workflow definitions.
-        </p>
-      </div>
-      {listQuery.isLoading ? (
-        <AdminNotice>Loading workflows…</AdminNotice>
-      ) : listQuery.error ? (
-        <AdminNotice>Couldn&apos;t load workflows.</AdminNotice>
-      ) : workflows.length === 0 ? (
-        <AdminNotice>No workflows yet.</AdminNotice>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Origin</TableHead>
-              <TableHead>Enabled</TableHead>
-              <TableHead>Live version</TableHead>
-              <TableHead>Updated</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {workflows.map((workflow) => {
-              const workflowId = parseResourceName(workflow.name ?? '').workflows ?? '';
-              return (
-                <TableRow key={workflow.name}>
-                  <TableCell className="font-medium">
-                    <Link
-                      to="/workflows/$workflowId"
-                      params={{ workflowId }}
-                      className="hover:underline"
-                    >
-                      {workflow.displayName || workflowId}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <OriginBadge origin={workflow.origin} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {workflow.enabled ? 'Enabled' : 'Disabled'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {versionLabel(workflow.version)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatTimestamp(workflow.updateTime)} · {actorLabel(workflow.updatedBy)}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      )}
-    </div>
+    <WorkflowsFeature
+      $api={$api}
+      apiClient={apiClient}
+      parent={parent}
+      listState={listState}
+      onListStateChange={onListStateChange}
+      onEdit={onEdit}
+    />
   );
 }

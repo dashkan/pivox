@@ -7,6 +7,8 @@ export type { HistoryMode, SortDirection, SortState } from '../grid/types';
 
 export type Connector = components['schemas']['v1Connector'];
 export type Secret = components['schemas']['v1Secret'];
+export type Workflow = components['schemas']['v1Workflow'];
+export type WorkflowOrigin = components['schemas']['v1WorkflowOrigin'];
 export type Actor = components['schemas']['typesActor'];
 
 export type DialogMode = 'create' | 'edit';
@@ -169,3 +171,13 @@ export interface SecretListExtras {
   /** Spaces to scope by (filter) or resolve a space-scoped row's label; empty = org-only. */
   spaceOptions: SpaceOption[];
 }
+
+/**
+ * The workflows-specific `extras` carried on the generic resource-list value
+ * (`ResourceListContextValue<Workflow, WorkflowListExtras>`). Workflows are an
+ * org-direct-only list (no space rollup, no agent facet, no scope), so the view's
+ * columns derive everything they need from a row and the extras bag is empty —
+ * the third-shape proof that a List with no resource-specific view data still
+ * fits the generic composite.
+ */
+export type WorkflowListExtras = Record<string, never>;

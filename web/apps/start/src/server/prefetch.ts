@@ -28,6 +28,7 @@ import {
   fetchAgentOptions,
 } from '@pivox/features/connectors';
 import { buildSecretsListRequest } from '@pivox/features/secrets';
+import { buildWorkflowsListRequest } from '@pivox/features/workflows';
 import { ACTIVE_ORG } from '@pivox/storage';
 import { createServerFn } from '@tanstack/react-start';
 import { getCookie } from '@tanstack/react-start/server';
@@ -37,6 +38,10 @@ import {
   searchToValue as secretsSearchToValue,
   type SecretsSearch,
 } from '../lib/secrets-search';
+import {
+  searchToValue as workflowsSearchToValue,
+  type WorkflowsSearch,
+} from '../lib/workflows-search';
 
 import { getSsrAccessToken } from './oidc/ssr-token';
 import { createServerApiClient } from './pivox-server-api';
@@ -49,6 +54,7 @@ import type {
   SecretsListQuery,
   SecretsListRequest,
 } from '@pivox/features/secrets';
+import type { WorkflowsListQuery } from '@pivox/features/workflows';
 import type { AgentOption } from '@pivox/ui/resource-admin';
 import type { components } from '@pivox/client/types';
 
@@ -472,6 +478,66 @@ export const prefetchSecret = createServerFn({ method: 'GET' })
       };
     } catch (err) {
       console.warn('[ssr-prefetch] secret: threw', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  });
+
+/** Slim wire-shape of the workflows list response (org-direct only). */
+export type ListWorkflowsResponse =
+  components['schemas']['v1ListWorkflowsResponse'];
+
+const WORKFLOWS_PATH = '/v1/organizations/{organization}/workflows' as const;
+
+/**
+ * Result of prefetchWorkflows. Carries the org slug + built query so the loader
+ * can reproduce the exact react-query key (via `$api.queryOptions`) the client
+ * hook uses — the byte-identical key is what makes the primed rows hydrate
+ * instead of silently refetching. Workflows are org-direct only, so there is no
+ * space-scope variant. Null whenever SSR can't fetch.
+ */
+export type PrefetchedWorkflows = {
+  orgSlug: string;
+  query: WorkflowsListQuery;
+  workflows: ListWorkflowsResponse;
+};
+
+/**
+ * prefetchWorkflows server-fn: reads the active-org cookie, builds the SAME list
+ * request the client hook builds (via the shared `buildWorkflowsListRequest`),
+ * and GETs the org-direct workflows path. Returns null on any failure — SSR must
+ * never throw; the client useQuery retries on hydration.
+ */
+export const prefetchWorkflows = createServerFn({ method: 'GET' })
+  .validator((search: WorkflowsSearch): WorkflowsSearch => search)
+  .handler(async ({ data }): Promise<PrefetchedWorkflows | null> => {
+    const accessToken = await getSsrAccessToken();
+    if (!accessToken) return null;
+
+    const activeOrg = getCookie(ACTIVE_ORG.name);
+    if (!activeOrg) return null;
+
+    try {
+      const orgSlug = organizationId(activeOrg);
+      if (!orgSlug) return null;
+
+      const req = buildWorkflowsListRequest(orgSlug, workflowsSearchToValue(data));
+      const client = createServerApiClient(accessToken);
+
+      const { data: body, response } = await client.GET(WORKFLOWS_PATH, {
+        params: { path: { organization: orgSlug }, query: req.query },
+      });
+      if (!body) {
+        console.warn('[ssr-prefetch] workflows: org non-2xx or empty', {
+          status: response.status,
+          orgSlug,
+        });
+        return null;
+      }
+      return { orgSlug, query: req.query, workflows: body };
+    } catch (err) {
+      console.warn('[ssr-prefetch] workflows: threw', {
         message: err instanceof Error ? err.message : String(err),
       });
       return null;

@@ -34,3 +34,18 @@ export { layoutGraph } from './transform/layout';
 export type { WorkflowAst } from './transform/graph-to-ast';
 export { useWorkflowDefinition } from './use-workflow-definition';
 export type { WorkflowDefinitionState } from './use-workflow-definition';
+
+// Resource-admin LIST surface (the shared descriptor-driven list; create/edit is
+// the bespoke canvas, unchanged).
+export { buildWorkflowsListRequest } from './build-workflows-request';
+export type {
+  WorkflowsListQuery,
+  WorkflowsListRequest,
+} from './build-workflows-request';
+export { deleteWorkflow } from './delete-workflow';
+export {
+  workflowsListDescriptor,
+  workflowsResourceAdmin,
+} from './workflows-descriptor';
+export { WorkflowsFeature } from './workflows-feature';
+export { useWorkflows } from './use-workflows';
