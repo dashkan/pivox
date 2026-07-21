@@ -1,3 +1,5 @@
+export { actionsColumn } from './actions-column';
+export type { ActionsColumnOptions } from './actions-column';
 export { AdminFrame, AdminNotice, AdminNoticeRow } from './admin-frame';
 // Pagination primitives + SortableHeader live in the generic `grid` tier;
 // re-export so existing `@pivox/ui/resource-admin` imports keep resolving.
@@ -25,7 +27,10 @@ export {
   seedConnectorValues,
   spaceLabel,
 } from './connector-shared';
-export { connectorsListView } from './connectors-list-view';
+export {
+  connectorDeleteDescription,
+  connectorsListView,
+} from './connectors-list-view';
 export { DeleteDialog } from './delete-dialog';
 export { ResourceFormPage } from './resource-form-page';
 // The generic form-page shell is `ResourceFormPage`; `ResourceForm` is the
@@ -49,7 +54,6 @@ export { FormActions, FormDialog } from './form-dialog';
 export { IdentifierField } from './identifier-field';
 export { KeyValueEditor } from './key-value-editor';
 export { actorLabel, formatTimestamp } from './meta-cells';
-export { RowActions } from './row-actions';
 export { ScopeSelect } from './scope-select';
 export { SecretCreateFields, SecretEditFields } from './secret-fields';
 export {
@@ -64,7 +68,10 @@ export {
   secretSpaceSlug,
   seedSecretValues,
 } from './secret-shared';
-export { secretsListView } from './secrets-list-view';
+export {
+  secretDeleteDescription,
+  secretsListView,
+} from './secrets-list-view';
 export { workflowLeafId, workflowVersionLabel } from './workflow-shared';
 export { workflowsListView } from './workflows-list-view';
 export { isValidIdentifier, slugify } from './slug';

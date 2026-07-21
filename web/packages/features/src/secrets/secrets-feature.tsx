@@ -1,6 +1,10 @@
 'use client';
 
-import { ResourceList, secretsListView } from '@pivox/ui/resource-admin';
+import {
+  ResourceList,
+  secretDeleteDescription,
+  secretsListView,
+} from '@pivox/ui/resource-admin';
 
 import { useSecrets } from './use-secrets';
 
@@ -48,7 +52,14 @@ export function SecretsFeature({
   });
   return (
     <ResourceList.Provider value={value}>
-      <ResourceList.Root view={secretsListView} />
+      {/* The 90% preset: composed New button + edit+delete affordance column +
+          confirm dialog. Presence of the composition is the create/delete config —
+          no descriptor flags. */}
+      <ResourceList.Default
+        view={secretsListView}
+        noun="secret"
+        confirmDelete={secretDeleteDescription}
+      />
     </ResourceList.Provider>
   );
 }

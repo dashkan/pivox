@@ -5,7 +5,6 @@ import { useGrid } from '../grid';
 import { AdminSearch } from './admin-search';
 import { connectorSpaceSlug, spaceLabel } from './connector-shared';
 import { actorLabel, formatTimestamp } from './meta-cells';
-import { RowActions } from './row-actions';
 import { ScopeSelect } from './scope-select';
 import { secretLeafId } from './secret-shared';
 
@@ -54,18 +53,19 @@ function SecretNameFilter() {
 }
 
 /**
- * Builds the secret columns. The Space column is spread in only at the org
+ * Builds the secret CONTENT columns. The Space column is spread in only at the org
  * rollup — inside a specific space every row shares that space. Filter controls
  * are supplied only when `showFilters` is on; their presence is what makes the
  * grid render the filter row (composition, not a boolean grid prop). The Name
- * link + row Edit action NAVIGATE via `onEdit`; row delete opens the quick
- * list-delete confirm via `onRemove`. Sortable columns match the server's
- * order_by fields (`displayName`, `createTime`); Updated is display-only.
+ * link NAVIGATES via `onEdit`. The trailing edit/delete affordance column is NOT
+ * built here — it is composed on top via `actionsColumn`. Sortable columns match
+ * the server's order_by fields (`displayName`, `createTime`); Updated is
+ * display-only.
  */
 function secretColumns(
   ctx: ResourceColumnContext<Secret, SecretListExtras>,
 ): GridColumn<Secret>[] {
-  const { scope, showFilters, extras, onEdit, onRemove } = ctx;
+  const { scope, showFilters, extras, onEdit } = ctx;
   const { spaceOptions } = extras;
   const orgLevel = scope === '';
 
@@ -118,18 +118,6 @@ function secretColumns(
         </>
       ),
     },
-    {
-      header: '',
-      className: 'w-0',
-      cell: (secret) => (
-        <RowActions
-          editLabel="Edit secret"
-          removeLabel="Delete secret"
-          onEdit={() => onEdit(secret)}
-          onRemove={() => onRemove(secret)}
-        />
-      ),
-    },
   ];
 }
 
@@ -138,7 +126,6 @@ export const secretsListView: ResourceListView<Secret, SecretListExtras> = {
   title: 'Secrets',
   description:
     'Encrypted credentials resolved by connectors at request time. Values are write-only.',
-  newLabel: 'New secret',
   loadingLabel: 'Loading secrets…',
   emptyLabel: (filtersActive) =>
     filtersActive ? 'No secrets match your filters.' : 'No secrets yet.',
@@ -156,10 +143,15 @@ export const secretsListView: ResourceListView<Secret, SecretListExtras> = {
         allLabel="All spaces"
       />
     ) : null,
-  deleteConfirm: (secret) => ({
-    title: 'Delete secret?',
-    description: `This permanently deletes "${
-      secret?.displayName || secretLeafId(secret?.name)
-    }". A secret still referenced by a connector can't be deleted.`,
-  }),
 };
+
+/**
+ * The secrets delete-confirm description — the resource-specific copy the composed
+ * delete affordance carries (`ResourceList.Default`'s `confirmDelete`). The title
+ * ("Delete secret?") is derived from the noun; only this warning is bespoke.
+ */
+export function secretDeleteDescription(secret: Secret): string {
+  return `This permanently deletes "${
+    secret.displayName || secretLeafId(secret.name)
+  }". A secret still referenced by a connector can't be deleted.`;
+}

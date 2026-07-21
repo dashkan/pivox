@@ -44,6 +44,33 @@ prefetch primes the byte-identical key the shared hook reads.
 
 ---
 
+## 2b. Affordances via composition (not flags)
+
+The descriptor holds **data**; UI **affordances are composed** — presence-of-child is
+the config, so there are **no `newLabel?`/`deleteConfirm?` flags** and no "List
+presumes create/delete" coupling.
+
+- **Data (descriptor):** `useList`, **columns-as-data**, `rowId`, the `remove`
+  mutation. (columns-as-data is the skill's sanctioned carve-out.)
+- **Row-level affordances (Edit/Delete) → a column.** A predefined
+  `actionsColumn(ctx, opts)` factory renders Edit + Delete using `ctx.onEdit(row)` /
+  `ctx.openRemove(row)` — the column render fn already gets the row, so no new Grid
+  machinery. A resource adds it (default edit+delete), customizes it (edit-only), or
+  omits it (workflows). The **delete-confirm copy is a param** to the delete opt, so
+  it exists only when the resource has delete. The confirm dialog + `remove` mutation
+  stay a composite/descriptor concern; the button just calls `openRemove(row)`.
+- **Toolbar-level affordances (New, filter, scope) → composed children:**
+  `<ResourceList.Toolbar><ResourceList.NewButton/>…</ResourceList.Toolbar>`.
+- **`ResourceList.Default` preset** composes the common toolbar-New + the edit+delete
+  actions column, so the 90% case stays one line; resources compose explicitly only
+  to deviate.
+
+Both couplings dissolve: no `<NewButton/>` → no create; no actions-column-delete → no
+delete. Workflows omits both today (nav on the Name cell) and **grows** edit/delete
+later by composing them in (edit → the canvas via `onEdit`; delete → the already-wired
+`removeWorkflow`) — zero abstraction change. That forward-flexibility is the point,
+and it's why this beats the optional-flags patch.
+
 ## 3. Descriptor shapes (illustrative — refine in code)
 
 ```ts

@@ -2,7 +2,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { connectorsListView } from '../../src/resource-admin/connectors-list-view';
+import {
+  connectorDeleteDescription,
+  connectorsListView,
+} from '../../src/resource-admin/connectors-list-view';
 import { ResourceList } from '../../src/resource-admin/resource-list';
 
 import type { ResourceListContextValue } from '../../src/resource-admin/resource-list.context';
@@ -103,10 +106,17 @@ const spaceOptions = [
   { name: 'organizations/acme/spaces/main', slug: 'main', displayName: 'Main' },
 ];
 
+// Connectors compose the 90% preset: New button + edit+delete affordance column +
+// confirm dialog. This is the composed-affordance twin of the old newLabel/
+// deleteConfirm descriptor flags.
 function renderList(value: Value) {
   render(
     <ResourceList.Provider value={value}>
-      <ResourceList.Root view={connectorsListView} />
+      <ResourceList.Default
+        view={connectorsListView}
+        noun="connector"
+        confirmDelete={connectorDeleteDescription}
+      />
     </ResourceList.Provider>,
   );
 }
@@ -301,7 +311,11 @@ describe('Connectors list view — list controls', () => {
     // Clean: no clear affordance.
     const { unmount } = render(
       <ResourceList.Provider value={makeValue({ rows: [connector] })}>
-        <ResourceList.Root view={connectorsListView} />
+        <ResourceList.Default
+          view={connectorsListView}
+          noun="connector"
+          confirmDelete={connectorDeleteDescription}
+        />
       </ResourceList.Provider>,
     );
     expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();

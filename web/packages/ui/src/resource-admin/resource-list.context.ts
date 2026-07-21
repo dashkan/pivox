@@ -54,10 +54,13 @@ export interface ResourceListContextValue<Row, Extras> {
 }
 
 /**
- * Runtime context handed to a view's `columns` builder: the current scope + the
- * filter-row toggle + the resource extras + the routed edit/remove callbacks.
+ * Runtime context handed to a view's `columns` builder AND to the
+ * {@link actionsColumn} factory: the current scope + the filter-row toggle + the
+ * resource extras + the routed edit callback + the open-remove callback.
  * Columns-as-data (the sanctioned children-over-render carve-out) means the view
- * returns a `GridColumn<Row>[]` from this.
+ * returns a `GridColumn<Row>[]` from this. `openRemove` opens the quick delete
+ * confirm — the affordance column calls it; the confirm dialog + `remove` mutation
+ * stay a composite/descriptor concern.
  */
 export interface ResourceColumnContext<Row, Extras> {
   /** Empty is the org rollup; a non-empty value is a space slug. */
@@ -66,7 +69,7 @@ export interface ResourceColumnContext<Row, Extras> {
   showFilters: boolean;
   extras: Extras;
   onEdit: (row: Row) => void;
-  onRemove: (row: Row) => void;
+  openRemove: (row: Row) => void;
 }
 
 /** Runtime context for a view's resource-specific toolbar controls (e.g. scope). */
@@ -88,13 +91,6 @@ export interface ResourceToolbarContext<Extras> {
 export interface ResourceListView<Row, Extras> {
   title: string;
   description: string;
-  /**
-   * "New connector" — the create-button label. OPTIONAL: a create-less resource
-   * (workflows, whose creation is a bespoke canvas concern, not a list action)
-   * omits it and the shared frame renders no "New" button. Present for every
-   * form-backed resource.
-   */
-  newLabel?: string;
   loadingLabel: string;
   /** Body copy for a zero-row result; `filtersActive` distinguishes filtered-empty. */
   emptyLabel: (filtersActive: boolean) => string;
@@ -102,12 +98,16 @@ export interface ResourceListView<Row, Extras> {
   hasActiveFilters: (filters: Record<string, string>, scope: string) => boolean;
   /** Stable React key for a row (the grid's `meta.rowKey`). */
   rowKey: (row: Row) => string;
-  /** Columns-as-data, built with the runtime column context. */
+  /**
+   * Columns-as-data, built with the runtime column context. These are the CONTENT
+   * columns only — the edit/delete affordance column is composed on top via the
+   * {@link actionsColumn} factory (see `ResourceList.Root`/`ResourceList.Default`),
+   * so a create-less/delete-less resource simply omits it. No `newLabel`/
+   * `deleteConfirm` flags live here anymore: affordances are composed, not data.
+   */
   columns: (ctx: ResourceColumnContext<Row, Extras>) => GridColumn<Row>[];
   /** Resource-specific toolbar controls (scope select, gated by `showFilters`). */
   toolbar?: (ctx: ResourceToolbarContext<Extras>) => ReactNode;
-  /** Copy for the quick list-row delete dialog. */
-  deleteConfirm: (row: Row | null) => { title: string; description: string };
 }
 
 export const ResourceListContext =

@@ -14,7 +14,6 @@ import {
   spaceLabel,
 } from './connector-shared';
 import { actorLabel, formatTimestamp } from './meta-cells';
-import { RowActions } from './row-actions';
 import { ScopeSelect } from './scope-select';
 
 import type { GridColumn } from '../grid';
@@ -85,17 +84,18 @@ function ConnectorAgentFilter({ options }: { options: AgentOption[] }) {
 }
 
 /**
- * Builds the connector columns. The Space column is spread in only at the org
- * rollup — inside a specific space every row shares that space. Filter controls
+ * Builds the connector CONTENT columns. The Space column is spread in only at the
+ * org rollup — inside a specific space every row shares that space. Filter controls
  * are supplied only when `showFilters` is on; their presence is what makes the
  * grid render the filter row (composition, not a boolean grid prop). The Name
- * link + row Edit action NAVIGATE via `onEdit`; row delete opens the quick
- * list-delete confirm via `onRemove`.
+ * link NAVIGATES via `onEdit`. The trailing edit/delete affordance column is NOT
+ * built here — it is composed on top via `actionsColumn` (see `ResourceList.Root`/
+ * `ResourceList.Default`), so create/delete stay presence-driven.
  */
 function connectorColumns(
   ctx: ResourceColumnContext<Connector, ConnectorListExtras>,
 ): GridColumn<Connector>[] {
-  const { scope, showFilters, extras, onEdit, onRemove } = ctx;
+  const { scope, showFilters, extras, onEdit } = ctx;
   const { agentOptions, agentsInUse, spaceOptions } = extras;
   const orgLevel = scope === '';
   // The agent facet lists only agents actually in scope, resolved to labels via
@@ -163,18 +163,6 @@ function connectorColumns(
         </>
       ),
     },
-    {
-      header: '',
-      className: 'w-0',
-      cell: (connector) => (
-        <RowActions
-          editLabel="Edit connector"
-          removeLabel="Delete connector"
-          onEdit={() => onEdit(connector)}
-          onRemove={() => onRemove(connector)}
-        />
-      ),
-    },
   ];
 }
 
@@ -186,7 +174,6 @@ export const connectorsListView: ResourceListView<
   title: 'Connectors',
   description:
     'Reusable, credentialed connections to external systems, used by workflow activities.',
-  newLabel: 'New connector',
   loadingLabel: 'Loading connectors…',
   emptyLabel: (filtersActive) =>
     filtersActive ? 'No connectors match your filters.' : 'No connectors yet.',
@@ -204,10 +191,16 @@ export const connectorsListView: ResourceListView<
         allLabel="All spaces"
       />
     ) : null,
-  deleteConfirm: (connector) => ({
-    title: 'Delete connector?',
-    description: `This permanently deletes "${
-      connector?.displayName || leafId(connector?.name)
-    }". Activities that reference it will fail.`,
-  }),
 };
+
+/**
+ * The connectors delete-confirm description — the resource-specific copy the
+ * composed delete affordance carries (`ResourceList.Default`'s `confirmDelete`).
+ * The title ("Delete connector?") is derived from the noun; only this warning is
+ * bespoke.
+ */
+export function connectorDeleteDescription(connector: Connector): string {
+  return `This permanently deletes "${
+    connector.displayName || leafId(connector.name)
+  }". Activities that reference it will fail.`;
+}

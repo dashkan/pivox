@@ -3,7 +3,10 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ResourceList } from '../../src/resource-admin/resource-list';
-import { secretsListView } from '../../src/resource-admin/secrets-list-view';
+import {
+  secretDeleteDescription,
+  secretsListView,
+} from '../../src/resource-admin/secrets-list-view';
 
 import type { ResourceListContextValue } from '../../src/resource-admin/resource-list.context';
 import type {
@@ -102,10 +105,17 @@ const spaceOptions = [
   { name: 'organizations/acme/spaces/main', slug: 'main', displayName: 'Main' },
 ];
 
+// Secrets compose the 90% preset: New button + edit+delete affordance column +
+// confirm dialog. This is the composed-affordance twin of the old newLabel/
+// deleteConfirm descriptor flags.
 function renderList(value: Value) {
   render(
     <ResourceList.Provider value={value}>
-      <ResourceList.Root view={secretsListView} />
+      <ResourceList.Default
+        view={secretsListView}
+        noun="secret"
+        confirmDelete={secretDeleteDescription}
+      />
     </ResourceList.Provider>,
   );
 }

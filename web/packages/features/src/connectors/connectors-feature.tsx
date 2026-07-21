@@ -1,6 +1,10 @@
 'use client';
 
-import { connectorsListView, ResourceList } from '@pivox/ui/resource-admin';
+import {
+  connectorDeleteDescription,
+  connectorsListView,
+  ResourceList,
+} from '@pivox/ui/resource-admin';
 
 import { useConnectors } from './use-connectors';
 
@@ -52,7 +56,14 @@ export function ConnectorsFeature({
   });
   return (
     <ResourceList.Provider value={value}>
-      <ResourceList.Root view={connectorsListView} />
+      {/* The 90% preset: composed New button + edit+delete affordance column +
+          confirm dialog. Presence of the composition is the create/delete config —
+          no descriptor flags. */}
+      <ResourceList.Default
+        view={connectorsListView}
+        noun="connector"
+        confirmDelete={connectorDeleteDescription}
+      />
     </ResourceList.Provider>
   );
 }

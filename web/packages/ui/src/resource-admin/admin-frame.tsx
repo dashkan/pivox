@@ -1,26 +1,25 @@
 'use client';
 
-import { Button } from '@pivox/primitives/button';
 import { TableCell, TableRow } from '@pivox/primitives/table';
-import { PlusIcon } from 'lucide-react';
 
 /**
  * Page chrome shared by the resource admin surfaces: a title/description header
- * with an optional primary "New" action, over a content slot (the table). The
- * "New" button renders only when `newLabel` is supplied — a create-less resource
- * (workflows) omits it and gets a header with no create affordance.
+ * with a composed header-actions slot (the top-right primary action area), over a
+ * content slot (the table). The frame no longer knows about "New" — the create
+ * affordance is composed into `actions` (`ResourceList.Toolbar` /
+ * `ResourceList.NewButton`), so a create-less resource simply composes nothing
+ * and the header renders no action.
  */
 export function AdminFrame({
   title,
   description,
-  newLabel,
-  onNew,
+  actions,
   children,
 }: {
   title: string;
   description: string;
-  newLabel?: string;
-  onNew?: () => void;
+  /** Composed header-actions (top-right), e.g. the New button. Omit for none. */
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -30,12 +29,7 @@ export function AdminFrame({
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        {newLabel ? (
-          <Button onClick={onNew}>
-            <PlusIcon />
-            {newLabel}
-          </Button>
-        ) : null}
+        {actions}
       </div>
       {children}
     </div>

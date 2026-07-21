@@ -120,10 +120,13 @@ function workflowColumns(
 }
 
 /**
- * The workflows list view — data for the generic `ResourceList`. Note the absent
- * `newLabel`: workflows have no create-from-list flow (creation is a bespoke
- * canvas concern), so the shared frame renders no "New" button. `toolbar` is
- * likewise omitted (no scope).
+ * The workflows list view — data for the generic `ResourceList`. Workflows compose
+ * NEITHER a New button NOR an edit/delete affordance column: the feature renders a
+ * bare `<ResourceList.Root view={workflowsListView} />`, so it is list + filter
+ * toolbar only. Creation/editing is the bespoke canvas (the Name cell navigates
+ * there via `onEdit`); delete is unsurfaced today and grows later by composing an
+ * `actionsColumn` with `delete` — zero abstraction change. `toolbar` is omitted
+ * (no scope). No `newLabel`/`deleteConfirm` flags: affordances are composed.
  */
 export const workflowsListView: ResourceListView<Workflow, WorkflowListExtras> =
   {
@@ -135,10 +138,4 @@ export const workflowsListView: ResourceListView<Workflow, WorkflowListExtras> =
     hasActiveFilters,
     rowKey: (workflow) => workflow.name ?? '',
     columns: workflowColumns,
-    deleteConfirm: (workflow) => ({
-      title: 'Delete workflow?',
-      description: `This permanently deletes "${
-        workflow?.displayName || workflowLeafId(workflow?.name)
-      }".`,
-    }),
   };
