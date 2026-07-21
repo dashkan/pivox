@@ -1,0 +1,165 @@
+'use client';
+
+import { useGrid } from '../grid';
+
+import { AdminSearch } from './admin-search';
+import { connectorSpaceSlug, spaceLabel } from './connector-shared';
+import { actorLabel, formatTimestamp } from './meta-cells';
+import { RowActions } from './row-actions';
+import { ScopeSelect } from './scope-select';
+import { secretLeafId } from './secret-shared';
+
+import type { GridColumn } from '../grid';
+import type {
+  ResourceColumnContext,
+  ResourceListView,
+} from './resource-list.context';
+import type { Secret, SecretListExtras } from './types';
+
+/**
+ * The secrets LIST view — the presentational descriptor `ResourceList` renders
+ * from, the secret twin of `connectorsListView`. The data-side (`buildListRequest`,
+ * scope paths, `rowId`, `rowsOf`) lives in the `@pivox/features` `ListDescriptor`;
+ * this half lives here because it reads ui contexts (`useGrid`) and composes ui
+ * atoms (`@pivox/ui` can't depend on `@pivox/features`). It is a verbatim port of
+ * the column + toolbar logic that used to live inline in `SecretsAdmin`.
+ *
+ * The secret VALUE is write-only (INPUT_ONLY) — the API never returns it, so no
+ * column ever surfaces it; the list is metadata-only.
+ */
+
+/** Whether any name filter or a non-default scope is active. */
+function hasActiveFilters(
+  filters: Record<string, string>,
+  scope: string,
+): boolean {
+  return Boolean(filters.displayName?.trim()) || scope !== '';
+}
+
+/**
+ * Name filter control for the Name column's filter cell. Reads the grid context
+ * (not the domain context) so it demonstrates the DI interface. Debounced text
+ * commits with `replace` history so keystrokes don't stack entries.
+ */
+function SecretNameFilter() {
+  const { state, actions } = useGrid<Secret>();
+  return (
+    <AdminSearch
+      value={state.filters.displayName ?? ''}
+      onChange={(value) => actions.setFilter('displayName', value, 'replace')}
+      placeholder="Filter by name"
+      debounceMs={300}
+    />
+  );
+}
+
+/**
+ * Builds the secret columns. The Space column is spread in only at the org
+ * rollup — inside a specific space every row shares that space. Filter controls
+ * are supplied only when `showFilters` is on; their presence is what makes the
+ * grid render the filter row (composition, not a boolean grid prop). The Name
+ * link + row Edit action NAVIGATE via `onEdit`; row delete opens the quick
+ * list-delete confirm via `onRemove`. Sortable columns match the server's
+ * order_by fields (`displayName`, `createTime`); Updated is display-only.
+ */
+function secretColumns(
+  ctx: ResourceColumnContext<Secret, SecretListExtras>,
+): GridColumn<Secret>[] {
+  const { scope, showFilters, extras, onEdit, onRemove } = ctx;
+  const { spaceOptions } = extras;
+  const orgLevel = scope === '';
+
+  return [
+    {
+      field: 'displayName',
+      header: 'Name',
+      sortable: true,
+      cellClassName: 'font-medium',
+      filter: showFilters ? <SecretNameFilter /> : undefined,
+      cell: (secret) => (
+        <button
+          type="button"
+          className="text-left hover:underline"
+          onClick={() => onEdit(secret)}
+        >
+          {secret.displayName || secretLeafId(secret.name)}
+        </button>
+      ),
+    },
+    ...(orgLevel
+      ? ([
+          {
+            header: 'Space',
+            cellClassName: 'text-muted-foreground',
+            cell: (secret: Secret) =>
+              connectorSpaceSlug(secret.name)
+                ? spaceLabel(secret.name, spaceOptions)
+                : '',
+          },
+        ] satisfies GridColumn<Secret>[])
+      : []),
+    {
+      field: 'createTime',
+      header: 'Created',
+      sortable: true,
+      cellClassName: 'text-muted-foreground',
+      cell: (secret) => (
+        <>
+          {formatTimestamp(secret.createTime)} · {actorLabel(secret.createdBy)}
+        </>
+      ),
+    },
+    {
+      header: 'Updated',
+      cellClassName: 'text-muted-foreground',
+      cell: (secret) => (
+        <>
+          {formatTimestamp(secret.updateTime)} · {actorLabel(secret.updatedBy)}
+        </>
+      ),
+    },
+    {
+      header: '',
+      className: 'w-0',
+      cell: (secret) => (
+        <RowActions
+          editLabel="Edit secret"
+          removeLabel="Delete secret"
+          onEdit={() => onEdit(secret)}
+          onRemove={() => onRemove(secret)}
+        />
+      ),
+    },
+  ];
+}
+
+/** The secrets list view — data for the generic `ResourceList`. */
+export const secretsListView: ResourceListView<Secret, SecretListExtras> = {
+  title: 'Secrets',
+  description:
+    'Encrypted credentials resolved by connectors at request time. Values are write-only.',
+  newLabel: 'New secret',
+  loadingLabel: 'Loading secrets…',
+  emptyLabel: (filtersActive) =>
+    filtersActive ? 'No secrets match your filters.' : 'No secrets yet.',
+  hasActiveFilters,
+  rowKey: (secret) => secret.name ?? '',
+  columns: secretColumns,
+  toolbar: ({ scope, showFilters, extras, setScope }) =>
+    // Scope is a secrets control the consumer wires into the toolbar, gated by
+    // the same filter toggle. The grid knows nothing about it.
+    showFilters ? (
+      <ScopeSelect
+        value={scope}
+        spaces={extras.spaceOptions}
+        onChange={setScope}
+        allLabel="All spaces"
+      />
+    ) : null,
+  deleteConfirm: (secret) => ({
+    title: 'Delete secret?',
+    description: `This permanently deletes "${
+      secret?.displayName || secretLeafId(secret?.name)
+    }". A secret still referenced by a connector can't be deleted.`,
+  }),
+};

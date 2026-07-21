@@ -56,6 +56,7 @@ export default mergeConfig(
       './src/image-editor.ts',
       './src/chat.ts',
       './src/workflows.ts',
+      './src/resource-admin.ts',
       './src/connectors.ts',
       './src/secrets.ts',
     ],

@@ -143,55 +143,29 @@ export interface RemoveState<Row> {
   pending: boolean;
 }
 
-export interface ConnectorsAdminContextValue {
-  state: ListControlsState & {
-    connectors: Connector[];
-    isLoading: boolean;
-    loadError: string | null;
-    /** All assignable on-prem agents (create form); empty = only the cloud option. */
-    agentOptions: AgentOption[];
-    /** Distinct agents in the base scope, for the filter facet; empty = hide it. */
-    agentsInUse: string[];
-    /** Spaces to scope by (filter) or create into; empty = org-only. */
-    spaceOptions: SpaceOption[];
-    /** Row-delete confirmation state (the quick list action; the edit page has its own). */
-    remove: RemoveState<Connector>;
-  };
-  actions: ListControlsActions & {
-    /**
-     * Create / edit are now ROUTED pages, not a dialog. These NAVIGATE (the
-     * feature wires them to the route's navigate, setting `?from=<origin>`); the
-     * list never opens a modal. Names kept so the table row + "New" button are
-     * unchanged.
-     */
-    openCreate: () => void;
-    openEdit: (connector: Connector) => void;
-    openRemove: (connector: Connector) => void;
-    closeRemove: () => void;
-    confirmRemove: () => void;
-  };
+/**
+ * The connectors-specific `extras` carried on the generic resource-list value
+ * (`ResourceListContextValue<Connector, ConnectorListExtras>`): the assignable
+ * agents (create form), the in-scope agents (filter facet), and the spaces to
+ * scope by. The connectors list view's columns/toolbar read these.
+ */
+export interface ConnectorListExtras {
+  /** All assignable on-prem agents (create form); empty = only the cloud option. */
+  agentOptions: AgentOption[];
+  /** Distinct agents in the base scope, for the filter facet; empty = hide it. */
+  agentsInUse: string[];
+  /** Spaces to scope by (filter) or create into; empty = org-only. */
+  spaceOptions: SpaceOption[];
 }
 
-export interface SecretsAdminContextValue {
-  state: ListControlsState & {
-    secrets: Secret[];
-    isLoading: boolean;
-    loadError: string | null;
-    /** Spaces to scope by (filter) or create into; empty = org-only. */
-    spaceOptions: SpaceOption[];
-    /** Row-delete confirmation state (the quick list action; the edit page has its own). */
-    remove: RemoveState<Secret>;
-  };
-  actions: ListControlsActions & {
-    /**
-     * Create / edit are ROUTED pages, not a dialog. These NAVIGATE (the feature
-     * wires them to the route's navigate, setting `?from=<origin>`); the list
-     * never opens a modal. Mirrors the connectors admin.
-     */
-    openCreate: () => void;
-    openEdit: (secret: Secret) => void;
-    openRemove: (secret: Secret) => void;
-    closeRemove: () => void;
-    confirmRemove: () => void;
-  };
+/**
+ * The secrets-specific `extras` carried on the generic resource-list value
+ * (`ResourceListContextValue<Secret, SecretListExtras>`): just the spaces to
+ * scope by. The secrets list view's columns (Space label) + toolbar (scope
+ * picker) read these. Secrets have no per-response facet (no agent equivalent),
+ * so this is the whole extras bag.
+ */
+export interface SecretListExtras {
+  /** Spaces to scope by (filter) or resolve a space-scoped row's label; empty = org-only. */
+  spaceOptions: SpaceOption[];
 }

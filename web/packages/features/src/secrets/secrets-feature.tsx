@@ -1,6 +1,6 @@
 'use client';
 
-import { SecretsAdmin } from '@pivox/ui/resource-admin';
+import { ResourceList, secretsListView } from '@pivox/ui/resource-admin';
 
 import { useSecrets } from './use-secrets';
 
@@ -13,11 +13,11 @@ import type {
 } from '@pivox/ui/resource-admin';
 
 /**
- * Secrets CRUD LIST feature. Reads via `$api`, writes via `apiClient`, and yields
- * the domain state to `SecretsAdmin` — the same shape as `ConnectorsFeature`.
- * List-controls state (filter/sort/scope/page) is owned by the caller (the route,
- * from URL search params) and passed in. Create/edit are routed pages, so the
- * route injects `onCreate` / `onEdit` navigation — the feature stays
+ * Secrets CRUD LIST feature — a thin wrapper: run the descriptor-driven
+ * {@link useSecrets} hook and render the generic `ResourceList` with the secrets
+ * view. List-controls state (filter/sort/scope/page) is owned by the caller (the
+ * route, from URL search params) and passed in. Create/edit are routed pages, so
+ * the route injects `onCreate`/`onEdit` navigation — the feature stays
  * router-agnostic.
  */
 export function SecretsFeature({
@@ -47,8 +47,8 @@ export function SecretsFeature({
     onEdit,
   });
   return (
-    <SecretsAdmin.Provider value={value}>
-      <SecretsAdmin.Root />
-    </SecretsAdmin.Provider>
+    <ResourceList.Provider value={value}>
+      <ResourceList.Root view={secretsListView} />
+    </ResourceList.Provider>
   );
 }

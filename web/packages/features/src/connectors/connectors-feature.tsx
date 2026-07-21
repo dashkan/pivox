@@ -1,6 +1,6 @@
 'use client';
 
-import { ConnectorsAdmin } from '@pivox/ui/resource-admin';
+import { connectorsListView, ResourceList } from '@pivox/ui/resource-admin';
 
 import { useConnectors } from './use-connectors';
 
@@ -14,13 +14,12 @@ import type {
 } from '@pivox/ui/resource-admin';
 
 /**
- * Connectors CRUD LIST feature. Reads via `$api`, writes via `apiClient`, and
- * yields the domain state to `ConnectorsAdmin` — a thin provider over the hook,
- * same shape as the other `*Feature` wrappers. List-controls state (filter/sort/
- * scope/page) and the agent options are owned by the caller (the route, from URL
- * search params / an SSR-prefetched query) and passed in. Create/edit are now
- * routed pages, so the route also injects `onCreate` / `onEdit` navigation — the
- * feature stays router-agnostic.
+ * Connectors CRUD LIST feature — a thin wrapper: run the descriptor-driven
+ * {@link useConnectors} hook and render the generic `ResourceList` with the
+ * connectors view. List-controls state (filter/sort/scope/page) + the agent
+ * options are owned by the caller (the route, from URL search params / an
+ * SSR-prefetched query) and passed in. Create/edit are routed pages, so the route
+ * injects `onCreate`/`onEdit` navigation — the feature stays router-agnostic.
  */
 export function ConnectorsFeature({
   $api,
@@ -52,8 +51,8 @@ export function ConnectorsFeature({
     onEdit,
   });
   return (
-    <ConnectorsAdmin.Provider value={value}>
-      <ConnectorsAdmin.Root />
-    </ConnectorsAdmin.Provider>
+    <ResourceList.Provider value={value}>
+      <ResourceList.Root view={connectorsListView} />
+    </ResourceList.Provider>
   );
 }

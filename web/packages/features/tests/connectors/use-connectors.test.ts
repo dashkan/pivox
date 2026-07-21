@@ -167,7 +167,7 @@ describe('useConnectors — query reflects the route-owned state', () => {
       data: { connectors: [], agentsInUse: [agent] },
     });
     await settle();
-    expect(result.current.state.agentsInUse).toEqual([agent]);
+    expect(result.current.state.extras.agentsInUse).toEqual([agent]);
   });
 });
 

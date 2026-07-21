@@ -25,13 +25,25 @@ export {
   seedConnectorValues,
   spaceLabel,
 } from './connector-shared';
-export { ConnectorsAdmin } from './connectors-admin';
-export {
-  ConnectorsAdminContext,
-  useConnectorsAdmin,
-} from './connectors-admin.context';
+export { connectorsListView } from './connectors-list-view';
 export { DeleteDialog } from './delete-dialog';
 export { ResourceFormPage } from './resource-form-page';
+// The generic form-page shell is `ResourceFormPage`; `ResourceForm` is the
+// design's name for it (→ FormPage, fields-as-children). Alias, one component.
+export { ResourceFormPage as ResourceForm } from './resource-form-page';
+export { ResourceList } from './resource-list';
+export {
+  ResourceListContext,
+  useResourceListContext,
+} from './resource-list.context';
+export type {
+  ResourceColumnContext,
+  ResourceListActions,
+  ResourceListContextValue,
+  ResourceListState,
+  ResourceListView,
+  ResourceToolbarContext,
+} from './resource-list.context';
 export { FilterToggleButton } from './filter-toggle-button';
 export { FormActions, FormDialog } from './form-dialog';
 export { IdentifierField } from './identifier-field';
@@ -52,6 +64,7 @@ export {
   secretSpaceSlug,
   seedSecretValues,
 } from './secret-shared';
+export { secretsListView } from './secrets-list-view';
 export { isValidIdentifier, slugify } from './slug';
 export { SuggestCombobox } from './suggest-combobox';
 export type { Suggestion } from './suggest-combobox';
@@ -65,17 +78,12 @@ export {
   useListControls,
 } from './use-list-controls';
 export type { ListControls } from './use-list-controls';
-export { SecretsAdmin } from './secrets-admin';
-export {
-  SecretsAdminContext,
-  useSecretsAdmin,
-} from './secrets-admin.context';
 export type {
   Actor,
   AgentOption,
   Connector,
   ConnectorFormValues,
-  ConnectorsAdminContextValue,
+  ConnectorListExtras,
   DialogMode,
   DialogState,
   HistoryMode,
@@ -87,7 +95,7 @@ export type {
   RemoveState,
   Secret,
   SecretFormValues,
-  SecretsAdminContextValue,
+  SecretListExtras,
   SortDirection,
   SortState,
   SpaceOption,

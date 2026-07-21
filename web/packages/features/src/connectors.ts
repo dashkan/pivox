@@ -5,6 +5,12 @@ export {
   ConnectorCreateFeature,
   ConnectorEditFeature,
 } from '@/connectors/connector-form-feature';
+export {
+  connectorsFormDescriptor,
+  connectorsListDescriptor,
+  connectorsResourceAdmin,
+} from '@/connectors/connectors-descriptor';
+export type { ConnectorListInjected } from '@/connectors/connectors-descriptor';
 export { ConnectorsFeature } from '@/connectors/connectors-feature';
 export { fetchAgentOptions } from '@/connectors/fetch-agent-options';
 export {

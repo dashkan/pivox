@@ -2,11 +2,15 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { SecretsAdmin } from '../../src/resource-admin/secrets-admin';
+import { ResourceList } from '../../src/resource-admin/resource-list';
+import { secretsListView } from '../../src/resource-admin/secrets-list-view';
 
+import type { ResourceListContextValue } from '../../src/resource-admin/resource-list.context';
 import type {
+  RemoveState,
   Secret,
-  SecretsAdminContextValue,
+  SecretListExtras,
+  SortState,
 } from '../../src/resource-admin/types';
 
 // Radix Select + Base UI combobox measure/scroll the DOM; jsdom needs shims.
@@ -23,22 +27,44 @@ afterEach(cleanup);
 
 const noop = (): void => {};
 
-function makeValue(
-  overrides: Partial<SecretsAdminContextValue['state']>,
-): SecretsAdminContextValue {
+type Value = ResourceListContextValue<Secret, SecretListExtras>;
+
+interface StateOverrides {
+  rows?: Secret[];
+  isLoading?: boolean;
+  loadError?: string | null;
+  remove?: RemoveState<Secret>;
+  extras?: Partial<SecretListExtras>;
+  filters?: Record<string, string>;
+  sort?: SortState | null;
+  pageSize?: number;
+  scope?: string;
+  pagination?: { hasPrevPage: boolean; hasNextPage: boolean };
+}
+
+/**
+ * The secrets LIST — now the generic `ResourceList` driven by the
+ * `secretsListView` descriptor + a DI'd resource-list value. This is the DOM
+ * proof of the byte-identical migration off the old hand-written `SecretsAdmin`
+ * bridge: the same metadata-only rows (the write-only value never surfaces), the
+ * org rollup Space column, scope, sort, pagination, and quick row-delete
+ * behaviors, verified against the generic composite.
+ */
+function makeValue(overrides: StateOverrides): Value {
+  const { extras: extrasOverride, ...stateOverride } = overrides;
   return {
     state: {
-      secrets: [],
+      rows: [],
       isLoading: false,
       loadError: null,
       remove: { target: null, error: null, pending: false },
+      extras: { spaceOptions: [], ...extrasOverride },
       filters: {},
       sort: null,
       pageSize: 25,
       scope: '',
-      spaceOptions: [],
       pagination: { hasPrevPage: false, hasNextPage: false },
-      ...overrides,
+      ...stateOverride,
     },
     actions: {
       openCreate: noop,
@@ -76,38 +102,47 @@ const spaceOptions = [
   { name: 'organizations/acme/spaces/main', slug: 'main', displayName: 'Main' },
 ];
 
+function renderList(value: Value) {
+  render(
+    <ResourceList.Provider value={value}>
+      <ResourceList.Root view={secretsListView} />
+    </ResourceList.Provider>,
+  );
+}
+
 function renderTable(
-  overrides: Partial<SecretsAdminContextValue['state']>,
-  actions?: Partial<SecretsAdminContextValue['actions']>,
-): SecretsAdminContextValue {
+  overrides: StateOverrides,
+  actions?: Partial<Value['actions']>,
+): Value {
   const value = makeValue(overrides);
   if (actions) Object.assign(value.actions, actions);
-  render(
-    <SecretsAdmin.Provider value={value}>
-      <SecretsAdmin.Root />
-    </SecretsAdmin.Provider>,
-  );
+  renderList(value);
   return value;
 }
 
-describe('SecretsAdmin — set-only list (no value ever surfaced)', () => {
+describe('Secrets list view — set-only list (no value ever surfaced)', () => {
   it('lists secrets by metadata only — no value input in the read view', () => {
-    renderTable({ secrets: [secret] });
+    renderTable({ rows: [secret] });
     expect(screen.getByText('Stripe key')).toBeDefined();
     // No value is ever surfaced in the list: no inputs in the read view.
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
+
+  it('advertises the write-only value in the description', () => {
+    renderTable({ rows: [secret] });
+    expect(screen.getByText(/Values are write-only/)).toBeDefined();
+  });
 });
 
-describe('SecretsAdmin — table', () => {
+describe('Secrets list view — table', () => {
   it('renders generic empty copy while keeping the sortable headers mounted', () => {
-    renderTable({ secrets: [] });
+    renderList(makeValue({ rows: [] }));
     expect(screen.getByText('No secrets yet.')).toBeDefined();
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeDefined();
   });
 
   it('keeps the header and filter row mounted while loading', () => {
-    renderTable({ secrets: [], isLoading: true });
+    renderList(makeValue({ rows: [], isLoading: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
     expect(screen.getByText('Loading secrets…')).toBeDefined();
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeDefined();
@@ -115,24 +150,29 @@ describe('SecretsAdmin — table', () => {
   });
 
   it('leaves the Space column blank for an org-direct secret', () => {
-    renderTable({ secrets: [secret] });
+    renderTable({ rows: [secret] });
     expect(screen.getByRole('columnheader', { name: 'Space' })).toBeDefined();
     expect(screen.queryByText('Organization')).toBeNull();
   });
 
   it('resolves a space-scoped secret name to its space label', () => {
-    renderTable({ secrets: [spaceSecret], spaceOptions });
+    renderTable({ rows: [spaceSecret], extras: { spaceOptions } });
     expect(screen.getByText('Main')).toBeDefined();
   });
 
+  it('falls back to the space slug when the space is unresolved', () => {
+    renderTable({ rows: [spaceSecret] });
+    expect(screen.getByText('main')).toBeDefined();
+  });
+
   it('hides the Space column inside a specific space (redundant there)', () => {
-    renderTable({ secrets: [spaceSecret], spaceOptions, scope: 'main' });
+    renderTable({ rows: [spaceSecret], extras: { spaceOptions }, scope: 'main' });
     expect(screen.queryByRole('columnheader', { name: 'Space' })).toBeNull();
   });
 
   it('navigates to the routed edit page when the name link is clicked', () => {
     const openEdit = vi.fn();
-    renderTable({ secrets: [secret] }, { openEdit });
+    renderTable({ rows: [secret] }, { openEdit });
     fireEvent.click(screen.getByRole('button', { name: 'Stripe key' }));
     expect(openEdit).toHaveBeenCalledWith(secret);
   });
@@ -140,7 +180,7 @@ describe('SecretsAdmin — table', () => {
   it('renders edit/delete as icon actions, with destructive styling on delete', () => {
     const openEdit = vi.fn();
     const openRemove = vi.fn();
-    renderTable({ secrets: [secret] }, { openEdit, openRemove });
+    renderTable({ rows: [secret] }, { openEdit, openRemove });
 
     const edit = screen.getByRole('button', { name: 'Edit secret' });
     const remove = screen.getByRole('button', { name: 'Delete secret' });
@@ -156,15 +196,15 @@ describe('SecretsAdmin — table', () => {
 
   it('navigates to the routed create page from the "New secret" button', () => {
     const openCreate = vi.fn();
-    renderTable({ secrets: [secret] }, { openCreate });
+    renderTable({ rows: [secret] }, { openCreate });
     fireEvent.click(screen.getByRole('button', { name: 'New secret' }));
     expect(openCreate).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('SecretsAdmin — list controls', () => {
+describe('Secrets list view — list controls', () => {
   it('toggles the filter row and reflects the on/off state', () => {
-    renderTable({ secrets: [secret] });
+    renderTable({ rows: [secret] });
     const button = screen.getByRole('button', { name: 'Filter' });
     expect(screen.queryByRole('searchbox')).toBeNull();
     expect(button.getAttribute('aria-pressed')).toBe('false');
@@ -178,7 +218,7 @@ describe('SecretsAdmin — list controls', () => {
     vi.useFakeTimers();
     try {
       const setFilter = vi.fn();
-      renderTable({ secrets: [secret] }, { setFilter });
+      renderTable({ rows: [secret] }, { setFilter });
       fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
       fireEvent.change(screen.getByRole('searchbox'), {
         target: { value: 'stripe' },
@@ -193,7 +233,7 @@ describe('SecretsAdmin — list controls', () => {
 
   it('renders sortable Name and Created headers wired to toggleSort', () => {
     const toggleSort = vi.fn();
-    renderTable({ secrets: [secret] }, { toggleSort });
+    renderTable({ rows: [secret] }, { toggleSort });
 
     fireEvent.click(screen.getByRole('button', { name: 'Name' }));
     expect(toggleSort).toHaveBeenCalledWith('displayName');
@@ -202,24 +242,42 @@ describe('SecretsAdmin — list controls', () => {
     expect(toggleSort).toHaveBeenCalledWith('createTime');
   });
 
+  it('marks the active sort column via aria-sort', () => {
+    renderTable({
+      rows: [secret],
+      sort: { field: 'createTime', direction: 'desc' },
+    });
+    expect(
+      screen.getByRole('columnheader', { name: 'Created' }).getAttribute('aria-sort'),
+    ).toBe('descending');
+    expect(
+      screen.getByRole('columnheader', { name: 'Name' }).getAttribute('aria-sort'),
+    ).toBe('none');
+  });
+
   it('distinguishes a filtered-empty result while keeping controls mounted', () => {
-    renderTable({ secrets: [], filters: { displayName: 'zzz' } });
+    renderTable({ rows: [], filters: { displayName: 'zzz' } });
     expect(screen.getByText('No secrets match your filters.')).toBeDefined();
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeDefined();
   });
 
   it('shows Clear filters only when a filter or scope is active', () => {
-    renderTable({ secrets: [secret] });
+    renderTable({ rows: [secret] });
     expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
     cleanup();
 
     const clearFilters = vi.fn();
     renderTable(
-      { secrets: [secret], filters: { displayName: 'stripe' } },
+      { rows: [secret], filters: { displayName: 'stripe' } },
       { clearFilters },
     );
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(clearFilters).toHaveBeenCalled();
+  });
+
+  it('shows Clear filters when a non-default scope is active', () => {
+    renderTable({ rows: [secret], scope: 'main' });
+    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeDefined();
   });
 
   it('pages forward and back through the cursor pager', () => {
@@ -227,7 +285,7 @@ describe('SecretsAdmin — list controls', () => {
     const prevPage = vi.fn();
     renderTable(
       {
-        secrets: [secret],
+        rows: [secret],
         pagination: { hasPrevPage: true, hasNextPage: true },
       },
       { nextPage, prevPage },
@@ -239,19 +297,19 @@ describe('SecretsAdmin — list controls', () => {
   });
 });
 
-describe('SecretsAdmin — scope', () => {
+describe('Secrets list view — scope', () => {
   it('shows the scope combobox (resting on "All spaces") as a gated toolbar control', () => {
-    renderTable({ secrets: [secret], spaceOptions });
+    renderTable({ rows: [secret], extras: { spaceOptions } });
     expect(screen.queryByPlaceholderText('All spaces')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
     expect(screen.getByPlaceholderText('All spaces')).toBeDefined();
   });
 });
 
-describe('SecretsAdmin — quick delete', () => {
+describe('Secrets list view — quick delete', () => {
   it('opens the delete confirm with the referenced-by-connector warning', () => {
     renderTable({
-      secrets: [secret],
+      rows: [secret],
       remove: { target: secret, error: null, pending: false },
     });
     expect(screen.getByText('Delete secret?')).toBeDefined();

@@ -43,6 +43,10 @@
       "types": "./dist/esm/workflows.d.ts",
       "import": "./dist/esm/workflows.js"
     },
+    "./resource-admin": {
+      "types": "./dist/esm/resource-admin.d.ts",
+      "import": "./dist/esm/resource-admin.js"
+    },
     "./connectors": {
       "types": "./dist/esm/connectors.d.ts",
       "import": "./dist/esm/connectors.js"
