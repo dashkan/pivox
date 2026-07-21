@@ -7,5 +7,8 @@
   },
   // ../forge.env.d.ts supplies the MAIN_WINDOW_VITE_* ambient globals that
   // ../src/main.ts references.
-  "include": ["./**/*", "../src/main.ts", "../src/main/**/*", "../forge.env.d.ts"]
+  "include": ["./**/*", "../src/main.ts", "../src/main/**/*", "../forge.env.d.ts"],
+  // Renderer (jsx/DOM) tests typecheck under their own web-based config
+  // (tests/renderer/tsconfig.json); they'd fail this node config's lib/jsx.
+  "exclude": ["renderer/**"]
 }

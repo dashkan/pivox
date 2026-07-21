@@ -7,6 +7,7 @@
     "vite.preload.config.ts",
     "vite.renderer.config.mts",
     "vitest.config.ts",
+    "vitest.renderer.config.mts",
     "src/main.ts",
     "src/main/**/*",
     "src/preload.ts",
