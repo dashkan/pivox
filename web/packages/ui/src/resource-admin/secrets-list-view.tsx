@@ -5,7 +5,6 @@ import { useGrid } from '../grid';
 import { AdminSearch } from './admin-search';
 import { connectorSpaceSlug, spaceLabel } from './connector-shared';
 import { actorLabel, formatTimestamp } from './meta-cells';
-import { ScopeSelect } from './scope-select';
 import { secretLeafId } from './secret-shared';
 
 import type { GridColumn } from '../grid';
@@ -27,12 +26,10 @@ import type { Secret, SecretListExtras } from './types';
  * column ever surfaces it; the list is metadata-only.
  */
 
-/** Whether any name filter or a non-default scope is active. */
-function hasActiveFilters(
-  filters: Record<string, string>,
-  scope: string,
-): boolean {
-  return Boolean(filters.displayName?.trim()) || scope !== '';
+/** Whether any in-list name filter is active (scope is path-owned, not a
+ *  clearable filter — the sidebar owns it). */
+function hasActiveFilters(filters: Record<string, string>): boolean {
+  return Boolean(filters.displayName?.trim());
 }
 
 /**
@@ -132,17 +129,9 @@ export const secretsListView: ResourceListView<Secret, SecretListExtras> = {
   hasActiveFilters,
   rowKey: (secret) => secret.name ?? '',
   columns: secretColumns,
-  toolbar: ({ scope, showFilters, extras, setScope }) =>
-    // Scope is a secrets control the consumer wires into the toolbar, gated by
-    // the same filter toggle. The grid knows nothing about it.
-    showFilters ? (
-      <ScopeSelect
-        value={scope}
-        spaces={extras.spaceOptions}
-        onChange={setScope}
-        allLabel="All spaces"
-      />
-    ) : null,
+  // No in-list scope control: the sidebar scope picker owns org/space scope. The
+  // org rollup keeps the Space column so each row's space is visible; narrowing
+  // to a space is a sidebar navigation.
 };
 
 /**

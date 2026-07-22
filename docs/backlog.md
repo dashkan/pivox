@@ -296,7 +296,13 @@ row.
   rendered as plain `DropdownMenuItem` (role `menuitem`) with a manual
   `CheckIcon`, so a screen reader doesn't announce the active org/space as
   selected. Convert to `DropdownMenuRadioGroup`/`RadioItem` (role
-  `menuitemradio` + `aria-checked`) — `scope-picker.tsx`.
+  `menuitemradio` + `aria-checked`) — `scope-picker.tsx`;
+  (e) **space as a rollup filter** — the in-list space selector was removed (it
+  was redundant with the sidebar + wrongly route-changing). Reintroduce space on
+  the org-rollup list as a real FILTER (narrow rows, no navigation) when the
+  facet UI lands. Prereq: `space` is only `Facetable` on `ConnectorFilter`/
+  `SecretFilter` today — add it to `Filterable` (→ `space_id`, uuid; the frontend
+  has slugs, so resolve slug→uuid like the facet keys do).
 
 ## 9. Workflows (pointer only)
 

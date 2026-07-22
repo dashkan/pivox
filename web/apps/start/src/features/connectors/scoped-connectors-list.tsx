@@ -35,9 +35,8 @@ function listSearch(value: Parameters<typeof valueToSearch>[0]): ConnectorsSearc
  * URL is the single source of truth for scope, so:
  *
  *  - `parent` is always the org (`organizations/{slug}`); the space narrows the
- *    list via the controls' `scope`, forced here from `spaceSlug` (not search).
- *  - the in-toolbar scope selector's changes NAVIGATE between the two routes
- *    rather than mutating a `?scope=` param — keeping the path authoritative.
+ *    list via the controls' `scope`, forced here from `spaceSlug` (path-owned, not
+ *    search). Scope is changed by the sidebar picker (navigation), not in-list.
  *  - create/edit navigate to the scoped routed pages, carrying `?from=` so the
  *    form can return to this exact filtered/sorted/paged view. Edit targets the
  *    connector's OWN scope (org-direct vs its space), read off its resource name.
@@ -71,28 +70,10 @@ export function ScopedConnectorsList({
 
   const onListStateChange = useCallback<ListControlsChange>(
     (next, opts) => {
-      const nextScope = next.scope;
-      const currentScope = spaceSlug ?? '';
+      // Scope is path-owned (sidebar navigation) — the list only updates search
+      // on the current route. Discrete changes push history; debounced search
+      // text replaces so keystrokes don't clutter it.
       const nextSearch = listSearch(next);
-      // A scope change is a ROUTE change (path owns scope); everything else
-      // updates search on the current route. Discrete changes push a history
-      // entry; debounced search text replaces so keystrokes don't clutter it.
-      if (nextScope !== currentScope) {
-        if (nextScope) {
-          void navigate({
-            to: '/organizations/$organization/spaces/$space/connectors',
-            params: { organization: orgSlug, space: nextScope },
-            search: nextSearch,
-          });
-        } else {
-          void navigate({
-            to: '/organizations/$organization/connectors',
-            params: { organization: orgSlug },
-            search: nextSearch,
-          });
-        }
-        return;
-      }
       if (spaceSlug) {
         void navigate({
           to: '/organizations/$organization/spaces/$space/connectors',

@@ -306,7 +306,7 @@ describe('Connectors list view — list controls', () => {
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeDefined();
   });
 
-  it('shows Clear filters only when a filter or scope is active', () => {
+  it('shows Clear filters only when a filter is active', () => {
     const clearFilters = vi.fn();
     // Clean: no clear affordance.
     const { unmount } = render(
@@ -328,11 +328,6 @@ describe('Connectors list view — list controls', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(clearFilters).toHaveBeenCalled();
-  });
-
-  it('shows Clear filters when a non-default scope is active', () => {
-    renderTable({ rows: [connector], scope: 'main' });
-    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeDefined();
   });
 
   it('pages forward and back through the cursor pager', () => {
@@ -362,25 +357,13 @@ describe('Connectors list view — list controls', () => {
   });
 });
 
-describe('Connectors list view — scope', () => {
-  it('shows the scope combobox (resting on "All spaces") as a gated toolbar control', () => {
-    renderTable({ rows: [connector], extras: { spaceOptions } });
-    // Scope is a toolbar control the connectors view wires (the grid knows
-    // nothing about scope); it's gated by the same filter toggle as the row.
-    expect(screen.queryByPlaceholderText('All spaces')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    // The combobox input rests on the "All spaces" placeholder when empty.
-    expect(screen.getByPlaceholderText('All spaces')).toBeDefined();
-  });
-});
-
 describe('Connectors list view — agent filter facet', () => {
   const agent = 'organizations/acme/storageGateways/gw/agents/a1';
 
   it('hides the agent filter when no agents are in scope', () => {
     renderTable({ rows: [connector], extras: { agentsInUse: [] } });
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    // The Name + Scope filters render; the agent facet does not.
+    // The Name filter renders; the agent facet does not.
     expect(screen.getByRole('searchbox')).toBeDefined();
     expect(screen.queryByPlaceholderText('Any agent')).toBeNull();
   });

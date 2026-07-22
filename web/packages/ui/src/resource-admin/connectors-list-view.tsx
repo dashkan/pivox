@@ -14,7 +14,6 @@ import {
   spaceLabel,
 } from './connector-shared';
 import { actorLabel, formatTimestamp } from './meta-cells';
-import { ScopeSelect } from './scope-select';
 
 import type { GridColumn } from '../grid';
 import type {
@@ -37,15 +36,12 @@ import type {
  * logic that used to live inline in `ConnectorsAdmin`.
  */
 
-/** Whether any name/agent filter or a non-default scope is active. */
-function hasActiveFilters(
-  filters: Record<string, string>,
-  scope: string,
-): boolean {
+/** Whether any in-list name/agent filter is active (scope is path-owned, not a
+ *  clearable filter — the sidebar owns it). */
+function hasActiveFilters(filters: Record<string, string>): boolean {
   return (
     Boolean(filters.displayName?.trim()) ||
-    (filters.agent !== undefined && filters.agent !== AGENT_FILTER_ANY) ||
-    scope !== ''
+    (filters.agent !== undefined && filters.agent !== AGENT_FILTER_ANY)
   );
 }
 
@@ -180,17 +176,9 @@ export const connectorsListView: ResourceListView<
   hasActiveFilters,
   rowKey: (connector) => connector.name ?? '',
   columns: connectorColumns,
-  toolbar: ({ scope, showFilters, extras, setScope }) =>
-    // Scope is a connectors control the consumer wires into the toolbar, gated by
-    // the same filter toggle. The grid knows nothing about it.
-    showFilters ? (
-      <ScopeSelect
-        value={scope}
-        spaces={extras.spaceOptions}
-        onChange={setScope}
-        allLabel="All spaces"
-      />
-    ) : null,
+  // No in-list scope control: the sidebar scope picker owns org/space scope (the
+  // URL is the source of truth). The org rollup keeps the Space column so each
+  // row's space is visible; narrowing to a space is a sidebar navigation.
 };
 
 /**

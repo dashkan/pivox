@@ -271,7 +271,7 @@ describe('Secrets list view — list controls', () => {
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeDefined();
   });
 
-  it('shows Clear filters only when a filter or scope is active', () => {
+  it('shows Clear filters only when a filter is active', () => {
     renderTable({ rows: [secret] });
     expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
     cleanup();
@@ -283,11 +283,6 @@ describe('Secrets list view — list controls', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(clearFilters).toHaveBeenCalled();
-  });
-
-  it('shows Clear filters when a non-default scope is active', () => {
-    renderTable({ rows: [secret], scope: 'main' });
-    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeDefined();
   });
 
   it('pages forward and back through the cursor pager', () => {
@@ -304,15 +299,6 @@ describe('Secrets list view — list controls', () => {
     expect(nextPage).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
     expect(prevPage).toHaveBeenCalled();
-  });
-});
-
-describe('Secrets list view — scope', () => {
-  it('shows the scope combobox (resting on "All spaces") as a gated toolbar control', () => {
-    renderTable({ rows: [secret], extras: { spaceOptions } });
-    expect(screen.queryByPlaceholderText('All spaces')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    expect(screen.getByPlaceholderText('All spaces')).toBeDefined();
   });
 });
 

@@ -27,9 +27,8 @@ function listSearch(value: Parameters<typeof valueToSearch>[0]): SecretsSearch {
  * source of truth for scope, so:
  *
  *  - `parent` is always the org (`organizations/{slug}`); the space narrows the
- *    list via the controls' `scope`, forced here from `spaceSlug` (not search).
- *  - the in-toolbar scope selector's changes NAVIGATE between the two routes
- *    rather than mutating a `?scope=` param — keeping the path authoritative.
+ *    list via the controls' `scope`, forced here from `spaceSlug` (path-owned, not
+ *    search). Scope is changed by the sidebar picker (navigation), not in-list.
  *  - create/edit navigate to the scoped routed pages, carrying `?from=` so the
  *    form can return to this exact filtered/sorted/paged view. Edit targets the
  *    secret's OWN scope (org-direct vs its space), read off its resource name.
@@ -54,27 +53,9 @@ export function ScopedSecretsList({
 
   const onListStateChange = useCallback<ListControlsChange>(
     (next, opts) => {
-      const nextScope = next.scope;
-      const currentScope = spaceSlug ?? '';
+      // Scope is path-owned (sidebar navigation) — the list only updates search
+      // on the current route.
       const nextSearch = listSearch(next);
-      // A scope change is a ROUTE change (path owns scope); everything else
-      // updates search on the current route.
-      if (nextScope !== currentScope) {
-        if (nextScope) {
-          void navigate({
-            to: '/organizations/$organization/spaces/$space/secrets',
-            params: { organization: orgSlug, space: nextScope },
-            search: nextSearch,
-          });
-        } else {
-          void navigate({
-            to: '/organizations/$organization/secrets',
-            params: { organization: orgSlug },
-            search: nextSearch,
-          });
-        }
-        return;
-      }
       if (spaceSlug) {
         void navigate({
           to: '/organizations/$organization/spaces/$space/secrets',
