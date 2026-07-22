@@ -19,8 +19,8 @@
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-hook-form": "7.81.0",
-    "react-i18next": "17.0.9",
+    "react-hook-form": "7.82.0",
+    "react-i18next": "17.0.10",
     "react-router-dom": "7.18.1"
   },
   "devDependencies": {

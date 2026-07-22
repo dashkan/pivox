@@ -9,44 +9,44 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LaunchRouteImport } from './routes/launch'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as LaunchRouteImport } from './routes/launch'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
-import { Route as AuthLogoutRouteImport } from './routes/auth/logout'
-import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
-import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
-import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
+import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
+import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
+import { Route as AuthLogoutRouteImport } from './routes/auth/logout'
+import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as AppOrganizationsIndexRouteImport } from './routes/_app/organizations/index'
-import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AppOrganizationsOrganizationRouteImport } from './routes/_app/organizations/$organization'
+import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AppOrganizationsOrganizationIndexRouteImport } from './routes/_app/organizations/$organization/index'
-import { Route as AppOrganizationsOrganizationWorkflowsIndexRouteImport } from './routes/_app/organizations/$organization/workflows/index'
-import { Route as AppOrganizationsOrganizationSecretsIndexRouteImport } from './routes/_app/organizations/$organization/secrets/index'
 import { Route as AppOrganizationsOrganizationConnectorsIndexRouteImport } from './routes/_app/organizations/$organization/connectors/index'
-import { Route as AppOrganizationsOrganizationWorkflowsWorkflowIdRouteImport } from './routes/_app/organizations/$organization/workflows/$workflowId'
-import { Route as AppOrganizationsOrganizationSpacesSpaceRouteImport } from './routes/_app/organizations/$organization/spaces/$space'
-import { Route as AppOrganizationsOrganizationSecretsNewRouteImport } from './routes/_app/organizations/$organization/secrets/new'
 import { Route as AppOrganizationsOrganizationConnectorsNewRouteImport } from './routes/_app/organizations/$organization/connectors/new'
-import { Route as AppOrganizationsOrganizationSecretsSecretIdEditRouteImport } from './routes/_app/organizations/$organization/secrets/$secretId.edit'
+import { Route as AppOrganizationsOrganizationSecretsIndexRouteImport } from './routes/_app/organizations/$organization/secrets/index'
+import { Route as AppOrganizationsOrganizationSecretsNewRouteImport } from './routes/_app/organizations/$organization/secrets/new'
+import { Route as AppOrganizationsOrganizationSpacesSpaceRouteImport } from './routes/_app/organizations/$organization/spaces/$space'
+import { Route as AppOrganizationsOrganizationWorkflowsIndexRouteImport } from './routes/_app/organizations/$organization/workflows/index'
+import { Route as AppOrganizationsOrganizationWorkflowsWorkflowIdRouteImport } from './routes/_app/organizations/$organization/workflows/$workflowId'
 import { Route as AppOrganizationsOrganizationConnectorsConnectorIdEditRouteImport } from './routes/_app/organizations/$organization/connectors/$connectorId.edit'
-import { Route as AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRouteImport } from './routes/_app/organizations/$organization/spaces/$space/workflows/index'
-import { Route as AppOrganizationsOrganizationSpacesSpaceSecretsIndexRouteImport } from './routes/_app/organizations/$organization/spaces/$space/secrets/index'
+import { Route as AppOrganizationsOrganizationSecretsSecretIdEditRouteImport } from './routes/_app/organizations/$organization/secrets/$secretId.edit'
 import { Route as AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRouteImport } from './routes/_app/organizations/$organization/spaces/$space/connectors/index'
-import { Route as AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRouteImport } from './routes/_app/organizations/$organization/spaces/$space/workflows/$workflowId'
-import { Route as AppOrganizationsOrganizationSpacesSpaceSecretsNewRouteImport } from './routes/_app/organizations/$organization/spaces/$space/secrets/new'
 import { Route as AppOrganizationsOrganizationSpacesSpaceConnectorsNewRouteImport } from './routes/_app/organizations/$organization/spaces/$space/connectors/new'
-import { Route as AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRouteImport } from './routes/_app/organizations/$organization/spaces/$space/secrets/$secretId.edit'
+import { Route as AppOrganizationsOrganizationSpacesSpaceSecretsIndexRouteImport } from './routes/_app/organizations/$organization/spaces/$space/secrets/index'
+import { Route as AppOrganizationsOrganizationSpacesSpaceSecretsNewRouteImport } from './routes/_app/organizations/$organization/spaces/$space/secrets/new'
+import { Route as AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRouteImport } from './routes/_app/organizations/$organization/spaces/$space/workflows/index'
+import { Route as AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRouteImport } from './routes/_app/organizations/$organization/spaces/$space/workflows/$workflowId'
 import { Route as AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRouteImport } from './routes/_app/organizations/$organization/spaces/$space/connectors/$connectorId.edit'
+import { Route as AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRouteImport } from './routes/_app/organizations/$organization/spaces/$space/secrets/$secretId.edit'
 
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LaunchRoute = LaunchRouteImport.update({
   id: '/launch',
   path: '/launch',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AppRoute = AppRouteImport.update({
-  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -54,14 +54,19 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AuthSignInRoute = AuthSignInRouteImport.update({
-  id: '/auth/sign-in',
-  path: '/auth/sign-in',
-  getParentRoute: () => rootRouteImport,
+const AppAboutRoute = AppAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => AppRoute,
 } as any)
-const AuthLogoutRoute = AuthLogoutRouteImport.update({
-  id: '/auth/logout',
-  path: '/auth/logout',
+const AppImageEditorRoute = AppImageEditorRouteImport.update({
+  id: '/image-editor',
+  path: '/image-editor',
+  getParentRoute: () => AppRoute,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthCreateOrgRoute = AuthCreateOrgRouteImport.update({
@@ -69,30 +74,20 @@ const AuthCreateOrgRoute = AuthCreateOrgRouteImport.update({
   path: '/auth/create-org',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthCallbackRoute = AuthCallbackRouteImport.update({
-  id: '/auth/callback',
-  path: '/auth/callback',
+const AuthLogoutRoute = AuthLogoutRouteImport.update({
+  id: '/auth/logout',
+  path: '/auth/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppImageEditorRoute = AppImageEditorRouteImport.update({
-  id: '/image-editor',
-  path: '/image-editor',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAboutRoute = AppAboutRouteImport.update({
-  id: '/about',
-  path: '/about',
-  getParentRoute: () => AppRoute,
+const AuthSignInRoute = AuthSignInRouteImport.update({
+  id: '/auth/sign-in',
+  path: '/auth/sign-in',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppOrganizationsIndexRoute = AppOrganizationsIndexRouteImport.update({
   id: '/organizations/',
   path: '/organizations/',
   getParentRoute: () => AppRoute,
-} as any)
-const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
-  id: '/api/v1/$',
-  path: '/api/v1/$',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const AppOrganizationsOrganizationRoute =
   AppOrganizationsOrganizationRouteImport.update({
@@ -100,22 +95,15 @@ const AppOrganizationsOrganizationRoute =
     path: '/organizations/$organization',
     getParentRoute: () => AppRoute,
   } as any)
+const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
+  id: '/api/v1/$',
+  path: '/api/v1/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppOrganizationsOrganizationIndexRoute =
   AppOrganizationsOrganizationIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => AppOrganizationsOrganizationRoute,
-  } as any)
-const AppOrganizationsOrganizationWorkflowsIndexRoute =
-  AppOrganizationsOrganizationWorkflowsIndexRouteImport.update({
-    id: '/workflows/',
-    path: '/workflows/',
-    getParentRoute: () => AppOrganizationsOrganizationRoute,
-  } as any)
-const AppOrganizationsOrganizationSecretsIndexRoute =
-  AppOrganizationsOrganizationSecretsIndexRouteImport.update({
-    id: '/secrets/',
-    path: '/secrets/',
     getParentRoute: () => AppOrganizationsOrganizationRoute,
   } as any)
 const AppOrganizationsOrganizationConnectorsIndexRoute =
@@ -124,16 +112,16 @@ const AppOrganizationsOrganizationConnectorsIndexRoute =
     path: '/connectors/',
     getParentRoute: () => AppOrganizationsOrganizationRoute,
   } as any)
-const AppOrganizationsOrganizationWorkflowsWorkflowIdRoute =
-  AppOrganizationsOrganizationWorkflowsWorkflowIdRouteImport.update({
-    id: '/workflows/$workflowId',
-    path: '/workflows/$workflowId',
+const AppOrganizationsOrganizationConnectorsNewRoute =
+  AppOrganizationsOrganizationConnectorsNewRouteImport.update({
+    id: '/connectors/new',
+    path: '/connectors/new',
     getParentRoute: () => AppOrganizationsOrganizationRoute,
   } as any)
-const AppOrganizationsOrganizationSpacesSpaceRoute =
-  AppOrganizationsOrganizationSpacesSpaceRouteImport.update({
-    id: '/spaces/$space',
-    path: '/spaces/$space',
+const AppOrganizationsOrganizationSecretsIndexRoute =
+  AppOrganizationsOrganizationSecretsIndexRouteImport.update({
+    id: '/secrets/',
+    path: '/secrets/',
     getParentRoute: () => AppOrganizationsOrganizationRoute,
   } as any)
 const AppOrganizationsOrganizationSecretsNewRoute =
@@ -142,16 +130,22 @@ const AppOrganizationsOrganizationSecretsNewRoute =
     path: '/secrets/new',
     getParentRoute: () => AppOrganizationsOrganizationRoute,
   } as any)
-const AppOrganizationsOrganizationConnectorsNewRoute =
-  AppOrganizationsOrganizationConnectorsNewRouteImport.update({
-    id: '/connectors/new',
-    path: '/connectors/new',
+const AppOrganizationsOrganizationSpacesSpaceRoute =
+  AppOrganizationsOrganizationSpacesSpaceRouteImport.update({
+    id: '/spaces/$space',
+    path: '/spaces/$space',
     getParentRoute: () => AppOrganizationsOrganizationRoute,
   } as any)
-const AppOrganizationsOrganizationSecretsSecretIdEditRoute =
-  AppOrganizationsOrganizationSecretsSecretIdEditRouteImport.update({
-    id: '/secrets/$secretId/edit',
-    path: '/secrets/$secretId/edit',
+const AppOrganizationsOrganizationWorkflowsIndexRoute =
+  AppOrganizationsOrganizationWorkflowsIndexRouteImport.update({
+    id: '/workflows/',
+    path: '/workflows/',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationWorkflowsWorkflowIdRoute =
+  AppOrganizationsOrganizationWorkflowsWorkflowIdRouteImport.update({
+    id: '/workflows/$workflowId',
+    path: '/workflows/$workflowId',
     getParentRoute: () => AppOrganizationsOrganizationRoute,
   } as any)
 const AppOrganizationsOrganizationConnectorsConnectorIdEditRoute =
@@ -160,34 +154,16 @@ const AppOrganizationsOrganizationConnectorsConnectorIdEditRoute =
     path: '/connectors/$connectorId/edit',
     getParentRoute: () => AppOrganizationsOrganizationRoute,
   } as any)
-const AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute =
-  AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRouteImport.update({
-    id: '/workflows/',
-    path: '/workflows/',
-    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
-  } as any)
-const AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute =
-  AppOrganizationsOrganizationSpacesSpaceSecretsIndexRouteImport.update({
-    id: '/secrets/',
-    path: '/secrets/',
-    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+const AppOrganizationsOrganizationSecretsSecretIdEditRoute =
+  AppOrganizationsOrganizationSecretsSecretIdEditRouteImport.update({
+    id: '/secrets/$secretId/edit',
+    path: '/secrets/$secretId/edit',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
   } as any)
 const AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRoute =
   AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRouteImport.update({
     id: '/connectors/',
     path: '/connectors/',
-    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
-  } as any)
-const AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute =
-  AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRouteImport.update({
-    id: '/workflows/$workflowId',
-    path: '/workflows/$workflowId',
-    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
-  } as any)
-const AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute =
-  AppOrganizationsOrganizationSpacesSpaceSecretsNewRouteImport.update({
-    id: '/secrets/new',
-    path: '/secrets/new',
     getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
   } as any)
 const AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute =
@@ -196,10 +172,28 @@ const AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute =
     path: '/connectors/new',
     getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
   } as any)
-const AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute =
-  AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRouteImport.update({
-    id: '/secrets/$secretId/edit',
-    path: '/secrets/$secretId/edit',
+const AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute =
+  AppOrganizationsOrganizationSpacesSpaceSecretsIndexRouteImport.update({
+    id: '/secrets/',
+    path: '/secrets/',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute =
+  AppOrganizationsOrganizationSpacesSpaceSecretsNewRouteImport.update({
+    id: '/secrets/new',
+    path: '/secrets/new',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute =
+  AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRouteImport.update({
+    id: '/workflows/',
+    path: '/workflows/',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute =
+  AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRouteImport.update({
+    id: '/workflows/$workflowId',
+    path: '/workflows/$workflowId',
     getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
   } as any)
 const AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute =
@@ -210,6 +204,12 @@ const AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute =
       getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
     } as any,
   )
+const AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute =
+  AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRouteImport.update({
+    id: '/secrets/$secretId/edit',
+    path: '/secrets/$secretId/edit',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -413,18 +413,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/launch': {
-      id: '/launch'
-      path: '/launch'
-      fullPath: '/launch'
-      preLoaderRoute: typeof LaunchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_app': {
       id: '/_app'
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/launch': {
+      id: '/launch'
+      path: '/launch'
+      fullPath: '/launch'
+      preLoaderRoute: typeof LaunchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/': {
@@ -434,18 +434,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/auth/sign-in': {
-      id: '/auth/sign-in'
-      path: '/auth/sign-in'
-      fullPath: '/auth/sign-in'
-      preLoaderRoute: typeof AuthSignInRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_app/about': {
+      id: '/_app/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AppAboutRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/auth/logout': {
-      id: '/auth/logout'
-      path: '/auth/logout'
-      fullPath: '/auth/logout'
-      preLoaderRoute: typeof AuthLogoutRouteImport
+    '/_app/image-editor': {
+      id: '/_app/image-editor'
+      path: '/image-editor'
+      fullPath: '/image-editor'
+      preLoaderRoute: typeof AppImageEditorRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/create-org': {
@@ -455,32 +462,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCreateOrgRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/callback': {
-      id: '/auth/callback'
-      path: '/auth/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
+    '/auth/logout': {
+      id: '/auth/logout'
+      path: '/auth/logout'
+      fullPath: '/auth/logout'
+      preLoaderRoute: typeof AuthLogoutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/image-editor': {
-      id: '/_app/image-editor'
-      path: '/image-editor'
-      fullPath: '/image-editor'
-      preLoaderRoute: typeof AppImageEditorRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/about': {
-      id: '/_app/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AppAboutRouteImport
-      parentRoute: typeof AppRoute
+    '/auth/sign-in': {
+      id: '/auth/sign-in'
+      path: '/auth/sign-in'
+      fullPath: '/auth/sign-in'
+      preLoaderRoute: typeof AuthSignInRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/organizations/': {
       id: '/_app/organizations/'
       path: '/organizations'
       fullPath: '/organizations/'
       preLoaderRoute: typeof AppOrganizationsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/organizations/$organization': {
+      id: '/_app/organizations/$organization'
+      path: '/organizations/$organization'
+      fullPath: '/organizations/$organization'
+      preLoaderRoute: typeof AppOrganizationsOrganizationRouteImport
       parentRoute: typeof AppRoute
     }
     '/api/v1/$': {
@@ -490,32 +497,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/organizations/$organization': {
-      id: '/_app/organizations/$organization'
-      path: '/organizations/$organization'
-      fullPath: '/organizations/$organization'
-      preLoaderRoute: typeof AppOrganizationsOrganizationRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/organizations/$organization/': {
       id: '/_app/organizations/$organization/'
       path: '/'
       fullPath: '/organizations/$organization/'
       preLoaderRoute: typeof AppOrganizationsOrganizationIndexRouteImport
-      parentRoute: typeof AppOrganizationsOrganizationRoute
-    }
-    '/_app/organizations/$organization/workflows/': {
-      id: '/_app/organizations/$organization/workflows/'
-      path: '/workflows'
-      fullPath: '/organizations/$organization/workflows/'
-      preLoaderRoute: typeof AppOrganizationsOrganizationWorkflowsIndexRouteImport
-      parentRoute: typeof AppOrganizationsOrganizationRoute
-    }
-    '/_app/organizations/$organization/secrets/': {
-      id: '/_app/organizations/$organization/secrets/'
-      path: '/secrets'
-      fullPath: '/organizations/$organization/secrets/'
-      preLoaderRoute: typeof AppOrganizationsOrganizationSecretsIndexRouteImport
       parentRoute: typeof AppOrganizationsOrganizationRoute
     }
     '/_app/organizations/$organization/connectors/': {
@@ -525,18 +511,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrganizationsOrganizationConnectorsIndexRouteImport
       parentRoute: typeof AppOrganizationsOrganizationRoute
     }
-    '/_app/organizations/$organization/workflows/$workflowId': {
-      id: '/_app/organizations/$organization/workflows/$workflowId'
-      path: '/workflows/$workflowId'
-      fullPath: '/organizations/$organization/workflows/$workflowId'
-      preLoaderRoute: typeof AppOrganizationsOrganizationWorkflowsWorkflowIdRouteImport
+    '/_app/organizations/$organization/connectors/new': {
+      id: '/_app/organizations/$organization/connectors/new'
+      path: '/connectors/new'
+      fullPath: '/organizations/$organization/connectors/new'
+      preLoaderRoute: typeof AppOrganizationsOrganizationConnectorsNewRouteImport
       parentRoute: typeof AppOrganizationsOrganizationRoute
     }
-    '/_app/organizations/$organization/spaces/$space': {
-      id: '/_app/organizations/$organization/spaces/$space'
-      path: '/spaces/$space'
-      fullPath: '/organizations/$organization/spaces/$space'
-      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceRouteImport
+    '/_app/organizations/$organization/secrets/': {
+      id: '/_app/organizations/$organization/secrets/'
+      path: '/secrets'
+      fullPath: '/organizations/$organization/secrets/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSecretsIndexRouteImport
       parentRoute: typeof AppOrganizationsOrganizationRoute
     }
     '/_app/organizations/$organization/secrets/new': {
@@ -546,18 +532,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrganizationsOrganizationSecretsNewRouteImport
       parentRoute: typeof AppOrganizationsOrganizationRoute
     }
-    '/_app/organizations/$organization/connectors/new': {
-      id: '/_app/organizations/$organization/connectors/new'
-      path: '/connectors/new'
-      fullPath: '/organizations/$organization/connectors/new'
-      preLoaderRoute: typeof AppOrganizationsOrganizationConnectorsNewRouteImport
+    '/_app/organizations/$organization/spaces/$space': {
+      id: '/_app/organizations/$organization/spaces/$space'
+      path: '/spaces/$space'
+      fullPath: '/organizations/$organization/spaces/$space'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceRouteImport
       parentRoute: typeof AppOrganizationsOrganizationRoute
     }
-    '/_app/organizations/$organization/secrets/$secretId/edit': {
-      id: '/_app/organizations/$organization/secrets/$secretId/edit'
-      path: '/secrets/$secretId/edit'
-      fullPath: '/organizations/$organization/secrets/$secretId/edit'
-      preLoaderRoute: typeof AppOrganizationsOrganizationSecretsSecretIdEditRouteImport
+    '/_app/organizations/$organization/workflows/': {
+      id: '/_app/organizations/$organization/workflows/'
+      path: '/workflows'
+      fullPath: '/organizations/$organization/workflows/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationWorkflowsIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
+    }
+    '/_app/organizations/$organization/workflows/$workflowId': {
+      id: '/_app/organizations/$organization/workflows/$workflowId'
+      path: '/workflows/$workflowId'
+      fullPath: '/organizations/$organization/workflows/$workflowId'
+      preLoaderRoute: typeof AppOrganizationsOrganizationWorkflowsWorkflowIdRouteImport
       parentRoute: typeof AppOrganizationsOrganizationRoute
     }
     '/_app/organizations/$organization/connectors/$connectorId/edit': {
@@ -567,39 +560,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrganizationsOrganizationConnectorsConnectorIdEditRouteImport
       parentRoute: typeof AppOrganizationsOrganizationRoute
     }
-    '/_app/organizations/$organization/spaces/$space/workflows/': {
-      id: '/_app/organizations/$organization/spaces/$space/workflows/'
-      path: '/workflows'
-      fullPath: '/organizations/$organization/spaces/$space/workflows/'
-      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRouteImport
-      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
-    }
-    '/_app/organizations/$organization/spaces/$space/secrets/': {
-      id: '/_app/organizations/$organization/spaces/$space/secrets/'
-      path: '/secrets'
-      fullPath: '/organizations/$organization/spaces/$space/secrets/'
-      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsIndexRouteImport
-      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    '/_app/organizations/$organization/secrets/$secretId/edit': {
+      id: '/_app/organizations/$organization/secrets/$secretId/edit'
+      path: '/secrets/$secretId/edit'
+      fullPath: '/organizations/$organization/secrets/$secretId/edit'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSecretsSecretIdEditRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
     }
     '/_app/organizations/$organization/spaces/$space/connectors/': {
       id: '/_app/organizations/$organization/spaces/$space/connectors/'
       path: '/connectors'
       fullPath: '/organizations/$organization/spaces/$space/connectors/'
       preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRouteImport
-      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
-    }
-    '/_app/organizations/$organization/spaces/$space/workflows/$workflowId': {
-      id: '/_app/organizations/$organization/spaces/$space/workflows/$workflowId'
-      path: '/workflows/$workflowId'
-      fullPath: '/organizations/$organization/spaces/$space/workflows/$workflowId'
-      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRouteImport
-      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
-    }
-    '/_app/organizations/$organization/spaces/$space/secrets/new': {
-      id: '/_app/organizations/$organization/spaces/$space/secrets/new'
-      path: '/secrets/new'
-      fullPath: '/organizations/$organization/spaces/$space/secrets/new'
-      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsNewRouteImport
       parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
     }
     '/_app/organizations/$organization/spaces/$space/connectors/new': {
@@ -609,11 +581,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceConnectorsNewRouteImport
       parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
     }
-    '/_app/organizations/$organization/spaces/$space/secrets/$secretId/edit': {
-      id: '/_app/organizations/$organization/spaces/$space/secrets/$secretId/edit'
-      path: '/secrets/$secretId/edit'
-      fullPath: '/organizations/$organization/spaces/$space/secrets/$secretId/edit'
-      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRouteImport
+    '/_app/organizations/$organization/spaces/$space/secrets/': {
+      id: '/_app/organizations/$organization/spaces/$space/secrets/'
+      path: '/secrets'
+      fullPath: '/organizations/$organization/spaces/$space/secrets/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/secrets/new': {
+      id: '/_app/organizations/$organization/spaces/$space/secrets/new'
+      path: '/secrets/new'
+      fullPath: '/organizations/$organization/spaces/$space/secrets/new'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsNewRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/workflows/': {
+      id: '/_app/organizations/$organization/spaces/$space/workflows/'
+      path: '/workflows'
+      fullPath: '/organizations/$organization/spaces/$space/workflows/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/workflows/$workflowId': {
+      id: '/_app/organizations/$organization/spaces/$space/workflows/$workflowId'
+      path: '/workflows/$workflowId'
+      fullPath: '/organizations/$organization/spaces/$space/workflows/$workflowId'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRouteImport
       parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
     }
     '/_app/organizations/$organization/spaces/$space/connectors/$connectorId/edit': {
@@ -621,6 +614,13 @@ declare module '@tanstack/react-router' {
       path: '/connectors/$connectorId/edit'
       fullPath: '/organizations/$organization/spaces/$space/connectors/$connectorId/edit'
       preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/secrets/$secretId/edit': {
+      id: '/_app/organizations/$organization/spaces/$space/secrets/$secretId/edit'
+      path: '/secrets/$secretId/edit'
+      fullPath: '/organizations/$organization/spaces/$space/secrets/$secretId/edit'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRouteImport
       parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
     }
   }
