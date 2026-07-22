@@ -1,0 +1,14 @@
+# Compiled theme assets — BUILD OUTPUTS of `web:build`, not source:
+#   - theme/pivox/account/resources/app/   ← @pivox/account-console vite bundle
+#     (index.html, index.js, assets/index.css, bundled fonts)
+#   - theme/pivox/login/resources/css/theme.css ← build.mjs Tailwind compile
+#
+# They must NOT be tracked: they silently go stale whenever a bundled component's
+# Tailwind class set changes without a rebuild (e.g. the autocomplete->combobox
+# primitive rename left the committed account index.css a diff forever). Dev
+# regenerates them via `web:build` and Keycloak serves them over the apphost
+# bind-mount; a future prod theme-packaging step must likewise run `web:build`
+# before packaging. Hand-authored files (.ftl templates, theme.properties,
+# messages/, the login resources/fonts/*) stay tracked.
+/theme/pivox/account/resources/app/
+/theme/pivox/login/resources/css/theme.css
