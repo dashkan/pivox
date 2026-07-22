@@ -3,9 +3,6 @@ import { safeInternalPath } from '@pivox/ui/form-page';
 /** The search-param key that carries the launching route forward to a form page. */
 export const RETURN_PARAM = 'from';
 
-/** Where a connector form returns when `?from=` is absent or fails sanitizing. */
-export const CONNECTORS_LIST_ROUTE = '/connectors';
-
 /**
  * The app origin used to resolve a candidate `from` path. On the client this is
  * the real origin; on the SSR pass it is a stable placeholder. Either way the
@@ -32,13 +29,4 @@ export function resolveReturnTo(
   fallback: string,
 ): string {
   return safeInternalPath(from, appOrigin()) ?? fallback;
-}
-
-/**
- * Connectors-specific `resolveReturnTo`, kept as a thin wrapper so existing
- * connector call sites (and their tests) stay unchanged while the generic
- * resolver backs both consumers.
- */
-export function resolveConnectorReturn(from: string | undefined): string {
-  return resolveReturnTo(from, CONNECTORS_LIST_ROUTE);
 }

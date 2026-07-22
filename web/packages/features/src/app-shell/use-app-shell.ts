@@ -61,9 +61,37 @@ export function useAppShell(input: {
    * from the route's beforeLoad/context when SSR has already seen
    * the cookie — synchronizes initial state across SSR and client
    * paints, and prevents the validation effect from racing the
-   * cookie-hydration setState. Electron (no SSR) omits this.
+   * cookie-hydration setState. Electron (no SSR) omits this. Only used
+   * in the UNCONTROLLED (cookie-driven) mode below.
    */
   initialActiveOrganization?: string | null;
+  /**
+   * CONTROLLED active org (resource name), derived by the consumer from
+   * the route's `$organization` param — the URL is the source of truth
+   * for scope. When provided (even as null on a scopeless route), it
+   * overrides the internal cookie state and the orgs[0] defaulting
+   * effect. Leave `undefined` for the UNCONTROLLED cookie/localStorage
+   * mode (Electron), which keeps its prior behavior.
+   */
+  activeOrganization?: string | null;
+  /**
+   * CONTROLLED active space (resource name) or null for the org rollup,
+   * derived from the route's `$space` param. Only meaningful alongside
+   * a controlled `activeOrganization`.
+   */
+  activeSpace?: string | null;
+  /**
+   * Select-org handler. When provided (web), it replaces the internal
+   * cookie setter — the consumer navigates to the org's scoped home and
+   * writes the last-visited cookie. Omitted in Electron, where the
+   * internal cookie/localStorage setter is used instead.
+   */
+  onSelectOrganization?: (organization: string) => void;
+  /**
+   * Select-space handler (null = org rollup). Provided by the web
+   * consumer to navigate to the scoped route; a no-op when omitted.
+   */
+  onSelectSpace?: (space: string | null) => void;
 }): AppShellContextValue {
   const {
     $api,
@@ -72,7 +100,15 @@ export function useAppShell(input: {
     navMain = [],
     initialUser,
     initialActiveOrganization,
+    activeOrganization: controlledActiveOrganization,
+    activeSpace: controlledActiveSpace,
+    onSelectOrganization,
+    onSelectSpace,
   } = input;
+
+  // Controlled when the consumer derives the active org from the URL
+  // (web). Undefined => uncontrolled cookie/localStorage mode (Electron).
+  const controlled = controlledActiveOrganization !== undefined;
   const { user, signOut } = useAuth();
   // Prefer the live authenticated user once useAuth resolves (mutations
   // on the account update displayName/photoURL in IndexedDB before
@@ -94,14 +130,38 @@ export function useAppShell(input: {
   // Precedence: SSR-resolved value (matches the HTML the server
   // rendered, no hydration mismatch) > client-side cookie read
   // (covers electron + any pure CSR path) > null.
-  const [activeOrganization, setActiveOrganizationState] = useState<
+  const [internalActiveOrganization, setActiveOrganizationState] = useState<
     string | null
   >(() => initialActiveOrganization ?? storage.get(ACTIVE_ORG));
 
-  const setActiveOrganization = useCallback((organization: string) => {
-    setActiveOrganizationState(organization);
-    storage.set(ACTIVE_ORG, organization);
-  }, []);
+  // In controlled mode the URL (route param) owns scope; otherwise the
+  // cookie-driven internal state does.
+  const activeOrganization = controlled
+    ? (controlledActiveOrganization ?? null)
+    : internalActiveOrganization;
+  const activeSpace = controlled ? (controlledActiveSpace ?? null) : null;
+
+  // Org selection: web injects `onSelectOrganization` (navigate + write
+  // the last-visited cookie); Electron falls back to the internal
+  // cookie/localStorage setter.
+  const setActiveOrganization = useCallback(
+    (organization: string) => {
+      if (onSelectOrganization) {
+        onSelectOrganization(organization);
+        return;
+      }
+      setActiveOrganizationState(organization);
+      storage.set(ACTIVE_ORG, organization);
+    },
+    [onSelectOrganization],
+  );
+
+  const selectSpace = useCallback(
+    (space: string | null) => {
+      onSelectSpace?.(space);
+    },
+    [onSelectSpace],
+  );
 
   // Orgs query — slim caller-scoped view (used by post-sign-in
   // bootstrap and the picker). The path's `{parent}` is literal
@@ -150,6 +210,10 @@ export function useAppShell(input: {
   // because the orgs query result isn't available at mount; we
   // need to react to its arrival.
   useEffect(() => {
+    // Controlled mode: the URL owns the active org, so never default to
+    // orgs[0] — an unknown slug is a notFound at the route layer, not a
+    // silent fallback here.
+    if (controlled) return;
     if (orgs.length === 0) return;
     if (
       activeOrganization &&
@@ -158,9 +222,25 @@ export function useAppShell(input: {
       return;
     }
     const first = orgs[0]?.organization;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- canonical react-to-external-data: derive default once orgs arrive, bounded by the early-return guard
-    if (first) setActiveOrganization(first);
-  }, [orgs, activeOrganization, setActiveOrganization]);
+    if (first) {
+      // Seed local cookie state IN PLACE — do NOT delegate to
+      // setActiveOrganization here: on an uncontrolled (flat) route it routes
+      // via onSelectOrganization, which would navigate the user off the page
+      // (stranding them before they reach secrets/workflows).
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- canonical react-to-external-data: derive default once orgs arrive, bounded by the early-return guard
+      setActiveOrganizationState(first);
+      storage.set(ACTIVE_ORG, first);
+    }
+  }, [controlled, orgs, activeOrganization]);
+
+  // Keep the last-visited hint in sync with URL-driven (controlled) scope, so
+  // the uncontrolled contexts (the org selector, Electron) and the root redirect
+  // track the actual last org the user was in, not a stale earlier pick.
+  useEffect(() => {
+    if (controlled && controlledActiveOrganization) {
+      storage.set(ACTIVE_ORG, controlledActiveOrganization);
+    }
+  }, [controlled, controlledActiveOrganization]);
 
   // Spaces query — scoped to the active org. Disabled until we have
   // one (initial render before localStorage hydrate + orgs load).
@@ -209,6 +289,7 @@ export function useAppShell(input: {
       orgs,
       orgsLoading: orgsQuery.isLoading,
       activeOrganization,
+      activeSpace,
       spaces,
       spacesLoading: spacesQuery.isLoading,
       navMain,
@@ -216,6 +297,7 @@ export function useAppShell(input: {
     },
     actions: {
       setActiveOrganization,
+      selectSpace,
       createOrganization: onCreateOrganization,
       openAccount: onOpenAccount,
       setProfileOpen,

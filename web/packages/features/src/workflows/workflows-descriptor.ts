@@ -12,6 +12,8 @@ import type { Workflow, WorkflowListExtras } from '@pivox/ui/resource-admin';
 type ListWorkflowsResponse = components['schemas']['v1ListWorkflowsResponse'];
 
 const WORKFLOWS_PATH = '/v1/organizations/{organization}/workflows' as const;
+const SPACE_WORKFLOWS_PATH =
+  '/v1/organizations/{organization}/spaces/{space}/workflows' as const;
 
 /**
  * react-query `placeholderData` that keeps the previous page rendered while a new
@@ -23,17 +25,22 @@ function keepPrevious<T>(previous: T): T {
 }
 
 /**
- * The workflows LIST descriptor (data side) — the THIRD SHAPE that validates the
- * List half stands alone without a form. Unlike connectors/secrets there is no
- * scope union (workflows are org-direct only: a single parent path, no space
- * rollup) and no per-response facet, so `useList` runs one query and `extrasOf`
- * returns an empty bag. Its react-query key is byte-identical to the SSR loader's
- * prime (same literal path + shared `buildWorkflowsListRequest`), so primed rows
- * hydrate instead of refetching.
+ * The workflows LIST descriptor (data side) — the sibling of
+ * `secretsListDescriptor`. The scope switches the list PARENT path; both queries
+ * are declared so the hook count stays stable and only the one matching the scope
+ * is enabled. Its react-query key is byte-identical to the SSR loader's prime
+ * (same literal path + shared `buildWorkflowsListRequest`), so primed rows hydrate
+ * instead of refetching. Workflows carry no per-response facet, so `extrasOf`
+ * returns an empty bag.
+ *
+ * Unlike secrets/connectors the org level is an EXACT space_id match, not a rollup
+ * (see the backend `WorkflowFilter`): `scope: ''` lists only the org-direct
+ * workflows, a space slug lists that space's — the request plumbing is the same,
+ * only the backend semantics differ.
  *
  * The row action navigates to the bespoke React Flow CANVAS, not a form — that is
- * the injected `onEdit` the route points at `/workflows/$id`; the descriptor is
- * agnostic to where it lands.
+ * the injected `onEdit` the route points at the `$workflowId` route; the
+ * descriptor is agnostic to where it lands.
  */
 export const workflowsListDescriptor: ListDescriptor<
   Workflow,
@@ -45,12 +52,21 @@ export const workflowsListDescriptor: ListDescriptor<
   useList({ $api, organization, state }) {
     // The shared builder produces the exact query the SSR loader keys on.
     const { query } = buildWorkflowsListRequest(organization, state);
-    const listQuery = $api.useQuery(
+    const scope = state.scope;
+
+    const orgListQuery = $api.useQuery(
       'get',
       WORKFLOWS_PATH,
       { params: { path: { organization }, query } },
-      { placeholderData: keepPrevious },
+      { enabled: scope === '', placeholderData: keepPrevious },
     );
+    const spaceListQuery = $api.useQuery(
+      'get',
+      SPACE_WORKFLOWS_PATH,
+      { params: { path: { organization, space: scope }, query } },
+      { enabled: scope !== '', placeholderData: keepPrevious },
+    );
+    const listQuery = scope === '' ? orgListQuery : spaceListQuery;
     return {
       data: listQuery.data,
       isLoading: listQuery.isLoading,

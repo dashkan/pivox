@@ -1,5 +1,7 @@
 export { AppShell } from './app-shell';
 export { useAppShellContext } from './app-shell.context';
+export { AppShellScopePicker } from './scope-picker';
+export type { ScopePickerProps } from './scope-picker';
 export type {
   AppShellActions,
   AppShellContextValue,

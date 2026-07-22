@@ -9,8 +9,7 @@ import {
 // edit form refetches fresh instead of reading the pre-edit cache. Each pair is a
 // [method, pathTemplate] openapi-react-query key prefix — a partial invalidate
 // matches every filter/sort/scope/page (list) or path-param (detail) variant.
-const CONNECTOR_FORM_NAV: ResourceFormNavConfig = {
-  listRoute: '/connectors',
+const CONNECTOR_FORM_NAV: Omit<ResourceFormNavConfig, 'listRoute'> = {
   listKeys: [
     ['get', '/v1/organizations/{organization}/connectors'],
     ['get', '/v1/organizations/{organization}/spaces/{space}/connectors'],
@@ -24,9 +23,10 @@ const CONNECTOR_FORM_NAV: ResourceFormNavConfig = {
 
 /**
  * Route-owned navigation for a connector form page — a thin wrapper over the
- * generic {@link useResourceFormNav} (shared with secrets). Behavior is
- * unchanged from the previous connector-specific implementation.
+ * generic {@link useResourceFormNav} (shared with secrets). `listRoute` is the
+ * `?from=` fallback — the caller's own scoped list (org rollup or space).
+ * Required: there is no flat resource route to safely default to.
  */
-export function useConnectorFormNav(from: string | undefined) {
-  return useResourceFormNav(from, CONNECTOR_FORM_NAV);
+export function useConnectorFormNav(from: string | undefined, listRoute: string) {
+  return useResourceFormNav(from, { ...CONNECTOR_FORM_NAV, listRoute });
 }

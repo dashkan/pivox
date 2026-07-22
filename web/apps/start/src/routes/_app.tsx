@@ -1,24 +1,26 @@
-import { organizationId } from '@pivox/client';
+import { organizationId, spaceId } from '@pivox/client';
 import { AppShellFeature } from '@pivox/features/app-shell';
 import { useUserId } from '@pivox/features/auth';
 import { ChatModalFeature } from '@pivox/features/chat';
 import { SidebarInset, SidebarTrigger } from '@pivox/primitives/sidebar';
+import { ACTIVE_ORG, storage } from '@pivox/storage';
 import { AppShell, useAppShellContext } from '@pivox/ui/app-shell';
 import { SidebarProvider } from '@pivox/ui/sidebar-provider';
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
 import {
   Outlet,
   createFileRoute,
+  useParams,
   useRouter,
   useRouterState,
 } from '@tanstack/react-router';
-import { ShieldIcon, WorkflowIcon } from 'lucide-react';
-
-import type { NavMainItem } from '@pivox/ui/app-shell';
+import { useCallback } from 'react';
 
 import { $api } from '@/lib/api-client';
 import { requireKcSession } from '@/lib/auth-gate';
 import { KeycloakAuthProvider } from '@/lib/kc-auth-provider';
+import { orgNavTarget, spaceNavTarget } from '@/lib/scope-nav';
+import { useNavMain } from '@/lib/use-nav-main';
 import {
   getActiveOrgCookie,
   prefetchOrgsForCurrentUser,
@@ -119,39 +121,8 @@ export const Route = createFileRoute('/_app')({
   component: AppLayoutRoute,
 });
 
-/**
- * Sidebar nav groups. `href` on a group is unused (the trigger toggles the
- * group); subitems carry the real routes. `isActive` opens the group holding
- * the current route. "Definitions" points at the workflows catalog (T5);
- * "Connectors" and "Secrets" ship here.
- */
-function useNavMain(): NavMainItem[] {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  return [
-    {
-      title: 'Workflows',
-      href: '/workflows',
-      icon: <WorkflowIcon />,
-      isActive:
-        pathname.startsWith('/workflows') || pathname.startsWith('/connectors'),
-      items: [
-        { title: 'Definitions', href: '/workflows' },
-        { title: 'Connectors', href: '/connectors' },
-      ],
-    },
-    {
-      title: 'Admin',
-      href: '/secrets',
-      icon: <ShieldIcon />,
-      isActive: pathname.startsWith('/secrets'),
-      items: [{ title: 'Secrets', href: '/secrets' }],
-    },
-  ];
-}
-
 function AppLayoutRoute() {
   const router = useRouter();
-  const navMain = useNavMain();
   const {
     user,
     accountConsoleUrl,
@@ -159,11 +130,71 @@ function AppLayoutRoute() {
     initialTheme,
     initialSidebarOpen,
   } = Route.useRouteContext();
+
+  // The URL is the single source of truth for scope. Read the current route's
+  // `$organization` / `$space` slugs (present under the scoped tree) and derive
+  // the shell's active scope from them. Routes without an org param (the org
+  // selector, and Electron with no SSR) leave the shell UNCONTROLLED, falling
+  // back to its cookie-driven state.
+  const params = useParams({ strict: false }) as {
+    organization?: string;
+    space?: string;
+  };
+  const orgSlugParam = params.organization;
+  const spaceSlugParam = params.space;
+
+  // Space-select keeps the user on the current resource's space variant, so the
+  // handler reads the resource off the pathname.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const controlledActiveOrganization = orgSlugParam
+    ? `organizations/${orgSlugParam}`
+    : undefined;
+  const controlledActiveSpace = orgSlugParam
+    ? spaceSlugParam
+      ? `organizations/${orgSlugParam}/spaces/${spaceSlugParam}`
+      : null
+    : undefined;
+
+  // Nav derives the Connectors link's org from the URL param or the live
+  // last-visited cookie (see use-nav-main). Kept a hook so it's unit-testable.
+  const navMain = useNavMain(initialActiveOrganization);
+
+  // Org select: keep the user on the current section in the new org (org-rollup
+  // scope — a space can't carry across orgs), and write the last-visited hint.
+  // The URL then owns scope; the cookie is only a hint for the next cold `/` visit.
+  const onSelectOrganization = useCallback(
+    (organization: string) => {
+      storage.set(ACTIVE_ORG, organization);
+      router.history.push(orgNavTarget(pathname, organizationId(organization)));
+    },
+    [router, pathname],
+  );
+
+  // Space select: narrow (or roll up) within the current org, keeping the user on
+  // the CURRENT resource's space variant (derived from the pathname by the pure
+  // `spaceNavTarget` — connectors→space connectors, secrets→space secrets). A
+  // workflows context (org-direct) falls back to that org's connectors, per
+  // `spaceNavTarget`, though the picker's Spaces section is suppressed there so
+  // this is only a defensive path. A no-op off the scoped tree (no org context).
+  const onSelectSpace = useCallback(
+    (space: string | null) => {
+      if (!orgSlugParam) return;
+      router.history.push(
+        spaceNavTarget(pathname, orgSlugParam, space ? spaceId(space) : null),
+      );
+    },
+    [router, orgSlugParam, pathname],
+  );
+
   return (
     <KeycloakAuthProvider user={user}>
       <AppShellFeature
         $api={$api}
         navMain={navMain}
+        activeOrganization={controlledActiveOrganization}
+        activeSpace={controlledActiveSpace}
+        onSelectOrganization={onSelectOrganization}
+        onSelectSpace={onSelectSpace}
         // Seed the shell with the server-verified user so the nav-
         // user menu paints with name + photo on first SSR render,
         // not a half-rendered avatar that pops in after the client

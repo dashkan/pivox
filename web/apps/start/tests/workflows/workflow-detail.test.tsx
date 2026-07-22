@@ -20,7 +20,7 @@ vi.mock('@pivox/ui/workflow', () => ({
   WorkflowCanvas: () => <div data-testid="workflow-canvas" />,
 }));
 
-import { WorkflowDetail } from '../../src/routes/_app/workflows/$workflowId';
+import { WorkflowDetail } from '../../src/features/workflows/scoped-workflow-detail';
 
 type Workflow = components['schemas']['v1Workflow'];
 
@@ -55,6 +55,7 @@ describe('WorkflowDetail', () => {
         apiClient={apiClient}
         parent={parent}
         workflowId="ingest"
+        back={<a href="#">← Workflows</a>}
       />,
     );
 
@@ -84,6 +85,7 @@ describe('WorkflowDetail', () => {
         apiClient={apiClient}
         parent={parent}
         workflowId="draft"
+        back={<a href="#">← Workflows</a>}
       />,
     );
 

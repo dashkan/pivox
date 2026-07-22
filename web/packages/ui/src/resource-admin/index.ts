@@ -72,7 +72,11 @@ export {
   secretDeleteDescription,
   secretsListView,
 } from './secrets-list-view';
-export { workflowLeafId, workflowVersionLabel } from './workflow-shared';
+export {
+  workflowLeafId,
+  workflowSpaceSlug,
+  workflowVersionLabel,
+} from './workflow-shared';
 export { workflowsListView } from './workflows-list-view';
 export { isValidIdentifier, slugify } from './slug';
 export { SuggestCombobox } from './suggest-combobox';

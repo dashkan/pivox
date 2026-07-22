@@ -18,15 +18,27 @@ import { Route as AuthCreateOrgRouteImport } from './routes/auth/create-org'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
-import { Route as AppWorkflowsIndexRouteImport } from './routes/_app/workflows/index'
-import { Route as AppSecretsIndexRouteImport } from './routes/_app/secrets/index'
-import { Route as AppConnectorsIndexRouteImport } from './routes/_app/connectors/index'
+import { Route as AppOrganizationsIndexRouteImport } from './routes/_app/organizations/index'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
-import { Route as AppWorkflowsWorkflowIdRouteImport } from './routes/_app/workflows/$workflowId'
-import { Route as AppSecretsNewRouteImport } from './routes/_app/secrets/new'
-import { Route as AppConnectorsNewRouteImport } from './routes/_app/connectors/new'
-import { Route as AppSecretsSecretIdEditRouteImport } from './routes/_app/secrets/$secretId.edit'
-import { Route as AppConnectorsConnectorIdEditRouteImport } from './routes/_app/connectors/$connectorId.edit'
+import { Route as AppOrganizationsOrganizationRouteImport } from './routes/_app/organizations/$organization'
+import { Route as AppOrganizationsOrganizationIndexRouteImport } from './routes/_app/organizations/$organization/index'
+import { Route as AppOrganizationsOrganizationWorkflowsIndexRouteImport } from './routes/_app/organizations/$organization/workflows/index'
+import { Route as AppOrganizationsOrganizationSecretsIndexRouteImport } from './routes/_app/organizations/$organization/secrets/index'
+import { Route as AppOrganizationsOrganizationConnectorsIndexRouteImport } from './routes/_app/organizations/$organization/connectors/index'
+import { Route as AppOrganizationsOrganizationWorkflowsWorkflowIdRouteImport } from './routes/_app/organizations/$organization/workflows/$workflowId'
+import { Route as AppOrganizationsOrganizationSpacesSpaceRouteImport } from './routes/_app/organizations/$organization/spaces/$space'
+import { Route as AppOrganizationsOrganizationSecretsNewRouteImport } from './routes/_app/organizations/$organization/secrets/new'
+import { Route as AppOrganizationsOrganizationConnectorsNewRouteImport } from './routes/_app/organizations/$organization/connectors/new'
+import { Route as AppOrganizationsOrganizationSecretsSecretIdEditRouteImport } from './routes/_app/organizations/$organization/secrets/$secretId.edit'
+import { Route as AppOrganizationsOrganizationConnectorsConnectorIdEditRouteImport } from './routes/_app/organizations/$organization/connectors/$connectorId.edit'
+import { Route as AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRouteImport } from './routes/_app/organizations/$organization/spaces/$space/workflows/index'
+import { Route as AppOrganizationsOrganizationSpacesSpaceSecretsIndexRouteImport } from './routes/_app/organizations/$organization/spaces/$space/secrets/index'
+import { Route as AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRouteImport } from './routes/_app/organizations/$organization/spaces/$space/connectors/index'
+import { Route as AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRouteImport } from './routes/_app/organizations/$organization/spaces/$space/workflows/$workflowId'
+import { Route as AppOrganizationsOrganizationSpacesSpaceSecretsNewRouteImport } from './routes/_app/organizations/$organization/spaces/$space/secrets/new'
+import { Route as AppOrganizationsOrganizationSpacesSpaceConnectorsNewRouteImport } from './routes/_app/organizations/$organization/spaces/$space/connectors/new'
+import { Route as AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRouteImport } from './routes/_app/organizations/$organization/spaces/$space/secrets/$secretId.edit'
+import { Route as AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRouteImport } from './routes/_app/organizations/$organization/spaces/$space/connectors/$connectorId.edit'
 
 const LaunchRoute = LaunchRouteImport.update({
   id: '/launch',
@@ -72,19 +84,9 @@ const AppAboutRoute = AppAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => AppRoute,
 } as any)
-const AppWorkflowsIndexRoute = AppWorkflowsIndexRouteImport.update({
-  id: '/workflows/',
-  path: '/workflows/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSecretsIndexRoute = AppSecretsIndexRouteImport.update({
-  id: '/secrets/',
-  path: '/secrets/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppConnectorsIndexRoute = AppConnectorsIndexRouteImport.update({
-  id: '/connectors/',
-  path: '/connectors/',
+const AppOrganizationsIndexRoute = AppOrganizationsIndexRouteImport.update({
+  id: '/organizations/',
+  path: '/organizations/',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
@@ -92,32 +94,122 @@ const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
   path: '/api/v1/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppWorkflowsWorkflowIdRoute = AppWorkflowsWorkflowIdRouteImport.update({
-  id: '/workflows/$workflowId',
-  path: '/workflows/$workflowId',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSecretsNewRoute = AppSecretsNewRouteImport.update({
-  id: '/secrets/new',
-  path: '/secrets/new',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppConnectorsNewRoute = AppConnectorsNewRouteImport.update({
-  id: '/connectors/new',
-  path: '/connectors/new',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSecretsSecretIdEditRoute = AppSecretsSecretIdEditRouteImport.update({
-  id: '/secrets/$secretId/edit',
-  path: '/secrets/$secretId/edit',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppConnectorsConnectorIdEditRoute =
-  AppConnectorsConnectorIdEditRouteImport.update({
-    id: '/connectors/$connectorId/edit',
-    path: '/connectors/$connectorId/edit',
+const AppOrganizationsOrganizationRoute =
+  AppOrganizationsOrganizationRouteImport.update({
+    id: '/organizations/$organization',
+    path: '/organizations/$organization',
     getParentRoute: () => AppRoute,
   } as any)
+const AppOrganizationsOrganizationIndexRoute =
+  AppOrganizationsOrganizationIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationWorkflowsIndexRoute =
+  AppOrganizationsOrganizationWorkflowsIndexRouteImport.update({
+    id: '/workflows/',
+    path: '/workflows/',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationSecretsIndexRoute =
+  AppOrganizationsOrganizationSecretsIndexRouteImport.update({
+    id: '/secrets/',
+    path: '/secrets/',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationConnectorsIndexRoute =
+  AppOrganizationsOrganizationConnectorsIndexRouteImport.update({
+    id: '/connectors/',
+    path: '/connectors/',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationWorkflowsWorkflowIdRoute =
+  AppOrganizationsOrganizationWorkflowsWorkflowIdRouteImport.update({
+    id: '/workflows/$workflowId',
+    path: '/workflows/$workflowId',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceRoute =
+  AppOrganizationsOrganizationSpacesSpaceRouteImport.update({
+    id: '/spaces/$space',
+    path: '/spaces/$space',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationSecretsNewRoute =
+  AppOrganizationsOrganizationSecretsNewRouteImport.update({
+    id: '/secrets/new',
+    path: '/secrets/new',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationConnectorsNewRoute =
+  AppOrganizationsOrganizationConnectorsNewRouteImport.update({
+    id: '/connectors/new',
+    path: '/connectors/new',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationSecretsSecretIdEditRoute =
+  AppOrganizationsOrganizationSecretsSecretIdEditRouteImport.update({
+    id: '/secrets/$secretId/edit',
+    path: '/secrets/$secretId/edit',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationConnectorsConnectorIdEditRoute =
+  AppOrganizationsOrganizationConnectorsConnectorIdEditRouteImport.update({
+    id: '/connectors/$connectorId/edit',
+    path: '/connectors/$connectorId/edit',
+    getParentRoute: () => AppOrganizationsOrganizationRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute =
+  AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRouteImport.update({
+    id: '/workflows/',
+    path: '/workflows/',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute =
+  AppOrganizationsOrganizationSpacesSpaceSecretsIndexRouteImport.update({
+    id: '/secrets/',
+    path: '/secrets/',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRoute =
+  AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRouteImport.update({
+    id: '/connectors/',
+    path: '/connectors/',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute =
+  AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRouteImport.update({
+    id: '/workflows/$workflowId',
+    path: '/workflows/$workflowId',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute =
+  AppOrganizationsOrganizationSpacesSpaceSecretsNewRouteImport.update({
+    id: '/secrets/new',
+    path: '/secrets/new',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute =
+  AppOrganizationsOrganizationSpacesSpaceConnectorsNewRouteImport.update({
+    id: '/connectors/new',
+    path: '/connectors/new',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute =
+  AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRouteImport.update({
+    id: '/secrets/$secretId/edit',
+    path: '/secrets/$secretId/edit',
+    getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+  } as any)
+const AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute =
+  AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRouteImport.update(
+    {
+      id: '/connectors/$connectorId/edit',
+      path: '/connectors/$connectorId/edit',
+      getParentRoute: () => AppOrganizationsOrganizationSpacesSpaceRoute,
+    } as any,
+  )
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -128,15 +220,27 @@ export interface FileRoutesByFullPath {
   '/auth/create-org': typeof AuthCreateOrgRoute
   '/auth/logout': typeof AuthLogoutRoute
   '/auth/sign-in': typeof AuthSignInRoute
-  '/connectors/new': typeof AppConnectorsNewRoute
-  '/secrets/new': typeof AppSecretsNewRoute
-  '/workflows/$workflowId': typeof AppWorkflowsWorkflowIdRoute
+  '/organizations/$organization': typeof AppOrganizationsOrganizationRouteWithChildren
   '/api/v1/$': typeof ApiV1SplatRoute
-  '/connectors/': typeof AppConnectorsIndexRoute
-  '/secrets/': typeof AppSecretsIndexRoute
-  '/workflows/': typeof AppWorkflowsIndexRoute
-  '/connectors/$connectorId/edit': typeof AppConnectorsConnectorIdEditRoute
-  '/secrets/$secretId/edit': typeof AppSecretsSecretIdEditRoute
+  '/organizations/': typeof AppOrganizationsIndexRoute
+  '/organizations/$organization/': typeof AppOrganizationsOrganizationIndexRoute
+  '/organizations/$organization/connectors/new': typeof AppOrganizationsOrganizationConnectorsNewRoute
+  '/organizations/$organization/secrets/new': typeof AppOrganizationsOrganizationSecretsNewRoute
+  '/organizations/$organization/spaces/$space': typeof AppOrganizationsOrganizationSpacesSpaceRouteWithChildren
+  '/organizations/$organization/workflows/$workflowId': typeof AppOrganizationsOrganizationWorkflowsWorkflowIdRoute
+  '/organizations/$organization/connectors/': typeof AppOrganizationsOrganizationConnectorsIndexRoute
+  '/organizations/$organization/secrets/': typeof AppOrganizationsOrganizationSecretsIndexRoute
+  '/organizations/$organization/workflows/': typeof AppOrganizationsOrganizationWorkflowsIndexRoute
+  '/organizations/$organization/connectors/$connectorId/edit': typeof AppOrganizationsOrganizationConnectorsConnectorIdEditRoute
+  '/organizations/$organization/secrets/$secretId/edit': typeof AppOrganizationsOrganizationSecretsSecretIdEditRoute
+  '/organizations/$organization/spaces/$space/connectors/new': typeof AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute
+  '/organizations/$organization/spaces/$space/secrets/new': typeof AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute
+  '/organizations/$organization/spaces/$space/workflows/$workflowId': typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute
+  '/organizations/$organization/spaces/$space/connectors/': typeof AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRoute
+  '/organizations/$organization/spaces/$space/secrets/': typeof AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute
+  '/organizations/$organization/spaces/$space/workflows/': typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute
+  '/organizations/$organization/spaces/$space/connectors/$connectorId/edit': typeof AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute
+  '/organizations/$organization/spaces/$space/secrets/$secretId/edit': typeof AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute
 }
 export interface FileRoutesByTo {
   '/launch': typeof LaunchRoute
@@ -147,15 +251,26 @@ export interface FileRoutesByTo {
   '/auth/logout': typeof AuthLogoutRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/': typeof AppIndexRoute
-  '/connectors/new': typeof AppConnectorsNewRoute
-  '/secrets/new': typeof AppSecretsNewRoute
-  '/workflows/$workflowId': typeof AppWorkflowsWorkflowIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
-  '/connectors': typeof AppConnectorsIndexRoute
-  '/secrets': typeof AppSecretsIndexRoute
-  '/workflows': typeof AppWorkflowsIndexRoute
-  '/connectors/$connectorId/edit': typeof AppConnectorsConnectorIdEditRoute
-  '/secrets/$secretId/edit': typeof AppSecretsSecretIdEditRoute
+  '/organizations': typeof AppOrganizationsIndexRoute
+  '/organizations/$organization': typeof AppOrganizationsOrganizationIndexRoute
+  '/organizations/$organization/connectors/new': typeof AppOrganizationsOrganizationConnectorsNewRoute
+  '/organizations/$organization/secrets/new': typeof AppOrganizationsOrganizationSecretsNewRoute
+  '/organizations/$organization/spaces/$space': typeof AppOrganizationsOrganizationSpacesSpaceRouteWithChildren
+  '/organizations/$organization/workflows/$workflowId': typeof AppOrganizationsOrganizationWorkflowsWorkflowIdRoute
+  '/organizations/$organization/connectors': typeof AppOrganizationsOrganizationConnectorsIndexRoute
+  '/organizations/$organization/secrets': typeof AppOrganizationsOrganizationSecretsIndexRoute
+  '/organizations/$organization/workflows': typeof AppOrganizationsOrganizationWorkflowsIndexRoute
+  '/organizations/$organization/connectors/$connectorId/edit': typeof AppOrganizationsOrganizationConnectorsConnectorIdEditRoute
+  '/organizations/$organization/secrets/$secretId/edit': typeof AppOrganizationsOrganizationSecretsSecretIdEditRoute
+  '/organizations/$organization/spaces/$space/connectors/new': typeof AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute
+  '/organizations/$organization/spaces/$space/secrets/new': typeof AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute
+  '/organizations/$organization/spaces/$space/workflows/$workflowId': typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute
+  '/organizations/$organization/spaces/$space/connectors': typeof AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRoute
+  '/organizations/$organization/spaces/$space/secrets': typeof AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute
+  '/organizations/$organization/spaces/$space/workflows': typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute
+  '/organizations/$organization/spaces/$space/connectors/$connectorId/edit': typeof AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute
+  '/organizations/$organization/spaces/$space/secrets/$secretId/edit': typeof AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -168,15 +283,27 @@ export interface FileRoutesById {
   '/auth/logout': typeof AuthLogoutRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/_app/': typeof AppIndexRoute
-  '/_app/connectors/new': typeof AppConnectorsNewRoute
-  '/_app/secrets/new': typeof AppSecretsNewRoute
-  '/_app/workflows/$workflowId': typeof AppWorkflowsWorkflowIdRoute
+  '/_app/organizations/$organization': typeof AppOrganizationsOrganizationRouteWithChildren
   '/api/v1/$': typeof ApiV1SplatRoute
-  '/_app/connectors/': typeof AppConnectorsIndexRoute
-  '/_app/secrets/': typeof AppSecretsIndexRoute
-  '/_app/workflows/': typeof AppWorkflowsIndexRoute
-  '/_app/connectors/$connectorId/edit': typeof AppConnectorsConnectorIdEditRoute
-  '/_app/secrets/$secretId/edit': typeof AppSecretsSecretIdEditRoute
+  '/_app/organizations/': typeof AppOrganizationsIndexRoute
+  '/_app/organizations/$organization/': typeof AppOrganizationsOrganizationIndexRoute
+  '/_app/organizations/$organization/connectors/new': typeof AppOrganizationsOrganizationConnectorsNewRoute
+  '/_app/organizations/$organization/secrets/new': typeof AppOrganizationsOrganizationSecretsNewRoute
+  '/_app/organizations/$organization/spaces/$space': typeof AppOrganizationsOrganizationSpacesSpaceRouteWithChildren
+  '/_app/organizations/$organization/workflows/$workflowId': typeof AppOrganizationsOrganizationWorkflowsWorkflowIdRoute
+  '/_app/organizations/$organization/connectors/': typeof AppOrganizationsOrganizationConnectorsIndexRoute
+  '/_app/organizations/$organization/secrets/': typeof AppOrganizationsOrganizationSecretsIndexRoute
+  '/_app/organizations/$organization/workflows/': typeof AppOrganizationsOrganizationWorkflowsIndexRoute
+  '/_app/organizations/$organization/connectors/$connectorId/edit': typeof AppOrganizationsOrganizationConnectorsConnectorIdEditRoute
+  '/_app/organizations/$organization/secrets/$secretId/edit': typeof AppOrganizationsOrganizationSecretsSecretIdEditRoute
+  '/_app/organizations/$organization/spaces/$space/connectors/new': typeof AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute
+  '/_app/organizations/$organization/spaces/$space/secrets/new': typeof AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute
+  '/_app/organizations/$organization/spaces/$space/workflows/$workflowId': typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute
+  '/_app/organizations/$organization/spaces/$space/connectors/': typeof AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRoute
+  '/_app/organizations/$organization/spaces/$space/secrets/': typeof AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute
+  '/_app/organizations/$organization/spaces/$space/workflows/': typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute
+  '/_app/organizations/$organization/spaces/$space/connectors/$connectorId/edit': typeof AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute
+  '/_app/organizations/$organization/spaces/$space/secrets/$secretId/edit': typeof AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -189,15 +316,27 @@ export interface FileRouteTypes {
     | '/auth/create-org'
     | '/auth/logout'
     | '/auth/sign-in'
-    | '/connectors/new'
-    | '/secrets/new'
-    | '/workflows/$workflowId'
+    | '/organizations/$organization'
     | '/api/v1/$'
-    | '/connectors/'
-    | '/secrets/'
-    | '/workflows/'
-    | '/connectors/$connectorId/edit'
-    | '/secrets/$secretId/edit'
+    | '/organizations/'
+    | '/organizations/$organization/'
+    | '/organizations/$organization/connectors/new'
+    | '/organizations/$organization/secrets/new'
+    | '/organizations/$organization/spaces/$space'
+    | '/organizations/$organization/workflows/$workflowId'
+    | '/organizations/$organization/connectors/'
+    | '/organizations/$organization/secrets/'
+    | '/organizations/$organization/workflows/'
+    | '/organizations/$organization/connectors/$connectorId/edit'
+    | '/organizations/$organization/secrets/$secretId/edit'
+    | '/organizations/$organization/spaces/$space/connectors/new'
+    | '/organizations/$organization/spaces/$space/secrets/new'
+    | '/organizations/$organization/spaces/$space/workflows/$workflowId'
+    | '/organizations/$organization/spaces/$space/connectors/'
+    | '/organizations/$organization/spaces/$space/secrets/'
+    | '/organizations/$organization/spaces/$space/workflows/'
+    | '/organizations/$organization/spaces/$space/connectors/$connectorId/edit'
+    | '/organizations/$organization/spaces/$space/secrets/$secretId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/launch'
@@ -208,15 +347,26 @@ export interface FileRouteTypes {
     | '/auth/logout'
     | '/auth/sign-in'
     | '/'
-    | '/connectors/new'
-    | '/secrets/new'
-    | '/workflows/$workflowId'
     | '/api/v1/$'
-    | '/connectors'
-    | '/secrets'
-    | '/workflows'
-    | '/connectors/$connectorId/edit'
-    | '/secrets/$secretId/edit'
+    | '/organizations'
+    | '/organizations/$organization'
+    | '/organizations/$organization/connectors/new'
+    | '/organizations/$organization/secrets/new'
+    | '/organizations/$organization/spaces/$space'
+    | '/organizations/$organization/workflows/$workflowId'
+    | '/organizations/$organization/connectors'
+    | '/organizations/$organization/secrets'
+    | '/organizations/$organization/workflows'
+    | '/organizations/$organization/connectors/$connectorId/edit'
+    | '/organizations/$organization/secrets/$secretId/edit'
+    | '/organizations/$organization/spaces/$space/connectors/new'
+    | '/organizations/$organization/spaces/$space/secrets/new'
+    | '/organizations/$organization/spaces/$space/workflows/$workflowId'
+    | '/organizations/$organization/spaces/$space/connectors'
+    | '/organizations/$organization/spaces/$space/secrets'
+    | '/organizations/$organization/spaces/$space/workflows'
+    | '/organizations/$organization/spaces/$space/connectors/$connectorId/edit'
+    | '/organizations/$organization/spaces/$space/secrets/$secretId/edit'
   id:
     | '__root__'
     | '/_app'
@@ -228,15 +378,27 @@ export interface FileRouteTypes {
     | '/auth/logout'
     | '/auth/sign-in'
     | '/_app/'
-    | '/_app/connectors/new'
-    | '/_app/secrets/new'
-    | '/_app/workflows/$workflowId'
+    | '/_app/organizations/$organization'
     | '/api/v1/$'
-    | '/_app/connectors/'
-    | '/_app/secrets/'
-    | '/_app/workflows/'
-    | '/_app/connectors/$connectorId/edit'
-    | '/_app/secrets/$secretId/edit'
+    | '/_app/organizations/'
+    | '/_app/organizations/$organization/'
+    | '/_app/organizations/$organization/connectors/new'
+    | '/_app/organizations/$organization/secrets/new'
+    | '/_app/organizations/$organization/spaces/$space'
+    | '/_app/organizations/$organization/workflows/$workflowId'
+    | '/_app/organizations/$organization/connectors/'
+    | '/_app/organizations/$organization/secrets/'
+    | '/_app/organizations/$organization/workflows/'
+    | '/_app/organizations/$organization/connectors/$connectorId/edit'
+    | '/_app/organizations/$organization/secrets/$secretId/edit'
+    | '/_app/organizations/$organization/spaces/$space/connectors/new'
+    | '/_app/organizations/$organization/spaces/$space/secrets/new'
+    | '/_app/organizations/$organization/spaces/$space/workflows/$workflowId'
+    | '/_app/organizations/$organization/spaces/$space/connectors/'
+    | '/_app/organizations/$organization/spaces/$space/secrets/'
+    | '/_app/organizations/$organization/spaces/$space/workflows/'
+    | '/_app/organizations/$organization/spaces/$space/connectors/$connectorId/edit'
+    | '/_app/organizations/$organization/spaces/$space/secrets/$secretId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -314,25 +476,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAboutRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/workflows/': {
-      id: '/_app/workflows/'
-      path: '/workflows'
-      fullPath: '/workflows/'
-      preLoaderRoute: typeof AppWorkflowsIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/secrets/': {
-      id: '/_app/secrets/'
-      path: '/secrets'
-      fullPath: '/secrets/'
-      preLoaderRoute: typeof AppSecretsIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/connectors/': {
-      id: '/_app/connectors/'
-      path: '/connectors'
-      fullPath: '/connectors/'
-      preLoaderRoute: typeof AppConnectorsIndexRouteImport
+    '/_app/organizations/': {
+      id: '/_app/organizations/'
+      path: '/organizations'
+      fullPath: '/organizations/'
+      preLoaderRoute: typeof AppOrganizationsIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/api/v1/$': {
@@ -342,70 +490,235 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/workflows/$workflowId': {
-      id: '/_app/workflows/$workflowId'
+    '/_app/organizations/$organization': {
+      id: '/_app/organizations/$organization'
+      path: '/organizations/$organization'
+      fullPath: '/organizations/$organization'
+      preLoaderRoute: typeof AppOrganizationsOrganizationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/organizations/$organization/': {
+      id: '/_app/organizations/$organization/'
+      path: '/'
+      fullPath: '/organizations/$organization/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
+    }
+    '/_app/organizations/$organization/workflows/': {
+      id: '/_app/organizations/$organization/workflows/'
+      path: '/workflows'
+      fullPath: '/organizations/$organization/workflows/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationWorkflowsIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
+    }
+    '/_app/organizations/$organization/secrets/': {
+      id: '/_app/organizations/$organization/secrets/'
+      path: '/secrets'
+      fullPath: '/organizations/$organization/secrets/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSecretsIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
+    }
+    '/_app/organizations/$organization/connectors/': {
+      id: '/_app/organizations/$organization/connectors/'
+      path: '/connectors'
+      fullPath: '/organizations/$organization/connectors/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationConnectorsIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
+    }
+    '/_app/organizations/$organization/workflows/$workflowId': {
+      id: '/_app/organizations/$organization/workflows/$workflowId'
       path: '/workflows/$workflowId'
-      fullPath: '/workflows/$workflowId'
-      preLoaderRoute: typeof AppWorkflowsWorkflowIdRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/organizations/$organization/workflows/$workflowId'
+      preLoaderRoute: typeof AppOrganizationsOrganizationWorkflowsWorkflowIdRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
     }
-    '/_app/secrets/new': {
-      id: '/_app/secrets/new'
+    '/_app/organizations/$organization/spaces/$space': {
+      id: '/_app/organizations/$organization/spaces/$space'
+      path: '/spaces/$space'
+      fullPath: '/organizations/$organization/spaces/$space'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
+    }
+    '/_app/organizations/$organization/secrets/new': {
+      id: '/_app/organizations/$organization/secrets/new'
       path: '/secrets/new'
-      fullPath: '/secrets/new'
-      preLoaderRoute: typeof AppSecretsNewRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/organizations/$organization/secrets/new'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSecretsNewRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
     }
-    '/_app/connectors/new': {
-      id: '/_app/connectors/new'
+    '/_app/organizations/$organization/connectors/new': {
+      id: '/_app/organizations/$organization/connectors/new'
       path: '/connectors/new'
-      fullPath: '/connectors/new'
-      preLoaderRoute: typeof AppConnectorsNewRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/organizations/$organization/connectors/new'
+      preLoaderRoute: typeof AppOrganizationsOrganizationConnectorsNewRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
     }
-    '/_app/secrets/$secretId/edit': {
-      id: '/_app/secrets/$secretId/edit'
+    '/_app/organizations/$organization/secrets/$secretId/edit': {
+      id: '/_app/organizations/$organization/secrets/$secretId/edit'
       path: '/secrets/$secretId/edit'
-      fullPath: '/secrets/$secretId/edit'
-      preLoaderRoute: typeof AppSecretsSecretIdEditRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/organizations/$organization/secrets/$secretId/edit'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSecretsSecretIdEditRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
     }
-    '/_app/connectors/$connectorId/edit': {
-      id: '/_app/connectors/$connectorId/edit'
+    '/_app/organizations/$organization/connectors/$connectorId/edit': {
+      id: '/_app/organizations/$organization/connectors/$connectorId/edit'
       path: '/connectors/$connectorId/edit'
-      fullPath: '/connectors/$connectorId/edit'
-      preLoaderRoute: typeof AppConnectorsConnectorIdEditRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/organizations/$organization/connectors/$connectorId/edit'
+      preLoaderRoute: typeof AppOrganizationsOrganizationConnectorsConnectorIdEditRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/workflows/': {
+      id: '/_app/organizations/$organization/spaces/$space/workflows/'
+      path: '/workflows'
+      fullPath: '/organizations/$organization/spaces/$space/workflows/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/secrets/': {
+      id: '/_app/organizations/$organization/spaces/$space/secrets/'
+      path: '/secrets'
+      fullPath: '/organizations/$organization/spaces/$space/secrets/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/connectors/': {
+      id: '/_app/organizations/$organization/spaces/$space/connectors/'
+      path: '/connectors'
+      fullPath: '/organizations/$organization/spaces/$space/connectors/'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/workflows/$workflowId': {
+      id: '/_app/organizations/$organization/spaces/$space/workflows/$workflowId'
+      path: '/workflows/$workflowId'
+      fullPath: '/organizations/$organization/spaces/$space/workflows/$workflowId'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/secrets/new': {
+      id: '/_app/organizations/$organization/spaces/$space/secrets/new'
+      path: '/secrets/new'
+      fullPath: '/organizations/$organization/spaces/$space/secrets/new'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsNewRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/connectors/new': {
+      id: '/_app/organizations/$organization/spaces/$space/connectors/new'
+      path: '/connectors/new'
+      fullPath: '/organizations/$organization/spaces/$space/connectors/new'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceConnectorsNewRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/secrets/$secretId/edit': {
+      id: '/_app/organizations/$organization/spaces/$space/secrets/$secretId/edit'
+      path: '/secrets/$secretId/edit'
+      fullPath: '/organizations/$organization/spaces/$space/secrets/$secretId/edit'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
+    }
+    '/_app/organizations/$organization/spaces/$space/connectors/$connectorId/edit': {
+      id: '/_app/organizations/$organization/spaces/$space/connectors/$connectorId/edit'
+      path: '/connectors/$connectorId/edit'
+      fullPath: '/organizations/$organization/spaces/$space/connectors/$connectorId/edit'
+      preLoaderRoute: typeof AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRouteImport
+      parentRoute: typeof AppOrganizationsOrganizationSpacesSpaceRoute
     }
   }
 }
+
+interface AppOrganizationsOrganizationSpacesSpaceRouteChildren {
+  AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute: typeof AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute
+  AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute
+  AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute: typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute
+  AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRoute: typeof AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRoute
+  AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute
+  AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute: typeof AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute
+  AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute: typeof AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute
+  AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute: typeof AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute
+}
+
+const AppOrganizationsOrganizationSpacesSpaceRouteChildren: AppOrganizationsOrganizationSpacesSpaceRouteChildren =
+  {
+    AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute:
+      AppOrganizationsOrganizationSpacesSpaceConnectorsNewRoute,
+    AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute:
+      AppOrganizationsOrganizationSpacesSpaceSecretsNewRoute,
+    AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute:
+      AppOrganizationsOrganizationSpacesSpaceWorkflowsWorkflowIdRoute,
+    AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRoute:
+      AppOrganizationsOrganizationSpacesSpaceConnectorsIndexRoute,
+    AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute:
+      AppOrganizationsOrganizationSpacesSpaceSecretsIndexRoute,
+    AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute:
+      AppOrganizationsOrganizationSpacesSpaceWorkflowsIndexRoute,
+    AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute:
+      AppOrganizationsOrganizationSpacesSpaceConnectorsConnectorIdEditRoute,
+    AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute:
+      AppOrganizationsOrganizationSpacesSpaceSecretsSecretIdEditRoute,
+  }
+
+const AppOrganizationsOrganizationSpacesSpaceRouteWithChildren =
+  AppOrganizationsOrganizationSpacesSpaceRoute._addFileChildren(
+    AppOrganizationsOrganizationSpacesSpaceRouteChildren,
+  )
+
+interface AppOrganizationsOrganizationRouteChildren {
+  AppOrganizationsOrganizationIndexRoute: typeof AppOrganizationsOrganizationIndexRoute
+  AppOrganizationsOrganizationConnectorsNewRoute: typeof AppOrganizationsOrganizationConnectorsNewRoute
+  AppOrganizationsOrganizationSecretsNewRoute: typeof AppOrganizationsOrganizationSecretsNewRoute
+  AppOrganizationsOrganizationSpacesSpaceRoute: typeof AppOrganizationsOrganizationSpacesSpaceRouteWithChildren
+  AppOrganizationsOrganizationWorkflowsWorkflowIdRoute: typeof AppOrganizationsOrganizationWorkflowsWorkflowIdRoute
+  AppOrganizationsOrganizationConnectorsIndexRoute: typeof AppOrganizationsOrganizationConnectorsIndexRoute
+  AppOrganizationsOrganizationSecretsIndexRoute: typeof AppOrganizationsOrganizationSecretsIndexRoute
+  AppOrganizationsOrganizationWorkflowsIndexRoute: typeof AppOrganizationsOrganizationWorkflowsIndexRoute
+  AppOrganizationsOrganizationConnectorsConnectorIdEditRoute: typeof AppOrganizationsOrganizationConnectorsConnectorIdEditRoute
+  AppOrganizationsOrganizationSecretsSecretIdEditRoute: typeof AppOrganizationsOrganizationSecretsSecretIdEditRoute
+}
+
+const AppOrganizationsOrganizationRouteChildren: AppOrganizationsOrganizationRouteChildren =
+  {
+    AppOrganizationsOrganizationIndexRoute:
+      AppOrganizationsOrganizationIndexRoute,
+    AppOrganizationsOrganizationConnectorsNewRoute:
+      AppOrganizationsOrganizationConnectorsNewRoute,
+    AppOrganizationsOrganizationSecretsNewRoute:
+      AppOrganizationsOrganizationSecretsNewRoute,
+    AppOrganizationsOrganizationSpacesSpaceRoute:
+      AppOrganizationsOrganizationSpacesSpaceRouteWithChildren,
+    AppOrganizationsOrganizationWorkflowsWorkflowIdRoute:
+      AppOrganizationsOrganizationWorkflowsWorkflowIdRoute,
+    AppOrganizationsOrganizationConnectorsIndexRoute:
+      AppOrganizationsOrganizationConnectorsIndexRoute,
+    AppOrganizationsOrganizationSecretsIndexRoute:
+      AppOrganizationsOrganizationSecretsIndexRoute,
+    AppOrganizationsOrganizationWorkflowsIndexRoute:
+      AppOrganizationsOrganizationWorkflowsIndexRoute,
+    AppOrganizationsOrganizationConnectorsConnectorIdEditRoute:
+      AppOrganizationsOrganizationConnectorsConnectorIdEditRoute,
+    AppOrganizationsOrganizationSecretsSecretIdEditRoute:
+      AppOrganizationsOrganizationSecretsSecretIdEditRoute,
+  }
+
+const AppOrganizationsOrganizationRouteWithChildren =
+  AppOrganizationsOrganizationRoute._addFileChildren(
+    AppOrganizationsOrganizationRouteChildren,
+  )
 
 interface AppRouteChildren {
   AppAboutRoute: typeof AppAboutRoute
   AppImageEditorRoute: typeof AppImageEditorRoute
   AppIndexRoute: typeof AppIndexRoute
-  AppConnectorsNewRoute: typeof AppConnectorsNewRoute
-  AppSecretsNewRoute: typeof AppSecretsNewRoute
-  AppWorkflowsWorkflowIdRoute: typeof AppWorkflowsWorkflowIdRoute
-  AppConnectorsIndexRoute: typeof AppConnectorsIndexRoute
-  AppSecretsIndexRoute: typeof AppSecretsIndexRoute
-  AppWorkflowsIndexRoute: typeof AppWorkflowsIndexRoute
-  AppConnectorsConnectorIdEditRoute: typeof AppConnectorsConnectorIdEditRoute
-  AppSecretsSecretIdEditRoute: typeof AppSecretsSecretIdEditRoute
+  AppOrganizationsOrganizationRoute: typeof AppOrganizationsOrganizationRouteWithChildren
+  AppOrganizationsIndexRoute: typeof AppOrganizationsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAboutRoute: AppAboutRoute,
   AppImageEditorRoute: AppImageEditorRoute,
   AppIndexRoute: AppIndexRoute,
-  AppConnectorsNewRoute: AppConnectorsNewRoute,
-  AppSecretsNewRoute: AppSecretsNewRoute,
-  AppWorkflowsWorkflowIdRoute: AppWorkflowsWorkflowIdRoute,
-  AppConnectorsIndexRoute: AppConnectorsIndexRoute,
-  AppSecretsIndexRoute: AppSecretsIndexRoute,
-  AppWorkflowsIndexRoute: AppWorkflowsIndexRoute,
-  AppConnectorsConnectorIdEditRoute: AppConnectorsConnectorIdEditRoute,
-  AppSecretsSecretIdEditRoute: AppSecretsSecretIdEditRoute,
+  AppOrganizationsOrganizationRoute:
+    AppOrganizationsOrganizationRouteWithChildren,
+  AppOrganizationsIndexRoute: AppOrganizationsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

@@ -141,6 +141,20 @@ row.
   in any released version (GitHub discussion **#605**); needed for
   Next-style modal-permalink slots. Open-ended — gates the "true modal
   slots" endpoint of the permalink work in §8.
+- **ORG-CREATE-PERM — gate org creation server-side.** `PENDING`
+  (BE, user-agreed to fold in). `CreateOrganization`
+  (`api/proto/pivox/api/v1/organizations.proto:61`, POST `/v1/organizations`)
+  has **no `required_permission`** today → effectively open to any
+  authenticated user. Two rules to enforce in the backend: (a) a user who
+  already belongs to ≥1 org **cannot** create another; (b) a notion of
+  "may create an org at all" (access-gated) for the zero-org onboarding
+  case. Also surface a `canCreateOrg` capability (e.g. on `accounts/me`)
+  so the frontend can render forced-create vs no-access states from a real
+  signal. **Frontend interim (this session):** root `/` sends zero-org
+  users to forced create-org; `canCreateOrg` defaults `true`; and the
+  app-shell scope picker's "Create Organization" CTA is removed (the
+  picker only renders for existing members, who by rule (a) can't create).
+  Replace the interim default with the real capability when the BE lands.
 
 ## 4. Tags
 
@@ -241,6 +255,48 @@ row.
   routed pages. Interim is search-param based (`?edit=<slug>` / `?new`);
   **true modal slots are blocked** on TanStack Router parallel routes
   (discussion #605, see §3).
+
+## 8b. Scope-in-URL routing (connectors slice landed)
+
+- **SCOPE-URL-1 — connectors on URL scope.** `RESOLVED (this session)`.
+  `/organizations/$organization[/spaces/$space]/connectors` with membership-
+  guarded `$organization`/`$space` layouts (`notFound()` on a non-member slug),
+  root `/` redirect via `resolveRootTarget`, app-themed `/organizations`
+  selector, org-home stub, cookie→param prefetch flip, and the shell rewired to
+  `AppShellScopePicker` (activeOrg/activeSpace from route params; nav-spaces +
+  Create-CTA removed). Cookie demoted to last-visited hint, now synced to URL.
+- **SCOPE-URL-2 — migrate secrets + workflows onto URL scope.** `PENDING`
+  (next slice). They're intentionally still flat/cookie-scoped. Two transitional
+  regressions were fixed in the shell so they stay coherent meanwhile
+  (`use-app-shell.ts`: sync hint on controlled nav; default in place, don't
+  route). Migrating them **removes the flat routes entirely** and closes the
+  divergence class — do this before adding more flat resources.
+- **TEST-GAP — route/nav wiring had no render tests.** `PARTIAL`. The
+  Connectors nav link shipped pointing at a dead route (derived the active org
+  from a frozen SSR snapshot, not the live cookie) — green typecheck + 587 unit
+  tests missed it because they covered pure logic (resolvers, picker) but NOT
+  the wiring seam. Closed for this case (`use-nav-main.tsx` extracted + tested,
+  regression proven red-on-bug). **Standing rule going forward:** every
+  route/nav/redirect wiring change gets a render/hook test asserting the link
+  resolves to the right scoped route + the guard/redirect fires — write these
+  FIRST for SCOPE-URL-2 (secrets/workflows nav + routes). **Still open:** no
+  automated AUTHED end-to-end test exists (both agents could only `curl`
+  unauth → 307); the authed happy-path is manual-only. Options: Playwright with
+  a seeded KC session, or a jsdom render of the route tree with the auth gate
+  mocked. Build before the flat routes multiply.
+- **SCOPE-URL-3 — routing-slice follow-ups.** `PENDING` (minor):
+  (a) picker's Spaces section is inert on flat routes/Electron — hide it when
+  the shell is uncontrolled (auto-resolves once (2) lands);
+  (b) space-scoped connector `/new` starts the form org-direct — seed the
+  form scope from the `$space` slug (`scoped-connector-form.tsx`); user-visible
+  + correctable today, not a silent wrong-scope write;
+  (c) brief "All spaces" label flash before the spaces query resolves on a
+  space route (`scope-picker.tsx`) — cosmetic;
+  (d) **a11y** — the scope picker's org + space lists are single-select groups
+  rendered as plain `DropdownMenuItem` (role `menuitem`) with a manual
+  `CheckIcon`, so a screen reader doesn't announce the active org/space as
+  selected. Convert to `DropdownMenuRadioGroup`/`RadioItem` (role
+  `menuitemradio` + `aria-checked`) — `scope-picker.tsx`.
 
 ## 9. Workflows (pointer only)
 

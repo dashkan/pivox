@@ -15,6 +15,13 @@ export interface AppShellState {
   orgsLoading: boolean;
   /** Resource name of the active org, e.g. "organizations/acme". */
   activeOrganization: string | null;
+  /**
+   * Resource name of the active space
+   * (e.g. "organizations/acme/spaces/dev"), or null for the org
+   * rollup. Derived from the route's `$space` param by the consumer;
+   * the URL is the source of truth for scope.
+   */
+  activeSpace: string | null;
   spaces: NavSpacesSpace[];
   spacesLoading: boolean;
   navMain: NavMainItem[];
@@ -22,7 +29,18 @@ export interface AppShellState {
 }
 
 export interface AppShellActions {
+  /**
+   * Select an organization. In the web app the consumer wires this to
+   * navigate to the org's scoped home (the URL owns scope) and write
+   * the last-visited cookie; Electron falls back to cookie-only state.
+   */
   setActiveOrganization: (organization: string) => void;
+  /**
+   * Select a space within the active org, or null for the org rollup
+   * ("All spaces"). The consumer wires this to navigate to the scoped
+   * route. No-op when the shell isn't scope-routed (Electron).
+   */
+  selectSpace: (space: string | null) => void;
   /**
    * Navigate to the create-organization flow. Concrete implementation
    * lives in the route layer (`router.navigate({ to: '/auth/create-org' })`).

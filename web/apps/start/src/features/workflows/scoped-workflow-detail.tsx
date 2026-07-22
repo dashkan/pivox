@@ -7,49 +7,34 @@ import { Input } from '@pivox/primitives/input';
 import { Switch } from '@pivox/primitives/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@pivox/primitives/tabs';
 import { Textarea } from '@pivox/primitives/textarea';
-import { useAppShellContext } from '@pivox/ui/app-shell';
 import { actorLabel, AdminNotice, formatTimestamp } from '@pivox/ui/resource-admin';
 import { WorkflowCanvas } from '@pivox/ui/workflow';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
+
 import { useState } from 'react';
 
 import type { ApiClient, components } from '@pivox/client';
 import type { ReactQueryApi } from '@pivox/client/react-query';
 
 import { $api, apiClient } from '@/lib/api-client';
+import { resolveReturnTo } from '@/lib/return-to';
 
 type Workflow = components['schemas']['v1Workflow'];
 type WorkflowVersion = components['schemas']['v1WorkflowVersion'];
 
 const WORKFLOW_PATH = '/v1/organizations/{organization}/workflows/{workflow}' as const;
+const SPACE_WORKFLOW_PATH =
+  '/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}' as const;
 const VERSIONS_PATH =
   '/v1/organizations/{organization}/workflows/{workflow}/versions' as const;
+const SPACE_VERSIONS_PATH =
+  '/v1/organizations/{organization}/spaces/{space}/workflows/{workflow}/versions' as const;
 
-export const Route = createFileRoute('/_app/workflows/$workflowId')({
-  component: WorkflowDetailRoute,
-});
-
-function WorkflowDetailRoute() {
-  const { workflowId } = Route.useParams();
-  const { state } = useAppShellContext();
-  const parent = state.activeOrganization;
-
-  if (!parent) {
-    return (
-      <div className="flex flex-1 flex-col p-6">
-        <AdminNotice>Select an organization to view this workflow.</AdminNotice>
-      </div>
-    );
-  }
-
-  return (
-    <WorkflowDetail
-      $api={$api}
-      apiClient={apiClient}
-      parent={parent}
-      workflowId={workflowId}
-    />
-  );
+/** The scoped workflows LIST path for this route's `?from=` fallback. */
+function scopedWorkflowsListRoute(orgSlug: string, spaceSlug?: string): string {
+  return spaceSlug
+    ? `/organizations/${orgSlug}/spaces/${spaceSlug}/workflows`
+    : `/organizations/${orgSlug}/workflows`;
 }
 
 function versionId(name: string | undefined): string {
@@ -57,29 +42,98 @@ function versionId(name: string | undefined): string {
   return parseResourceName(name).versions ?? '';
 }
 
+/**
+ * Scoped workflow CANVAS DETAIL shell for the URL-scoped route tree. The org (and,
+ * on the space route, the space) come from the route's path params, and the
+ * "← Workflows" back link soft-navigates to the scoped workflows list — honoring
+ * `?from=` (sanitized) so a filtered/sorted list view is preserved on return, else
+ * the scope's list. `spaceSlug` threads into the record/versions/settings queries
+ * so a space-scoped workflow resolves on its own REST path.
+ */
+export function ScopedWorkflowDetail({
+  orgSlug,
+  spaceSlug,
+  workflowId,
+  from,
+}: {
+  orgSlug: string;
+  /** Present on the space-scoped route; absent on the org route. */
+  spaceSlug?: string;
+  workflowId: string;
+  from?: string;
+}) {
+  const router = useRouter();
+  const returnTo = resolveReturnTo(
+    from,
+    scopedWorkflowsListRoute(orgSlug, spaceSlug),
+  );
+
+  return (
+    <WorkflowDetail
+      $api={$api}
+      apiClient={apiClient}
+      parent={`organizations/${orgSlug}`}
+      space={spaceSlug}
+      workflowId={workflowId}
+      back={
+        <a
+          href={returnTo}
+          className="text-sm text-muted-foreground hover:underline"
+          onClick={(e) => {
+            e.preventDefault();
+            router.history.push(returnTo);
+          }}
+        >
+          ← Workflows
+        </a>
+      }
+    />
+  );
+}
+
+/**
+ * The tabbed workflow detail body (definition canvas / versions / settings /
+ * runs). Router-free and `$api`/`apiClient`-injected so it unit-tests without a
+ * router; `ScopedWorkflowDetail` wraps it with the scoped back link.
+ */
 export function WorkflowDetail({
   $api: api,
   apiClient: client,
   parent,
+  space,
   workflowId,
+  back,
 }: {
   $api: ReactQueryApi;
   apiClient: ApiClient;
   parent: string;
+  /** Space slug for a space-scoped workflow; absent = org-direct. */
+  space?: string;
   workflowId: string;
+  back: React.ReactNode;
 }) {
   const organization = organizationId(parent);
-  const workflowQuery = api.useQuery('get', WORKFLOW_PATH, {
-    params: { path: { organization, workflow: workflowId } },
-  });
+  // Both queries are declared (stable hook count); only the one matching the
+  // scope is enabled — the same pattern the list descriptor uses.
+  const orgQuery = api.useQuery(
+    'get',
+    WORKFLOW_PATH,
+    { params: { path: { organization, workflow: workflowId } } },
+    { enabled: !space },
+  );
+  const spaceQuery = api.useQuery(
+    'get',
+    SPACE_WORKFLOW_PATH,
+    { params: { path: { organization, space: space ?? '', workflow: workflowId } } },
+    { enabled: !!space },
+  );
+  const workflowQuery = space ? spaceQuery : orgQuery;
   const workflow = workflowQuery.data;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div className="flex flex-col gap-2">
-        <Link to="/workflows" className="text-sm text-muted-foreground hover:underline">
-          ← Workflows
-        </Link>
+        {back}
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
             {workflow?.displayName || workflowId}
@@ -124,6 +178,7 @@ export function WorkflowDetail({
             <VersionsTab
               $api={api}
               organization={organization}
+              space={space}
               workflowId={workflowId}
               liveVersion={workflow.version}
             />
@@ -133,6 +188,7 @@ export function WorkflowDetail({
             <SettingsForm
               apiClient={client}
               organization={organization}
+              space={space}
               workflowId={workflowId}
               workflow={workflow}
               onSaved={() => {
@@ -177,17 +233,30 @@ function DefinitionCanvas({
 function VersionsTab({
   $api: api,
   organization,
+  space,
   workflowId,
   liveVersion,
 }: {
   $api: ReactQueryApi;
   organization: string;
+  space?: string;
   workflowId: string;
   liveVersion: string | undefined;
 }) {
-  const versionsQuery = api.useQuery('get', VERSIONS_PATH, {
-    params: { path: { organization, workflow: workflowId } },
-  });
+  // Both queries declared (stable hook count); only the scoped one is enabled.
+  const orgVersionsQuery = api.useQuery(
+    'get',
+    VERSIONS_PATH,
+    { params: { path: { organization, workflow: workflowId } } },
+    { enabled: !space },
+  );
+  const spaceVersionsQuery = api.useQuery(
+    'get',
+    SPACE_VERSIONS_PATH,
+    { params: { path: { organization, space: space ?? '', workflow: workflowId } } },
+    { enabled: !!space },
+  );
+  const versionsQuery = space ? spaceVersionsQuery : orgVersionsQuery;
   const versions = versionsQuery.data?.workflowVersions ?? [];
 
   const [selected, setSelected] = useState<string | undefined>(liveVersion);
@@ -245,12 +314,14 @@ function VersionsTab({
 function SettingsForm({
   apiClient: client,
   organization,
+  space,
   workflowId,
   workflow,
   onSaved,
 }: {
   apiClient: ApiClient;
   organization: string;
+  space?: string;
   workflowId: string;
   workflow: Workflow;
   onSaved: () => void;
@@ -265,15 +336,21 @@ function SettingsForm({
     setPending(true);
     setError(null);
     void (async () => {
-      const resp = await client.PATCH(WORKFLOW_PATH, {
-        params: { path: { organization, workflow: workflowId } },
-        body: {
-          displayName,
-          description,
-          enabled,
-          ...(workflow.etag ? { etag: workflow.etag } : {}),
-        },
-      });
+      const body = {
+        displayName,
+        description,
+        enabled,
+        ...(workflow.etag ? { etag: workflow.etag } : {}),
+      };
+      const resp = space
+        ? await client.PATCH(SPACE_WORKFLOW_PATH, {
+            params: { path: { organization, space, workflow: workflowId } },
+            body,
+          })
+        : await client.PATCH(WORKFLOW_PATH, {
+            params: { path: { organization, workflow: workflowId } },
+            body,
+          });
       setPending(false);
       if (resp.error) {
         setError(resp.error.message ?? "Couldn't save changes.");

@@ -40,6 +40,10 @@ export function AppShellFeature({
   navMain,
   initialUser,
   initialActiveOrganization,
+  activeOrganization,
+  activeSpace,
+  onSelectOrganization,
+  onSelectSpace,
   children,
 }: {
   $api: ReactQueryApi;
@@ -62,6 +66,18 @@ export function AppShellFeature({
    * cookie directly.
    */
   initialActiveOrganization?: string | null;
+  /**
+   * CONTROLLED active org (resource name) derived from the route's
+   * `$organization` param — the URL owns scope. Undefined leaves the
+   * shell in the UNCONTROLLED cookie mode (Electron). See useAppShell.
+   */
+  activeOrganization?: string | null;
+  /** CONTROLLED active space (resource name) or null for the org rollup. */
+  activeSpace?: string | null;
+  /** Select-org handler: navigate to the org's scoped home + write the cookie. */
+  onSelectOrganization?: (organization: string) => void;
+  /** Select-space handler (null = org rollup): navigate to the scoped route. */
+  onSelectSpace?: (space: string | null) => void;
   children: React.ReactNode;
 }) {
   const value: AppShellContextValue = useAppShell({
@@ -71,6 +87,10 @@ export function AppShellFeature({
     navMain,
     initialUser,
     initialActiveOrganization,
+    activeOrganization,
+    activeSpace,
+    onSelectOrganization,
+    onSelectSpace,
   });
   return <AppShell.Provider value={value}>{children}</AppShell.Provider>;
 }

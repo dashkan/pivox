@@ -8,8 +8,7 @@ import {
 // are invalidated so the changed row shows on return; the two single-secret
 // DETAIL families are invalidated so a reopened edit form refetches fresh. Each
 // pair is a [method, pathTemplate] openapi-react-query key prefix.
-const SECRET_FORM_NAV: ResourceFormNavConfig = {
-  listRoute: '/secrets',
+const SECRET_FORM_NAV: Omit<ResourceFormNavConfig, 'listRoute'> = {
   listKeys: [
     ['get', '/v1/organizations/{organization}/secrets'],
     ['get', '/v1/organizations/{organization}/spaces/{space}/secrets'],
@@ -23,8 +22,10 @@ const SECRET_FORM_NAV: ResourceFormNavConfig = {
 
 /**
  * Route-owned navigation for a secret form page — a thin wrapper over the generic
- * {@link useResourceFormNav}, mirroring `useConnectorFormNav`.
+ * {@link useResourceFormNav}, mirroring `useConnectorFormNav`. `listRoute`
+ * overrides the `?from=` fallback target so the scope-in-URL routes return to
+ * their own scoped list (org rollup or space) when `?from=` is absent.
  */
-export function useSecretFormNav(from: string | undefined) {
-  return useResourceFormNav(from, SECRET_FORM_NAV);
+export function useSecretFormNav(from: string | undefined, listRoute: string) {
+  return useResourceFormNav(from, { ...SECRET_FORM_NAV, listRoute });
 }

@@ -4,11 +4,13 @@ import type { ListControlsValue } from '@pivox/ui/resource-admin';
 
 /**
  * URL search-param shape for the workflows list — the workflows sibling of
- * `SecretsSearch`, minus the `scope` workflows don't have (ListWorkflows is
- * org-direct only, no space rollup). Short keys keep links tidy; defaults are
- * omitted (see {@link valueToSearch}) so a clean list has a bare `/workflows`
- * URL. This is the single source of the list controls' state — the route owns it;
- * the feature/ui packages consume it controlled.
+ * `SecretsSearch`, minus the `scope` param: workflows scope lives entirely in the
+ * PATH (org route vs `.../spaces/$space/workflows`), so the shell forces it onto
+ * the controls value from the route params rather than a `?scope=` query. Short
+ * keys keep links tidy; defaults are omitted (see {@link valueToSearch}) so a
+ * clean list has a bare `/workflows` URL. This is the single source of the list
+ * controls' state — the route owns it; the feature/ui packages consume it
+ * controlled.
  */
 export interface WorkflowsSearch {
   /** Name substring filter. */
@@ -47,7 +49,8 @@ export function searchToValue(search: WorkflowsSearch): ListControlsValue {
       ? { field: search.sort, direction: search.dir ?? 'asc' }
       : null,
     pageSize: search.size ?? DEFAULT_PAGE_SIZE,
-    // Workflows are org-direct only — the list has no space scope.
+    // Scope is not a search param — the shell forces it from the route's path
+    // param (org route = '', space route = the space slug).
     scope: '',
     pageToken: search.cursor,
   };

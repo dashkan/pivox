@@ -1,33 +1,46 @@
-import { Badge } from '@pivox/primitives/badge';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@pivox/primitives/card';
-import { createFileRoute } from '@tanstack/react-router';
+import { organizationId } from '@pivox/client';
+import { ACTIVE_ORG, storage } from '@pivox/storage';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
-export const Route = createFileRoute('/_app/')({ component: HomePage });
+import { accountOrgsQueryOptions, toScopeOrgs } from '@/lib/orgs-query';
+import { resolveRootTarget } from '@/lib/scope-resolve';
+import { getActiveOrgCookie } from '@/server/prefetch';
 
-function HomePage() {
-  return (
-    <div className="flex flex-1 items-center justify-center p-8">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-2xl">Pivox</CardTitle>
-            <Badge variant="secondary">TanStack Start</Badge>
-          </div>
-          <CardDescription>Observability Platform</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <p className="text-sm text-muted-foreground">
-            Shared UI components working across Next.js, Electron, and TanStack
-            Start.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+/**
+ * App root (`/`). Not a page — a scope router. Reads the caller's orgs (reusing
+ * the SSR-primed entry `_app.tsx` seeded) + the last-visited `ACTIVE_ORG` hint,
+ * then `resolveRootTarget` decides where to land:
+ *
+ *  - org       → that org's home (`/organizations/{slug}`)
+ *  - selector  → the org chooser (`/organizations`)
+ *  - create    → forced onboarding (`/auth/create-org`) for zero-org callers
+ *
+ * The cookie is a hint, never authoritative — a stale value can only demote to
+ * the selector (it's checked against the membership list), never cross into an
+ * org the caller doesn't belong to.
+ */
+export const Route = createFileRoute('/_app/')({
+  beforeLoad: async ({ context }) => {
+    const data = await context.queryClient.ensureQueryData(
+      accountOrgsQueryOptions(),
+    );
+    const orgs = toScopeOrgs(data);
+    // Server pass reads the cookie via the server-fn; client reads it directly.
+    const remembered =
+      typeof window === 'undefined'
+        ? await getActiveOrgCookie()
+        : storage.get(ACTIVE_ORG);
+
+    const target = resolveRootTarget(orgs, remembered);
+    if (target.kind === 'create') {
+      throw redirect({ to: '/auth/create-org' });
+    }
+    if (target.kind === 'selector') {
+      throw redirect({ to: '/organizations' });
+    }
+    throw redirect({
+      to: '/organizations/$organization',
+      params: { organization: organizationId(target.organization) },
+    });
+  },
+});

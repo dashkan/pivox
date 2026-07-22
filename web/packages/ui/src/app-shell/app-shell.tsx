@@ -11,9 +11,8 @@ import * as React from 'react';
 
 import { AppShellContext } from './app-shell.context';
 import { AppShellNavMain } from './nav-main';
-import { AppShellNavSpaces } from './nav-spaces';
 import { AppShellNavUser } from './nav-user';
-import { AppShellOrgPicker } from './org-picker';
+import { AppShellScopePickerConnected } from './scope-picker-connected';
 
 import type { AppShellContextValue } from './app-shell.types';
 
@@ -36,22 +35,22 @@ function AppShellProvider({
 /* ------------------------------------------------------------------ */
 
 /**
- * Pre-composed sidebar: org picker in the header, nav-main + spaces
- * in the content, user menu in the footer. Most consumers want this.
+ * Pre-composed sidebar: scope picker (org + space) in the header,
+ * nav-main in the content, user menu in the footer. Most consumers
+ * want this.
  *
  * For custom composition, drop down to the individual pieces
- * (AppShell.OrgPicker / NavMain / NavSpaces / NavUser) inside your
- * own Sidebar/SidebarHeader/etc.
+ * (AppShell.ScopePicker / NavMain / NavUser) inside your own
+ * Sidebar/SidebarHeader/etc.
  */
 function AppShellSidebar(props: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <AppShellOrgPicker />
+        <AppShellScopePickerConnected />
       </SidebarHeader>
       <SidebarContent>
         <AppShellNavMain />
-        <AppShellNavSpaces />
       </SidebarContent>
       <SidebarFooter>
         <AppShellNavUser />
@@ -68,9 +67,8 @@ function AppShellSidebar(props: React.ComponentProps<typeof Sidebar>) {
 export const AppShell = {
   Provider: AppShellProvider,
   Sidebar: AppShellSidebar,
-  OrgPicker: AppShellOrgPicker,
+  ScopePicker: AppShellScopePickerConnected,
   NavMain: AppShellNavMain,
-  NavSpaces: AppShellNavSpaces,
   NavUser: AppShellNavUser,
   Context: AppShellContext,
 };

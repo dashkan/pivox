@@ -54,7 +54,10 @@ import type {
   SecretsListQuery,
   SecretsListRequest,
 } from '@pivox/features/secrets';
-import type { WorkflowsListQuery } from '@pivox/features/workflows';
+import type {
+  WorkflowsListQuery,
+  WorkflowsListRequest,
+} from '@pivox/features/workflows';
 import type { AgentOption } from '@pivox/ui/resource-admin';
 import type { components } from '@pivox/client/types';
 
@@ -101,26 +104,40 @@ export type PrefetchedConnectors = ConnectorsListRequest & {
 };
 
 /**
- * prefetchConnectors server-fn: reads the active-org cookie, builds the SAME
- * list request the client hook builds (via the shared `buildConnectorsListRequest`),
- * and GETs the org-rollup or space-scoped connectors path per the URL scope.
- * Returns null on any failure — SSR must never throw; the client useQuery
- * retries on hydration.
+ * Input for the connectors prefetch: the org + optional space slug come from the
+ * route's PATH params (the URL owns scope now), and the list controls from its
+ * search params. Replaces the old active-org cookie read.
+ */
+export interface PrefetchConnectorsInput {
+  orgSlug: string;
+  /** Space slug for a space-scoped list; absent = the org rollup. */
+  space?: string;
+  search: ConnectorsSearch;
+}
+
+/**
+ * prefetchConnectors server-fn: takes the org (+ optional space) from the route's
+ * path params and the list controls from its search, builds the SAME list request
+ * the client hook builds (via the shared `buildConnectorsListRequest`), and GETs
+ * the org-rollup or space-scoped connectors path. Returns null on any failure —
+ * SSR must never throw; the client useQuery retries on hydration.
  */
 export const prefetchConnectors = createServerFn({ method: 'GET' })
-  .validator((search: ConnectorsSearch): ConnectorsSearch => search)
+  .validator((input: PrefetchConnectorsInput): PrefetchConnectorsInput => input)
   .handler(async ({ data }): Promise<PrefetchedConnectors | null> => {
     const accessToken = await getSsrAccessToken();
     if (!accessToken) return null;
 
-    const activeOrg = getCookie(ACTIVE_ORG.name);
-    if (!activeOrg) return null;
+    const orgSlug = data.orgSlug;
+    if (!orgSlug) return null;
 
     try {
-      const orgSlug = organizationId(activeOrg);
-      if (!orgSlug) return null;
-
-      const req = buildConnectorsListRequest(orgSlug, searchToValue(data));
+      // Scope comes from the path param, not the search — force it onto the
+      // controls value so the request (and its react-query key) match the route.
+      const req = buildConnectorsListRequest(orgSlug, {
+        ...searchToValue(data.search),
+        scope: data.space ?? '',
+      });
       const client = createServerApiClient(accessToken);
 
       if (req.isSpaceScoped) {
@@ -171,8 +188,9 @@ export const prefetchConnectors = createServerFn({ method: 'GET' })
 /** Wire-shape of a single connector, primed for the routed edit page. */
 export type ConnectorRecord = components['schemas']['v1Connector'];
 
-/** Which connector the edit route wants: its leaf id + optional space slug. */
+/** Which connector the edit route wants: org slug + leaf id + optional space slug. */
 export interface PrefetchConnectorInput {
+  orgSlug: string;
   connectorId: string;
   /** Space slug for a space-scoped connector; absent = org-direct. */
   space?: string;
@@ -192,10 +210,10 @@ export type PrefetchedConnector = {
 } | null;
 
 /**
- * prefetchConnector server-fn: reads the active-org cookie, then GETs the single
- * connector (org-direct or space-scoped per `space`) as the user, mirroring
- * prefetchConnectors for the list. Returns null on any failure — SSR must never
- * throw; the client `useConnectorForm` query retries on hydration.
+ * prefetchConnector server-fn: takes the org slug from the route's path params,
+ * then GETs the single connector (org-direct or space-scoped per `space`) as the
+ * user, mirroring prefetchConnectors for the list. Returns null on any failure —
+ * SSR must never throw; the client `useConnectorForm` query retries on hydration.
  */
 export const prefetchConnector = createServerFn({ method: 'GET' })
   .validator((input: PrefetchConnectorInput): PrefetchConnectorInput => input)
@@ -203,13 +221,10 @@ export const prefetchConnector = createServerFn({ method: 'GET' })
     const accessToken = await getSsrAccessToken();
     if (!accessToken) return null;
 
-    const activeOrg = getCookie(ACTIVE_ORG.name);
-    if (!activeOrg) return null;
+    const orgSlug = data.orgSlug;
+    if (!orgSlug) return null;
 
     try {
-      const orgSlug = organizationId(activeOrg);
-      if (!orgSlug) return null;
-
       const client = createServerApiClient(accessToken);
 
       if (data.space) {
@@ -267,38 +282,41 @@ export interface PrefetchedConnectorAgents {
   options: AgentOption[];
 }
 
+/** Input for prefetchConnectorAgents: the org slug from the route's path params. */
+export interface PrefetchConnectorAgentsInput {
+  orgSlug: string;
+}
+
 /**
- * prefetchConnectorAgents server-fn: reads the active-org cookie itself (rather
- * than taking orgSlug as input) so the connectors loader can run it in parallel
- * with prefetchConnectors instead of waterfalling on that result. Fans out
- * gateways → agents for the active org (via the shared `fetchAgentOptions`) so
- * the page's agent options are SSR-primed and no gateways/agents XHR fires on
- * load. Returns the resolved orgSlug alongside the options so the loader can key
- * the primed data. Null on any failure — the client's composite query then
- * fetches on hydration.
+ * prefetchConnectorAgents server-fn: takes the org slug from the route's path
+ * params so the connectors loader can run it in parallel with prefetchConnectors
+ * instead of waterfalling on that result. Fans out gateways → agents for the org
+ * (via the shared `fetchAgentOptions`) so the page's agent options are SSR-primed
+ * and no gateways/agents XHR fires on load. Returns the orgSlug alongside the
+ * options so the loader can key the primed data. Null on any failure — the
+ * client's composite query then fetches on hydration.
  */
-export const prefetchConnectorAgents = createServerFn({
-  method: 'GET',
-}).handler(async (): Promise<PrefetchedConnectorAgents | null> => {
-  const accessToken = await getSsrAccessToken();
-  if (!accessToken) return null;
+export const prefetchConnectorAgents = createServerFn({ method: 'GET' })
+  .validator(
+    (input: PrefetchConnectorAgentsInput): PrefetchConnectorAgentsInput => input,
+  )
+  .handler(async ({ data }): Promise<PrefetchedConnectorAgents | null> => {
+    const accessToken = await getSsrAccessToken();
+    if (!accessToken) return null;
 
-  const activeOrg = getCookie(ACTIVE_ORG.name);
-  if (!activeOrg) return null;
-
-  try {
-    const orgSlug = organizationId(activeOrg);
+    const orgSlug = data.orgSlug;
     if (!orgSlug) return null;
 
-    const client = createServerApiClient(accessToken);
-    return { orgSlug, options: await fetchAgentOptions(client, orgSlug) };
-  } catch (err) {
-    console.warn('[ssr-prefetch] connector-agents: threw', {
-      message: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
-});
+    try {
+      const client = createServerApiClient(accessToken);
+      return { orgSlug, options: await fetchAgentOptions(client, orgSlug) };
+    } catch (err) {
+      console.warn('[ssr-prefetch] connector-agents: threw', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  });
 
 /** Slim wire-shape of the secrets list responses (org rollup + space). */
 export type ListSecretsResponse =
@@ -324,26 +342,41 @@ export type PrefetchedSecrets = SecretsListRequest & {
 };
 
 /**
- * prefetchSecrets server-fn: reads the active-org cookie, builds the SAME list
+ * Input for the secrets prefetch: the org + optional space slug come from the
+ * route's PATH params (the URL owns scope now), and the list controls from its
+ * search params. Replaces the old active-org cookie read — the secret twin of
+ * PrefetchConnectorsInput.
+ */
+export interface PrefetchSecretsInput {
+  orgSlug: string;
+  /** Space slug for a space-scoped list; absent = the org rollup. */
+  space?: string;
+  search: SecretsSearch;
+}
+
+/**
+ * prefetchSecrets server-fn: takes the org (+ optional space) from the route's
+ * path params and the list controls from its search, builds the SAME list
  * request the client hook builds (via the shared `buildSecretsListRequest`), and
- * GETs the org-rollup or space-scoped secrets path per the URL scope. Returns
- * null on any failure — SSR must never throw; the client useQuery retries on
- * hydration.
+ * GETs the org-rollup or space-scoped secrets path. Returns null on any failure —
+ * SSR must never throw; the client useQuery retries on hydration.
  */
 export const prefetchSecrets = createServerFn({ method: 'GET' })
-  .validator((search: SecretsSearch): SecretsSearch => search)
+  .validator((input: PrefetchSecretsInput): PrefetchSecretsInput => input)
   .handler(async ({ data }): Promise<PrefetchedSecrets | null> => {
     const accessToken = await getSsrAccessToken();
     if (!accessToken) return null;
 
-    const activeOrg = getCookie(ACTIVE_ORG.name);
-    if (!activeOrg) return null;
+    const orgSlug = data.orgSlug;
+    if (!orgSlug) return null;
 
     try {
-      const orgSlug = organizationId(activeOrg);
-      if (!orgSlug) return null;
-
-      const req = buildSecretsListRequest(orgSlug, secretsSearchToValue(data));
+      // Scope comes from the path param, not the search — force it onto the
+      // controls value so the request (and its react-query key) match the route.
+      const req = buildSecretsListRequest(orgSlug, {
+        ...secretsSearchToValue(data.search),
+        scope: data.space ?? '',
+      });
       const client = createServerApiClient(accessToken);
 
       if (req.isSpaceScoped) {
@@ -394,8 +427,9 @@ export const prefetchSecrets = createServerFn({ method: 'GET' })
 /** Wire-shape of a single secret, primed for the routed edit page. */
 export type SecretRecord = components['schemas']['v1Secret'];
 
-/** Which secret the edit route wants: its leaf id + optional space slug. */
+/** Which secret the edit route wants: org slug + leaf id + optional space slug. */
 export interface PrefetchSecretInput {
+  orgSlug: string;
   secretId: string;
   /** Space slug for a space-scoped secret; absent = org-direct. */
   space?: string;
@@ -415,10 +449,10 @@ export type PrefetchedSecret = {
 } | null;
 
 /**
- * prefetchSecret server-fn: reads the active-org cookie, then GETs the single
- * secret (org-direct or space-scoped per `space`) as the user, mirroring
- * prefetchConnector. The value is INPUT_ONLY and never returned, so the primed
- * record is metadata only. Returns null on any failure.
+ * prefetchSecret server-fn: takes the org slug from the route's path params, then
+ * GETs the single secret (org-direct or space-scoped per `space`) as the user,
+ * mirroring prefetchConnector. The value is INPUT_ONLY and never returned, so the
+ * primed record is metadata only. Returns null on any failure.
  */
 export const prefetchSecret = createServerFn({ method: 'GET' })
   .validator((input: PrefetchSecretInput): PrefetchSecretInput => input)
@@ -426,13 +460,10 @@ export const prefetchSecret = createServerFn({ method: 'GET' })
     const accessToken = await getSsrAccessToken();
     if (!accessToken) return null;
 
-    const activeOrg = getCookie(ACTIVE_ORG.name);
-    if (!activeOrg) return null;
+    const orgSlug = data.orgSlug;
+    if (!orgSlug) return null;
 
     try {
-      const orgSlug = organizationId(activeOrg);
-      if (!orgSlug) return null;
-
       const client = createServerApiClient(accessToken);
 
       if (data.space) {
@@ -484,46 +515,83 @@ export const prefetchSecret = createServerFn({ method: 'GET' })
     }
   });
 
-/** Slim wire-shape of the workflows list response (org-direct only). */
+/** Slim wire-shape of the workflows list responses (org + space). */
 export type ListWorkflowsResponse =
   components['schemas']['v1ListWorkflowsResponse'];
 
 const WORKFLOWS_PATH = '/v1/organizations/{organization}/workflows' as const;
+const SPACE_WORKFLOWS_PATH =
+  '/v1/organizations/{organization}/spaces/{space}/workflows' as const;
 
 /**
- * Result of prefetchWorkflows. Carries the org slug + built query so the loader
- * can reproduce the exact react-query key (via `$api.queryOptions`) the client
- * hook uses — the byte-identical key is what makes the primed rows hydrate
- * instead of silently refetching. Workflows are org-direct only, so there is no
- * space-scope variant. Null whenever SSR can't fetch.
+ * Result of prefetchWorkflows. Carries the built request so the loader can
+ * reproduce the exact react-query key (via `$api.queryOptions`) the client hook
+ * uses — the byte-identical key is what makes the primed rows hydrate instead of
+ * silently refetching. The workflow twin of PrefetchedSecrets. Null whenever SSR
+ * can't fetch.
  */
-export type PrefetchedWorkflows = {
+export type PrefetchedWorkflows = WorkflowsListRequest & {
   orgSlug: string;
   query: WorkflowsListQuery;
   workflows: ListWorkflowsResponse;
 };
 
 /**
- * prefetchWorkflows server-fn: reads the active-org cookie, builds the SAME list
- * request the client hook builds (via the shared `buildWorkflowsListRequest`),
- * and GETs the org-direct workflows path. Returns null on any failure — SSR must
- * never throw; the client useQuery retries on hydration.
+ * Input for the workflows prefetch: the org + optional space slug come from the
+ * route's PATH params (the URL owns scope), and the list controls from its search.
+ * The workflow twin of PrefetchSecretsInput.
+ */
+export interface PrefetchWorkflowsInput {
+  orgSlug: string;
+  /** Space slug for a space-scoped list; absent = the org list. */
+  space?: string;
+  search: WorkflowsSearch;
+}
+
+/**
+ * prefetchWorkflows server-fn: takes the org (+ optional space) from the route's
+ * path params and the list controls from its search, builds the SAME list request
+ * the client hook builds (via the shared `buildWorkflowsListRequest`), and GETs the
+ * org or space-scoped workflows path. Returns null on any failure — SSR must never
+ * throw; the client useQuery retries on hydration.
  */
 export const prefetchWorkflows = createServerFn({ method: 'GET' })
-  .validator((search: WorkflowsSearch): WorkflowsSearch => search)
+  .validator((input: PrefetchWorkflowsInput): PrefetchWorkflowsInput => input)
   .handler(async ({ data }): Promise<PrefetchedWorkflows | null> => {
     const accessToken = await getSsrAccessToken();
     if (!accessToken) return null;
 
-    const activeOrg = getCookie(ACTIVE_ORG.name);
-    if (!activeOrg) return null;
+    const orgSlug = data.orgSlug;
+    if (!orgSlug) return null;
 
     try {
-      const orgSlug = organizationId(activeOrg);
-      if (!orgSlug) return null;
-
-      const req = buildWorkflowsListRequest(orgSlug, workflowsSearchToValue(data));
+      // Scope comes from the path param, not the search — force it onto the
+      // controls value so the request (and its react-query key) match the route.
+      const req = buildWorkflowsListRequest(orgSlug, {
+        ...workflowsSearchToValue(data.search),
+        scope: data.space ?? '',
+      });
       const client = createServerApiClient(accessToken);
+
+      if (req.isSpaceScoped) {
+        const { data: body, response } = await client.GET(SPACE_WORKFLOWS_PATH, {
+          params: { path: req.pathParams, query: req.query },
+        });
+        if (!body) {
+          console.warn('[ssr-prefetch] workflows: space non-2xx or empty', {
+            status: response.status,
+            orgSlug,
+          });
+          return null;
+        }
+        return {
+          orgSlug,
+          isSpaceScoped: true,
+          pathParams: req.pathParams,
+          query: req.query,
+          workflows: body,
+        };
+      }
 
       const { data: body, response } = await client.GET(WORKFLOWS_PATH, {
         params: { path: { organization: orgSlug }, query: req.query },
@@ -535,9 +603,52 @@ export const prefetchWorkflows = createServerFn({ method: 'GET' })
         });
         return null;
       }
-      return { orgSlug, query: req.query, workflows: body };
+      return {
+        orgSlug,
+        isSpaceScoped: false,
+        pathParams: req.pathParams,
+        query: req.query,
+        workflows: body,
+      };
     } catch (err) {
       console.warn('[ssr-prefetch] workflows: threw', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  });
+
+/**
+ * prefetchSpacesForOrg server-fn: fetches `/v1/organizations/{org}/spaces` for an
+ * ARBITRARY org slug (from the route's path param), so the `spaces/$space` layout
+ * can prime + validate the space on the SSR pass. The active-org twin
+ * (`prefetchSpacesForActiveOrg`) reads the cookie; this one takes the org from the
+ * URL — the source of truth for scope. Returns the spaces body on success, null
+ * on any failure (SSR must never throw; the client ensureQueryData retries).
+ */
+export const prefetchSpacesForOrg = createServerFn({ method: 'GET' })
+  .validator((input: { orgSlug: string }): { orgSlug: string } => input)
+  .handler(async ({ data }): Promise<ListSpacesResponse | null> => {
+    const accessToken = await getSsrAccessToken();
+    if (!accessToken) return null;
+    if (!data.orgSlug) return null;
+
+    try {
+      const client = createServerApiClient(accessToken);
+      const { data: body, response } = await client.GET(
+        '/v1/organizations/{organization}/spaces',
+        { params: { path: { organization: data.orgSlug } } },
+      );
+      if (!body) {
+        console.warn('[ssr-prefetch] spaces-for-org: gateway non-2xx or empty', {
+          status: response.status,
+          orgSlug: data.orgSlug,
+        });
+        return null;
+      }
+      return body;
+    } catch (err) {
+      console.warn('[ssr-prefetch] spaces-for-org: threw', {
         message: err instanceof Error ? err.message : String(err),
       });
       return null;
