@@ -53,6 +53,14 @@ type Transpiler struct {
 	filter   *ResourceFilter
 	args     []any
 	startIdx int // offset for $N placeholders (1-based)
+	// exclude, when non-empty, is the AIP field id whose OWN comparisons are
+	// dropped from the output (each replaced by the neutral `TRUE`). It powers
+	// self-excluding facets: a facet on an actively-filtered field is computed
+	// with its own predicate removed so its sibling values stay visible. Only
+	// the field's direct comparisons are dropped — every OTHER predicate (and
+	// its bound operand) is preserved, so numbering stays aligned because the
+	// dropped comparison never appends an arg.
+	exclude string
 }
 
 // Transpile converts an AIP-160 filter string into a parameterized SQL WHERE clause.
@@ -63,6 +71,14 @@ type Transpiler struct {
 // requiring them to be pre-declared. The transpiler handles unknown identifiers
 // as bare literal values.
 func Transpile(rf *ResourceFilter, filterStr string, startIdx int) (*WhereClause, error) {
+	return TranspileExcluding(rf, filterStr, startIdx, "")
+}
+
+// TranspileExcluding is Transpile with self-exclusion: excludeField (an AIP
+// field id, "" to disable) has its own comparisons dropped from the output,
+// each replaced by the neutral `TRUE`. Used to compute a self-excluding facet's
+// buckets over "every other filter but not this facet's own" (see FacetSpec.SelfExcluding).
+func TranspileExcluding(rf *ResourceFilter, filterStr string, startIdx int, excludeField string) (*WhereClause, error) {
 	if filterStr == "" {
 		return &WhereClause{}, nil
 	}
@@ -84,6 +100,7 @@ func Transpile(rf *ResourceFilter, filterStr string, startIdx int) (*WhereClause
 	t := &Transpiler{
 		filter:   rf,
 		startIdx: startIdx,
+		exclude:  excludeField,
 	}
 
 	sql, err := t.transpileExpr(root)
@@ -180,6 +197,13 @@ func (t *Transpiler) transpileComparison(call *expr.Expr_Call, op string) (strin
 	lhs := args[0]
 	rhs := args[1]
 
+	// Self-exclusion: a comparison on the excluded facet field is dropped
+	// (replaced by the neutral TRUE) so the facet's siblings still show. No arg
+	// is appended, keeping placeholder numbering aligned for the rest.
+	if t.isExcluded(lhs) {
+		return "TRUE", nil
+	}
+
 	// Resolve the left-hand side to a column.
 	column, fm, err := t.resolveField(lhs)
 	if err != nil {
@@ -220,6 +244,10 @@ func (t *Transpiler) transpileHas(call *expr.Expr_Call) (string, error) {
 
 	lhs := args[0]
 	rhs := args[1]
+
+	if t.isExcluded(lhs) {
+		return "TRUE", nil
+	}
 
 	// Check if the left side is a select expression (labels.key).
 	if sel, ok := lhs.GetExprKind().(*expr.Expr_SelectExpr); ok {
@@ -331,6 +359,17 @@ func (t *Transpiler) transpileSelect(sel *expr.Expr_Select) (string, error) {
 	}
 	// e.g. labels->>$N
 	return fmt.Sprintf("%s->>%s", fm.Column, keyParam), nil
+}
+
+// isExcluded reports whether e is a direct reference to the self-excluded facet
+// field (an ident whose name equals t.exclude). Only bare-ident LHSs are
+// excluded; JSONB traversals (labels.key) are not facetable and never match.
+func (t *Transpiler) isExcluded(e *expr.Expr) bool {
+	if t.exclude == "" {
+		return false
+	}
+	id, ok := e.GetExprKind().(*expr.Expr_IdentExpr)
+	return ok && id.IdentExpr.GetName() == t.exclude
 }
 
 // resolveField extracts the column name and FilterableField from an expression.

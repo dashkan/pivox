@@ -56,6 +56,22 @@
     # on the file-level header for the rest.
     - 'core::0192::has-comments'
 - included_paths:
+    - 'api/proto/pivox/workflows/v1/connector.proto'
+  # ListConnectors carries the List-tier faceting contract
+  # (docs/search-faceting-design.md): the request adds `repeated string
+  # aggs` (opt-in terms facets, each `field` or `field:size` — a scalar
+  # repeated field so grpc-gateway can bind it to GET query params),
+  # and the response adds `total_count`, `total_is_estimate`, a
+  # `map<string, FacetResult> facets`, and the legacy `agents_in_use`.
+  # None are in AIP-132's fixed request/response field allowlist, which
+  # predates faceting, so the unknown-fields rules fire on every one.
+  # The contract is deliberate and shared across every faceted List;
+  # suppress the two rules for this file rather than fight a spec that
+  # has no faceting concept.
+  disabled_rules:
+    - 'core::0132::request-unknown-fields'
+    - 'core::0132::response-unknown-fields'
+- included_paths:
     - 'api/proto/pivox/api/v1/watch.proto'
   disabled_rules:
     - 'all'

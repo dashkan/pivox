@@ -119,12 +119,24 @@ message SearchAssetsRequest {
 }
 ```
 
-**Same contract on `List`.** `List*` requests carry the same
-`repeated pivox.type.AggSpec aggs` (only the `terms` kind, backed by PG) and
-return the same `map<string,FacetResult> facets` + `total_count`. So a facet
-renders identically whether it came from a `List` (PG terms) or a `Search`
-(OpenSearch) response — the frontend Grid consumes one shape. The tiers differ
-only in supported agg kinds + backing, not in the wire contract.
+**The two tiers split on the REQUEST, share the RESPONSE.** They differ in how a
+caller *asks* for aggs, because their transports differ:
+
+- **`List*` (AIP-132 GET)** carries `repeated string aggs`, each element
+  `field` or `field:size` — terms-only, backed by PG. It is a scalar-repeated
+  field on purpose: grpc-gateway can bind `repeated string` (but **not** a
+  `repeated message`) to URL query params, and REST is the only transport the
+  web app uses. Every `List` terms facet is multi-select self-excluding; there
+  is no per-agg flag in the string form.
+- **`Search*` (AIP-136 POST `…:search`)** carries the structured
+  `repeated pivox.type.AggSpec aggs` below in its request **body** (no query-param
+  binding constraint), where the extra kinds (date-histogram, range) and per-agg
+  flags earn their keep.
+
+Both tiers return the **same** `map<string,FacetResult> facets` + `total_count`
++ `total_is_estimate`, so a facet renders identically whether it came from a
+`List` (PG terms) or a `Search` (OpenSearch) response — the frontend Grid
+consumes one response shape regardless of tier.
 
 ### Agg types (all native to OpenSearch)
 terms, date_histogram, numeric histogram, range, and basic metrics

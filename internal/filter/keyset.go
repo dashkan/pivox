@@ -167,6 +167,62 @@ type ListQuery struct {
 	ShowDeleted bool
 }
 
+// buildScopeConditions assembles the ANDed WHERE predicates shared by the
+// keyset list, the total-count query, and the terms-facet queries: the
+// resource soft-delete guard, the handler's base scope, the resource's default
+// conditions, and the transpiled AIP-160 filter. Placeholders are numbered from
+// $1 in emission order (base → default → filter); the returned args align with
+// them. excludeFilterField, when non-empty, drops that field's own comparisons
+// from the transpiled filter (self-excluding facets) — the dropped comparison
+// binds no arg, so numbering stays aligned.
+//
+// It is the single source of truth for the base+filter predicate set: the list
+// query appends its cursor/limit after these, and the facet queries append
+// their GROUP BY after them, so neither can drift from the other.
+func buildScopeConditions(q ListQuery, excludeFilterField string) ([]string, []any, error) {
+	var (
+		conditions []string
+		args       []any
+	)
+
+	// Soft-delete filter — resource-level: exclude soft-deleted rows unless the
+	// caller passes ShowDeleted. It is a no-arg literal predicate, so it never
+	// consumes a $N placeholder. Only fires for a resource whose table actually
+	// has a delete_time column (SoftDelete set).
+	if q.Resource.SoftDelete && !q.ShowDeleted {
+		conditions = append(conditions, "delete_time IS NULL")
+	}
+
+	// Base scope — always first, so filter params never collide with it.
+	for _, p := range q.Base {
+		args = append(args, p.Arg)
+		conditions = append(conditions, fmt.Sprintf(p.SQL, fmt.Sprintf("$%d", len(args))))
+	}
+
+	// Resource-level default conditions — server-declared predicates ALWAYS
+	// applied, even when the client sends no filter. Each carries exactly one
+	// %s / one bound Arg, so numbering stays aligned. Inert (nil) when none.
+	for _, p := range q.Resource.DefaultConditions {
+		args = append(args, p.Arg)
+		conditions = append(conditions, fmt.Sprintf(p.SQL, fmt.Sprintf("$%d", len(args))))
+	}
+
+	// AIP-160 filter, transpiled to a parameterized WHERE fragment. startIdx is
+	// the next free placeholder index.
+	if strings.TrimSpace(q.Filter) != "" {
+		wc, err := TranspileExcluding(q.Resource, q.Filter, len(args)+1, excludeFilterField)
+		if err != nil {
+			return nil, nil, err
+		}
+		if wc.SQL != "" {
+			conditions = append(conditions, wc.SQL)
+			args = append(args, wc.Args...)
+		}
+	}
+
+	return conditions, args, nil
+}
+
 // BuildListQuery assembles the parameterized SQL and args for a keyset list.
 // The returned SQL selects `*` (the caller scans with a resource Scan helper)
 // and over-fetches by one row (LIMIT PageSize+1) so the caller can detect a
@@ -182,48 +238,13 @@ func BuildListQuery(q ListQuery) (string, []any, error) {
 		return "", nil, fmt.Errorf("filter: ListQuery.Resource is required")
 	}
 
-	var (
-		conditions []string
-		args       []any
-	)
-
-	// Soft-delete filter — resource-level: exclude soft-deleted rows unless the
-	// caller passes ShowDeleted. It is a
-	// no-arg literal predicate, so it never consumes a $N placeholder and leaves
-	// the base/filter/cursor numbering below untouched. Only fires for a resource
-	// whose table actually has a delete_time column (SoftDelete set).
-	if q.Resource.SoftDelete && !q.ShowDeleted {
-		conditions = append(conditions, "delete_time IS NULL")
-	}
-
-	// Base scope — always first, so filter params never collide with it.
-	for _, p := range q.Base {
-		args = append(args, p.Arg)
-		conditions = append(conditions, fmt.Sprintf(p.SQL, fmt.Sprintf("$%d", len(args))))
-	}
-
-	// Resource-level default conditions — server-declared predicates ALWAYS
-	// applied, even when the client sends no filter (e.g. a resource that hides
-	// archived rows by default). They compose with the base scope + soft-delete +
-	// client filter as ANDed conditions; like the base scope, each carries
-	// exactly one %s / one bound Arg, so numbering stays aligned. Inert (nil) for
-	// a resource that declares none.
-	for _, p := range q.Resource.DefaultConditions {
-		args = append(args, p.Arg)
-		conditions = append(conditions, fmt.Sprintf(p.SQL, fmt.Sprintf("$%d", len(args))))
-	}
-
-	// AIP-160 filter, transpiled to a parameterized WHERE fragment. startIdx is
-	// the next free placeholder index.
-	if strings.TrimSpace(q.Filter) != "" {
-		wc, err := Transpile(q.Resource, q.Filter, len(args)+1)
-		if err != nil {
-			return "", nil, err
-		}
-		if wc.SQL != "" {
-			conditions = append(conditions, wc.SQL)
-			args = append(args, wc.Args...)
-		}
+	// Soft-delete + base scope + default conditions + AIP filter — the same
+	// predicate set the facet/count queries operate over, built once here so the
+	// two paths never drift. Cursor + limit are keyset-list-only and appended
+	// after, continuing the placeholder numbering.
+	conditions, args, err := buildScopeConditions(q, "")
+	if err != nil {
+		return "", nil, err
 	}
 
 	// Keyset cursor. For id-only ordering, a scalar `id <op> $n`. For a custom

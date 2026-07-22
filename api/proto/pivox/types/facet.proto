@@ -1,0 +1,58 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+package pivox.types;
+
+option go_package = "pivox/types;typespb";
+
+// Faceting / aggregation contract shared across every List* and Search* RPC.
+//
+// These live in `pivox.types` (unversioned — the same shared-infrastructure
+// namespace as Actor) so a facet renders identically whether it came from a
+// Postgres-backed List response (terms only) or a search-engine-backed Search
+// response (the full agg set). The tiers differ only in supported agg kinds and
+// backing, never in the wire shape. See docs/search-faceting-design.md.
+
+// FacetBucket is one aggregation bucket. `key` identifies a terms bucket (a
+// column value); `from`/`to` identify a range or date-histogram bin (unused by
+// the List terms tier). Buckets are returned in an ordered list, not a map,
+// because their order is meaningful (count-desc for terms) and range/histogram
+// bins have no scalar identity to key on.
+message FacetBucket {
+  // The bucket's scalar identity for a terms agg (the column value). Empty for
+  // range / date-histogram buckets, which identify via from/to.
+  string key = 1;
+
+  // The number of matching rows in this bucket.
+  int64 count = 2;
+
+  // Inclusive lower bound for a range / date-histogram bucket (number or
+  // RFC3339). Empty for terms buckets.
+  string from = 3;
+
+  // Exclusive upper bound for a range / date-histogram bucket (number or
+  // RFC3339). Empty for terms buckets.
+  string to = 4;
+}
+
+// FacetResult is the ordered bucket list for one facet. It is a message wrapper
+// (not a bare repeated field) because proto forbids `map<string, repeated ...>`
+// — the response keys facets by name into a `map<string, FacetResult>`.
+message FacetResult {
+  // The facet's buckets, ordered (count-desc for terms).
+  repeated FacetBucket buckets = 1;
+}

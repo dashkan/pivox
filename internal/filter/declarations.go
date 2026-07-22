@@ -25,6 +25,17 @@ type SortableField struct {
 	Type *expr.Type
 }
 
+// FacetableField whitelists a field for terms faceting (GROUP BY over the
+// scoped+filtered set). Column is a FIXED, server-controlled SQL column or
+// expression — never request input — exactly like SortableField.Column: the
+// faceting engine emits it verbatim into GROUP BY / GROUPING SETS, so it is the
+// injection boundary. Only fields declared here can be aggregated; a request
+// naming an undeclared field is rejected (InvalidArgument). See
+// docs/search-faceting-design.md §2.
+type FacetableField struct {
+	Column string
+}
+
 // ResourceFilter holds per-resource metadata needed to translate AIP-132/160
 // List RPC inputs into a pgx query. Filter and sort surfaces are declared
 // independently: a field may be filterable only, sortable only, both, or
@@ -32,6 +43,11 @@ type SortableField struct {
 type ResourceFilter struct {
 	Filterable map[string]FilterableField
 	Sortable   map[string]SortableField
+	// Facetable whitelists the fields a List request may terms-facet via its
+	// `aggs`. Independent of Filterable/Sortable: a field may be facetable
+	// without being sortable and vice versa. Nil → the resource exposes no
+	// facets (every `aggs` entry is rejected). Consumed by ComputeFacets.
+	Facetable  map[string]FacetableField
 	Table      string // SQL table name
 	SoftDelete bool   // if true, adds "delete_time IS NULL"
 
@@ -336,6 +352,17 @@ func ConnectorFilter() *ResourceFilter {
 			"displayName": {Column: "display_name", Type: filtering.TypeString},
 			"createTime":  {Column: "create_time", Type: filtering.TypeTimestamp},
 			"updateTime":  {Column: "update_time", Type: filtering.TypeTimestamp},
+		},
+		// Terms-facetable fields. `agent` is the "agents in use" case done as a
+		// real facet (buckets = distinct agent values with counts, self-excludable
+		// so an agent filter still lists sibling agents). `space` buckets an
+		// org-level rollup by space_id (connectors-per-space); its keys are space
+		// uuids ("" for org-direct rows), which the frontend resolves to slugs the
+		// same way it resolves resource names. Connectors have no `state` column,
+		// so no state facet.
+		Facetable: map[string]FacetableField{
+			"agent": {Column: "agent"},
+			"space": {Column: "space_id"},
 		},
 		Table:         "connectors",
 		SoftDelete:    false, // connectors hard-delete; no delete_time column

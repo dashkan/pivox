@@ -10,8 +10,11 @@ package connectors
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -187,14 +190,18 @@ func (s *ConnectorsServer) ListConnectors(ctx context.Context, req *workflowsv1.
 	if spaceID.Valid {
 		base = append(base, filter.Predicate{SQL: "space_id = %s", Arg: spaceID})
 	}
-	sql, args, err := filter.BuildListQuery(filter.ListQuery{
+	// One ListQuery drives both the page (BuildListQuery) and the facets/
+	// total_count (ComputeFacets), so they share an identical base scope + filter
+	// and can never diverge.
+	lq := filter.ListQuery{
 		Resource: rf,
 		Base:     base,
 		Filter:   req.GetFilter(),
 		Order:    plan,
 		PageSize: pageSize,
 		Cursor:   cursor,
-	})
+	}
+	sql, args, err := filter.BuildListQuery(lq)
 	if err != nil {
 		// The only error source is the filter transpiler (bad user filter, e.g.
 		// an unknown field) — surface it as InvalidArgument on "filter".
@@ -271,11 +278,108 @@ func (s *ConnectorsServer) ListConnectors(ctx context.Context, req *workflowsv1.
 	if err != nil {
 		return nil, apierr.Internal(err, "list agents in use")
 	}
-	return &workflowsv1.ListConnectorsResponse{
+
+	resp := &workflowsv1.ListConnectorsResponse{
 		Connectors:    out,
 		NextPageToken: nextPageToken,
 		AgentsInUse:   agents,
-	}, nil
+	}
+
+	// Opt-in terms facets + exact total_count over the base scope + filter, in
+	// one live Postgres pass. Skipped entirely (zero cost) when the request
+	// carries no aggs. Every facet field is validated against the Facetable
+	// allowlist inside ComputeFacets; an unknown field is the caller's error.
+	if aggs := req.GetAggs(); len(aggs) > 0 {
+		specs, err := parseFacetAggs(aggs)
+		if err != nil {
+			return nil, err
+		}
+		total, facets, err := filter.ComputeFacets(ctx, s.pool, lq, specs)
+		if err != nil {
+			if errors.Is(err, filter.ErrUnknownFacetField) {
+				return nil, apierr.InvalidArgument(apierr.FieldViolation("aggs", err.Error()))
+			}
+			return nil, apierr.Internal(err, "compute connector facets")
+		}
+		resp.TotalCount = total
+		resp.TotalIsEstimate = false // List tier: exact COUNT.
+		resp.Facets = facetsToProto(facets)
+	}
+
+	return resp, nil
+}
+
+// maxFacetAggs caps how many aggregations one List request may ask for. The
+// valid count is naturally bounded by the resource's Facetable allowlist (dup
+// and unknown fields are rejected), but this clamps parse-time allocation and
+// the downstream per-facet DB-scan multiplier by contract — before either
+// check runs — rather than relying on the edge's URL-length limit.
+const maxFacetAggs = 16
+
+// parseFacetAggs converts the List request's `aggs` strings into engine
+// FacetSpecs. Each element is `field` or `field:size`: `field` names a terms
+// facet and the optional `size` caps its top-N buckets. List terms facets are
+// multi-select, so every spec is self-excluding. A malformed element — an empty
+// field, or a size that is not a positive int32 — is the caller's error,
+// surfaced as InvalidArgument on `aggs`. An empty input is a no-op (nil), which
+// the caller uses to skip all facet computation.
+//
+// The field is NOT validated against the Facetable allowlist here: that stays
+// in filter.ComputeFacets (the single allowlist source), whose
+// ErrUnknownFacetField the handler maps to InvalidArgument on `aggs`.
+func parseFacetAggs(aggs []string) ([]filter.FacetSpec, error) {
+	if len(aggs) == 0 {
+		return nil, nil
+	}
+	if len(aggs) > maxFacetAggs {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("aggs",
+			fmt.Sprintf("at most %d aggregations may be requested", maxFacetAggs)))
+	}
+	specs := make([]filter.FacetSpec, 0, len(aggs))
+	seen := make(map[string]struct{}, len(aggs))
+	for _, a := range aggs {
+		field, sizeStr, hasSize := strings.Cut(strings.TrimSpace(a), ":")
+		field = strings.TrimSpace(field)
+		if field == "" {
+			return nil, apierr.InvalidArgument(apierr.FieldViolation("aggs",
+				`each agg must name a field, as "field" or "field:size"`))
+		}
+		// The response facets map is field-keyed, so a repeated field would
+		// collide on / clobber its own entry. Reject rather than pick a winner.
+		if _, dup := seen[field]; dup {
+			return nil, apierr.InvalidArgument(apierr.FieldViolation("aggs",
+				fmt.Sprintf("agg field %q appears more than once", field)))
+		}
+		seen[field] = struct{}{}
+		spec := filter.FacetSpec{Field: field, SelfExcluding: true}
+		if hasSize {
+			size, err := strconv.ParseInt(strings.TrimSpace(sizeStr), 10, 32)
+			if err != nil || size <= 0 {
+				return nil, apierr.InvalidArgument(apierr.FieldViolation("aggs",
+					fmt.Sprintf("agg %q has a malformed size; want a positive integer", a)))
+			}
+			spec.Size = int32(size)
+		}
+		specs = append(specs, spec)
+	}
+	return specs, nil
+}
+
+// facetsToProto wraps the engine's per-facet bucket lists into the response's
+// map<string, FacetResult>. A nil/empty input yields nil (an omitted map).
+func facetsToProto(facets map[string][]filter.FacetBucket) map[string]*typespb.FacetResult {
+	if len(facets) == 0 {
+		return nil
+	}
+	out := make(map[string]*typespb.FacetResult, len(facets))
+	for name, buckets := range facets {
+		pb := make([]*typespb.FacetBucket, 0, len(buckets))
+		for _, b := range buckets {
+			pb = append(pb, &typespb.FacetBucket{Key: b.Key, Count: b.Count})
+		}
+		out[name] = &typespb.FacetResult{Buckets: pb}
+	}
+	return out
 }
 
 // agentsInUse returns the distinct, sorted, non-empty agent values in the

@@ -274,7 +274,26 @@ type ListConnectorsRequest struct {
 	// Optional. An AIP-160 filter expression.
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
 	// Optional. A comma-separated list of fields to order by.
-	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
+	OrderBy string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
+	// Optional. Terms facets + total_count to compute over the list's base scope
+	// + filter, in one live Postgres pass. Opt-in: an empty list skips all
+	// aggregation cost.
+	//
+	// Each element is a terms-facet spec of the form `field` or `field:size`:
+	//   - `field` is required and must match a server-side Facetable allowlist id
+	//     (currently `agent` or `space`); an unknown id is rejected with
+	//     INVALID_ARGUMENT.
+	//   - `size` is optional; when present it must be a positive integer, capping
+	//     the facet's top-N buckets (count-desc). Omitted → a server default.
+	//
+	// The List tier supports only terms facets, and every facet is multi-select
+	// self-excluding (a facet drops its own active filter so its sibling values
+	// stay selectable). The type is `repeated string` (not a structured message)
+	// because ListConnectors is an AIP-132 GET and grpc-gateway can bind only
+	// scalar-repeated fields to URL query params — the transport the web app uses.
+	// The richer structured AggSpec (date-histogram, range, per-agg flags) belongs
+	// to the future Search tier's POST body. See docs/search-faceting-design.md.
+	Aggs          []string `protobuf:"bytes,6,rep,name=aggs,proto3" json:"aggs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -344,6 +363,13 @@ func (x *ListConnectorsRequest) GetOrderBy() string {
 	return ""
 }
 
+func (x *ListConnectorsRequest) GetAggs() []string {
+	if x != nil {
+		return x.Aggs
+	}
+	return nil
+}
+
 // Response for ListConnectors.
 type ListConnectorsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -358,7 +384,23 @@ type ListConnectorsResponse struct {
 	// agent-filter facet with every agent actually assigned to a connector in
 	// scope, regardless of the current page's filter. Empty when every connector
 	// in scope runs on the cloud controller (agent = "").
-	AgentsInUse   []string `protobuf:"bytes,3,rep,name=agents_in_use,json=agentsInUse,proto3" json:"agents_in_use,omitempty"`
+	//
+	// Deprecated: superseded by `facets` (an `agent` terms facet). Retained until
+	// the frontend migrates its agent-filter dropdown to consume `facets`.
+	AgentsInUse []string `protobuf:"bytes,3,rep,name=agents_in_use,json=agentsInUse,proto3" json:"agents_in_use,omitempty"`
+	// The exact number of Connectors matching the base scope + request filter
+	// (NOT narrowed by pagination). Populated only when the request carries
+	// `aggs`; zero otherwise. Exact at admin scale, so total_is_estimate is
+	// always false here.
+	TotalCount int64 `protobuf:"varint,4,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	// Whether total_count is an estimate. Always false for the List tier (exact
+	// COUNT); reserved for the Search tier's capped estimates at scale.
+	TotalIsEstimate bool `protobuf:"varint,5,opt,name=total_is_estimate,json=totalIsEstimate,proto3" json:"total_is_estimate,omitempty"`
+	// Terms facets requested via `aggs`, keyed by each agg's `field`. Each
+	// FacetResult holds count-desc buckets over the base scope + filter, with a
+	// self-excluding facet dropping its own filter so its sibling values stay
+	// selectable. Empty when the request carries no `aggs`.
+	Facets        map[string]*types.FacetResult `protobuf:"bytes,6,rep,name=facets,proto3" json:"facets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -410,6 +452,27 @@ func (x *ListConnectorsResponse) GetNextPageToken() string {
 func (x *ListConnectorsResponse) GetAgentsInUse() []string {
 	if x != nil {
 		return x.AgentsInUse
+	}
+	return nil
+}
+
+func (x *ListConnectorsResponse) GetTotalCount() int64 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *ListConnectorsResponse) GetTotalIsEstimate() bool {
+	if x != nil {
+		return x.TotalIsEstimate
+	}
+	return false
+}
+
+func (x *ListConnectorsResponse) GetFacets() map[string]*types.FacetResult {
+	if x != nil {
+		return x.Facets
 	}
 	return nil
 }
@@ -665,7 +728,7 @@ var File_pivox_workflows_v1_connector_proto protoreflect.FileDescriptor
 
 const file_pivox_workflows_v1_connector_proto_rawDesc = "" +
 	"\n" +
-	"\"pivox/workflows/v1/connector.proto\x12\x12pivox.workflows.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xb7\x06\n" +
+	"\"pivox/workflows/v1/connector.proto\x12\x12pivox.workflows.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\x1a\x17pivox/types/facet.proto\"\xb7\x06\n" +
 	"\tConnector\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x01\xbaH\x05r\x03\x18\x80\x02R\vdisplayName\x12-\n" +
@@ -694,20 +757,28 @@ const file_pivox_workflows_v1_connector_proto_rawDesc = "" +
 	"\aheaders\x18\x02 \x03(\v2..pivox.workflows.v1.HttpConnector.HeadersEntryB\x03\xe0A\x01R\aheaders\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe5\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfe\x01\n" +
 	"\x15ListConnectorsRequest\x12?\n" +
 	"\x06parent\x18\x01 \x01(\tB'\xe0A\x02\xfaA\x1b\x12\x19pivox.workflows/Connector\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
 	"\x06filter\x18\x04 \x01(\tB\x03\xe0A\x01R\x06filter\x12\x1e\n" +
-	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"\xa3\x01\n" +
+	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\x12\x17\n" +
+	"\x04aggs\x18\x06 \x03(\tB\x03\xe0A\x01R\x04aggs\"\x95\x03\n" +
 	"\x16ListConnectorsResponse\x12=\n" +
 	"\n" +
 	"connectors\x18\x01 \x03(\v2\x1d.pivox.workflows.v1.ConnectorR\n" +
 	"connectors\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12\"\n" +
-	"\ragents_in_use\x18\x03 \x03(\tR\vagentsInUse\"R\n" +
+	"\ragents_in_use\x18\x03 \x03(\tR\vagentsInUse\x12\x1f\n" +
+	"\vtotal_count\x18\x04 \x01(\x03R\n" +
+	"totalCount\x12*\n" +
+	"\x11total_is_estimate\x18\x05 \x01(\bR\x0ftotalIsEstimate\x12N\n" +
+	"\x06facets\x18\x06 \x03(\v26.pivox.workflows.v1.ListConnectorsResponse.FacetsEntryR\x06facets\x1aS\n" +
+	"\vFacetsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12.\n" +
+	"\x05value\x18\x02 \x01(\v2\x18.pivox.types.FacetResultR\x05value:\x028\x01\"R\n" +
 	"\x13GetConnectorRequest\x12;\n" +
 	"\x04name\x18\x01 \x01(\tB'\xe0A\x02\xfaA\x1b\n" +
 	"\x19pivox.workflows/Connector\xbaH\x03\xc8\x01\x01R\x04name\"\xf3\x01\n" +
@@ -747,7 +818,7 @@ func file_pivox_workflows_v1_connector_proto_rawDescGZIP() []byte {
 	return file_pivox_workflows_v1_connector_proto_rawDescData
 }
 
-var file_pivox_workflows_v1_connector_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_pivox_workflows_v1_connector_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_pivox_workflows_v1_connector_proto_goTypes = []any{
 	(*Connector)(nil),              // 0: pivox.workflows.v1.Connector
 	(*HttpConnector)(nil),          // 1: pivox.workflows.v1.HttpConnector
@@ -759,38 +830,42 @@ var file_pivox_workflows_v1_connector_proto_goTypes = []any{
 	(*DeleteConnectorRequest)(nil), // 7: pivox.workflows.v1.DeleteConnectorRequest
 	nil,                            // 8: pivox.workflows.v1.Connector.AnnotationsEntry
 	nil,                            // 9: pivox.workflows.v1.HttpConnector.HeadersEntry
-	(*types.Actor)(nil),            // 10: pivox.types.Actor
-	(*timestamppb.Timestamp)(nil),  // 11: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),  // 12: google.protobuf.FieldMask
-	(*emptypb.Empty)(nil),          // 13: google.protobuf.Empty
+	nil,                            // 10: pivox.workflows.v1.ListConnectorsResponse.FacetsEntry
+	(*types.Actor)(nil),            // 11: pivox.types.Actor
+	(*timestamppb.Timestamp)(nil),  // 12: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),  // 13: google.protobuf.FieldMask
+	(*types.FacetResult)(nil),      // 14: pivox.types.FacetResult
+	(*emptypb.Empty)(nil),          // 15: google.protobuf.Empty
 }
 var file_pivox_workflows_v1_connector_proto_depIdxs = []int32{
 	1,  // 0: pivox.workflows.v1.Connector.http:type_name -> pivox.workflows.v1.HttpConnector
-	10, // 1: pivox.workflows.v1.Connector.created_by:type_name -> pivox.types.Actor
-	11, // 2: pivox.workflows.v1.Connector.create_time:type_name -> google.protobuf.Timestamp
-	10, // 3: pivox.workflows.v1.Connector.updated_by:type_name -> pivox.types.Actor
-	11, // 4: pivox.workflows.v1.Connector.update_time:type_name -> google.protobuf.Timestamp
+	11, // 1: pivox.workflows.v1.Connector.created_by:type_name -> pivox.types.Actor
+	12, // 2: pivox.workflows.v1.Connector.create_time:type_name -> google.protobuf.Timestamp
+	11, // 3: pivox.workflows.v1.Connector.updated_by:type_name -> pivox.types.Actor
+	12, // 4: pivox.workflows.v1.Connector.update_time:type_name -> google.protobuf.Timestamp
 	8,  // 5: pivox.workflows.v1.Connector.annotations:type_name -> pivox.workflows.v1.Connector.AnnotationsEntry
 	9,  // 6: pivox.workflows.v1.HttpConnector.headers:type_name -> pivox.workflows.v1.HttpConnector.HeadersEntry
 	0,  // 7: pivox.workflows.v1.ListConnectorsResponse.connectors:type_name -> pivox.workflows.v1.Connector
-	0,  // 8: pivox.workflows.v1.CreateConnectorRequest.connector:type_name -> pivox.workflows.v1.Connector
-	0,  // 9: pivox.workflows.v1.UpdateConnectorRequest.connector:type_name -> pivox.workflows.v1.Connector
-	12, // 10: pivox.workflows.v1.UpdateConnectorRequest.update_mask:type_name -> google.protobuf.FieldMask
-	2,  // 11: pivox.workflows.v1.Connectors.ListConnectors:input_type -> pivox.workflows.v1.ListConnectorsRequest
-	4,  // 12: pivox.workflows.v1.Connectors.GetConnector:input_type -> pivox.workflows.v1.GetConnectorRequest
-	5,  // 13: pivox.workflows.v1.Connectors.CreateConnector:input_type -> pivox.workflows.v1.CreateConnectorRequest
-	6,  // 14: pivox.workflows.v1.Connectors.UpdateConnector:input_type -> pivox.workflows.v1.UpdateConnectorRequest
-	7,  // 15: pivox.workflows.v1.Connectors.DeleteConnector:input_type -> pivox.workflows.v1.DeleteConnectorRequest
-	3,  // 16: pivox.workflows.v1.Connectors.ListConnectors:output_type -> pivox.workflows.v1.ListConnectorsResponse
-	0,  // 17: pivox.workflows.v1.Connectors.GetConnector:output_type -> pivox.workflows.v1.Connector
-	0,  // 18: pivox.workflows.v1.Connectors.CreateConnector:output_type -> pivox.workflows.v1.Connector
-	0,  // 19: pivox.workflows.v1.Connectors.UpdateConnector:output_type -> pivox.workflows.v1.Connector
-	13, // 20: pivox.workflows.v1.Connectors.DeleteConnector:output_type -> google.protobuf.Empty
-	16, // [16:21] is the sub-list for method output_type
-	11, // [11:16] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	10, // 8: pivox.workflows.v1.ListConnectorsResponse.facets:type_name -> pivox.workflows.v1.ListConnectorsResponse.FacetsEntry
+	0,  // 9: pivox.workflows.v1.CreateConnectorRequest.connector:type_name -> pivox.workflows.v1.Connector
+	0,  // 10: pivox.workflows.v1.UpdateConnectorRequest.connector:type_name -> pivox.workflows.v1.Connector
+	13, // 11: pivox.workflows.v1.UpdateConnectorRequest.update_mask:type_name -> google.protobuf.FieldMask
+	14, // 12: pivox.workflows.v1.ListConnectorsResponse.FacetsEntry.value:type_name -> pivox.types.FacetResult
+	2,  // 13: pivox.workflows.v1.Connectors.ListConnectors:input_type -> pivox.workflows.v1.ListConnectorsRequest
+	4,  // 14: pivox.workflows.v1.Connectors.GetConnector:input_type -> pivox.workflows.v1.GetConnectorRequest
+	5,  // 15: pivox.workflows.v1.Connectors.CreateConnector:input_type -> pivox.workflows.v1.CreateConnectorRequest
+	6,  // 16: pivox.workflows.v1.Connectors.UpdateConnector:input_type -> pivox.workflows.v1.UpdateConnectorRequest
+	7,  // 17: pivox.workflows.v1.Connectors.DeleteConnector:input_type -> pivox.workflows.v1.DeleteConnectorRequest
+	3,  // 18: pivox.workflows.v1.Connectors.ListConnectors:output_type -> pivox.workflows.v1.ListConnectorsResponse
+	0,  // 19: pivox.workflows.v1.Connectors.GetConnector:output_type -> pivox.workflows.v1.Connector
+	0,  // 20: pivox.workflows.v1.Connectors.CreateConnector:output_type -> pivox.workflows.v1.Connector
+	0,  // 21: pivox.workflows.v1.Connectors.UpdateConnector:output_type -> pivox.workflows.v1.Connector
+	15, // 22: pivox.workflows.v1.Connectors.DeleteConnector:output_type -> google.protobuf.Empty
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_pivox_workflows_v1_connector_proto_init() }
@@ -807,7 +882,7 @@ func file_pivox_workflows_v1_connector_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_workflows_v1_connector_proto_rawDesc), len(file_pivox_workflows_v1_connector_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

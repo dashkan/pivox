@@ -3906,6 +3906,44 @@ export interface components {
              */
             readonly isDeleted?: boolean;
         };
+        /**
+         * @description FacetBucket is one aggregation bucket. `key` identifies a terms bucket (a
+         *     column value); `from`/`to` identify a range or date-histogram bin (unused by
+         *     the List terms tier). Buckets are returned in an ordered list, not a map,
+         *     because their order is meaningful (count-desc for terms) and range/histogram
+         *     bins have no scalar identity to key on.
+         */
+        typesFacetBucket: {
+            /**
+             * @description The bucket's scalar identity for a terms agg (the column value). Empty for
+             *     range / date-histogram buckets, which identify via from/to.
+             */
+            key?: string;
+            /**
+             * Format: int64
+             * @description The number of matching rows in this bucket.
+             */
+            count?: string;
+            /**
+             * @description Inclusive lower bound for a range / date-histogram bucket (number or
+             *     RFC3339). Empty for terms buckets.
+             */
+            from?: string;
+            /**
+             * @description Exclusive upper bound for a range / date-histogram bucket (number or
+             *     RFC3339). Empty for terms buckets.
+             */
+            to?: string;
+        };
+        /**
+         * @description FacetResult is the ordered bucket list for one facet. It is a message wrapper
+         *     (not a bare repeated field) because proto forbids `map<string, repeated ...>`
+         *     — the response keys facets by name into a `map<string, FacetResult>`.
+         */
+        typesFacetResult: {
+            /** @description The facet's buckets, ordered (count-desc for terms). */
+            buckets?: components["schemas"]["typesFacetBucket"][];
+        };
         v1Abort: {
             /** @description Optional. Human-readable cancellation reason. */
             reason?: string;
@@ -5830,8 +5868,33 @@ export interface components {
              *     agent-filter facet with every agent actually assigned to a connector in
              *     scope, regardless of the current page's filter. Empty when every connector
              *     in scope runs on the cloud controller (agent = "").
+             *
+             *     Deprecated: superseded by `facets` (an `agent` terms facet). Retained until
+             *     the frontend migrates its agent-filter dropdown to consume `facets`.
              */
             agentsInUse?: string[];
+            /**
+             * Format: int64
+             * @description The exact number of Connectors matching the base scope + request filter
+             *     (NOT narrowed by pagination). Populated only when the request carries
+             *     `aggs`; zero otherwise. Exact at admin scale, so total_is_estimate is
+             *     always false here.
+             */
+            totalCount?: string;
+            /**
+             * @description Whether total_count is an estimate. Always false for the List tier (exact
+             *     COUNT); reserved for the Search tier's capped estimates at scale.
+             */
+            totalIsEstimate?: boolean;
+            /**
+             * @description Terms facets requested via `aggs`, keyed by each agg's `field`. Each
+             *     FacetResult holds count-desc buckets over the base scope + filter, with a
+             *     self-excluding facet dropping its own filter so its sibling values stay
+             *     selectable. Empty when the request carries no `aggs`.
+             */
+            facets?: {
+                [key: string]: components["schemas"]["typesFacetResult"];
+            };
         };
         /** @description Response message for `ListConversations`. */
         v1ListConversationsResponse: {
@@ -8516,6 +8579,27 @@ export interface operations {
                 filter?: string;
                 /** @description Optional. A comma-separated list of fields to order by. */
                 orderBy?: string;
+                /**
+                 * @description Optional. Terms facets + total_count to compute over the list's base scope
+                 *     + filter, in one live Postgres pass. Opt-in: an empty list skips all
+                 *     aggregation cost.
+                 *
+                 *     Each element is a terms-facet spec of the form `field` or `field:size`:
+                 *       - `field` is required and must match a server-side Facetable allowlist id
+                 *         (currently `agent` or `space`); an unknown id is rejected with
+                 *         INVALID_ARGUMENT.
+                 *       - `size` is optional; when present it must be a positive integer, capping
+                 *         the facet's top-N buckets (count-desc). Omitted → a server default.
+                 *
+                 *     The List tier supports only terms facets, and every facet is multi-select
+                 *     self-excluding (a facet drops its own active filter so its sibling values
+                 *     stay selectable). The type is `repeated string` (not a structured message)
+                 *     because ListConnectors is an AIP-132 GET and grpc-gateway can bind only
+                 *     scalar-repeated fields to URL query params — the transport the web app uses.
+                 *     The richer structured AggSpec (date-histogram, range, per-agg flags) belongs
+                 *     to the future Search tier's POST body. See docs/search-faceting-design.md.
+                 */
+                aggs?: string[];
             };
             header?: never;
             path: {
@@ -11849,6 +11933,27 @@ export interface operations {
                 filter?: string;
                 /** @description Optional. A comma-separated list of fields to order by. */
                 orderBy?: string;
+                /**
+                 * @description Optional. Terms facets + total_count to compute over the list's base scope
+                 *     + filter, in one live Postgres pass. Opt-in: an empty list skips all
+                 *     aggregation cost.
+                 *
+                 *     Each element is a terms-facet spec of the form `field` or `field:size`:
+                 *       - `field` is required and must match a server-side Facetable allowlist id
+                 *         (currently `agent` or `space`); an unknown id is rejected with
+                 *         INVALID_ARGUMENT.
+                 *       - `size` is optional; when present it must be a positive integer, capping
+                 *         the facet's top-N buckets (count-desc). Omitted → a server default.
+                 *
+                 *     The List tier supports only terms facets, and every facet is multi-select
+                 *     self-excluding (a facet drops its own active filter so its sibling values
+                 *     stay selectable). The type is `repeated string` (not a structured message)
+                 *     because ListConnectors is an AIP-132 GET and grpc-gateway can bind only
+                 *     scalar-repeated fields to URL query params — the transport the web app uses.
+                 *     The richer structured AggSpec (date-histogram, range, per-agg flags) belongs
+                 *     to the future Search tier's POST body. See docs/search-faceting-design.md.
+                 */
+                aggs?: string[];
             };
             header?: never;
             path: {
