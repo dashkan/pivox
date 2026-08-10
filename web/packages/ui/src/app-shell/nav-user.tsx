@@ -5,12 +5,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@pivox/primitives/dropdown-menu';
 import { SidebarMenuButton, useSidebar } from '@pivox/primitives/sidebar';
 import { ChevronsUpDownIcon, LogOutIcon, UserIcon } from 'lucide-react';
+import { useState } from 'react';
 
 import { useAppShellContext } from './app-shell.context';
 
@@ -23,6 +25,47 @@ export interface NavUserUser {
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
+}
+
+/**
+ * The user's photo, or their initials once we know the photo won't load.
+ *
+ * Plain <img>, not <AvatarImage>: AvatarImage verifies the URL loads in a
+ * layout effect, which doesn't run during SSR — so SSR would render the
+ * initials and hydration would swap to the image, which flashes. Rendering
+ * the <img> directly puts it in the SSR HTML, at the cost of owning the error
+ * path: provider photo URLs are reliable but not guaranteed, and without
+ * `onError` a failed load leaves the browser's broken-image icon (plus
+ * overflowing alt text) in the sidebar until the next reload.
+ *
+ * Failure is tracked per URL, not as a sticky boolean, so switching photos
+ * gets a fresh attempt.
+ */
+function NavUserAvatar({
+  photoURL,
+  name,
+  initials,
+}: {
+  photoURL: string | null;
+  name: string;
+  initials: string;
+}) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+
+  return (
+    <Avatar className="h-8 w-8 rounded-lg">
+      {photoURL && photoURL !== failedSrc ? (
+        <img
+          src={photoURL}
+          alt={name}
+          onError={() => setFailedSrc(photoURL)}
+          className="aspect-square size-full rounded-lg object-cover"
+        />
+      ) : (
+        <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+      )}
+    </Avatar>
+  );
 }
 
 /**
@@ -54,62 +97,17 @@ export function AppShellNavUser() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <SidebarMenuButton
-          size="lg"
-          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-        >
-          <Avatar className="h-8 w-8 rounded-lg">
-            {user.photoURL ? (
-              // Plain <img>, not <AvatarImage>. Radix's AvatarImage
-              // uses useLayoutEffect to verify the URL loads before
-              // rendering the <img>, but useLayoutEffect doesn't run
-              // during SSR — so SSR renders the fallback initials, then
-              // hydration swaps to the image. The flash is jarring and
-              // pointless for our use case: provider photo URLs are
-              // reliable OAuth-provider URLs (Google/Apple/GitHub).
-              // Render the image directly so SSR HTML includes it.
-              <img
-                src={user.photoURL}
-                alt={user.displayName ?? 'User avatar'}
-                className="aspect-square size-full rounded-lg object-cover"
-              />
-            ) : (
-              <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-            )}
-          </Avatar>
-          <div className="grid flex-1 text-start text-sm leading-tight">
-            <span className="truncate font-medium">
-              {user.displayName ?? 'User'}
-            </span>
-            {user.email ? (
-              <span className="truncate text-xs">{user.email}</span>
-            ) : null}
-          </div>
-          <ChevronsUpDownIcon className="ms-auto size-4" />
-        </SidebarMenuButton>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-        side={isMobile ? 'bottom' : 'right'}
-        align="end"
-        sideOffset={4}
-      >
-        <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
-            <Avatar className="h-8 w-8 rounded-lg">
-              {user.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName ?? 'User avatar'}
-                  className="aspect-square size-full rounded-lg object-cover"
-                />
-              ) : (
-                <AvatarFallback className="rounded-lg">
-                  {initials}
-                </AvatarFallback>
-              )}
-            </Avatar>
+      <DropdownMenuTrigger
+        render={
+          <SidebarMenuButton
+            size="lg"
+            className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+          >
+            <NavUserAvatar
+              photoURL={user.photoURL}
+              name={user.displayName ?? 'User avatar'}
+              initials={initials}
+            />
             <div className="grid flex-1 text-start text-sm leading-tight">
               <span className="truncate font-medium">
                 {user.displayName ?? 'User'}
@@ -118,8 +116,36 @@ export function AppShellNavUser() {
                 <span className="truncate text-xs">{user.email}</span>
               ) : null}
             </div>
-          </div>
-        </DropdownMenuLabel>
+            <ChevronsUpDownIcon className="ms-auto size-4" />
+          </SidebarMenuButton>
+        }
+      />
+      <DropdownMenuContent
+        className="w-(--anchor-width) min-w-56 rounded-lg"
+        side={isMobile ? 'bottom' : 'right'}
+        align="end"
+        sideOffset={4}
+      >
+        {/* Base UI GroupLabel needs a Group ancestor (Radix allowed bare). */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="p-0 font-normal">
+            <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
+              <NavUserAvatar
+                photoURL={user.photoURL}
+                name={user.displayName ?? 'User avatar'}
+                initials={initials}
+              />
+              <div className="grid flex-1 text-start text-sm leading-tight">
+                <span className="truncate font-medium">
+                  {user.displayName ?? 'User'}
+                </span>
+                {user.email ? (
+                  <span className="truncate text-xs">{user.email}</span>
+                ) : null}
+              </div>
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {

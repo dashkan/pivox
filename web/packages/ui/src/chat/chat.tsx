@@ -210,37 +210,43 @@ const Input: FC<ComponentProps<typeof ComposerPrimitive.Root>> = ({
     <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
       {/* jsx-a11y/no-autofocus: omitted — auto-focusing a textarea
           on mount hijacks keyboard context for assistive tech. */}
-      <ComposerPrimitive.Input asChild>
-        <Textarea
-          rows={1}
-          placeholder="Send a message…"
-          className="min-h-[44px] resize-none"
-        />
-      </ComposerPrimitive.Input>
+      <ComposerPrimitive.Input
+        render={
+          <Textarea
+            rows={1}
+            placeholder="Send a message…"
+            className="min-h-[44px] resize-none"
+          />
+        }
+      />
       <AuiIf condition={(s) => !s.thread.isRunning}>
-        <ComposerPrimitive.Send asChild>
-          <Button
-            type="submit"
-            size="icon"
-            aria-label="Send message"
-            className="shrink-0"
-          >
-            <SendHorizonalIcon className="size-4" />
-          </Button>
-        </ComposerPrimitive.Send>
+        <ComposerPrimitive.Send
+          render={
+            <Button
+              type="submit"
+              size="icon"
+              aria-label="Send message"
+              className="shrink-0"
+            >
+              <SendHorizonalIcon className="size-4" />
+            </Button>
+          }
+        />
       </AuiIf>
       <AuiIf condition={(s) => s.thread.isRunning}>
-        <ComposerPrimitive.Cancel asChild>
-          <Button
-            type="button"
-            size="icon"
-            variant="secondary"
-            aria-label="Stop generation"
-            className="shrink-0"
-          >
-            <SquareIcon className="size-4" />
-          </Button>
-        </ComposerPrimitive.Cancel>
+        <ComposerPrimitive.Cancel
+          render={
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              aria-label="Stop generation"
+              className="shrink-0"
+            >
+              <SquareIcon className="size-4" />
+            </Button>
+          }
+        />
       </AuiIf>
     </div>
   </ComposerPrimitive.Root>
@@ -266,18 +272,18 @@ const ChatModalButton = forwardRef<
       aria-label={state === 'open' ? 'Close chat' : 'Open chat'}
       className={cn(
         'relative size-12 rounded-full opacity-50 shadow-lg transition-opacity',
-        'hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
+        'hover:opacity-100 focus-visible:opacity-100 data-open:opacity-100',
         className,
       )}
       {...props}
     >
       <BotIcon
         data-state={state}
-        className="size-5 transition-all data-[state=open]:scale-0 data-[state=open]:opacity-0"
+        className="size-5 transition-all data-open:scale-0 data-open:opacity-0"
       />
       <XIcon
         data-state={state}
-        className="absolute size-5 scale-0 opacity-0 transition-all data-[state=open]:scale-100 data-[state=open]:opacity-100"
+        className="absolute size-5 scale-0 opacity-0 transition-all data-open:scale-100 data-open:opacity-100"
       />
     </Button>
   );
@@ -303,17 +309,15 @@ function ChatModal({ value }: { value: ChatContextValue }) {
       <AssistantRuntimeProvider runtime={value.meta.runtime}>
         <AssistantModalPrimitive.Root>
           <AssistantModalPrimitive.Anchor className="fixed end-6 bottom-6 z-50">
-            <AssistantModalPrimitive.Trigger asChild>
-              <ChatModalButton />
-            </AssistantModalPrimitive.Trigger>
+            <AssistantModalPrimitive.Trigger render={<ChatModalButton />} />
           </AssistantModalPrimitive.Anchor>
           <AssistantModalPrimitive.Content
             sideOffset={16}
             className={cn(
               'z-50 overflow-hidden rounded-2xl border border-border bg-background shadow-xl',
-              'data-[state=open]:animate-in data-[state=closed]:animate-out',
-              'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-              'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+              'data-open:animate-in data-closed:animate-out',
+              'data-closed:fade-out-0 data-open:fade-in-0',
+              'data-closed:zoom-out-95 data-open:zoom-in-95',
               'data-[side=top]:slide-in-from-bottom-2',
             )}
           >

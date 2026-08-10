@@ -294,16 +294,18 @@ function ImageEditorRotateControls({ className }: { className?: string }) {
       className={cn('flex items-center gap-1', className)}
     >
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={actions.rotateCounterClockwise}
-            aria-label="Rotate counter-clockwise"
-          >
-            <RotateCcwSquare />
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={actions.rotateCounterClockwise}
+              aria-label="Rotate counter-clockwise"
+            >
+              <RotateCcwSquare />
+            </Button>
+          }
+        />
         <TooltipContent>
           Rotate left
           <ShortcutHint shortcut={meta.shortcuts.rotateCounterClockwise} />
@@ -311,16 +313,18 @@ function ImageEditorRotateControls({ className }: { className?: string }) {
       </Tooltip>
 
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={actions.rotateClockwise}
-            aria-label="Rotate clockwise"
-          >
-            <RotateCwSquare />
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={actions.rotateClockwise}
+              aria-label="Rotate clockwise"
+            >
+              <RotateCwSquare />
+            </Button>
+          }
+        />
         <TooltipContent>
           Rotate right
           <ShortcutHint shortcut={meta.shortcuts.rotateClockwise} />
@@ -338,10 +342,12 @@ function ImageEditorRotateControls({ className }: { className?: string }) {
           min={-45}
           max={45}
           step={0.1}
-          onValueChange={([v]) => {
+          onValueChange={(next) => {
+            // Base UI's Slider emits number | readonly number[].
+            const v = typeof next === 'number' ? next : next[0];
             if (v !== undefined) actions.setStraighten(v);
           }}
-          onValueCommit={() => {
+          onValueCommitted={() => {
             actions.commitStraighten();
           }}
           className="w-24"
@@ -367,16 +373,18 @@ function ImageEditorFlipControls({ className }: { className?: string }) {
       className={cn('flex items-center gap-1', className)}
     >
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Toggle
-            pressed={state.flipHorizontal}
-            onPressedChange={actions.toggleFlipHorizontal}
-            size="sm"
-            aria-label="Flip horizontal"
-          >
-            <FlipHorizontal2 />
-          </Toggle>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Toggle
+              pressed={state.flipHorizontal}
+              onPressedChange={actions.toggleFlipHorizontal}
+              size="sm"
+              aria-label="Flip horizontal"
+            >
+              <FlipHorizontal2 />
+            </Toggle>
+          }
+        />
         <TooltipContent>
           Flip horizontal
           <ShortcutHint shortcut={meta.shortcuts.flipHorizontal} />
@@ -384,16 +392,18 @@ function ImageEditorFlipControls({ className }: { className?: string }) {
       </Tooltip>
 
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Toggle
-            pressed={state.flipVertical}
-            onPressedChange={actions.toggleFlipVertical}
-            size="sm"
-            aria-label="Flip vertical"
-          >
-            <FlipVertical2 />
-          </Toggle>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Toggle
+              pressed={state.flipVertical}
+              onPressedChange={actions.toggleFlipVertical}
+              size="sm"
+              aria-label="Flip vertical"
+            >
+              <FlipVertical2 />
+            </Toggle>
+          }
+        />
         <TooltipContent>
           Flip vertical
           <ShortcutHint shortcut={meta.shortcuts.flipVertical} />
@@ -416,17 +426,19 @@ function ImageEditorUndoRedoControls({ className }: { className?: string }) {
       className={cn('flex items-center gap-1', className)}
     >
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={actions.undo}
-            disabled={!state.canUndo}
-            aria-label="Undo"
-          >
-            <Undo2 />
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={actions.undo}
+              disabled={!state.canUndo}
+              aria-label="Undo"
+            >
+              <Undo2 />
+            </Button>
+          }
+        />
         <TooltipContent>
           Undo
           <ShortcutHint shortcut={meta.shortcuts.undo} />
@@ -434,17 +446,19 @@ function ImageEditorUndoRedoControls({ className }: { className?: string }) {
       </Tooltip>
 
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={actions.redo}
-            disabled={!state.canRedo}
-            aria-label="Redo"
-          >
-            <Redo2 />
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={actions.redo}
+              disabled={!state.canRedo}
+              aria-label="Redo"
+            >
+              <Redo2 />
+            </Button>
+          }
+        />
         <TooltipContent>
           Redo
           <ShortcutHint shortcut={meta.shortcuts.redo} />
@@ -463,18 +477,20 @@ function ImageEditorResetButton({ className }: { className?: string }) {
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={actions.reset}
-          disabled={!state.isDirty}
-          className={className}
-          aria-label="Reset all edits"
-        >
-          <ResetIcon />
-        </Button>
-      </TooltipTrigger>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={actions.reset}
+            disabled={!state.isDirty}
+            className={className}
+            aria-label="Reset all edits"
+          >
+            <ResetIcon />
+          </Button>
+        }
+      />
       <TooltipContent>
         Reset
         <ShortcutHint shortcut={meta.shortcuts.reset} />
@@ -498,16 +514,18 @@ function ImageEditorZoomControls({ className }: { className?: string }) {
       className={cn('flex items-center gap-1', className)}
     >
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={actions.zoomOut}
-            aria-label="Zoom out"
-          >
-            <Minus className="size-3.5" />
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={actions.zoomOut}
+              aria-label="Zoom out"
+            >
+              <Minus className="size-3.5" />
+            </Button>
+          }
+        />
         <TooltipContent>
           Zoom out
           <ShortcutHint shortcut={meta.shortcuts.zoomOut} />
@@ -515,15 +533,17 @@ function ImageEditorZoomControls({ className }: { className?: string }) {
       </Tooltip>
 
       <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={actions.zoomToFit}
-            className="min-w-[3.5rem] rounded px-1.5 py-0.5 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            {displayZoom}
-          </button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              onClick={actions.zoomToFit}
+              className="min-w-[3.5rem] rounded px-1.5 py-0.5 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {displayZoom}
+            </button>
+          }
+        />
         <TooltipContent>
           Fit to screen
           <ShortcutHint shortcut={meta.shortcuts.zoomToFit} />
@@ -531,16 +551,18 @@ function ImageEditorZoomControls({ className }: { className?: string }) {
       </Tooltip>
 
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={actions.zoomIn}
-            aria-label="Zoom in"
-          >
-            <Plus className="size-3.5" />
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={actions.zoomIn}
+              aria-label="Zoom in"
+            >
+              <Plus className="size-3.5" />
+            </Button>
+          }
+        />
         <TooltipContent>
           Zoom in
           <ShortcutHint shortcut={meta.shortcuts.zoomIn} />
@@ -579,17 +601,19 @@ function ImageEditorCloseCropButton({ className }: { className?: string }) {
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={actions.exitCropMode}
-          className={className}
-          aria-label="Close crop mode"
-        >
-          <X />
-        </Button>
-      </TooltipTrigger>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={actions.exitCropMode}
+            className={className}
+            aria-label="Close crop mode"
+          >
+            <X />
+          </Button>
+        }
+      />
       <TooltipContent>Close crop</TooltipContent>
     </Tooltip>
   );

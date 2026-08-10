@@ -175,8 +175,7 @@ export const FileTreeFolder = ({
               isSelected && "bg-muted"
             )}
           >
-            <CollapsibleTrigger asChild>
-              <button
+            <CollapsibleTrigger render={<button
                 className="flex shrink-0 cursor-pointer items-center border-none bg-transparent p-0"
                 type="button"
               >
@@ -186,8 +185,7 @@ export const FileTreeFolder = ({
                     isExpanded && "rotate-90"
                   )}
                 />
-              </button>
-            </CollapsibleTrigger>
+              </button>} />
             <button
               className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-start"
               onClick={handleSelect}

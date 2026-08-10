@@ -20,11 +20,7 @@ import type {
   ResourceColumnContext,
   ResourceListView,
 } from './resource-list.context';
-import type {
-  AgentOption,
-  Connector,
-  ConnectorListExtras,
-} from './types';
+import type { AgentOption, Connector, ConnectorListExtras } from './types';
 
 /**
  * The connectors LIST view — the presentational descriptor `ResourceList`

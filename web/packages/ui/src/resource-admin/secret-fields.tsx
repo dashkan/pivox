@@ -166,14 +166,18 @@ export function SecretEditFields() {
       <Field>
         <FieldLabel>Scope</FieldLabel>
         {/* Immutable — a secret can't move between org and space. */}
-        <Input value={spaceLabel(record?.name, spaceOptions)} readOnly disabled />
+        <Input
+          value={spaceLabel(record?.name, spaceOptions)}
+          readOnly
+          disabled
+        />
       </Field>
       <div className="flex items-center gap-2 text-sm">
         <Checkbox
           id="secret-rotate"
           checked={values.rotate}
           onCheckedChange={(checked) =>
-            patch({ rotate: checked === true, value: '' })
+            patch({ rotate: checked, value: '' })
           }
         />
         <label htmlFor="secret-rotate" className="cursor-pointer">

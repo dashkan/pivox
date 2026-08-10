@@ -3,6 +3,7 @@
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -101,81 +102,90 @@ export function AppShellScopePicker({
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-medium text-sidebar-primary-foreground">
-                {active.logo ?? orgInitials(active.displayName)}
-              </div>
-              <div className="grid flex-1 text-start text-sm leading-tight">
-                <span className="truncate font-medium">
-                  {active.displayName}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {scopeLabel}
-                </span>
-              </div>
-              <ChevronsUpDownIcon className="ms-auto" />
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger
+            render={
+              <SidebarMenuButton
+                size="lg"
+                className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+              >
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-medium text-sidebar-primary-foreground">
+                  {active.logo ?? orgInitials(active.displayName)}
+                </div>
+                <div className="grid flex-1 text-start text-sm leading-tight">
+                  <span className="truncate font-medium">
+                    {active.displayName}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {scopeLabel}
+                  </span>
+                </div>
+                <ChevronsUpDownIcon className="ms-auto" />
+              </SidebarMenuButton>
+            }
+          />
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-60 rounded-lg"
+            className="w-(--anchor-width) min-w-60 rounded-lg"
             align="start"
             side={isMobile ? 'bottom' : 'right'}
             sideOffset={4}
           >
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Organizations
-            </DropdownMenuLabel>
-            {orgs.map((org) => (
-              // preventDefault keeps the menu open on select so org + space can
-              // be picked in one session (a context switcher applies immediately;
-              // dismiss with Escape / click-away).
-              <DropdownMenuItem
-                key={org.organization}
-                onSelect={(e) => {
-                  e.preventDefault();
-                  onSelectOrganization(org.organization);
-                }}
-                className="gap-2 p-2"
-              >
-                <div className="flex size-6 items-center justify-center rounded-md border text-xs font-medium">
-                  {org.logo ?? orgInitials(org.displayName)}
-                </div>
-                <span className="flex-1 truncate">{org.displayName}</span>
-                {org.organization === activeOrganization && (
-                  <CheckIcon className="size-4" />
-                )}
-              </DropdownMenuItem>
-            ))}
+            {/* Base UI's GroupLabel requires a Group ancestor (Radix allowed a
+                bare label), so each labelled section is wrapped. */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Organizations
+              </DropdownMenuLabel>
+              {orgs.map((org) => (
+                // closeOnClick={false} keeps the menu open so org + space can be
+                // picked in one session (a context switcher applies immediately;
+                // dismiss with Escape / click-away). Base UI has no onSelect —
+                // that prop name is a native DOM text-selection handler here.
+                <DropdownMenuItem
+                  key={org.organization}
+                  closeOnClick={false}
+                  onClick={() => {
+                    onSelectOrganization(org.organization);
+                  }}
+                  className="gap-2 p-2"
+                >
+                  <div className="flex size-6 items-center justify-center rounded-md border text-xs font-medium">
+                    {org.logo ?? orgInitials(org.displayName)}
+                  </div>
+                  <span className="flex-1 truncate">{org.displayName}</span>
+                  {org.organization === activeOrganization && (
+                    <CheckIcon className="size-4" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Spaces
-            </DropdownMenuLabel>
-            <DropdownMenuItem
-              onSelect={() => {
-                onSelectSpace(null);
-              }}
-              className="gap-2 p-2"
-            >
-              <span className="flex-1 truncate">{ALL_SPACES_LABEL}</span>
-              {activeSpace === null && <CheckIcon className="size-4" />}
-            </DropdownMenuItem>
-            {spaces.map((sp) => (
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Spaces
+              </DropdownMenuLabel>
               <DropdownMenuItem
-                key={sp.space}
-                onSelect={() => {
-                  onSelectSpace(sp.space);
+                onClick={() => {
+                  onSelectSpace(null);
                 }}
                 className="gap-2 p-2"
               >
-                {sp.icon}
-                <span className="flex-1 truncate">{sp.displayName}</span>
-                {sp.space === activeSpace && <CheckIcon className="size-4" />}
+                <span className="flex-1 truncate">{ALL_SPACES_LABEL}</span>
+                {activeSpace === null && <CheckIcon className="size-4" />}
               </DropdownMenuItem>
-            ))}
+              {spaces.map((sp) => (
+                <DropdownMenuItem
+                  key={sp.space}
+                  onClick={() => {
+                    onSelectSpace(sp.space);
+                  }}
+                  className="gap-2 p-2"
+                >
+                  {sp.icon}
+                  <span className="flex-1 truncate">{sp.displayName}</span>
+                  {sp.space === activeSpace && <CheckIcon className="size-4" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

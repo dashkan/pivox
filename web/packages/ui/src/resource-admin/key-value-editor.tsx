@@ -19,8 +19,7 @@ import type { KeyValueEntry } from './types';
  *
  * When `keySuggestions` is given, the KEY field becomes a creatable combobox
  * (common names + descriptions, still freeform); otherwise it stays a plain
- * input, so other callers are unaffected. `keyContainer` portals that combobox
- * popup into a dialog mount node (see the connectors form).
+ * input, so other callers are unaffected.
  */
 export function KeyValueEditor({
   label,
@@ -31,8 +30,6 @@ export function KeyValueEditor({
   onChange,
   disabled,
   keySuggestions,
-  keyContainer,
-  keyBoundary,
 }: {
   label: string;
   description?: React.ReactNode;
@@ -42,8 +39,6 @@ export function KeyValueEditor({
   onChange: (entries: KeyValueEntry[]) => void;
   disabled?: boolean;
   keySuggestions?: Suggestion[];
-  keyContainer?: React.RefObject<HTMLElement | null>;
-  keyBoundary?: Element | null;
 }) {
   const rows: KeyValueEntry[] = [...entries, { key: '', value: '' }];
 
@@ -63,9 +58,13 @@ export function KeyValueEditor({
   }
 
   const update = (index: number, patch: Partial<KeyValueEntry>) => {
-    const next = rows.map((row, i) => (i === index ? { ...row, ...patch } : row));
+    const next = rows.map((row, i) =>
+      i === index ? { ...row, ...patch } : row,
+    );
     // Trim the trailing blank sentinel so state holds only real rows.
-    onChange(next.filter((row, i) => i < next.length - 1 || row.key || row.value));
+    onChange(
+      next.filter((row, i) => i < next.length - 1 || row.key || row.value),
+    );
   };
 
   const removeRow = (index: number) => {
@@ -97,8 +96,6 @@ export function KeyValueEditor({
                     onChange={(key) => update(index, { key })}
                     suggestions={keySuggestions}
                     disabled={disabled}
-                    container={keyContainer}
-                    collisionBoundary={keyBoundary}
                   />
                 ) : (
                   <Input
@@ -123,7 +120,11 @@ export function KeyValueEditor({
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label={isSentinel ? `Add ${label} row` : `Remove ${label} row ${index + 1}`}
+                aria-label={
+                  isSentinel
+                    ? `Add ${label} row`
+                    : `Remove ${label} row ${index + 1}`
+                }
                 onClick={() => {
                   if (!isSentinel) removeRow(index);
                 }}

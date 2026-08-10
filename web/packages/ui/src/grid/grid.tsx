@@ -96,11 +96,15 @@ function GridTable<T>({
   );
 
   const body = state.isLoading ? (
-    <GridNoticeRow colSpan={colSpan}>{loadingLabel ?? 'Loading…'}</GridNoticeRow>
+    <GridNoticeRow colSpan={colSpan}>
+      {loadingLabel ?? 'Loading…'}
+    </GridNoticeRow>
   ) : state.loadError !== null ? (
     <GridNoticeRow colSpan={colSpan}>{state.loadError}</GridNoticeRow>
   ) : state.rows.length === 0 ? (
-    <GridNoticeRow colSpan={colSpan}>{emptyLabel ?? 'No results.'}</GridNoticeRow>
+    <GridNoticeRow colSpan={colSpan}>
+      {emptyLabel ?? 'No results.'}
+    </GridNoticeRow>
   ) : (
     state.rows.map((row) => (
       <TableRow key={meta.rowKey(row)}>

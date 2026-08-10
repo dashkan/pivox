@@ -56,10 +56,16 @@ export const useVoiceSelector = () => {
   return context;
 };
 
-export type VoiceSelectorProps = ComponentProps<typeof Dialog> & {
+// Base UI's Dialog onOpenChange is (open, eventDetails); this component only
+// ever surfaced the boolean, so keep the narrower signature as its public API.
+export type VoiceSelectorProps = Omit<
+  ComponentProps<typeof Dialog>,
+  "onOpenChange"
+> & {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string | undefined) => void;
+  onOpenChange?: (open: boolean) => void;
 };
 
 export const VoiceSelector = ({

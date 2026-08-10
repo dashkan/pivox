@@ -11,7 +11,13 @@ import {
   type NodeTypes,
   type ProOptions,
 } from '@xyflow/react';
-import { type CSSProperties, type MouseEvent, useCallback, useMemo, type ReactNode } from 'react';
+import {
+  type CSSProperties,
+  type MouseEvent,
+  useCallback,
+  useMemo,
+  type ReactNode,
+} from 'react';
 
 import { useTheme } from '@/theme-switcher/use-theme';
 
@@ -101,7 +107,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps): ReactNode {
   );
 }
 
-function CanvasInner({ nodes, edges, onNodeSelect }: WorkflowCanvasProps): ReactNode {
+function CanvasInner({
+  nodes,
+  edges,
+  onNodeSelect,
+}: WorkflowCanvasProps): ReactNode {
   const { select } = useSelection();
 
   // Follow the app's theme choice (light/dark/system) — sourced from the
@@ -115,7 +125,10 @@ function CanvasInner({ nodes, edges, onNodeSelect }: WorkflowCanvasProps): React
   // when there is no Start node (e.g. an empty definition).
   const startId = nodes.find((n) => n.data.element === 'start')?.id;
   const fitViewOptions = useMemo<FitViewOptions>(
-    () => (startId ? { nodes: [{ id: startId }], minZoom: 1, maxZoom: 1 } : { maxZoom: 1 }),
+    () =>
+      startId
+        ? { nodes: [{ id: startId }], minZoom: 1, maxZoom: 1 }
+        : { maxZoom: 1 },
     [startId],
   );
 

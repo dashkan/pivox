@@ -9,7 +9,7 @@ import {
 import { Progress } from "@/shadcn/components/ui/progress";
 import { cn } from "@/shadcn/lib/utils";
 import type { LanguageModelUsage } from "ai";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactElement } from "react";
 import { createContext, useContext, useMemo } from "react";
 import { getUsage } from "tokenlens";
 
@@ -56,7 +56,7 @@ export const Context = ({
 
   return (
     <ContextContext.Provider value={contextValue}>
-      <HoverCard closeDelay={0} openDelay={0} {...props} />
+      <HoverCard {...props} />
     </ContextContext.Provider>
   );
 };
@@ -113,16 +113,15 @@ export const ContextTrigger = ({ children, ...props }: ContextTriggerProps) => {
   }).format(usedPercent);
 
   return (
-    <HoverCardTrigger asChild>
-      {children ?? (
+    // Delays live on Trigger in Base UI; 0/0 keeps the instant open/close.
+    <HoverCardTrigger closeDelay={0} delay={0} render={(children as ReactElement | undefined) ?? (
         <Button type="button" variant="ghost" {...props}>
           <span className="font-medium text-muted-foreground">
             {renderedPercent}
           </span>
           <ContextIcon />
         </Button>
-      )}
-    </HoverCardTrigger>
+      )} />
   );
 };
 
@@ -336,7 +335,8 @@ export const ContextReasoningUsage = ({
   ...props
 }: ContextReasoningUsageProps) => {
   const { usage, modelId } = useContextValue();
-  const reasoningTokens = usage?.reasoningTokens ?? 0;
+  // ai v7 nested the token breakdowns; v6 had these flat on usage.
+  const reasoningTokens = usage?.outputTokenDetails?.reasoningTokens ?? 0;
 
   if (children) {
     return children;
@@ -376,7 +376,7 @@ export const ContextCacheUsage = ({
   ...props
 }: ContextCacheUsageProps) => {
   const { usage, modelId } = useContextValue();
-  const cacheTokens = usage?.cachedInputTokens ?? 0;
+  const cacheTokens = usage?.inputTokenDetails?.cacheReadTokens ?? 0;
 
   if (children) {
     return children;

@@ -35,6 +35,12 @@ allowBuilds:
 # Drop the ignoredOptionalDependencies entries (the @types/react pin
 # stays in the catalog) once `react-jsx-parser` ships a release with
 # @types/react ^19. Upstream: https://github.com/TroyAlford/react-jsx-parser/releases
+# @streamdown/code still pins shiki ^3 while streamdown 2.5 is on shiki 4. Two
+# copies make their HighlightOptions/BundledLanguage types incompatible, so
+# collapse them onto the version primitives already depends on.
+overrides:
+  shiki: "4.4.2"
+
 catalog:
   "@assistant-ui/react": "0.15.13"
   "@assistant-ui/react-ai-sdk": "1.4.5"

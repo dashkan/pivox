@@ -22,14 +22,9 @@ export interface ComboOption {
  * keep a plain `value: string` / `onChange(value)` contract — the Base UI
  * object-item wiring stays inside here.
  *
- * `container` portals the popup into a specific element (a ref). Needed inside a
- * modal dialog: the dialog's pointer-lock disables clicks outside its content,
- * so the default body portal is unclickable by mouse — pass the dialog's own
- * content/form element. Undefined (the default) portals to `<body>`.
- *
- * `collisionBoundary` sets the box the popup flips/shifts within (default: the
- * viewport). In a dialog, pass the dialog/form element so a bottom-of-dialog
- * popup flips ABOVE the input instead of overrunning the dialog footer.
+ * The popup portals to `<body>`. It previously took `container` /
+ * `collisionBoundary` to escape Radix Dialog's body-level pointer-lock; Base UI
+ * scopes modality to an internal backdrop instead, so that plumbing is gone.
  */
 export function OptionCombobox({
   options,
@@ -39,8 +34,6 @@ export function OptionCombobox({
   placeholder,
   emptyText,
   disabled,
-  container,
-  collisionBoundary,
 }: {
   options: ComboOption[];
   value: string;
@@ -49,8 +42,6 @@ export function OptionCombobox({
   placeholder?: string;
   emptyText: string;
   disabled?: boolean;
-  container?: React.RefObject<HTMLElement | null>;
-  collisionBoundary?: Element | null;
 }) {
   const selected =
     value === emptyValue
@@ -69,10 +60,7 @@ export function OptionCombobox({
       disabled={disabled}
     >
       <ComboboxInput placeholder={placeholder} showClear disabled={disabled} />
-      <ComboboxContent
-        container={container}
-        collisionBoundary={collisionBoundary ?? undefined}
-      >
+      <ComboboxContent>
         <ComboboxEmpty>{emptyText}</ComboboxEmpty>
         <ComboboxList>
           {(item: ComboOption) => (

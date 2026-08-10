@@ -78,6 +78,18 @@ import {
 // Helpers
 // ============================================================================
 
+// Base UI wraps handler events (adding `preventBaseUIHandler`), so a bare
+// `Event` / `React.MouseEvent` no longer matches. Derive the exact parameter
+// types from the components themselves so they track future upgrades.
+// Base UI's Menu.Item exposes onClick + closeOnClick; `onSelect` there is the
+// native DOM text-selection handler, so it would silently never fire.
+type MenuItemClickEvent = Parameters<
+  NonNullable<ComponentProps<typeof DropdownMenuItem>["onClick"]>
+>[0];
+type InputGroupButtonClickEvent = Parameters<
+  NonNullable<ComponentProps<typeof InputGroupButton>["onClick"]>
+>[0];
+
 const convertBlobUrlToDataUrl = async (url: string): Promise<string | null> => {
   try {
     const response = await fetch(url);
@@ -421,15 +433,14 @@ export const PromptInputActionAddAttachments = ({
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
-    (e: Event) => {
-      e.preventDefault();
+    () => {
       attachments.openFileDialog();
     },
     [attachments]
   );
 
   return (
-    <DropdownMenuItem {...props} onSelect={handleSelect}>
+    <DropdownMenuItem {...props} closeOnClick={false} onClick={handleSelect}>
       <ImageIcon className="me-2 size-4" /> {label}
     </DropdownMenuItem>
   );
@@ -443,14 +454,14 @@ export type PromptInputActionAddScreenshotProps = ComponentProps<
 
 export const PromptInputActionAddScreenshot = ({
   label = "Take screenshot",
-  onSelect,
+  onClick,
   ...props
 }: PromptInputActionAddScreenshotProps) => {
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
-    async (event: Event) => {
-      onSelect?.(event);
+    async (event: MenuItemClickEvent) => {
+      onClick?.(event);
       if (event.defaultPrevented) {
         return;
       }
@@ -470,11 +481,11 @@ export const PromptInputActionAddScreenshot = ({
         throw error;
       }
     },
-    [onSelect, attachments]
+    [onClick, attachments]
   );
 
   return (
-    <DropdownMenuItem {...props} onSelect={handleSelect}>
+    <DropdownMenuItem {...props} closeOnClick={false} onClick={handleSelect}>
       <Monitor className="me-2 size-4" />
       {label}
     </DropdownMenuItem>
@@ -1155,7 +1166,7 @@ export const PromptInputButton = ({
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipTrigger render={button} />
       <TooltipContent side={side}>
         {tooltipContent}
         {shortcut && (
@@ -1178,11 +1189,9 @@ export const PromptInputActionMenuTrigger = ({
   children,
   ...props
 }: PromptInputActionMenuTriggerProps) => (
-  <DropdownMenuTrigger asChild>
-    <PromptInputButton className={className} {...props}>
+  <DropdownMenuTrigger render={<PromptInputButton className={className} {...props}>
       {children ?? <PlusIcon className="size-4" />}
-    </PromptInputButton>
-  </DropdownMenuTrigger>
+    </PromptInputButton>} />
 );
 
 export type PromptInputActionMenuContentProps = ComponentProps<
@@ -1236,7 +1245,7 @@ export const PromptInputSubmit = ({
   }
 
   const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
+    (e: InputGroupButtonClickEvent) => {
       if (isGenerating && onStop) {
         e.preventDefault();
         onStop();
@@ -1317,21 +1326,23 @@ export const PromptInputSelectValue = ({
 
 export type PromptInputHoverCardProps = ComponentProps<typeof HoverCard>;
 
-export const PromptInputHoverCard = ({
-  openDelay = 0,
-  closeDelay = 0,
-  ...props
-}: PromptInputHoverCardProps) => (
-  <HoverCard closeDelay={closeDelay} openDelay={openDelay} {...props} />
+export const PromptInputHoverCard = (props: PromptInputHoverCardProps) => (
+  <HoverCard {...props} />
 );
 
 export type PromptInputHoverCardTriggerProps = ComponentProps<
   typeof HoverCardTrigger
 >;
 
-export const PromptInputHoverCardTrigger = (
-  props: PromptInputHoverCardTriggerProps
-) => <HoverCardTrigger {...props} />;
+// Base UI carries the hover delays on Trigger (Root has none, and its default
+// is 600ms); 0/0 preserves the instant show/hide these had under Radix.
+export const PromptInputHoverCardTrigger = ({
+  delay = 0,
+  closeDelay = 0,
+  ...props
+}: PromptInputHoverCardTriggerProps) => (
+  <HoverCardTrigger closeDelay={closeDelay} delay={delay} {...props} />
+);
 
 export type PromptInputHoverCardContentProps = ComponentProps<
   typeof HoverCardContent

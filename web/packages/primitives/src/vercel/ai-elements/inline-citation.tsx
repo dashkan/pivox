@@ -50,7 +50,7 @@ export const InlineCitationText = ({
 export type InlineCitationCardProps = ComponentProps<typeof HoverCard>;
 
 export const InlineCitationCard = (props: InlineCitationCardProps) => (
-  <HoverCard closeDelay={0} openDelay={0} {...props} />
+  <HoverCard {...props} />
 );
 
 export type InlineCitationCardTriggerProps = ComponentProps<typeof Badge> & {
@@ -62,8 +62,8 @@ export const InlineCitationCardTrigger = ({
   className,
   ...props
 }: InlineCitationCardTriggerProps) => (
-  <HoverCardTrigger asChild>
-    <Badge
+  // Delays live on Trigger in Base UI; 0/0 keeps the instant open/close.
+  <HoverCardTrigger closeDelay={0} delay={0} render={<Badge
       className={cn("ms-1 rounded-full", className)}
       variant="secondary"
       {...props}
@@ -76,8 +76,7 @@ export const InlineCitationCardTrigger = ({
       ) : (
         "unknown"
       )}
-    </Badge>
-  </HoverCardTrigger>
+    </Badge>} />
 );
 
 export type InlineCitationCardBodyProps = ComponentProps<"div">;

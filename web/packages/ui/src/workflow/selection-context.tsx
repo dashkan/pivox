@@ -13,14 +13,20 @@ type SelectionContextValue = {
   select: (nodeId: string | undefined) => void;
 };
 
-const SelectionContext = createContext<SelectionContextValue | undefined>(undefined);
+const SelectionContext = createContext<SelectionContextValue | undefined>(
+  undefined,
+);
 
 export type SelectionProviderProps = {
   children: ReactNode;
 };
 
-export function SelectionProvider({ children }: SelectionProviderProps): ReactNode {
-  const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
+export function SelectionProvider({
+  children,
+}: SelectionProviderProps): ReactNode {
+  const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(
+    undefined,
+  );
   const value = useMemo<SelectionContextValue>(
     () => ({ selectedNodeId, select: setSelectedNodeId }),
     [selectedNodeId],

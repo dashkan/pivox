@@ -7,7 +7,7 @@ import {
 } from "@/shadcn/components/ui/collapsible";
 import { cn } from "@/shadcn/lib/utils";
 import { ChevronDownIcon, SearchIcon } from "lucide-react";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactElement } from "react";
 
 export type TaskItemFileProps = ComponentProps<"div">;
 
@@ -55,15 +55,13 @@ export const TaskTrigger = ({
   title,
   ...props
 }: TaskTriggerProps) => (
-  <CollapsibleTrigger asChild className={cn("group", className)} {...props}>
-    {children ?? (
+  <CollapsibleTrigger render={(children as ReactElement | undefined) ?? (
       <div className="flex w-full cursor-pointer items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground">
         <SearchIcon className="size-4" />
         <p className="text-sm">{title}</p>
-        <ChevronDownIcon className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+        <ChevronDownIcon className="size-4 transition-transform group-data-open:rotate-180" />
       </div>
-    )}
-  </CollapsibleTrigger>
+    )} className={cn("group", className)} {...props} />
 );
 
 export type TaskContentProps = ComponentProps<typeof CollapsibleContent>;
@@ -75,7 +73,7 @@ export const TaskContent = ({
 }: TaskContentProps) => (
   <CollapsibleContent
     className={cn(
-      "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
+      "data-closed:fade-out-0 data-closed:slide-out-to-top-2 data-open:slide-in-from-top-2 text-popover-foreground outline-none data-closed:animate-out data-open:animate-in",
       className
     )}
     {...props}

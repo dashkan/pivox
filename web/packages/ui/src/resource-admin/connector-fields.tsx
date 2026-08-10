@@ -187,7 +187,11 @@ export function ConnectorEditFields() {
       <Field>
         <FieldLabel>Scope</FieldLabel>
         {/* Immutable — a connector can't move between org and space. */}
-        <Input value={spaceLabel(record?.name, spaceOptions)} readOnly disabled />
+        <Input
+          value={spaceLabel(record?.name, spaceOptions)}
+          readOnly
+          disabled
+        />
       </Field>
       <ConnectorConfigFields />
     </>

@@ -68,9 +68,7 @@ function ResourceListProvider<Row, Extras>({
 }) {
   // eslint-disable-next-line typescript/no-unsafe-type-assertion -- widen the consumer's typed value to the unknown-rowed context (React context is invariant); useResourceListContext<Row, Extras> re-narrows. The DI boundary needs this cast.
   const injected = value as ResourceListContextValue<unknown, unknown>;
-  return (
-    <ResourceListContext value={injected}>{children}</ResourceListContext>
-  );
+  return <ResourceListContext value={injected}>{children}</ResourceListContext>;
 }
 
 /**

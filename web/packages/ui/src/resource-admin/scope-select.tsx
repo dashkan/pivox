@@ -19,8 +19,6 @@ export function ScopeSelect({
   allLabel,
   placeholder,
   disabled,
-  container,
-  collisionBoundary,
 }: {
   value: string;
   spaces: SpaceOption[];
@@ -29,9 +27,7 @@ export function ScopeSelect({
   placeholder?: string;
   disabled?: boolean;
   /** Portal target for the popup; pass the dialog's content when used in a modal. */
-  container?: React.RefObject<HTMLElement | null>;
   /** Flip/shift boundary; pass the dialog element when used in a modal. */
-  collisionBoundary?: Element | null;
 }) {
   const options: ComboOption[] = spaces.map((space) => ({
     value: space.slug,
@@ -47,8 +43,6 @@ export function ScopeSelect({
       placeholder={placeholder ?? allLabel}
       emptyText="No spaces found"
       disabled={disabled}
-      container={container}
-      collisionBoundary={collisionBoundary}
     />
   );
 }

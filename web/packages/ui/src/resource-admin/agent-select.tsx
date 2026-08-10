@@ -14,23 +14,18 @@ function agentLeaf(name: string): string {
 /**
  * "Run on Agent" picker (combobox with typeahead + clear). Empty value (`''`)
  * runs the connector in the cloud — the resting/placeholder state; a non-empty
- * value is an agent resource name. Clearing returns to cloud. `container`
- * portals the popup into the dialog mount node (see the connectors form).
+ * value is an agent resource name. Clearing returns to cloud.
  */
 export function AgentSelect({
   value,
   options,
   onChange,
   disabled,
-  container,
-  collisionBoundary,
 }: {
   value: string;
   options: AgentOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
-  container?: React.RefObject<HTMLElement | null>;
-  collisionBoundary?: Element | null;
 }) {
   // An editing connector's current agent must stay selectable even if it's no
   // longer in the fetched list.
@@ -56,8 +51,6 @@ export function AgentSelect({
       }
       emptyText="No agents found"
       disabled={disabled}
-      container={container}
-      collisionBoundary={collisionBoundary}
     />
   );
 }

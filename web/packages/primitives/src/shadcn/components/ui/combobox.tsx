@@ -1,3 +1,5 @@
+"use client"
+
 import * as React from "react"
 import { Combobox as ComboboxPrimitive } from "@base-ui/react"
 
@@ -69,13 +71,11 @@ function ComboboxInput({
           <InputGroupButton
             size="icon-xs"
             variant="ghost"
-            asChild
+            render={<ComboboxTrigger />}
             data-slot="input-group-button"
             className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent"
             disabled={disabled}
-          >
-            <ComboboxTrigger />
-          </InputGroupButton>
+          />
         )}
         {showClear && <ComboboxClear disabled={disabled} />}
       </InputGroupAddon>
@@ -91,36 +91,20 @@ function ComboboxContent({
   align = "start",
   alignOffset = 0,
   anchor,
-  container,
-  positionMethod,
-  collisionBoundary,
   ...props
 }: ComboboxPrimitive.Popup.Props &
   Pick<
     ComboboxPrimitive.Positioner.Props,
-    | "side"
-    | "align"
-    | "sideOffset"
-    | "alignOffset"
-    | "anchor"
-    | "positionMethod"
-    | "collisionBoundary"
-  > &
-  Pick<ComboboxPrimitive.Portal.Props, "container">) {
+    "side" | "align" | "sideOffset" | "alignOffset" | "anchor"
+  >) {
   return (
-    <ComboboxPrimitive.Portal container={container}>
+    <ComboboxPrimitive.Portal>
       <ComboboxPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
-        collisionBoundary={collisionBoundary}
-        // When portaled into a container (e.g. a modal dialog), float via
-        // `position: fixed` so the popup overlays instead of joining the
-        // container's flow (which would push/grow/flicker the dialog). The
-        // default body portal keeps `absolute`, so filter comboboxes are unchanged.
-        positionMethod={positionMethod ?? (container ? "fixed" : undefined)}
         className="isolate z-50"
       >
         <ComboboxPrimitive.Popup

@@ -117,7 +117,8 @@ function AttributeField({
         form={form}
         t={t}
       />
-      {error && <FieldError>{error}</FieldError>}
+      {/* react-hook-form widened message to string | FieldError for nested errors. */}
+      {typeof error === 'string' && <FieldError>{error}</FieldError>}
     </Field>
   );
 }

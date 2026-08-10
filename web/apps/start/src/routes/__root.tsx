@@ -55,7 +55,7 @@ function RootComponent() {
     // TooltipProvider at the root so Radix Tooltip consumers
     // (currently SidebarMenuButton's tooltip prop in @pivox/ui/
     // app-shell, anywhere else later) find an ancestor context.
-    // delayDuration={0} matches shadcn's recommended sidebar shape —
+    // delay={0} matches shadcn's recommended sidebar shape —
     // the icon-collapsed sidebar relies on instant tooltips to be
     // navigable; the default 700ms feels broken.
     //
@@ -63,7 +63,7 @@ function RootComponent() {
     // resolved server-side by the `_app` (and `/auth/create-org`)
     // gates, which wrap their subtree in `KeycloakAuthProvider`. The
     // root has no auth SDK and no client session to manage.
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider delay={0}>
       <Outlet />
     </TooltipProvider>
   );

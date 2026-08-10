@@ -26,7 +26,8 @@ function valuesEqual(a: SecretFormValues, b: SecretFormValues): boolean {
   }
   return a.annotations.every(
     (row, i) =>
-      row.key === b.annotations[i]?.key && row.value === b.annotations[i]?.value,
+      row.key === b.annotations[i]?.key &&
+      row.value === b.annotations[i]?.value,
   );
 }
 

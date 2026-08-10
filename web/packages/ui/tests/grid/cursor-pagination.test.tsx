@@ -38,10 +38,14 @@ describe('PageSizeSelect', () => {
   it('reports a new page size through onPageSizeChange', () => {
     const onPageSizeChange = vi.fn();
     renderSelect({ onPageSizeChange });
-    // Radix mirrors options into a hidden native select for a11y/forms.
-    const native = document.querySelector('select');
-    expect(native).not.toBeNull();
-    fireEvent.change(native as HTMLSelectElement, { target: { value: '100' } });
+    // Drive the real control rather than a library internal: Radix mirrored
+    // options into a hidden native <select>, Base UI does not.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Rows per page' }));
+    const option = screen.getByRole('option', { name: '100' });
+    // Base UI commits on the pointer sequence, not a bare click.
+    fireEvent.pointerDown(option);
+    fireEvent.pointerUp(option);
+    fireEvent.click(option);
     expect(onPageSizeChange).toHaveBeenCalledWith(100);
   });
 });

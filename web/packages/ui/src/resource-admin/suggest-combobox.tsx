@@ -50,8 +50,6 @@ export function SuggestCombobox({
   ariaLabel,
   emptyText = 'No matches',
   disabled,
-  container,
-  collisionBoundary,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -60,8 +58,6 @@ export function SuggestCombobox({
   ariaLabel?: string;
   emptyText?: string;
   disabled?: boolean;
-  container?: React.RefObject<HTMLElement | null>;
-  collisionBoundary?: Element | null;
 }) {
   // Displayed input text. Independent of the filter query: it holds the
   // committed value on open and is only replaced as the user types.
@@ -83,7 +79,9 @@ export function SuggestCombobox({
 
   const q = inputValue.trim();
   const modified = q.toLowerCase() !== value.trim().toLowerCase();
-  const exact = base.some((item) => item.value.toLowerCase() === q.toLowerCase());
+  const exact = base.some(
+    (item) => item.value.toLowerCase() === q.toLowerCase(),
+  );
   // Transient custom-value item: only while typing a non-empty, non-matching
   // value distinct from the committed one. Rendered like a suggestion so a typed
   // value doesn't look out of place next to the named headers.
@@ -111,7 +109,10 @@ export function SuggestCombobox({
           justSelected.current = false; // selection already committed
           return;
         }
-        if (details.reason === 'escape-key' || details.reason === 'cancel-open') {
+        if (
+          details.reason === 'escape-key' ||
+          details.reason === 'cancel-open'
+        ) {
           setInputValue(value); // cancelled — restore, don't commit
           return;
         }
@@ -143,11 +144,7 @@ export function SuggestCombobox({
         disabled={disabled}
       />
       {/* Widen the POPUP (not the trigger) so names + descriptions read on one line. */}
-      <ComboboxContent
-        container={container}
-        collisionBoundary={collisionBoundary ?? undefined}
-        className="min-w-72"
-      >
+      <ComboboxContent className="min-w-72">
         <ComboboxEmpty>{emptyText}</ComboboxEmpty>
         <ComboboxList>
           {(item: Item) => (

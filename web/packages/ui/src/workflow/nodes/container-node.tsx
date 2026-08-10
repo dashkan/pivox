@@ -1,5 +1,11 @@
 import { cn } from '@pivox/primitives/utils';
-import { Handle, type Node as FlowNode, type NodeProps, type NodeTypes, Position } from '@xyflow/react';
+import {
+  Handle,
+  type Node as FlowNode,
+  type NodeProps,
+  type NodeTypes,
+  Position,
+} from '@xyflow/react';
 import { GitBranch, ShieldAlert, Split, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -13,7 +19,10 @@ import { useSelection } from '../selection-context';
 // one. The header bar is exactly HEADER_ROW tall — matching the elk top padding
 // so the first region child clears it.
 
-type ContainerNodeType<K extends ContainerNodeData['kind']> = FlowNode<ContainerNodeData, K>;
+type ContainerNodeType<K extends ContainerNodeData['kind']> = FlowNode<
+  ContainerNodeData,
+  K
+>;
 
 type ContainerShellProps = {
   id: string;
@@ -23,7 +32,13 @@ type ContainerShellProps = {
   className?: string;
 };
 
-function ContainerShell({ id, icon: Icon, label, badge, className }: ContainerShellProps): ReactNode {
+function ContainerShell({
+  id,
+  icon: Icon,
+  label,
+  badge,
+  className,
+}: ContainerShellProps): ReactNode {
   const { selectedNodeId } = useSelection();
   const selected = selectedNodeId === id;
   return (
@@ -52,15 +67,22 @@ function ContainerShell({ id, icon: Icon, label, badge, className }: ContainerSh
   );
 }
 
-export function ConditionNode({ id }: NodeProps<ContainerNodeType<'condition'>>): ReactNode {
+export function ConditionNode({
+  id,
+}: NodeProps<ContainerNodeType<'condition'>>): ReactNode {
   return <ContainerShell id={id} icon={GitBranch} label="Condition" />;
 }
 
-export function ParallelNode({ id }: NodeProps<ContainerNodeType<'parallel'>>): ReactNode {
+export function ParallelNode({
+  id,
+}: NodeProps<ContainerNodeType<'parallel'>>): ReactNode {
   return <ContainerShell id={id} icon={Split} label="Parallel" />;
 }
 
-export function TryNode({ id, data }: NodeProps<ContainerNodeType<'try'>>): ReactNode {
+export function TryNode({
+  id,
+  data,
+}: NodeProps<ContainerNodeType<'try'>>): ReactNode {
   return (
     <ContainerShell
       id={id}

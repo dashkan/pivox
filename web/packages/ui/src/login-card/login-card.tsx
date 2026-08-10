@@ -219,7 +219,7 @@ function LoginCardRememberMe({ className }: { className?: string }) {
         // use the indeterminate tri-state for this control, so collapse
         // anything non-true to false.
         onCheckedChange={(next) => {
-          actions.setRememberEmail(next === true);
+          actions.setRememberEmail(next);
         }}
       />
       <Label

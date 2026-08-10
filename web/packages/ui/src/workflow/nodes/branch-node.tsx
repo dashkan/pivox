@@ -10,7 +10,10 @@ import { CONTENT_PAD, LABEL_ROW } from '../grid';
 // The label strip is exactly LABEL_ROW tall — matching the elk top padding so
 // the first child clears it.
 
-type RegionNodeType<K extends RegionNodeData['kind']> = FlowNode<RegionNodeData, K>;
+type RegionNodeType<K extends RegionNodeData['kind']> = FlowNode<
+  RegionNodeData,
+  K
+>;
 
 type RegionShellProps = {
   label: string;
@@ -29,33 +32,47 @@ function RegionShell({ label, className }: RegionShellProps): ReactNode {
         className="absolute top-0 left-0 flex w-full items-center"
         style={{ height: LABEL_ROW, paddingInline: CONTENT_PAD }}
       >
-        <span className="truncate text-xs font-medium text-muted-foreground">{label}</span>
+        <span className="truncate text-xs font-medium text-muted-foreground">
+          {label}
+        </span>
       </div>
     </div>
   );
 }
 
-export function BranchRegionNode({ data }: NodeProps<RegionNodeType<'branch'>>): ReactNode {
+export function BranchRegionNode({
+  data,
+}: NodeProps<RegionNodeType<'branch'>>): ReactNode {
   return <RegionShell label={data.when ? `when ${data.when}` : 'when'} />;
 }
 
-export function OtherwiseRegionNode(_: NodeProps<RegionNodeType<'otherwise'>>): ReactNode {
+export function OtherwiseRegionNode(
+  _: NodeProps<RegionNodeType<'otherwise'>>,
+): ReactNode {
   return <RegionShell label="else" />;
 }
 
-export function LaneRegionNode(_: NodeProps<RegionNodeType<'lane'>>): ReactNode {
+export function LaneRegionNode(
+  _: NodeProps<RegionNodeType<'lane'>>,
+): ReactNode {
   return <RegionShell label="lane" />;
 }
 
-export function TryBodyRegionNode(_: NodeProps<RegionNodeType<'try-body'>>): ReactNode {
+export function TryBodyRegionNode(
+  _: NodeProps<RegionNodeType<'try-body'>>,
+): ReactNode {
   return <RegionShell label="try" />;
 }
 
-export function TryCatchRegionNode(_: NodeProps<RegionNodeType<'try-catch'>>): ReactNode {
+export function TryCatchRegionNode(
+  _: NodeProps<RegionNodeType<'try-catch'>>,
+): ReactNode {
   return <RegionShell label="catch" />;
 }
 
-export function ErrorRegionNode(_: NodeProps<RegionNodeType<'error'>>): ReactNode {
+export function ErrorRegionNode(
+  _: NodeProps<RegionNodeType<'error'>>,
+): ReactNode {
   return (
     <RegionShell
       label="on error"

@@ -88,18 +88,22 @@ function UserProfileCardRoot({
   return (
     <Dialog
       open={open}
-      onOpenChange={(value) => {
+      onOpenChange={(value, details) => {
+        // Escape inside an inline edit cancels that edit, not the dialog.
+        // Base UI replaces Radix's onEscapeKeyDown with a cancelable reason.
+        if (
+          details.reason === 'escape-key' &&
+          document.activeElement?.closest('[data-inline-edit]')
+        ) {
+          details.cancel();
+          return;
+        }
         actions.clearStatus();
         onOpenChange(value);
       }}
     >
       <DialogContent
         className={cn('sm:max-w-3xl gap-0 overflow-hidden p-0', className)}
-        onEscapeKeyDown={(e) => {
-          if (document.activeElement?.closest('[data-inline-edit]')) {
-            e.preventDefault();
-          }
-        }}
       >
         <DialogTitle className="sr-only">Profile settings</DialogTitle>
         <DialogDescription className="sr-only">
@@ -244,18 +248,20 @@ function ProfileSubsection() {
       <h3 className="mb-3 text-sm font-medium">Profile</h3>
       <div className="flex items-center gap-4">
         <Popover open={avatarOpen} onOpenChange={setAvatarOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" className="group relative rounded-full">
-              <UserAvatar
-                src={state.photoURL}
-                name={state.displayName}
-                size="lg"
-              />
-              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                <CameraIcon />
-              </div>
-            </button>
-          </PopoverTrigger>
+          <PopoverTrigger
+            render={
+              <button type="button" className="group relative rounded-full">
+                <UserAvatar
+                  src={state.photoURL}
+                  name={state.displayName}
+                  size="lg"
+                />
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                  <CameraIcon />
+                </div>
+              </button>
+            }
+          />
           <PopoverContent align="start" className="w-56 p-2">
             <div className="flex flex-col gap-1">
               {providerPhotos.map((p) => {

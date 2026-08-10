@@ -12,7 +12,8 @@ import {
 import type { ComponentProps, ReactNode } from 'react';
 
 /** The run/step lifecycle states surfaced in the UI (`STATE_UNSPECIFIED` excluded). */
-export type RunState = 'PENDING' | 'RUNNING' | 'WAITING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+export type RunState =
+  'PENDING' | 'RUNNING' | 'WAITING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
 
 type BadgeVariant = ComponentProps<typeof Badge>['variant'];
 

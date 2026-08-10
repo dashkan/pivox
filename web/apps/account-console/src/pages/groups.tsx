@@ -69,7 +69,7 @@ export function Groups() {
               <Checkbox
                 checked={directOnly}
                 onCheckedChange={(c) => {
-                  setDirectOnly(c === true);
+                  setDirectOnly(c);
                 }}
               />
               {t("directMembership")}

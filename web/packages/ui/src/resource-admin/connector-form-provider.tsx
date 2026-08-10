@@ -35,7 +35,8 @@ function valuesEqual(a: ConnectorFormValues, b: ConnectorFormValues): boolean {
     return false;
   }
   return a.headers.every(
-    (row, i) => row.key === b.headers[i]?.key && row.value === b.headers[i]?.value,
+    (row, i) =>
+      row.key === b.headers[i]?.key && row.value === b.headers[i]?.value,
   );
 }
 
@@ -98,7 +99,9 @@ export function ConnectorFormProvider({
   );
   // Stable seed for this mount (remounted by key across edit records), so the
   // dirty check compares against the record the form opened on.
-  const [initial] = useState<ConnectorFormValues>(() => seedConnectorValues(record));
+  const [initial] = useState<ConnectorFormValues>(() =>
+    seedConnectorValues(record),
+  );
   // HTTP is the only config today; edit keeps the existing type.
   const [type, setType] = useState<ConnectorType>('http');
 
@@ -149,7 +152,16 @@ export function ConnectorFormProvider({
   );
 
   const connectorFormValue = useMemo(
-    () => ({ mode, values, patch, type, setType, spaceOptions, agentOptions, record }),
+    () => ({
+      mode,
+      values,
+      patch,
+      type,
+      setType,
+      spaceOptions,
+      agentOptions,
+      record,
+    }),
     [mode, values, patch, type, spaceOptions, agentOptions, record],
   );
 

@@ -94,71 +94,7 @@ describe('ScopeSelect — filter (no placeholder)', () => {
   });
 });
 
-describe('ScopeSelect — popup portal container (dialog pointer-lock fix)', () => {
-  it('portals the popup into the provided container', () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    render(
-      <ScopeSelect
-        value=""
-        spaces={spaces}
-        onChange={vi.fn()}
-        allLabel="All spaces"
-        container={{ current: container }}
-      />,
-    );
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
-    expect(container.contains(screen.getByText('Main'))).toBe(true);
-  });
-
-  it('portals to body by default (filter path unchanged)', () => {
-    const outside = document.createElement('div');
-    document.body.appendChild(outside);
-    render(
-      <ScopeSelect
-        value=""
-        spaces={spaces}
-        onChange={vi.fn()}
-        allLabel="All spaces"
-      />,
-    );
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
-    const option = screen.getByText('Main');
-    expect(outside.contains(option)).toBe(false);
-    expect(document.body.contains(option)).toBe(true);
-  });
-
-  // The Positioner (className "isolate z-50") is the floating wrapper.
-  const positioner = () =>
-    document.querySelector('.isolate.z-50') as HTMLElement;
-
-  it('floats as a fixed overlay when a container is set (no dialog reflow)', () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    render(
-      <ScopeSelect
-        value=""
-        spaces={spaces}
-        onChange={vi.fn()}
-        allLabel="All spaces"
-        container={{ current: container }}
-      />,
-    );
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
-    // position: fixed → out of flow, cannot push/grow the dialog it overlays.
-    expect(positioner().style.position).toBe('fixed');
-  });
-
-  it('keeps the default absolute strategy without a container (filter unchanged)', () => {
-    render(
-      <ScopeSelect
-        value=""
-        spaces={spaces}
-        onChange={vi.fn()}
-        allLabel="All spaces"
-      />,
-    );
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
-    expect(positioner().style.position).toBe('absolute');
-  });
-});
+// The popup-portal-container tests lived here. They covered `container` /
+// `positionMethod`, which existed only to escape Radix Dialog's body-level
+// pointer-lock. Base UI scopes modality to an internal backdrop, so that
+// plumbing was removed from ScopeSelect and these tests with it.

@@ -1,4 +1,10 @@
-import { Handle, type Node as FlowNode, type NodeProps, type NodeTypes, Position } from '@xyflow/react';
+import {
+  Handle,
+  type Node as FlowNode,
+  type NodeProps,
+  type NodeTypes,
+  Position,
+} from '@xyflow/react';
 import { Play } from 'lucide-react';
 import type { ReactNode } from 'react';
 

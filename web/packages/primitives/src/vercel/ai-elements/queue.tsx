@@ -212,8 +212,7 @@ export const QueueSectionTrigger = ({
   className,
   ...props
 }: QueueSectionTriggerProps) => (
-  <CollapsibleTrigger asChild>
-    <button
+  <CollapsibleTrigger render={<button
       className={cn(
         "group flex w-full items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-start font-medium text-muted-foreground text-sm transition-colors hover:bg-muted",
         className
@@ -222,8 +221,7 @@ export const QueueSectionTrigger = ({
       {...props}
     >
       {children}
-    </button>
-  </CollapsibleTrigger>
+    </button>} />
 );
 
 // QueueSectionLabel - label content with icon and count
@@ -241,7 +239,7 @@ export const QueueSectionLabel = ({
   ...props
 }: QueueSectionLabelProps) => (
   <span className={cn("flex items-center gap-2", className)} {...props}>
-    <ChevronDownIcon className="size-4 transition-transform group-data-[state=closed]:-rotate-90" />
+    <ChevronDownIcon className="size-4 transition-transform group-data-closed:-rotate-90" />
     {icon}
     <span>
       {count} {label}

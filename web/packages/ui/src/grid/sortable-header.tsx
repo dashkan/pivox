@@ -48,7 +48,9 @@ export function SortableHeader({
       >
         {children}
         <Icon
-          className={direction ? 'size-3.5' : 'size-3.5 text-muted-foreground/50'}
+          className={
+            direction ? 'size-3.5' : 'size-3.5 text-muted-foreground/50'
+          }
         />
       </button>
     </TableHead>

@@ -1,15 +1,34 @@
 import { Node } from '@pivox/primitives/node';
 import { cn } from '@pivox/primitives/utils';
-import { Handle, type Node as FlowNode, type NodeProps, type NodeTypes, Position } from '@xyflow/react';
-import { CircleStop, Globe, OctagonAlert, Variable, Workflow, type LucideIcon } from 'lucide-react';
+import {
+  Handle,
+  type Node as FlowNode,
+  type NodeProps,
+  type NodeTypes,
+  Position,
+} from '@xyflow/react';
+import {
+  CircleStop,
+  Globe,
+  OctagonAlert,
+  Variable,
+  Workflow,
+  type LucideIcon,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import type { ActivityNodeData } from '../graph-types';
 import { CONTENT_PAD, CONTENT_ROW, HEADER_ROW } from '../grid';
 import { useSelection } from '../selection-context';
 
-type ActivityData<K extends ActivityNodeData['kind']> = Extract<ActivityNodeData, { kind: K }>;
-type ActivityNodeType<K extends ActivityNodeData['kind']> = FlowNode<ActivityData<K>, K>;
+type ActivityData<K extends ActivityNodeData['kind']> = Extract<
+  ActivityNodeData,
+  { kind: K }
+>;
+type ActivityNodeType<K extends ActivityNodeData['kind']> = FlowNode<
+  ActivityData<K>,
+  K
+>;
 
 type ActivityShellProps = {
   id: string;
@@ -24,13 +43,21 @@ type ActivityShellProps = {
 // construction and matches the size the transform feeds elk. The shared Node
 // primitive hardwires Left/Right handles and `!`-important padding, so its
 // chrome is bypassed for full grid control; handles are Top(target)/Bottom(source).
-function ActivityShell({ id, icon: Icon, label, summary }: ActivityShellProps): ReactNode {
+function ActivityShell({
+  id,
+  icon: Icon,
+  label,
+  summary,
+}: ActivityShellProps): ReactNode {
   const { selectedNodeId } = useSelection();
   const selected = selectedNodeId === id;
   return (
     <Node
       handles={{ target: false, source: false }}
-      className={cn('h-full! w-full! gap-0 overflow-hidden p-0', selected && 'ring-2 ring-ring')}
+      className={cn(
+        'h-full! w-full! gap-0 overflow-hidden p-0',
+        selected && 'ring-2 ring-ring',
+      )}
     >
       <Handle position={Position.Top} type="target" />
       <div
@@ -41,8 +68,13 @@ function ActivityShell({ id, icon: Icon, label, summary }: ActivityShellProps): 
         <span className="truncate text-sm font-medium">{label}</span>
       </div>
       {summary !== undefined ? (
-        <div className="flex items-center" style={{ height: CONTENT_ROW, paddingInline: CONTENT_PAD }}>
-          <p className="truncate font-mono text-xs text-muted-foreground">{summary}</p>
+        <div
+          className="flex items-center"
+          style={{ height: CONTENT_ROW, paddingInline: CONTENT_PAD }}
+        >
+          <p className="truncate font-mono text-xs text-muted-foreground">
+            {summary}
+          </p>
         </div>
       ) : null}
       <Handle position={Position.Bottom} type="source" />
@@ -56,23 +88,59 @@ const httpSummary = (config: ActivityData<'http'>['config']): string =>
 const setSummary = (config: ActivityData<'set'>['config']): string =>
   Object.keys(config.assignments).join(', ');
 
-export function HttpNode({ id, data }: NodeProps<ActivityNodeType<'http'>>): ReactNode {
-  return <ActivityShell id={id} icon={Globe} label="HTTP" summary={httpSummary(data.config)} />;
-}
-
-export function SetNode({ id, data }: NodeProps<ActivityNodeType<'set'>>): ReactNode {
-  return <ActivityShell id={id} icon={Variable} label="Set" summary={setSummary(data.config)} />;
-}
-
-export function RunWorkflowNode({ id, data }: NodeProps<ActivityNodeType<'run_workflow'>>): ReactNode {
+export function HttpNode({
+  id,
+  data,
+}: NodeProps<ActivityNodeType<'http'>>): ReactNode {
   return (
-    <ActivityShell id={id} icon={Workflow} label="Run workflow" summary={data.config.workflow} />
+    <ActivityShell
+      id={id}
+      icon={Globe}
+      label="HTTP"
+      summary={httpSummary(data.config)}
+    />
   );
 }
 
-export function FailNode({ id, data }: NodeProps<ActivityNodeType<'fail'>>): ReactNode {
+export function SetNode({
+  id,
+  data,
+}: NodeProps<ActivityNodeType<'set'>>): ReactNode {
   return (
-    <ActivityShell id={id} icon={OctagonAlert} label="Fail" summary={data.config.message} />
+    <ActivityShell
+      id={id}
+      icon={Variable}
+      label="Set"
+      summary={setSummary(data.config)}
+    />
+  );
+}
+
+export function RunWorkflowNode({
+  id,
+  data,
+}: NodeProps<ActivityNodeType<'run_workflow'>>): ReactNode {
+  return (
+    <ActivityShell
+      id={id}
+      icon={Workflow}
+      label="Run workflow"
+      summary={data.config.workflow}
+    />
+  );
+}
+
+export function FailNode({
+  id,
+  data,
+}: NodeProps<ActivityNodeType<'fail'>>): ReactNode {
+  return (
+    <ActivityShell
+      id={id}
+      icon={OctagonAlert}
+      label="Fail"
+      summary={data.config.message}
+    />
   );
 }
 

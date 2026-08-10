@@ -34,9 +34,9 @@ function RootComponent() {
     // TooltipProvider at the root so Radix Tooltip consumers
     // (currently SidebarMenuButton's tooltip prop in @pivox/ui/
     // app-shell, anywhere else later) find an ancestor context.
-    // delayDuration={0} matches shadcn's recommended sidebar shape.
+    // delay={0} matches shadcn's recommended sidebar shape.
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={0}>
+      <TooltipProvider delay={0}>
         {/* Clear the outgoing user's state on sign-out so the next user
             doesn't inherit the selected org / cached org-list. No server
             session here (electron has no cookie) — just the client caches:
