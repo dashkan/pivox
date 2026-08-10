@@ -31,6 +31,10 @@
       "types": "./dist/esm/shadcn/components/ui/aspect-ratio.d.ts",
       "import": "./dist/esm/shadcn/components/ui/aspect-ratio.js"
     },
+    "./attachment": {
+      "types": "./dist/esm/shadcn/components/ui/attachment.d.ts",
+      "import": "./dist/esm/shadcn/components/ui/attachment.js"
+    },
     "./attachments": {
       "types": "./dist/esm/vercel/ai-elements/attachments.d.ts",
       "import": "./dist/esm/vercel/ai-elements/attachments.js"
@@ -50,6 +54,10 @@
     "./breadcrumb": {
       "types": "./dist/esm/shadcn/components/ui/breadcrumb.d.ts",
       "import": "./dist/esm/shadcn/components/ui/breadcrumb.js"
+    },
+    "./bubble": {
+      "types": "./dist/esm/shadcn/components/ui/bubble.d.ts",
+      "import": "./dist/esm/shadcn/components/ui/bubble.js"
     },
     "./button": {
       "types": "./dist/esm/shadcn/components/ui/button.d.ts",
@@ -211,6 +219,10 @@
       "types": "./dist/esm/shadcn/components/ui/label.d.ts",
       "import": "./dist/esm/shadcn/components/ui/label.js"
     },
+    "./marker": {
+      "types": "./dist/esm/shadcn/components/ui/marker.d.ts",
+      "import": "./dist/esm/shadcn/components/ui/marker.js"
+    },
     "./menubar": {
       "types": "./dist/esm/shadcn/components/ui/menubar.d.ts",
       "import": "./dist/esm/shadcn/components/ui/menubar.js"
@@ -218,6 +230,10 @@
     "./message": {
       "types": "./dist/esm/vercel/ai-elements/message.d.ts",
       "import": "./dist/esm/vercel/ai-elements/message.js"
+    },
+    "./message-scroller": {
+      "types": "./dist/esm/shadcn/components/ui/message-scroller.d.ts",
+      "import": "./dist/esm/shadcn/components/ui/message-scroller.js"
     },
     "./mic-selector": {
       "types": "./dist/esm/vercel/ai-elements/mic-selector.d.ts",
@@ -355,6 +371,7 @@
       "types": "./dist/esm/vercel/ai-elements/stack-trace.d.ts",
       "import": "./dist/esm/vercel/ai-elements/stack-trace.js"
     },
+    "./styles.css": "./dist/primitives.css",
     "./suggestion": {
       "types": "./dist/esm/vercel/ai-elements/suggestion.d.ts",
       "import": "./dist/esm/vercel/ai-elements/suggestion.js"
@@ -387,6 +404,7 @@
       "types": "./dist/esm/shadcn/components/ui/textarea.d.ts",
       "import": "./dist/esm/shadcn/components/ui/textarea.js"
     },
+    "./theme.css": "./src/index.css",
     "./toggle": {
       "types": "./dist/esm/shadcn/components/ui/toggle.d.ts",
       "import": "./dist/esm/shadcn/components/ui/toggle.js"
@@ -411,6 +429,10 @@
       "types": "./dist/esm/vercel/ai-elements/transcription.d.ts",
       "import": "./dist/esm/vercel/ai-elements/transcription.js"
     },
+    "./ui-message": {
+      "types": "./dist/esm/shadcn/components/ui/message.d.ts",
+      "import": "./dist/esm/shadcn/components/ui/message.js"
+    },
     "./use-mobile": {
       "types": "./dist/esm/shadcn/hooks/use-mobile.d.ts",
       "import": "./dist/esm/shadcn/hooks/use-mobile.js"
@@ -426,9 +448,7 @@
     "./web-preview": {
       "types": "./dist/esm/vercel/ai-elements/web-preview.d.ts",
       "import": "./dist/esm/vercel/ai-elements/web-preview.js"
-    },
-    "./styles.css": "./dist/primitives.css",
-    "./theme.css": "./src/index.css"
+    }
   },
   "files": [
     "dist",
