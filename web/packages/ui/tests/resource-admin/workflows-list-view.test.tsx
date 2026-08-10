@@ -196,7 +196,9 @@ describe('Workflows list view — list controls', () => {
         target: { value: 'nightly' },
       });
       expect(setFilter).not.toHaveBeenCalled();
-      act(() => vi.advanceTimersByTime(300));
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
       expect(setFilter).toHaveBeenCalledWith('displayName', 'nightly', 'replace');
     } finally {
       vi.useRealTimers();

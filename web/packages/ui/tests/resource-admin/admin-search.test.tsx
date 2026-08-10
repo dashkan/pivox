@@ -30,7 +30,9 @@ describe('AdminSearch', () => {
     expect(box).toHaveProperty('value', 'stripe');
     expect(onChange).not.toHaveBeenCalled();
 
-    act(() => vi.advanceTimersByTime(300));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     // Only the latest value is committed, once.
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith('stripe');
@@ -54,7 +56,9 @@ describe('AdminSearch', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'abc' } });
     rerender(<AdminSearch value="" onChange={onChange} debounceMs={300} />);
 
-    act(() => vi.advanceTimersByTime(300));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     // The stale "abc" timer must NOT re-commit the filter that was just cleared.
     expect(onChange).not.toHaveBeenCalledWith('abc');
     expect(screen.getByRole('searchbox')).toHaveProperty('value', '');

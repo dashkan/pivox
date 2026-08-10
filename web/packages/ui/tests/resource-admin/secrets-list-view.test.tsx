@@ -234,7 +234,9 @@ describe('Secrets list view — list controls', () => {
         target: { value: 'stripe' },
       });
       expect(setFilter).not.toHaveBeenCalled();
-      act(() => vi.advanceTimersByTime(300));
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
       expect(setFilter).toHaveBeenCalledWith('displayName', 'stripe', 'replace');
     } finally {
       vi.useRealTimers();

@@ -73,6 +73,10 @@ function NameFilter() {
   );
 }
 
+// Module scope: `cell` is a render prop, not a component, but defining it
+// inside TestGrid trips react/no-unstable-nested-components.
+const nameCell = (row: Row) => <span>{row.name}</span>;
+
 /** The composed UI under test — the same parts a real consumer would compose. */
 function TestGrid({
   value,
@@ -87,7 +91,7 @@ function TestGrid({
       header: 'Name',
       sortable: true,
       filter,
-      cell: (row) => <span>{row.name}</span>,
+      cell: nameCell,
     },
     { header: 'Size', cellClassName: 'muted', cell: (row) => row.size },
   ];

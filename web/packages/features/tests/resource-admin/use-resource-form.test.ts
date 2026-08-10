@@ -35,7 +35,7 @@ function makeDescriptor(): FormDescriptor<Widget, WidgetValues> {
       lastUseRecordInput = { enabled, id, space };
       return recordResult;
     },
-    save: saveSpy as unknown as FormDescriptor<Widget, WidgetValues>['save'],
+    save: saveSpy,
     remove: removeSpy,
     loadErrorFallback: 'widget load failed',
     saveErrorFallback: 'widget save failed',

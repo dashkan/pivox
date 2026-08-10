@@ -8,7 +8,9 @@ import type { ReactQueryApi } from '@pivox/client/react-query';
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-router')>()),
-  Link: ({ children }: { children: ReactNode }) => <a href="#">{children}</a>,
+  Link: ({ children, to }: { children: ReactNode; to?: string }) => (
+    <a href={to ?? '/'}>{children}</a>
+  ),
 }));
 
 const useWorkflowDefinition = vi.fn();
@@ -55,7 +57,7 @@ describe('WorkflowDetail', () => {
         apiClient={apiClient}
         parent={parent}
         workflowId="ingest"
-        back={<a href="#">← Workflows</a>}
+        back={<a href="/workflows">← Workflows</a>}
       />,
     );
 
@@ -85,7 +87,7 @@ describe('WorkflowDetail', () => {
         apiClient={apiClient}
         parent={parent}
         workflowId="draft"
-        back={<a href="#">← Workflows</a>}
+        back={<a href="/workflows">← Workflows</a>}
       />,
     );
 

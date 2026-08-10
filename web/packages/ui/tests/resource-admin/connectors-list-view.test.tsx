@@ -267,7 +267,9 @@ describe('Connectors list view — list controls', () => {
       });
       // Debounced: no commit until the window elapses.
       expect(setFilter).not.toHaveBeenCalled();
-      act(() => vi.advanceTimersByTime(300));
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
       // Debounced text commits with 'replace' history.
       expect(setFilter).toHaveBeenCalledWith('displayName', 'stripe', 'replace');
     } finally {

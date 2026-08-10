@@ -101,9 +101,7 @@ async function assertReopenShowsFresh(opts: {
 
   await waitFor(() => expect(client.GET).toHaveBeenCalled());
   await waitFor(() =>
-    expect((screen.getByDisplayValue('New name') as HTMLInputElement).value).toBe(
-      'New name',
-    ),
+    expect(screen.getByDisplayValue('New name')).toHaveProperty('value', 'New name'),
   );
   expect(screen.queryByDisplayValue('Old name')).toBeNull();
 }
