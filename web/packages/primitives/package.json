@@ -291,6 +291,10 @@
       "types": "./dist/esm/vercel/ai-elements/prompt-input.d.ts",
       "import": "./dist/esm/vercel/ai-elements/prompt-input.js"
     },
+    "./questionnaire": {
+      "types": "./dist/esm/shadcn/components/ui/questionnaire.d.ts",
+      "import": "./dist/esm/shadcn/components/ui/questionnaire.js"
+    },
     "./queue": {
       "types": "./dist/esm/vercel/ai-elements/queue.d.ts",
       "import": "./dist/esm/vercel/ai-elements/queue.js"
@@ -405,6 +409,10 @@
       "import": "./dist/esm/shadcn/components/ui/textarea.js"
     },
     "./theme.css": "./src/index.css",
+    "./toast": {
+      "types": "./dist/esm/shadcn/components/ui/toast.d.ts",
+      "import": "./dist/esm/shadcn/components/ui/toast.js"
+    },
     "./toggle": {
       "types": "./dist/esm/shadcn/components/ui/toggle.d.ts",
       "import": "./dist/esm/shadcn/components/ui/toggle.js"
@@ -505,7 +513,7 @@
     "react-day-picker": "10.0.1",
     "react-jsx-parser": "2.4.1",
     "react-resizable-panels": "4.12.2",
-    "recharts": "3.10.1",
+    "recharts": "3.8.0",
     "shiki": "4.4.2",
     "sonner": "2.0.8",
     "streamdown": "2.5.0",
